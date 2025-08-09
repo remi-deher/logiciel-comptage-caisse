@@ -1,0 +1,286 @@
+body { 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    margin: 0; 
+    padding: 10px; /* Réduction du padding pour les petits écrans */
+    background-color: #f4f7f9; 
+    color: #333; 
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+.container { 
+    width: 100%;
+    max-width: 1100px; 
+    margin: 0 auto; 
+    background-color: #fff; 
+    padding: 15px; /* Réduction du padding pour les petits écrans */
+    border-radius: 8px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    flex-grow: 1;
+    box-sizing: border-box;
+}
+h2, h3 { 
+    color: #2c3e50; 
+    border-bottom: 2px solid #3498db; 
+    padding-bottom: 10px; 
+}
+.tab-selector { 
+    border-bottom: 2px solid #ccc; 
+    margin-bottom: 20px; 
+    display: flex;
+    flex-wrap: wrap; /* Permet aux onglets de passer à la ligne si pas assez de place */
+}
+.tab-link { 
+    background-color: #f1f1f1; 
+    border: 1px solid #ccc; 
+    border-bottom: none; 
+    padding: 10px 15px; /* Padding réduit pour les onglets */
+    cursor: pointer; 
+    font-size: 1em; /* Taille de police légèrement réduite */
+    border-radius: 5px 5px 0 0; 
+    margin-right: 5px; 
+}
+.tab-link.active { 
+    background-color: #fff; 
+    border-bottom: 2px solid #fff; 
+    margin-bottom: -2px; 
+    font-weight: bold; 
+    color: #3498db; 
+}
+.tab-content { display: none; } 
+.tab-content.active { display: block; }
+
+/* Styles pour l'affichage de l'écart en haut */
+.ecart-display-container {
+    text-align: center;
+}
+.ecart-display {
+    display: none; /* Caché par défaut */
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 2px solid #e9ecef; /* Bordure plus épaisse */
+    border-radius: 8px;
+    font-size: 1.1em; /* Taille de police ajustée */
+    font-weight: bold;
+    transition: background-color 0.3s, border-color 0.3s; /* Belle transition */
+}
+.ecart-display.active {
+    display: block; /* Affiché quand l'onglet est actif */
+}
+.ecart-display .ecart-value {
+    font-size: 1.5em; /* Taille de police ajustée */
+    display: block; /* Pour prendre toute la largeur */
+    margin-bottom: 5px;
+}
+.ecart-explanation {
+    font-size: 0.9em;
+    font-style: italic;
+    font-weight: normal;
+    color: #555;
+    margin-top: 8px;
+    min-height: 1.2em;
+}
+.ecart-explanation-total {
+    font-weight: bold;
+    color: #34495e; /* Couleur foncée pour le total */
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+    font-size: 0.9em;
+    display: none; /* Caché par défaut, affiché par JS */
+}
+
+fieldset { border: none; padding: 0; }
+legend { font-size: 1.5em; font-weight: bold; color: #3498db; padding: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));}
+.form-group { display: flex; flex-direction: column; justify-content: flex-end;}
+.form-group label { font-weight: bold; margin-bottom: 5px; color: #555; display: block; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; }
+.form-group input { text-align: right;}
+.form-group textarea { text-align: left; resize: vertical; }
+.results { margin-top: 40px; }
+.results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.result-box { background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; }
+.combined-results { background-color: #eaf5ff; border: 1px solid #aed6f1; margin-top: 30px; }
+
+/* Codes couleur pour l'écart */
+.ecart-display.ecart-ok { background-color: #eafaf1; border-color: #27ae60; }
+.ecart-display.ecart-ok .ecart-value { color: #27ae60; }
+.ecart-display.ecart-positif { background-color: #fef5e7; border-color: #f39c12; }
+.ecart-display.ecart-positif .ecart-value { color: #f39c12; }
+.ecart-display.ecart-negatif { background-color: #fdedec; border-color: #c0392b; }
+.ecart-display.ecart-negatif .ecart-value { color: #c0392b; }
+.ecart-ok { color: #27ae60; font-weight: bold; }
+.ecart-positif { color: #f39c12; font-weight: bold; }
+.ecart-negatif { color: #c0392b; font-weight: bold; }
+
+.save-section { margin-top: 30px; padding: 20px; background-color: #e8f5e9; border-radius: 8px; }
+.button-group { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+
+/* Styles des boutons */
+.save-btn, .new-btn { 
+    font-size: 1.1em; 
+    color: white;
+    padding: 15px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    text-align: center;
+}
+.save-btn {
+    background-color: #27ae60; /* Vert */
+}
+.new-btn {
+    background-color: #3498db; /* Bleu */
+}
+
+.session-message { padding: 15px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 5px; margin-bottom: 20px; }
+
+/* Styles pour la page d'historique et la liste des admins */
+.filter-form { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 15px; align-items: stretch; }
+.history-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
+.history-table th, .history-table td { padding: 8px; border: 1px solid #ddd; text-align: right; vertical-align: top; }
+.history-table th:first-child, .history-table td:first-child { text-align: left; white-space: normal; }
+.history-table th { background-color: #34495e; color: white; }
+.history-table tr:nth-child(even) { background-color: #f2f2f2; }
+.history-table a { text-decoration: none; padding: 5px 10px; background: #3498db; color: white; border-radius: 3px; }
+.explication-text { color: #555; font-style: italic; font-size: 0.95em; display: block; margin-top: 4px; }
+.action-cell { display: flex; gap: 5px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.delete-btn { background-color: #c0392b; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-family: inherit; font-size: 1em;}
+.delete-btn:hover { background-color: #a93226; }
+
+/* Styles pour la liste des sauvegardes */
+.backup-list {
+    list-style: none;
+    padding: 0;
+}
+.backup-list li {
+    background-color: #f8f9fa;
+    padding: 10px 15px;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.download-link {
+    font-size: 0.9em;
+    font-weight: bold;
+    text-decoration: none;
+    padding: 5px 10px;
+    background: #27ae60;
+    color: white;
+    border-radius: 3px;
+}
+.download-link:hover {
+    background: #229954;
+}
+
+/* Styles pour le footer */
+.main-footer {
+    text-align: center;
+    padding: 20px 0;
+    margin-top: auto; /* Pousse le footer en bas de la page */
+    color: #7f8c8d;
+    font-size: 0.9em;
+}
+.main-footer p {
+    margin: 5px 0;
+}
+.main-footer a {
+    color: #3498db;
+    text-decoration: none;
+    font-weight: bold;
+}
+.main-footer a:hover {
+    text-decoration: underline;
+}
+
+/* Styles pour l'indicateur de statut WebSocket */
+.status-indicator {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 18px;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: white;
+    background-color: #f39c12; /* Orange pour "Connexion..." */
+    transition: background-color 0.5s ease;
+}
+.status-indicator .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: white;
+    margin-right: 8px;
+    animation: pulse 2s infinite;
+}
+.status-indicator.connected {
+    background-color: #27ae60; /* Vert pour "Connecté" */
+}
+.status-indicator.connected .status-dot {
+    animation: none; /* On arrête l'animation quand c'est connecté */
+}
+.status-indicator.disconnected {
+    background-color: #c0392b; /* Rouge pour "Déconnecté" */
+}
+.status-indicator.disconnected .status-dot {
+    animation: none;
+    background-color: #f5c6cb; /* Point plus sombre quand déconnecté */
+}
+@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+/* Styles pour la section Admin */
+.admin-section {
+    margin-top: 20px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+/* Media Queries pour les écrans plus grands (tablettes, ordinateurs) */
+@media (min-width: 768px) {
+    body {
+        padding: 20px;
+    }
+    .container {
+        padding: 30px;
+    }
+    .tab-link {
+        padding: 12px 25px;
+        font-size: 1.1em;
+    }
+    .ecart-display {
+        font-size: 1.2em;
+    }
+    .ecart-display .ecart-value {
+        font-size: 1.6em;
+    }
+    .grid { 
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); 
+        gap: 20px; 
+    }
+    .grid-3 { 
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+    .results-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+    .filter-form {
+        flex-direction: row;
+        align-items: flex-end;
+    }
+    .button-group {
+        flex-direction: row;
+    }
+    .save-btn, .new-btn {
+        font-size: 1.2em;
+    }
+}
