@@ -23,6 +23,9 @@ class AdminController {
                 case 'delete_admin': $this->deleteAdmin(); break;
                 case 'update_password': $this->updateAdminPassword(); break;
                 case 'download_backup': $this->downloadBackup(); break;
+                case 'add_caisse': $this->addCaisse(); break;
+                case 'rename_caisse': $this->renameCaisse(); break;
+                case 'delete_caisse': $this->deleteCaisse(); break;
             }
             header('Location: index.php?page=admin');
             exit;
@@ -35,13 +38,17 @@ class AdminController {
      * Affiche le tableau de bord principal.
      */
     private function dashboard() {
+        global $noms_caisses;
         $backups = $this->getBackups();
         $admins = $this->getAdminsList();
+        $caisses = $noms_caisses;
         $page_css = 'admin.css';
         require __DIR__ . '/../templates/admin.php';
     }
 
-    // ... (login, logout, et autres méthodes restent inchangées)
+    /**
+     * Gère la connexion avec fallback et synchronisation.
+     */
     public function login() {
         if (!empty($_SESSION['is_admin'])) {
             header('Location: index.php?page=admin');
@@ -88,12 +95,21 @@ class AdminController {
         $page_css = 'admin.css';
         require __DIR__ . '/../templates/login.php';
     }
+
+    /**
+     * Gère la déconnexion.
+     */
     public function logout() {
         session_destroy();
         header('Location: index.php?page=login');
         exit;
     }
+
+    /**
+     * Met à jour le fichier de configuration de la BDD.
+     */
     private function updateDbConfig() {
+        global $noms_caisses, $denominations;
         $config_path = __DIR__ . '/../config/config.php';
         
         $new_content = '<?php' . PHP_EOL . PHP_EOL;
@@ -105,8 +121,8 @@ class AdminController {
         $new_content .= "// URL du dépôt Git pour le pied de page" . PHP_EOL;
         $new_content .= "define('GIT_REPO_URL', '" . addslashes(GIT_REPO_URL) . "');" . PHP_EOL . PHP_EOL;
         $new_content .= "// Configuration de l'application" . PHP_EOL;
-        $new_content .= '$noms_caisses = ' . var_export($GLOBALS['noms_caisses'], true) . ';' . PHP_EOL;
-        $new_content .= '$denominations = ' . var_export($GLOBALS['denominations'], true) . ';' . PHP_EOL;
+        $new_content .= '$noms_caisses = ' . var_export($noms_caisses, true) . ';' . PHP_EOL;
+        $new_content .= '$denominations = ' . var_export($denominations, true) . ';' . PHP_EOL;
 
         if (is_writable($config_path)) {
             file_put_contents($config_path, $new_content);
@@ -115,6 +131,10 @@ class AdminController {
             $_SESSION['admin_error'] = "Erreur : Le fichier de configuration n'est pas accessible en écriture.";
         }
     }
+    
+    /**
+     * Crée une sauvegarde de la base de données.
+     */
     private function createBackup() {
         $backupDir = __DIR__ . '/../backups';
         if (!is_dir($backupDir)) {
@@ -139,6 +159,10 @@ class AdminController {
             $_SESSION['admin_error'] = "Erreur lors de la création de la sauvegarde.";
         }
     }
+
+    /**
+     * Récupère la liste des sauvegardes.
+     */
     private function getBackups() {
         $backupDir = __DIR__ . '/../backups';
         if (!is_dir($backupDir)) return [];
@@ -152,15 +176,27 @@ class AdminController {
         }
         return $backups;
     }
+
+    /**
+     * Vérifie si l'utilisateur est authentifié.
+     */
     private function checkAuth() {
         if (empty($_SESSION['is_admin'])) {
             header('Location: index.php?page=login');
             exit;
         }
     }
+    
+    /**
+     * Synchronise un seul admin vers le fichier de secours (après une connexion réussie).
+     */
     private function syncFallbackAdmin($username, $db_hash) {
         $this->updateFallbackFile($username, $db_hash);
     }
+
+    /**
+     * Récupère et compare la liste des admins de la BDD et du fichier de secours.
+     */
     private function getAdminsList() {
         $admins = [];
         $db_admins = [];
@@ -202,6 +238,7 @@ class AdminController {
         }
         return $admins;
     }
+
     private function deleteAdmin() {
         $username_to_delete = $_POST['username'] ?? '';
         $current_user = preg_replace('/ \(Secours\)$/', '', $_SESSION['admin_username']);
@@ -224,6 +261,7 @@ class AdminController {
         $this->updateFallbackFile($username_to_delete, null);
         $_SESSION['admin_message'] = "Administrateur '{$username_to_delete}' supprimé.";
     }
+
     private function updateAdminPassword() {
         $username = $_POST['username'] ?? '';
         $password = $_POST['password'] ?? '';
@@ -247,6 +285,7 @@ class AdminController {
         $this->updateFallbackFile($username, $hash);
         $_SESSION['admin_message'] = "Mot de passe pour '{$username}' mis à jour.";
     }
+
     private function syncSingleAdmin() {
         $username = $_POST['username'] ?? '';
         if (empty($username)) return;
@@ -265,6 +304,11 @@ class AdminController {
             $_SESSION['admin_error'] = "Erreur BDD lors de la synchronisation.";
         }
     }
+
+    /**
+     * Met à jour le fichier de secours avec un nouvel utilisateur/hash.
+     * Si $hash est null, l'utilisateur est supprimé.
+     */
     private function updateFallbackFile($username, $hash) {
         $fallback_file = __DIR__ . '/../config/admins.php';
         if (!is_writable(dirname($fallback_file))) return;
@@ -280,6 +324,10 @@ class AdminController {
         $content = "<?php\n\n// Fichier de secours pour les administrateurs\nreturn " . var_export($fallback_admins, true) . ";\n";
         file_put_contents($fallback_file, $content, LOCK_EX);
     }
+    
+    /**
+     * Gère le téléchargement d'un fichier de sauvegarde.
+     */
     private function downloadBackup() {
         $filename = basename($_GET['file'] ?? '');
         $backupDir = __DIR__ . '/../backups';
@@ -397,5 +445,142 @@ class AdminController {
             'message' => "Mise à jour terminée.",
             'output' => $output
         ]);
+    }
+
+    /**
+     * Ajoute une nouvelle caisse de manière robuste.
+     */
+    private function addCaisse() {
+        global $noms_caisses, $denominations;
+        $new_name = trim($_POST['caisse_name'] ?? '');
+        if (empty($new_name)) {
+            $_SESSION['admin_error'] = "Le nom de la nouvelle caisse ne peut pas être vide.";
+            return;
+        }
+
+        // 1. Déterminer le nouvel ID en inspectant la base de données
+        try {
+            $stmt = $this->pdo->query("SHOW COLUMNS FROM comptages");
+            $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            $existing_ids = [0]; // On commence avec 0 au cas où aucune caisse n'existe
+            foreach ($columns as $column) {
+                if (preg_match('/^c(\d+)_/', $column, $matches)) {
+                    $existing_ids[] = (int)$matches[1];
+                }
+            }
+            $new_id = max($existing_ids) + 1;
+
+        } catch (\Exception $e) {
+            $_SESSION['admin_error'] = "Erreur BDD lors de la vérification de la structure : " . $e->getMessage();
+            return;
+        }
+
+        // 2. Ajouter les colonnes à la base de données
+        try {
+            $cols_to_add = [];
+            $cols_to_add[] = "c{$new_id}_fond_de_caisse DECIMAL(10, 2) DEFAULT 0";
+            $cols_to_add[] = "c{$new_id}_ventes DECIMAL(10, 2) DEFAULT 0";
+            $cols_to_add[] = "c{$new_id}_retrocession DECIMAL(10, 2) DEFAULT 0";
+            foreach ($denominations as $list) {
+                foreach (array_keys($list) as $name) {
+                    $cols_to_add[] = "c{$new_id}_{$name} INT DEFAULT 0";
+                }
+            }
+            // On ajoute les colonnes une par une pour une meilleure compatibilité
+            foreach($cols_to_add as $col) {
+                $this->pdo->exec("ALTER TABLE comptages ADD COLUMN {$col}");
+            }
+        } catch (\Exception $e) {
+            $_SESSION['admin_error'] = "Erreur BDD lors de l'ajout de la caisse : " . $e->getMessage();
+            return;
+        }
+
+        // 3. Mettre à jour le fichier de configuration
+        $noms_caisses[$new_id] = $new_name;
+        $this->updateConfigFile(['noms_caisses' => $noms_caisses]);
+        $_SESSION['admin_message'] = "Caisse '{$new_name}' (ID: {$new_id}) ajoutée avec succès.";
+    }
+
+    /**
+     * Renomme une caisse existante.
+     */
+    private function renameCaisse() {
+        global $noms_caisses;
+        $id = intval($_POST['caisse_id'] ?? 0);
+        $new_name = trim($_POST['caisse_name'] ?? '');
+
+        if ($id > 0 && !empty($new_name) && isset($noms_caisses[$id])) {
+            $noms_caisses[$id] = $new_name;
+            $this->updateConfigFile(['noms_caisses' => $noms_caisses]);
+            $_SESSION['admin_message'] = "Caisse renommée avec succès.";
+        } else {
+            $_SESSION['admin_error'] = "Données invalides pour le renommage.";
+        }
+    }
+
+    /**
+     * Supprime une caisse et toutes ses données associées.
+     */
+    private function deleteCaisse() {
+        global $noms_caisses, $denominations;
+        $id = intval($_POST['caisse_id'] ?? 0);
+
+        if ($id > 0 && isset($noms_caisses[$id])) {
+            // 1. Supprimer les colonnes de la base de données
+            try {
+                $cols_to_drop = [];
+                $cols_to_drop[] = "c{$id}_fond_de_caisse";
+                $cols_to_drop[] = "c{$id}_ventes";
+                $cols_to_drop[] = "c{$id}_retrocession";
+                foreach ($denominations as $list) {
+                    foreach (array_keys($list) as $name) {
+                        $cols_to_drop[] = "c{$id}_{$name}";
+                    }
+                }
+                $sql = "ALTER TABLE comptages DROP COLUMN " . implode(', DROP COLUMN ', $cols_to_drop);
+                $this->pdo->exec($sql);
+            } catch (\Exception $e) {
+                $_SESSION['admin_error'] = "Erreur BDD lors de la suppression de la caisse : " . $e->getMessage();
+                return;
+            }
+
+            // 2. Mettre à jour le fichier de configuration
+            $deleted_name = $noms_caisses[$id];
+            unset($noms_caisses[$id]);
+            $this->updateConfigFile(['noms_caisses' => $noms_caisses]);
+            $_SESSION['admin_message'] = "Caisse '{$deleted_name}' et toutes ses données ont été supprimées.";
+        } else {
+            $_SESSION['admin_error'] = "ID de caisse invalide pour la suppression.";
+        }
+    }
+
+    /**
+     * Réécrit le fichier de configuration avec les nouvelles valeurs.
+     */
+    private function updateConfigFile($updates) {
+        global $noms_caisses, $denominations;
+        $config_path = __DIR__ . '/../config/config.php';
+
+        // Applique les mises à jour
+        if (isset($updates['noms_caisses'])) $noms_caisses = $updates['noms_caisses'];
+
+        $new_content = '<?php' . PHP_EOL . PHP_EOL;
+        $new_content .= "// Paramètres de connexion à la base de données" . PHP_EOL;
+        $new_content .= "define('DB_HOST', '" . addslashes(DB_HOST) . "');" . PHP_EOL;
+        $new_content .= "define('DB_NAME', '" . addslashes(DB_NAME) . "');" . PHP_EOL;
+        $new_content .= "define('DB_USER', '" . addslashes(DB_USER) . "');" . PHP_EOL;
+        $new_content .= "define('DB_PASS', '" . addslashes(DB_PASS) . "');" . PHP_EOL . PHP_EOL;
+        $new_content .= "// URL du dépôt Git pour le pied de page" . PHP_EOL;
+        $new_content .= "define('GIT_REPO_URL', '" . addslashes(GIT_REPO_URL) . "');" . PHP_EOL . PHP_EOL;
+        $new_content .= "// Configuration de l'application" . PHP_EOL;
+        $new_content .= '$noms_caisses = ' . var_export($noms_caisses, true) . ';' . PHP_EOL;
+        $new_content .= '$denominations = ' . var_export($denominations, true) . ';' . PHP_EOL;
+
+        if (is_writable($config_path)) {
+            file_put_contents($config_path, $new_content, LOCK_EX);
+        } else {
+            $_SESSION['admin_error'] = "Erreur critique : Le fichier de configuration n'est pas accessible en écriture.";
+        }
     }
 }

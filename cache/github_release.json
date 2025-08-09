@@ -1,1 +1,1 @@
-{"local_version":"v1.0","remote_version":"v1.0","update_available":false,"release_notes":"**Full Changelog**: https:\/\/github.com\/remi-deher\/logiciel-comptage-caisse\/commits\/v1.0"}
+{"local_version":"v1.1","remote_version":"v1.1","update_available":false,"release_notes":"**Full Changelog**: https:\/\/github.com\/remi-deher\/logiciel-comptage-caisse\/commits\/v1.1\r\n\r\nMise a jour de la section aide\r\n\r\nUtilisation d'un cache pour les appels vers l'API de Github"}
