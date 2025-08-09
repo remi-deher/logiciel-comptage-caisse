@@ -353,38 +353,69 @@ class AdminController {
         $projectRoot = dirname(__DIR__);
         $version_file = $projectRoot . '/VERSION';
 
-        // 1. Lire la version locale depuis le fichier VERSION
         $local_version = file_exists($version_file) ? trim(file_get_contents($version_file)) : '0.0.0';
 
-        // 2. Récupérer la dernière release via l'API GitHub
-        $repo_api_url = 'https://api.github.com/repos/remi-deher/logiciel-comptage-caisse-php/releases/latest';
+        // Essai 1: Obtenir la dernière release officielle
+        $repo_api_url_latest = 'https://api.github.com/repos/remi-deher/logiciel-comptage-caisse/releases/latest';
         
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $repo_api_url);
+        curl_setopt($ch, CURLOPT_URL, $repo_api_url_latest);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_USERAGENT, 'Comptage-Caisse-App-Updater'); 
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        $remote_version = null;
+        $curl_error = curl_error($ch);
+        
+        $data = null;
         if ($http_code == 200) {
             $data = json_decode($response, true);
-            $remote_version = $data['tag_name'] ?? null;
         }
 
-        if (!$remote_version) {
-            echo json_encode(['error' => 'Impossible de récupérer la version distante depuis l\'API GitHub.']);
+        // Essai 2 (Fallback): Si /latest échoue, on prend la première de la liste
+        if (!$data && !$curl_error) {
+            curl_setopt($ch, CURLOPT_URL, 'https://api.github.com/repos/remi-deher/logiciel-comptage-caisse/releases');
+            $response_fallback = curl_exec($ch);
+            $http_code_fallback = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curl_error_fallback = curl_error($ch);
+
+            if ($http_code_fallback == 200) {
+                $releases = json_decode($response_fallback, true);
+                if (!empty($releases)) {
+                    $data = $releases[0]; // On prend la plus récente de la liste
+                }
+            }
+        }
+        
+        curl_close($ch);
+
+        if ($curl_error) {
+            echo json_encode(['error' => 'Erreur de connexion cURL: ' . $curl_error]);
             return;
         }
 
-        // 3. Comparer les versions
+        if (!$data) {
+            echo json_encode(['error' => 'Impossible de récupérer les informations de release. Assurez-vous qu\'au moins une release est publiée sur GitHub. Code HTTP: ' . ($http_code_fallback ?? $http_code)]);
+            return;
+        }
+
+        $remote_version = $data['tag_name'] ?? null;
+        $release_notes = $data['body'] ?? 'Notes de version non disponibles.';
+
+        if (!$remote_version) {
+            echo json_encode(['error' => 'Impossible de trouver le nom de la version (tag_name) dans la réponse de l\'API.']);
+            return;
+        }
+
         $update_available = version_compare($local_version, $remote_version, '<');
 
         echo json_encode([
             'local_version' => $local_version,
             'remote_version' => $remote_version,
-            'update_available' => $update_available
+            'update_available' => $update_available,
+            'release_notes' => $release_notes
         ]);
     }
 
@@ -395,7 +426,6 @@ class AdminController {
         header('Content-Type: application/json');
         $projectRoot = dirname(__DIR__);
         
-        // Exécute la commande git pull
         $output = shell_exec("cd {$projectRoot} && git pull 2>&1");
 
         echo json_encode([
