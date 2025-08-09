@@ -1,0 +1,52 @@
+# /etc/nginx/sites-available/comptabilite
+
+server {
+    # Le port sur lequel Nginx écoutera les requêtes pour ce site.
+    listen PORT;
+    listen [::]:PORT;
+
+    # Le chemin pointe maintenant vers la racine de votre projet,
+    # en spécifiant bien le dossier /public comme racine web.
+    root /var/www/votre_repertoire/public;
+    
+    # Fichiers à servir par défaut.
+    index index.php index.html;
+
+    # Nom du serveur (l'adresse IP de votre serveur Debian ou un nom de domaine).
+    server_name IP_OU_FQDN;
+
+    # Règle principale pour gérer les URLs.
+    # Essaye de trouver un fichier correspondant à l'URL, puis un dossier,
+    # sinon, redirige la requête vers index.php (Front Controller Pattern).
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # Règle pour traiter les fichiers PHP avec PHP-FPM.
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        # Assurez-vous que la version de PHP correspond à celle installée sur votre serveur.
+        # (ex: php8.2-fpm, php8.3-fpm, etc.)
+        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+    }
+
+    # Règle pour gérer la connexion WebSocket.
+    # Cet emplacement reçoit la connexion WebSocket du Reverse Proxy
+    # et la transmet au script Ratchet qui écoute sur le port 8081.
+    # Changez le port avec celui configuré dans le fichier websocker_server.php
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    # Bloque l'accès aux fichiers cachés comme .htaccess.
+    location ~ /\.ht {
+        deny all;
+    }
+}
+

@@ -1,0 +1,32 @@
+/* ==========================================================================
+   public/css/admin.css (MIS À JOUR)
+   ========================================================================== */
+body.login-page-body { display: flex; align-items: center; justify-content: center; }
+.login-container { max-width: 400px; width: 100%; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+.login-container h2 { text-align: center; margin-bottom: 20px; color: #2c3e50; border-bottom: none; }
+.login-container .form-group { margin-bottom: 15px; }
+/* Règle explicite pour l'alignement à gauche */
+.login-container input[type="text"], 
+.login-container input[type="password"] { 
+    text-align: left; 
+}
+.login-container .error { margin-bottom: 15px; }
+.login-container button { width: 100%; }
+
+.admin-section { margin-top: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+.backup-list { list-style: none; padding: 0; }
+.backup-list li { background-color: #f8f9fa; padding: 10px 15px; border: 1px solid #e9ecef; border-radius: 4px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+.download-link { font-size: 0.9em; font-weight: bold; text-decoration: none; padding: 5px 10px; background: #27ae60; color: white; border-radius: 3px; }
+.download-link:hover { background: #229954; }
+
+/* Responsive Overrides */
+@media (min-width: 768px) {
+    .tab-link { padding: 12px 25px; font-size: 1.1em; }
+    .ecart-display { font-size: 1.2em; }
+    .ecart-display .ecart-value { font-size: 1.6em; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; }
+    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    .results-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .filter-form { flex-direction: row; align-items: flex-end; }
+    .button-group { flex-direction: row; }
+}

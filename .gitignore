@@ -1,0 +1,6 @@
+backup/*
+config/admins.php
+config/config.php
+composer.phar
+/vendor/
+composer.lock

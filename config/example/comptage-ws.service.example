@@ -1,0 +1,25 @@
+# Fichier d'exemple pour systemd pour executer le Websocket en arrière plan
+[Unit]
+Description=Serveur WebSocket pour l'application de Comptage de Caisse
+After=network.target
+
+[Service]
+Type=simple
+# Exécute le service en tant qu'utilisateur du serveur web (www-data), pas en root. C'est plus sécurisé.
+User=www-data
+Group=www-data
+
+# MODIFIEZ CETTE LIGNE :
+# Mettez ici le chemin absolu COMPLET vers le dossier de votre projet.
+WorkingDirectory=/var/www/logiciel-comptage-caisse
+
+# MODIFIEZ CETTE LIGNE :
+# Mettez le chemin absolu COMPLET vers votre script run-server.php.
+# Pour trouver le chemin de php, tapez `which php` dans votre terminal.
+ExecStart=php /var/www/logiciel-comptage-caisse/config/websocket_server.php
+
+# Redémarre automatiquement le service s'il plante.
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

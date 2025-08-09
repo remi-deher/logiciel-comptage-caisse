@@ -1,0 +1,11 @@
+<?php
+// config/example/admins.php.example
+// Renommez ce fichier en "admins.php" pour l'activer.
+
+// Pour générer un mot de passe haché, utilisez ce code dans un fichier PHP temporaire :
+// echo password_hash('VOTRE_MOT_DE_PASSE_SECRET', PASSWORD_DEFAULT);
+
+return [
+    'admin' => '$2y$10$v...VOTRE_HASH_DE_MOT_DE_PASSE_ICI...wO6',
+    // Vous pouvez ajouter d'autres utilisateurs de secours ici.
+];
