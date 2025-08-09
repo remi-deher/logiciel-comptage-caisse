@@ -1,4 +1,4 @@
-*<?php
+<?php
 
 // Paramètres de connexion à la base de données
 define('DB_HOST', '192.168.1.60');

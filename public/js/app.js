@@ -256,4 +256,69 @@ document.addEventListener('DOMContentLoaded', function() {
             navigator.sendBeacon('index.php?page=calculateur&action=autosave', formData);
         }
     });
+
+    // --- Gestion de la mise à jour ---
+    const versionInfo = document.getElementById('version-info');
+    const updateButton = document.getElementById('update-button');
+
+    if (versionInfo && updateButton) {
+        let releaseNotes = ''; // Variable pour stocker les notes de version
+
+        fetch('index.php?action=git_release_check')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    versionInfo.textContent = "Erreur de vérification de version.";
+                    console.error(data.error);
+                    return;
+                }
+
+                if (data.update_available) {
+                    versionInfo.innerHTML = `Version <strong>${data.local_version}</strong>. 
+                        <span style="color: #e67e22;">Mise à jour vers ${data.remote_version} disponible.</span>`;
+                    updateButton.style.display = 'inline-block';
+                    releaseNotes = data.release_notes; // On stocke les notes
+                } else {
+                    versionInfo.innerHTML = `Version <strong>${data.local_version}</strong>. Vous êtes à jour.`;
+                }
+            })
+            .catch(error => {
+                versionInfo.textContent = "Impossible de vérifier la version.";
+                console.error('Erreur lors de la vérification de la version:', error);
+            });
+
+        updateButton.addEventListener('click', function() {
+            // On construit le message de confirmation avec les notes de version
+            const confirmationMessage = `
+Une nouvelle version est disponible !
+
+--- NOTES DE VERSION ---
+${releaseNotes}
+-------------------------
+
+Voulez-vous mettre à jour l'application maintenant ?`;
+
+            if (confirm(confirmationMessage)) {
+                versionInfo.textContent = "Mise à jour en cours...";
+                updateButton.disabled = true;
+
+                fetch('index.php?action=git_pull')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            versionInfo.innerHTML = "<strong>Mise à jour terminée. Veuillez rafraîchir la page.</strong>";
+                            updateButton.style.display = 'none';
+                        } else {
+                            versionInfo.textContent = "Erreur lors de la mise à jour.";
+                            updateButton.disabled = false;
+                        }
+                    })
+                    .catch(error => {
+                        versionInfo.textContent = "Erreur lors de la mise à jour.";
+                        updateButton.disabled = false;
+                        console.error('Erreur lors de la mise à jour:', error);
+                    });
+            }
+        });
+    }
 });
