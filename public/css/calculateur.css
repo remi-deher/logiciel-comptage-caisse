@@ -1,0 +1,31 @@
+/* ==========================================================================
+   public/css/calculateur.css
+   ========================================================================== */
+.tab-selector { border-bottom: 2px solid #ccc; margin-bottom: 20px; display: flex; flex-wrap: wrap; }
+.tab-link { background-color: #f1f1f1; border: 1px solid #ccc; border-bottom: none; padding: 10px 15px; cursor: pointer; font-size: 1em; border-radius: 5px 5px 0 0; margin-right: 5px; }
+.tab-link.active { background-color: #fff; border-bottom: 2px solid #fff; margin-bottom: -2px; font-weight: bold; color: #3498db; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.ecart-display-container { text-align: center; }
+.ecart-display { display: none; padding: 15px; margin-bottom: 20px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1.1em; font-weight: bold; transition: background-color 0.3s, border-color 0.3s; }
+.ecart-display.active { display: block; }
+.ecart-display .ecart-value { font-size: 1.5em; display: block; margin-bottom: 5px; }
+.ecart-explanation { font-size: 0.9em; font-style: italic; font-weight: normal; color: #555; margin-top: 8px; min-height: 1.2em; }
+.ecart-explanation-total { font-weight: bold; color: #34495e; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 0.9em; display: none; }
+
+.ecart-display.ecart-ok { background-color: #eafaf1; border-color: #27ae60; }
+.ecart-display.ecart-ok .ecart-value { color: #27ae60; }
+.ecart-display.ecart-positif { background-color: #fef5e7; border-color: #f39c12; }
+.ecart-display.ecart-positif .ecart-value { color: #f39c12; }
+.ecart-display.ecart-negatif { background-color: #fdedec; border-color: #c0392b; }
+.ecart-display.ecart-negatif .ecart-value { color: #c0392b; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));}
+.results { margin-top: 40px; }
+.results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.result-box { background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; }
+.combined-results { background-color: #eaf5ff; border: 1px solid #aed6f1; margin-top: 30px; }
+.save-section { margin-top: 30px; padding: 20px; background-color: #e8f5e9; border-radius: 8px; }
+.button-group { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
