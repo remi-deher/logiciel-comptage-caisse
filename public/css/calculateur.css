@@ -1,11 +1,16 @@
 /* ==========================================================================
-   public/css/calculateur.css
+   public/css/calculateur.css (MIS À JOUR)
    ========================================================================== */
 .tab-selector { border-bottom: 2px solid #ccc; margin-bottom: 20px; display: flex; flex-wrap: wrap; }
 .tab-link { background-color: #f1f1f1; border: 1px solid #ccc; border-bottom: none; padding: 10px 15px; cursor: pointer; font-size: 1em; border-radius: 5px 5px 0 0; margin-right: 5px; }
 .tab-link.active { background-color: #fff; border-bottom: 2px solid #fff; margin-bottom: -2px; font-weight: bold; color: #3498db; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
+
+/* Règle d'alignement déplacée ici */
+.tab-content .form-group input {
+    text-align: right;
+}
 
 .ecart-display-container { text-align: center; }
 .ecart-display { display: none; padding: 15px; margin-bottom: 20px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1.1em; font-weight: bold; transition: background-color 0.3s, border-color 0.3s; }

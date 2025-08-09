@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.error) {
                     versionInfo.textContent = "Erreur de vérification de version.";
-                    console.error("Détails de l'erreur de l'API:", data);
+                    console.error(data.error);
                     return;
                 }
 
@@ -288,6 +288,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
         updateButton.addEventListener('click', function() {
+            // On construit le message de confirmation avec les notes de version
             const confirmationMessage = `
 Une nouvelle version est disponible !
 
@@ -305,15 +306,10 @@ Voulez-vous mettre à jour l'application maintenant ?`;
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            versionInfo.innerHTML = `<strong>${data.message}</strong>`;
-                            if (data.message.includes("terminée")) {
-                                versionInfo.innerHTML += " Veuillez rafraîchir la page.";
-                            }
+                            versionInfo.innerHTML = "<strong>Mise à jour terminée. Veuillez rafraîchir la page.</strong>";
                             updateButton.style.display = 'none';
                         } else {
                             versionInfo.textContent = "Erreur lors de la mise à jour.";
-                            alert(`Échec de la mise à jour : ${data.message}\n\nDétails techniques dans la console (F12).`);
-                            console.error("Détails de l'erreur de mise à jour:", data.output);
                             updateButton.disabled = false;
                         }
                     })

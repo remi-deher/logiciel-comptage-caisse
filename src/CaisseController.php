@@ -14,6 +14,9 @@ class CaisseController {
         $this->nombre_caisses = count($noms_caisses);
     }
 
+    /**
+     * Gère l'affichage de la page du calculateur.
+     */
     public function calculateur() {
         $loaded_data = [];
         if (isset($_GET['load'])) {
@@ -36,6 +39,9 @@ class CaisseController {
         require __DIR__ . '/../templates/calculateur.php';
     }
 
+    /**
+     * Gère l'affichage de la page de l'historique.
+     */
     public function historique() {
         $date_debut = $_GET['date_debut'] ?? '';
         $date_fin = $_GET['date_fin'] ?? '';
@@ -67,9 +73,101 @@ class CaisseController {
         require __DIR__ . '/../templates/historique.php';
     }
     
+    /**
+     * Gère l'affichage de la page d'aide.
+     */
     public function aide() {
         require __DIR__ . '/../templates/aide.php';
     }
     
-    // ... (save, delete, autosave, etc.)
+    /**
+     * Gère la sauvegarde manuelle d'un comptage.
+     */
+    public function save() {
+        $sql_columns = ['nom_comptage', 'explication', 'date_comptage'];
+        $sql_values = [
+            trim($_POST['nom_comptage']), 
+            trim($_POST['explication']),
+            date('Y-m-d H:i:s')
+        ];
+
+        foreach (range(1, $this->nombre_caisses) as $i) {
+            $caisse_data = $_POST['caisse'][$i] ?? [];
+            $sql_columns[] = "c{$i}_fond_de_caisse"; $sql_values[] = get_numeric_value($caisse_data, 'fond_de_caisse');
+            $sql_columns[] = "c{$i}_ventes"; $sql_values[] = get_numeric_value($caisse_data, 'ventes');
+            $sql_columns[] = "c{$i}_retrocession"; $sql_values[] = get_numeric_value($caisse_data, 'retrocession');
+            foreach ($this->denominations as $list) {
+                foreach ($list as $name => $value) {
+                    $sql_columns[] = "c{$i}_{$name}";
+                    $sql_values[] = get_numeric_value($caisse_data, $name);
+                }
+            }
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($sql_values), '?'));
+        $sql = "INSERT INTO comptages (" . implode(', ', $sql_columns) . ") VALUES ($placeholders)";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($sql_values);
+        $last_id = $this->pdo->lastInsertId();
+
+        $_SESSION['message'] = "Comptage '" . htmlspecialchars(trim($_POST['nom_comptage'])) . "' créé avec succès !";
+        header('Location: index.php?page=calculateur&load=' . $last_id);
+        exit;
+    }
+
+    /**
+     * Gère la suppression d'un comptage.
+     */
+    public function delete() {
+        $id_a_supprimer = intval($_POST['id_a_supprimer'] ?? 0);
+        if ($id_a_supprimer > 0) {
+            $stmt = $this->pdo->prepare("DELETE FROM comptages WHERE id = ?");
+            $stmt->execute([$id_a_supprimer]);
+            $_SESSION['message'] = "Le comptage a été supprimé avec succès.";
+        }
+        header('Location: index.php?page=historique');
+        exit;
+    }
+
+    /**
+     * Gère la sauvegarde automatique des données du formulaire.
+     */
+    public function autosave() {
+        $nom_comptage = trim($_POST['nom_comptage'] ?? '');
+
+        if (empty($nom_comptage)) {
+            http_response_code(204);
+            exit;
+        }
+
+        $sql_columns = ['nom_comptage', 'explication', 'date_comptage'];
+        $sql_values = [
+            $nom_comptage,
+            trim($_POST['explication']),
+            date('Y-m-d H:i:s')
+        ];
+
+        foreach (range(1, $this->nombre_caisses) as $i) {
+            $caisse_data = $_POST['caisse'][$i] ?? [];
+            $sql_columns[] = "c{$i}_fond_de_caisse"; $sql_values[] = get_numeric_value($caisse_data, 'fond_de_caisse');
+            $sql_columns[] = "c{$i}_ventes"; $sql_values[] = get_numeric_value($caisse_data, 'ventes');
+            $sql_columns[] = "c{$i}_retrocession"; $sql_values[] = get_numeric_value($caisse_data, 'retrocession');
+            foreach ($this->denominations as $list) {
+                foreach ($list as $name => $value) {
+                    $sql_columns[] = "c{$i}_{$name}";
+                    $sql_values[] = get_numeric_value($caisse_data, $name);
+                }
+            }
+        }
+        
+        $placeholders = implode(', ', array_fill(0, count($sql_values), '?'));
+        $sql = "INSERT INTO comptages (" . implode(', ', $sql_columns) . ") VALUES ($placeholders)";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($sql_values);
+        
+        http_response_code(204);
+        exit;
+    }
 }
