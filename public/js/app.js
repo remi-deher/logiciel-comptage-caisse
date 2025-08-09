@@ -3,12 +3,87 @@
  * Gère les calculs, les onglets, la synchro WebSocket et la sauvegarde intelligente.
  */
 document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- Logique pour la page de l'historique ---
+    const printBtn = document.getElementById('print-btn');
+    const pdfBtn = document.getElementById('pdf-btn');
+    const excelBtn = document.getElementById('excel-btn');
+    const exportTable = document.getElementById('history-table-export');
+
+    if (printBtn && exportTable) {
+        printBtn.addEventListener('click', () => {
+            window.print();
+        });
+    }
+
+    if (pdfBtn && exportTable) {
+        pdfBtn.addEventListener('click', () => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'landscape'
+            });
+            
+            doc.autoTable({ 
+                html: '#history-table-export',
+                headStyles: { fillColor: [44, 62, 80] }, // Couleur de l'en-tête
+                margin: { top: 15 },
+                didDrawPage: function (data) {
+                    doc.text("Historique des Comptages", 15, 10);
+                }
+            });
+
+            const date = new Date();
+            const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+            const vueCaisseSelect = document.querySelector('select[name="vue_caisse"]');
+            const vueCaisse = vueCaisseSelect ? vueCaisseSelect.options[vueCaisseSelect.selectedIndex].text : 'global';
+            const filename = `export-historique-${vueCaisse.toLowerCase().replace(/\s/g, '-')}-${dateString}.pdf`;
+
+            doc.save(filename);
+        });
+    }
+
+    if (excelBtn && exportTable) {
+        excelBtn.addEventListener('click', () => {
+            let csv = [];
+            const rows = exportTable.querySelectorAll("tr");
+            
+            for (const row of rows) {
+                let row_data = [];
+                const cols = row.querySelectorAll("td, th");
+                
+                for (const col of cols) {
+                    if (!col.classList.contains('no-export')) {
+                        let data = col.innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/(\s\s)/gm, " ");
+                        data = data.replace(/"/g, '""');
+                        row_data.push('"' + data + '"');
+                    }
+                }
+                csv.push(row_data.join(","));
+            }
+
+            const csv_file = new Blob(["\uFEFF" + csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const download_link = document.createElement("a");
+            
+            const date = new Date();
+            const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+            const vueCaisseSelect = document.querySelector('select[name="vue_caisse"]');
+            const vueCaisse = vueCaisseSelect ? vueCaisseSelect.options[vueCaisseSelect.selectedIndex].text : 'global';
+            const filename = `export-historique-${vueCaisse.toLowerCase().replace(/\s/g, '-')}-${dateString}.csv`;
+
+            download_link.href = URL.createObjectURL(csv_file);
+            download_link.download = filename;
+            document.body.appendChild(download_link);
+            download_link.click();
+            document.body.removeChild(download_link);
+        });
+    }
+
+    // --- Logique pour la page du calculateur ---
     const caisseForm = document.getElementById('caisse-form');
     if (!caisseForm) {
         return;
     }
 
-    // --- Définitions et sélection des éléments du DOM ---
     const denominations = {
         billets: { b500: 500, b200: 200, b100: 100, b50: 50, b20: 20, b10: 10, b5: 5 },
         pieces: { p200: 2, p100: 1, p050: 0.50, p020: 0.20, p010: 0.10, p005: 0.05, p002: 0.02, p001: 0.01 }
@@ -25,9 +100,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const ecartDisplays = document.querySelectorAll('.ecart-display');
     const statusIndicator = document.getElementById('websocket-status-indicator');
     const statusText = statusIndicator ? statusIndicator.querySelector('.status-text') : null;
-    let isSubmitting = false; // Variable pour suivre la soumission manuelle
+    let isSubmitting = false;
 
-    // --- Fonctions ---
     const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(montant);
     const formatDateTimeFr = () => {
         const now = new Date();
@@ -37,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const calculateAllFull = () => {
         let totauxCombines = { fdc: 0, total: 0, recette: 0, theorique: 0, ecart: 0 };
-        let allCaissesReady = true; // Flag pour vérifier si toutes les caisses sont en mode comptage final
+        let allCaissesReady = true;
 
         for (let i = 1; i <= nombreCaisses; i++) {
             const getVal = (id) => parseFloat(document.getElementById(id + '_' + i).value.replace(',', '.')) || 0;
@@ -55,7 +129,6 @@ document.addEventListener('DOMContentLoaded', function() {
             totauxCombines.theorique += recetteTheorique;
             totauxCombines.ecart += ecart;
             
-            // Mise à jour des boîtes de résultats du bas (toujours affichées)
             document.getElementById(`res-c${i}-fdc`).textContent = formatEuros(fondDeCaisse);
             document.getElementById(`res-c${i}-total`).textContent = formatEuros(totalCompte);
             document.getElementById(`res-c${i}-theorique`).textContent = formatEuros(recetteTheorique);
@@ -66,7 +139,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (ecart > 0.001) { ecartEl.className = 'ecart-positif'; }
             if (ecart < -0.001) { ecartEl.className = 'ecart-negatif'; }
 
-            // Mise à jour de l'affichage de l'écart en haut (logique conditionnelle PAR CAISSE)
             const topEcartDisplay = document.querySelector(`#ecart-display-caisse${i}`);
             if (topEcartDisplay) {
                 const topEcartDisplayValue = topEcartDisplay.querySelector('.ecart-value');
@@ -74,11 +146,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const topEcartExplanationTotal = topEcartDisplay.querySelector('.ecart-explanation-total');
                 
                 topEcartDisplay.classList.remove('ecart-ok', 'ecart-positif', 'ecart-negatif');
-                topEcartExplanationTotal.style.display = 'none'; // Caché par défaut
+                topEcartExplanationTotal.style.display = 'none';
 
                 if (ventes === 0 && retrocession === 0) {
-                    allCaissesReady = false; // Cette caisse n'est pas prête pour le comptage final
-                    // CAS 1: Ventes non renseignées -> On vérifie le fond de caisse
+                    allCaissesReady = false;
                     const diffFondDeCaisse = totalCompte - fondDeCaisse;
                     topEcartDisplayValue.textContent = formatEuros(diffFondDeCaisse);
                     topEcartExplanation.innerHTML = "Renseignez la valeurs des ventes ou des rétrocession pour commencer le comptage";
@@ -95,7 +166,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         topEcartExplanationTotal.innerHTML = `Pour la <strong>${nomsCaisses[i]}</strong>, il manque <strong>${formatEuros(Math.abs(diffFondDeCaisse))}</strong> par rapport au fond de caisse.`;
                     }
                 } else {
-                    // CAS 2: Ventes renseignées -> On calcule l'écart de caisse
                     topEcartDisplayValue.textContent = formatEuros(ecart);
                     
                     if (Math.abs(ecart) < 0.01) {
@@ -112,7 +182,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Mise à jour des totaux combinés en bas
         document.getElementById('res-total-theorique').textContent = formatEuros(totauxCombines.theorique);
         document.getElementById('res-total-total').textContent = formatEuros(totauxCombines.total);
         document.getElementById('res-total-recette').textContent = formatEuros(totauxCombines.recette);
@@ -120,7 +189,6 @@ document.addEventListener('DOMContentLoaded', function() {
         ecartTotalEl.textContent = formatEuros(totauxCombines.ecart);
         ecartTotalEl.className = totauxCombines.ecart > 0.001 ? 'ecart-positif' : (totauxCombines.ecart < -0.001 ? 'ecart-negatif' : '');
         
-        // Mise à jour du message de retrait total dans les blocs du haut
         if (allCaissesReady) {
             ecartDisplays.forEach(display => {
                 const totalExplanationEl = display.querySelector('.ecart-explanation-total');

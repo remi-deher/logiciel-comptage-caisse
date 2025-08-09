@@ -16,5 +16,8 @@ $page_css = $page_css ?? ''; // Fichier CSS spécifique à la page
     <?php if ($page_css): ?>
         <link href="css/<?= htmlspecialchars($page_css) ?>" rel="stylesheet">
     <?php endif; ?>
+    <!-- NOUVELLES BIBLIOTHÈQUES POUR L'EXPORT PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body class="<?= htmlspecialchars($body_class) ?>">
