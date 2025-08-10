@@ -144,8 +144,9 @@
 
 .modal-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start; /* MODIFIÉ: Aligne les éléments au début */
     align-items: center;
+    gap: 20px; /* AJOUTÉ: Crée un espace entre le titre et les boutons */
     border-bottom: 1px solid #e9ecef;
     padding-bottom: 15px;
     margin-bottom: 15px;

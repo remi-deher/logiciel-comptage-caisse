@@ -339,6 +339,8 @@ Voulez-vous mettre à jour l'application maintenant ?`;
         const statusIndicator = document.getElementById('websocket-status-indicator');
         const statusText = statusIndicator ? statusIndicator.querySelector('.status-text') : null;
         let isSubmitting = false;
+        const autosaveStatus = document.getElementById('autosave-status');
+        let autosaveTimeout;
 
         const formatDateTimeFr = () => {
             const now = new Date();
@@ -540,18 +542,12 @@ Voulez-vous mettre à jour l'application maintenant ?`;
             });
         });
 
-        caisseForm.addEventListener('submit', function() {
-            isSubmitting = true;
-        });
-
-        // --- Initialisation ---
-        calculateAllFull();
-
-        // --- Logique de sauvegarde intelligente ---
+        // --- Logique de sauvegarde intelligente (CORRIGÉE) ---
         let initialState = '';
         
         function getFormStateAsString() {
             const state = {};
+            // On surveille TOUS les champs de saisie pour détecter un changement
             const inputs = caisseForm.querySelectorAll('input[type="number"], input[type="text"], textarea');
             inputs.forEach(input => {
                 if (input.id) {
@@ -560,24 +556,51 @@ Voulez-vous mettre à jour l'application maintenant ?`;
             });
             return JSON.stringify(state);
         }
-
-        initialState = getFormStateAsString();
-
-        window.addEventListener('beforeunload', function(e) {
-            if (isSubmitting) {
-                return;
-            }
-            
-            const currentState = getFormStateAsString();
-            if (initialState === currentState) {
-                return;
-            }
+        
+        function performAutosave() {
+            autosaveStatus.textContent = 'Sauvegarde en cours...';
+            autosaveStatus.className = 'autosave-status saving';
 
             const formData = new FormData(caisseForm);
-            const nouveauNom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
-            formData.set('nom_comptage', nouveauNom);
-            
-            navigator.sendBeacon('index.php?page=calculateur&action=autosave', formData);
+            let nom = formData.get('nom_comptage');
+            if (!nom || nom.startsWith('Sauvegarde auto')) {
+                nom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
+                formData.set('nom_comptage', nom);
+            }
+
+            fetch('index.php?action=autosave', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    autosaveStatus.textContent = data.message;
+                    autosaveStatus.className = 'autosave-status success';
+                    initialState = getFormStateAsString(); // On met à jour l'état de référence
+                }
+            })
+            .catch(error => {
+                console.error('Erreur de sauvegarde auto:', error);
+                autosaveStatus.textContent = 'Erreur de sauvegarde.';
+                autosaveStatus.className = 'autosave-status error';
+            });
+        }
+
+        caisseForm.addEventListener('input', () => {
+            clearTimeout(autosaveTimeout);
+            autosaveStatus.textContent = 'Modifications non enregistrées...';
+            autosaveStatus.className = 'autosave-status';
+            autosaveTimeout = setTimeout(performAutosave, 2500); // Sauvegarde après 2.5s d'inactivité
         });
+
+        caisseForm.addEventListener('submit', function() {
+            clearTimeout(autosaveTimeout);
+            isSubmitting = true;
+        });
+
+        // --- Initialisation ---
+        calculateAllFull();
+        initialState = getFormStateAsString();
     }
 });

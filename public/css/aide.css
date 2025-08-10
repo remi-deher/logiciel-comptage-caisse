@@ -1,0 +1,81 @@
+/* ==========================================================================
+   public/css/aide.css
+   ========================================================================== */
+
+.help-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.help-header h2 {
+    border-bottom: none;
+    display: inline-block;
+    position: relative;
+    padding-bottom: 10px;
+}
+
+.help-header h2::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background-color: #3498db;
+}
+
+.help-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 30px;
+}
+
+.help-card {
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    box-shadow: 0 4px 25px rgba(0,0,0,0.05);
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+}
+
+.help-card-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.help-card-icon {
+    font-size: 2em;
+    color: #3498db;
+    width: 50px;
+    height: 50px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #ecf0f1;
+    border-radius: 50%;
+}
+
+.help-card-header h3 {
+    margin: 0;
+    border: none;
+    font-size: 1.4em;
+}
+
+.help-card p, .help-card ul, .help-card ol {
+    line-height: 1.7;
+    color: #555;
+}
+
+.help-card ul, .help-card ol {
+    padding-left: 20px;
+}
+
+.help-card strong {
+    color: #2c3e50;
+}
