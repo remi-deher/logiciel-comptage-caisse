@@ -354,6 +354,8 @@ class AdminController {
     }
 
     public function forceGitReleaseCheck() {
+        // En forçant la vérification, on met aussi à jour le cache du changelog
+        $this->updateChangelogCache();
         $this->gitReleaseCheck(true);
     }
 
@@ -449,6 +451,28 @@ class AdminController {
 
         file_put_contents($cacheFile, json_encode($responseData), LOCK_EX);
         echo json_encode($responseData);
+    }
+
+    private function updateChangelogCache() {
+        $cacheFile = __DIR__ . '/../cache/github_releases_full.json';
+        if (function_exists('curl_init')) {
+            $repo_api_url = 'https://api.github.com/repos/remi-deher/logiciel-comptage-caisse/releases';
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $repo_api_url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Comptage-Caisse-App-Changelog');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/vnd.github.html+json']);
+            
+            $response = curl_exec($ch);
+            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($http_code == 200) {
+                $releases = json_decode($response, true);
+                file_put_contents($cacheFile, json_encode($releases), LOCK_EX);
+            }
+        }
     }
 
     public function gitPull() {
