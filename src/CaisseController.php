@@ -108,7 +108,6 @@ class CaisseController {
                 curl_setopt($ch, CURLOPT_URL, $repo_api_url);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
                 curl_setopt($ch, CURLOPT_USERAGENT, 'Comptage-Caisse-App-Changelog');
-                // On demande à l'API de nous renvoyer le contenu au format HTML
                 curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/vnd.github.html+json']);
                 
                 $response = curl_exec($ch);

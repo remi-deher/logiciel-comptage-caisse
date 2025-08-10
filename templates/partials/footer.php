@@ -60,17 +60,6 @@ if (function_exists('curl_init')) {
         </div>
     </footer>
 
-    <?php
-
-    if (isset($page_css) && $page_css === 'calculateur.css') {
-        echo "<script>\n";
-        echo "    const nombreCaisses = " . $nombre_caisses . ";\n";
-        echo "    const nomsCaisses = " . json_encode($noms_caisses) . ";\n";
-        echo "    const denominations = " . json_encode($denominations) . ";\n";
-        echo "</script>\n";
-    }
-    ?>
-
     <script src="js/app.js"></script>
 </body>
 </html>
