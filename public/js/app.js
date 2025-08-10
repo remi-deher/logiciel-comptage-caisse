@@ -3,29 +3,30 @@
  * Gère les calculs, les onglets, la synchro WebSocket et la sauvegarde intelligente.
  */
 document.addEventListener('DOMContentLoaded', function() {
+
+   // --- Logique pour la barre de navigation responsive (s'applique à toutes les pages) ---
+    const navbarToggler = document.getElementById('navbar-toggler');
+    const navbarCollapse = document.getElementById('navbar-collapse');
+
+    if (navbarToggler && navbarCollapse) {
+        navbarToggler.addEventListener('click', function() {
+            navbarCollapse.classList.toggle('show');
+        });
+    }
+
     const caisseForm = document.getElementById('caisse-form');
     if (!caisseForm) {
         return;
     }
 
     // --- Définitions et sélection des éléments du DOM ---
-    const denominations = {
-        billets: { b500: 500, b200: 200, b100: 100, b50: 50, b20: 20, b10: 10, b5: 5 },
-        pieces: { p200: 2, p100: 1, p050: 0.50, p020: 0.20, p010: 0.10, p005: 0.05, p002: 0.02, p001: 0.01 }
-    };
-    const nombreCaisses = 2;
-    const nomsCaisses = {
-        1: "Caisse centre ville",
-        2: "Caisse officine"
-    };
-
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
     const nomComptageInput = document.getElementById('nom_comptage');
     const ecartDisplays = document.querySelectorAll('.ecart-display');
     const statusIndicator = document.getElementById('websocket-status-indicator');
     const statusText = statusIndicator ? statusIndicator.querySelector('.status-text') : null;
-    let isSubmitting = false; // Variable pour suivre la soumission manuelle
+    let isSubmitting = false;
 
     // --- Fonctions ---
     const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(montant);
@@ -35,15 +36,32 @@ document.addEventListener('DOMContentLoaded', function() {
         return new Intl.DateTimeFormat('fr-FR', options).format(now).replace(/^\w/, c => c.toUpperCase());
     };
 
+    /**
+     * CORRECTION MAJEURE : La fonction calcule maintenant pour chaque caisse
+     * présente dans l'objet `nomsCaisses`, quels que soient leurs IDs.
+     */
     const calculateAllFull = () => {
         let totauxCombines = { fdc: 0, total: 0, recette: 0, theorique: 0, ecart: 0 };
         let allCaissesReady = true;
 
-        for (let i = 1; i <= nombreCaisses; i++) {
-            const getVal = (id) => parseFloat(document.getElementById(id + '_' + i).value.replace(',', '.')) || 0;
+        // Boucle sur les clés (IDs) de l'objet nomsCaisses (ex: "1", "3", "4")
+        for (const i of Object.keys(nomsCaisses)) {
+            const getVal = (id) => {
+                const element = document.getElementById(id + '_' + i);
+                // On vérifie si l'élément existe avant de lire sa valeur
+                return element ? parseFloat(element.value.replace(',', '.')) || 0 : 0;
+            };
+
             let totalCompte = 0;
-            for (const type in denominations) for (const name in denominations[type]) totalCompte += getVal(name) * denominations[type][name];
-            const fondDeCaisse = getVal('fond_de_caisse'), ventes = getVal('ventes'), retrocession = getVal('retrocession');
+            for (const type in denominations) {
+                for (const name in denominations[type]) {
+                    totalCompte += getVal(name) * denominations[type][name];
+                }
+            }
+            
+            const fondDeCaisse = getVal('fond_de_caisse');
+            const ventes = getVal('ventes');
+            const retrocession = getVal('retrocession');
             
             const recetteTheorique = ventes + retrocession;
             const recetteReelle = totalCompte - fondDeCaisse;
@@ -134,7 +152,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let conn;
     try {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = window.location.host;
+        // Adaptez le port si nécessaire, mais cela devrait fonctionner avec la configuration du VHost
+        const wsHost = window.location.host; 
         const wsUrl = `${wsProtocol}//${wsHost}/ws/`;
         conn = new WebSocket(wsUrl);
 
@@ -177,7 +196,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
                 calculateAllFull();
-                // CORRECTION: On met à jour l'état de référence après avoir reçu une modification
                 initialDenominationState = getDenominationStateAsString();
             } catch (error) {
                 console.error("Erreur de parsing JSON WebSocket:", error);
@@ -226,10 +244,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Logique de sauvegarde intelligente ---
     let initialDenominationState = '';
     
-    /**
-     * CORRECTION: Capture l'état actuel des champs de pièces et billets uniquement.
-     * @returns {string} Une chaîne JSON représentant les valeurs de ces champs.
-     */
     function getDenominationStateAsString() {
         const state = {};
         const inputs = caisseForm.querySelectorAll('input[type="number"]');
@@ -250,7 +264,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         const nomActuel = nomComptageInput.value.trim();
-        if (nomActuel !== '') {
+        // Sauvegarde seulement si des pièces/billets ont été saisis
+        if (currentDenominationState !== '{}' && nomActuel === '') {
             const formData = new FormData(caisseForm);
             const nouveauNom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
             formData.set('nom_comptage', nouveauNom);
@@ -275,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 if (data.update_available) {
-                    versionInfo.innerHTML = `Version <strong>${data.local_version}</strong>. 
+                    versionInfo.innerHTML = `Version <strong>${data.local_version}</strong>.
                         <span style="color: #e67e22;">Mise à jour vers ${data.remote_version} disponible.</span>`;
                     updateButton.style.display = 'inline-block';
                     releaseNotes = data.release_notes; // On stocke les notes

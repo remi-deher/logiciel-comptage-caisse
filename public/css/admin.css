@@ -1,100 +1,112 @@
 /* ==========================================================================
-   public/css/admin.css
+   public/css/admin.css (Responsive)
    ========================================================================== */
 
 /* --- Page de Connexion --- */
-body.login-page-body { display: flex; align-items: center; justify-content: center; }
-.login-container { max-width: 400px; width: 100%; padding: 30px; background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-.login-container h2 { text-align: center; margin-bottom: 20px; color: #2c3e50; border-bottom: none; }
-.login-container .form-group { margin-bottom: 15px; }
+body.login-page-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #eef2f5;
+}
+.login-container {
+    max-width: 400px;
+    width: 100%;
+    padding: 40px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+.login-container h2 {
+    text-align: center;
+    margin-bottom: 25px;
+    color: #2c3e50;
+    border-bottom: none;
+    font-size: 1.8em;
+}
+.login-container .form-group { margin-bottom: 20px; }
 .login-container input[type="text"], .login-container input[type="password"] { text-align: left; }
-.login-container .error { margin-bottom: 15px; }
-.login-container button { width: 100%; }
+.login-container .error { margin-bottom: 20px; }
+.login-container button { width: 100%; padding: 12px; font-size: 1.1em; }
 
 /* --- Page d'Administration --- */
 .admin-header {
-    margin-bottom: 20px;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #dee2e6;
 }
+.admin-header h2 {
+    border-bottom: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.admin-header i { color: #3498db; }
 
 .admin-grid {
     display: grid;
-    grid-template-columns: 1fr; /* Une colonne par défaut pour les mobiles */
+    grid-template-columns: 1fr; /* Une colonne par défaut pour mobile */
     gap: 25px;
 }
 
 .admin-card {
     background-color: #fff;
     border: 1px solid #e9ecef;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    overflow: hidden; /* Pour que les bordures du tableau s'arrondissent bien */
+    border-radius: 12px;
+    box-shadow: 0 4px 25px rgba(0,0,0,0.05);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
-
 .admin-card h3 {
     margin: 0;
-    padding: 15px 20px;
+    padding: 20px 25px;
     background-color: #f8f9fa;
     border-bottom: 1px solid #e9ecef;
     font-size: 1.2em;
-}
-
-.admin-card .admin-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-.admin-card .admin-table th, .admin-card .admin-table td {
-    padding: 12px 20px;
-    border-bottom: 1px solid #e9ecef;
-    text-align: left;
-}
-.admin-card .admin-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.inline-form {
     display: flex;
-    gap: 10px;
     align-items: center;
+    gap: 10px;
 }
-.inline-input {
-    flex-grow: 1;
-    text-align: left !important; /* Force l'alignement à gauche */
-}
-.action-btn-small {
-    padding: 5px 10px;
-    font-size: 0.9em;
-    flex-shrink: 0; /* Empêche le bouton de rétrécir */
-}
+.admin-card h3 i { color: #95a5a6; }
+.admin-card-content { padding: 25px; flex-grow: 1; }
+.admin-card-footer { padding: 20px 25px; background-color: #f8f9fa; border-top: 1px solid #e9ecef; }
 
-.card-footer {
-    padding: 20px;
-    background-color: #f8f9fa;
-    border-top: 1px solid #e9ecef;
-}
-.card-footer h4 {
-    margin-top: 0;
-    margin-bottom: 15px;
-}
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table th, .admin-table td { padding: 15px 0; border-bottom: 1px solid #e9ecef; text-align: left; vertical-align: middle; }
+.admin-table tbody tr:last-child td { border-bottom: none; }
+.admin-table td:last-child { text-align: right; }
 
-.status-tag {
-    padding: 3px 8px;
-    border-radius: 12px;
-    font-size: 0.8em;
-    font-weight: bold;
-    color: white;
-}
+.backup-list { list-style: none; padding: 0; margin: 0; }
+.backup-list li { background-color: #f8f9fa; padding: 12px 18px; border: 1px solid #e9ecef; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.backup-list li:hover { background-color: #f1f3f5; }
+
+.inline-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.inline-input { flex-grow: 1; text-align: left !important; min-width: 150px; }
+.action-btn-small { padding: 8px 12px; font-size: 0.9em; flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; }
+
+.download-link { font-size: 0.9em; font-weight: bold; text-decoration: none; padding: 8px 12px; background: #27ae60; color: white; border-radius: 5px; transition: background-color 0.2s; }
+.download-link:hover { background: #229954; }
+.download-link i { margin-right: 5px; }
+
+.status-tag { padding: 4px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; color: white; display: inline-block; }
 .status-ok { background-color: #27ae60; }
 .status-warning { background-color: #f39c12; }
 .status-partial { background-color: #e67e22; }
 
-.backup-list { list-style: none; padding: 0 20px 20px; }
-.backup-list li { background-color: #f8f9fa; padding: 10px 15px; border: 1px solid #e9ecef; border-radius: 4px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
-.download-link { font-size: 0.9em; font-weight: bold; text-decoration: none; padding: 5px 10px; background: #27ae60; color: white; border-radius: 3px; }
-.download-link:hover { background: #229954; }
+.admin-card .form-group { margin-bottom: 15px; }
+.admin-card .form-group:last-child { margin-bottom: 0; }
+.admin-card .save-btn { width: 100%; }
 
-/* Responsive pour les écrans plus larges */
-@media (min-width: 1024px) {
+/* --- Media Queries pour le responsive --- */
+@media (min-width: 768px) {
     .admin-grid {
-        grid-template-columns: 1fr 1fr; /* Deux colonnes sur les grands écrans */
+        grid-template-columns: 1fr 1fr; /* Deux colonnes sur tablette */
+    }
+}
+@media (min-width: 1200px) {
+    .admin-grid {
+        /* Permet d'avoir 2 ou 3 colonnes selon la place disponible */
+        grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
     }
 }

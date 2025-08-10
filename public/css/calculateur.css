@@ -1,5 +1,5 @@
 /* ==========================================================================
-   public/css/calculateur.css (MIS À JOUR)
+   public/css/calculateur.css (Responsive)
    ========================================================================== */
 .tab-selector { border-bottom: 2px solid #ccc; margin-bottom: 20px; display: flex; flex-wrap: wrap; }
 .tab-link { background-color: #f1f1f1; border: 1px solid #ccc; border-bottom: none; padding: 10px 15px; cursor: pointer; font-size: 1em; border-radius: 5px 5px 0 0; margin-right: 5px; }
@@ -7,10 +7,7 @@
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-/* Règle d'alignement déplacée ici */
-.tab-content .form-group input {
-    text-align: right;
-}
+.tab-content .form-group input { text-align: right; }
 
 .ecart-display-container { text-align: center; }
 .ecart-display { display: none; padding: 15px; margin-bottom: 20px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1.1em; font-weight: bold; transition: background-color 0.3s, border-color 0.3s; }
@@ -26,11 +23,22 @@
 .ecart-display.ecart-negatif { background-color: #fdedec; border-color: #c0392b; }
 .ecart-display.ecart-negatif .ecart-value { color: #c0392b; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; }
-.grid-3 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));}
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; }
+.grid-3 { grid-template-columns: 1fr; gap: 15px;} /* Une colonne par défaut pour mobile */
+
 .results { margin-top: 40px; }
-.results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.results-grid { display: grid; grid-template-columns: 1fr; gap: 20px; } /* Une colonne par défaut */
 .result-box { background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; }
-.combined-results { background-color: #eaf5ff; border: 1px solid #aed6f1; margin-top: 30px; }
+.combined-results { background-color: #eaf5ff; border: 1px solid #aed6f1; margin-top: 20px; }
 .save-section { margin-top: 30px; padding: 20px; background-color: #e8f5e9; border-radius: 8px; }
 .button-group { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+
+/* --- Media Queries pour le responsive --- */
+@media (min-width: 576px) {
+    .grid-3 {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .results-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+}
