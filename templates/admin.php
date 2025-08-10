@@ -16,6 +16,29 @@
     <?php endif; ?>
 
     <div class="admin-grid">
+        <!-- Nouvelle Carte : Configuration Générale -->
+        <div class="admin-card">
+            <h3><i class="fa-solid fa-sliders"></i>Configuration Générale</h3>
+            <div class="admin-card-content">
+                <form action="index.php?page=admin" method="POST">
+                    <input type="hidden" name="action" value="update_app_config">
+                    <div class="form-group">
+                        <label for="app_timezone">Fuseau Horaire de l'Application</label>
+                        <select id="app_timezone" name="app_timezone" class="inline-input">
+                            <?php 
+                            $current_timezone = defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Europe/Paris';
+                            foreach($timezones as $timezone): ?>
+                                <option value="<?= htmlspecialchars($timezone) ?>" <?= ($current_timezone === $timezone) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($timezone) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="submit" class="save-btn"><i class="fa-solid fa-floppy-disk"></i>Mettre à jour</button>
+                </form>
+            </div>
+        </div>
+
         <!-- Carte : Gestion des Caisses -->
         <div class="admin-card">
             <h3><i class="fa-solid fa-cash-register"></i>Gestion des Caisses</h3>

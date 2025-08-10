@@ -4,7 +4,7 @@
 // On injecte les variables PHP nécessaires au JavaScript, uniquement sur cette page.
 if (isset($page_css) && $page_css === 'calculateur.css') {
     echo "<script>\n";
-    echo "    const nombreCaisses = " . $nombre_caisses . ";\n";
+    echo "    const nombreCaisses = " . ($nombre_caisses ?? 0) . ";\n";
     echo "    const nomsCaisses = " . json_encode($noms_caisses) . ";\n";
     echo "    const denominations = " . json_encode($denominations) . ";\n";
     echo "</script>\n";
@@ -22,6 +22,7 @@ require 'partials/navbar.php';
     <form id="caisse-form" action="index.php?page=calculateur" method="post">
         <input type="hidden" name="action" value="save">
 
+        <!-- Sélecteur d'onglets pour naviguer entre les caisses -->
         <div class="tab-selector">
             <?php $is_first = true; ?>
             <?php foreach ($noms_caisses as $id => $nom): ?>
@@ -30,6 +31,7 @@ require 'partials/navbar.php';
             <?php endforeach; ?>
         </div>
 
+        <!-- Affichage de l'écart de la caisse active -->
         <div class="ecart-display-container">
             <?php $is_first = true; ?>
             <?php foreach ($noms_caisses as $id => $nom): ?>
@@ -42,6 +44,7 @@ require 'partials/navbar.php';
             <?php endforeach; ?>
         </div>
 
+        <!-- Contenu pour chaque caisse -->
         <?php $is_first = true; ?>
         <?php foreach ($noms_caisses as $id => $nom): ?>
             <div id="caisse<?= $id ?>" class="tab-content <?= $is_first ? 'active' : '' ?>">
@@ -88,6 +91,7 @@ require 'partials/navbar.php';
             <?php $is_first = false; ?>
         <?php endforeach; ?>
 
+        <!-- Section pour la sauvegarde -->
         <div class="save-section">
             <h3>Enregistrer le comptage</h3>
             <div class="form-group">
@@ -100,10 +104,12 @@ require 'partials/navbar.php';
             </div>
             <div class="button-group">
                 <button type="submit" class="save-btn">Enregistrer le Comptage</button>
+                <div id="autosave-status" class="autosave-status"></div>
             </div>
         </div>
     </form>
 
+    <!-- Section où les résultats en temps réel seront affichés par JavaScript -->
     <div class="results" id="results-container">
         <h2>Résultats en Temps Réel</h2>
         <div class="results-grid">

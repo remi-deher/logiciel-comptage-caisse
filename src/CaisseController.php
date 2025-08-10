@@ -197,7 +197,7 @@ class CaisseController {
         $nom_comptage = trim($_POST['nom_comptage'] ?? '');
 
         if (empty($nom_comptage)) {
-            http_response_code(204);
+            http_response_code(204); // Pas de contenu à sauvegarder
             exit;
         }
 
@@ -227,7 +227,9 @@ class CaisseController {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($sql_values);
         
-        http_response_code(204);
+        // On renvoie une réponse JSON pour le feedback
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'message' => 'Sauvegarde auto à ' . date('H:i:s')]);
         exit;
     }
 }

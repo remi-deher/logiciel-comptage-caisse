@@ -42,3 +42,18 @@
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     }
 }
+
+/* NOUVEAUX STYLES POUR L'AUTOSAVE */
+.autosave-status {
+    text-align: center;
+    font-size: 0.9em;
+    color: #7f8c8d;
+    min-height: 1.2em;
+    transition: color 0.5s;
+}
+.autosave-status.saving {
+    color: #3498db;
+}
+.autosave-status.success {
+    color: #27ae60;
+}

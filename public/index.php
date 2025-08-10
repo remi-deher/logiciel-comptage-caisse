@@ -1,6 +1,9 @@
 <?php
 // public/index.php
 
+// Définit le fuseau horaire pour toute l'application
+date_default_timezone_set('Europe/Paris');
+
 // REDIRECTION VERS L'INSTALLATEUR SI L'APPLICATION N'EST PAS CONFIGURÉE
 if (!file_exists(__DIR__ . '/../config/config.php')) {
     if (is_dir(__DIR__ . '/install')) {

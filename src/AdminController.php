@@ -21,6 +21,7 @@ class AdminController {
         if ($action) {
             switch ($action) {
                 case 'update_db_config': $this->updateDbConfig(); break;
+                case 'update_app_config': $this->updateAppConfig(); break;
                 case 'create_backup': $this->createBackup(); break;
                 case 'sync_single_admin': $this->syncSingleAdmin(); break;
                 case 'delete_admin': $this->deleteAdmin(); break;
@@ -45,6 +46,9 @@ class AdminController {
         $backups = $this->getBackups();
         $admins = $this->getAdminsList();
         $caisses = $noms_caisses;
+        // On récupère la liste des fuseaux horaires pour la vue
+        $timezones = DateTimeZone::listIdentifiers(DateTimeZone::EUROPE);
+        
         $page_css = 'admin.css';
         require __DIR__ . '/../templates/admin.php';
     }
@@ -109,35 +113,46 @@ class AdminController {
     }
 
     /**
+     * Met à jour le fichier de configuration de l'application (fuseau horaire).
+     */
+    private function updateAppConfig() {
+        $new_timezone = $_POST['app_timezone'] ?? 'Europe/Paris';
+        
+        if (!in_array($new_timezone, DateTimeZone::listIdentifiers())) {
+            $_SESSION['admin_error'] = "Fuseau horaire invalide.";
+            return;
+        }
+
+        $defines = [
+            'DB_HOST' => DB_HOST,
+            'DB_NAME' => DB_NAME,
+            'DB_USER' => DB_USER,
+            'DB_PASS' => DB_PASS,
+            'GIT_REPO_URL' => GIT_REPO_URL,
+            'APP_TIMEZONE' => $new_timezone
+        ];
+
+        $this->updateConfigFile($defines);
+        $_SESSION['admin_message'] = "Configuration de l'application mise à jour.";
+    }
+
+    /**
      * Met à jour le fichier de configuration de la BDD.
      */
     private function updateDbConfig() {
-        global $noms_caisses, $denominations;
-        $config_path = __DIR__ . '/../config/config.php';
+        $defines = [
+            'DB_HOST' => $_POST['db_host'],
+            'DB_NAME' => $_POST['db_name'],
+            'DB_USER' => $_POST['db_user'],
+            'DB_PASS' => $_POST['db_pass'],
+            'GIT_REPO_URL' => GIT_REPO_URL,
+            'APP_TIMEZONE' => defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Europe/Paris'
+        ];
         
-        $new_content = '<?php' . PHP_EOL . PHP_EOL;
-        $new_content .= "// Paramètres de connexion à la base de données" . PHP_EOL;
-        $new_content .= "define('DB_HOST', '" . addslashes($_POST['db_host']) . "');" . PHP_EOL;
-        $new_content .= "define('DB_NAME', '" . addslashes($_POST['db_name']) . "');" . PHP_EOL;
-        $new_content .= "define('DB_USER', '" . addslashes($_POST['db_user']) . "');" . PHP_EOL;
-        $new_content .= "define('DB_PASS', '" . addslashes($_POST['db_pass']) . "');" . PHP_EOL . PHP_EOL;
-        $new_content .= "// URL du dépôt Git pour le pied de page" . PHP_EOL;
-        $new_content .= "define('GIT_REPO_URL', '" . addslashes(GIT_REPO_URL) . "');" . PHP_EOL . PHP_EOL;
-        $new_content .= "// Configuration de l'application" . PHP_EOL;
-        $new_content .= '$noms_caisses = ' . var_export($noms_caisses, true) . ';' . PHP_EOL;
-        $new_content .= '$denominations = ' . var_export($denominations, true) . ';' . PHP_EOL;
-
-        if (is_writable($config_path)) {
-            file_put_contents($config_path, $new_content);
-            $_SESSION['admin_message'] = "Configuration de la base de données mise à jour.";
-        } else {
-            $_SESSION['admin_error'] = "Erreur : Le fichier de configuration n'est pas accessible en écriture.";
-        }
+        $this->updateConfigFile($defines);
+        $_SESSION['admin_message'] = "Configuration de la base de données mise à jour.";
     }
     
-    /**
-     * Crée une sauvegarde de la base de données.
-     */
     private function createBackup() {
         $backupDir = __DIR__ . '/../backups';
         if (!is_dir($backupDir)) {
@@ -163,9 +178,6 @@ class AdminController {
         }
     }
 
-    /**
-     * Récupère la liste des sauvegardes.
-     */
     private function getBackups() {
         $backupDir = __DIR__ . '/../backups';
         if (!is_dir($backupDir)) return [];
@@ -180,9 +192,6 @@ class AdminController {
         return $backups;
     }
 
-    /**
-     * Vérifie si l'utilisateur est authentifié.
-     */
     private function checkAuth() {
         if (empty($_SESSION['is_admin'])) {
             header('Location: index.php?page=login');
@@ -190,16 +199,10 @@ class AdminController {
         }
     }
     
-    /**
-     * Synchronise un seul admin vers le fichier de secours (après une connexion réussie).
-     */
     private function syncFallbackAdmin($username, $db_hash) {
         $this->updateFallbackFile($username, $db_hash);
     }
 
-    /**
-     * Récupère et compare la liste des admins de la BDD et du fichier de secours.
-     */
     private function getAdminsList() {
         $admins = [];
         $db_admins = [];
@@ -554,23 +557,25 @@ class AdminController {
         }
     }
 
-    private function updateConfigFile($updates) {
+    private function updateConfigFile($defines) {
         global $noms_caisses, $denominations;
         $config_path = __DIR__ . '/../config/config.php';
 
         if (isset($updates['noms_caisses'])) $noms_caisses = $updates['noms_caisses'];
 
-        $new_content = '<?php' . PHP_EOL . PHP_EOL;
-        $new_content .= "// Paramètres de connexion à la base de données" . PHP_EOL;
-        $new_content .= "define('DB_HOST', '" . addslashes(DB_HOST) . "');" . PHP_EOL;
-        $new_content .= "define('DB_NAME', '" . addslashes(DB_NAME) . "');" . PHP_EOL;
-        $new_content .= "define('DB_USER', '" . addslashes(DB_USER) . "');" . PHP_EOL;
-        $new_content .= "define('DB_PASS', '" . addslashes(DB_PASS) . "');" . PHP_EOL . PHP_EOL;
-        $new_content .= "// URL du dépôt Git pour le pied de page" . PHP_EOL;
-        $new_content .= "define('GIT_REPO_URL', '" . addslashes(GIT_REPO_URL) . "');" . PHP_EOL . PHP_EOL;
-        $new_content .= "// Configuration de l'application" . PHP_EOL;
-        $new_content .= '$noms_caisses = ' . var_export($noms_caisses, true) . ';' . PHP_EOL;
-        $new_content .= '$denominations = ' . var_export($denominations, true) . ';' . PHP_EOL;
+        $new_content = "<?php\n\n";
+        $new_content .= "// Paramètres de connexion à la base de données\n";
+        $new_content .= "define('DB_HOST', '" . addslashes($defines['DB_HOST']) . "');\n";
+        $new_content .= "define('DB_NAME', '" . addslashes($defines['DB_NAME']) . "');\n";
+        $new_content .= "define('DB_USER', '" . addslashes($defines['DB_USER']) . "');\n";
+        $new_content .= "define('DB_PASS', '" . addslashes($defines['DB_PASS']) . "');\n\n";
+        $new_content .= "// URL du dépôt Git pour le pied de page\n";
+        $new_content .= "define('GIT_REPO_URL', '" . addslashes($defines['GIT_REPO_URL']) . "');\n\n";
+        $new_content .= "// Fuseau horaire de l'application\n";
+        $new_content .= "define('APP_TIMEZONE', '" . addslashes($defines['APP_TIMEZONE']) . "');\n\n";
+        $new_content .= "// Configuration de l'application\n";
+        $new_content .= '$noms_caisses = ' . var_export($noms_caisses, true) . ";\n";
+        $new_content .= '$denominations = ' . var_export($denominations, true) . ";\n";
 
         if (is_writable($config_path)) {
             file_put_contents($config_path, $new_content, LOCK_EX);
