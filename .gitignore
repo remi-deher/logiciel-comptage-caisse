@@ -3,5 +3,5 @@ config/config.php
 composer.phar
 /vendor/
 composer.lock
-!/backups/.gitkeep
-!/cache/.gitkeep
+/backups/*
+/cache/*
