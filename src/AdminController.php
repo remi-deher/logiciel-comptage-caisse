@@ -386,7 +386,8 @@ class AdminController {
                 'remote_version' => $remote_version,
                 'update_available' => $update_available,
                 'release_notes' => $cachedData['release_notes'] ?? 'Notes de version non disponibles.',
-                'remote_version_published_at' => $cachedData['remote_version_published_at'] ?? null
+                'remote_version_published_at' => $cachedData['remote_version_published_at'] ?? null,
+                'formatted_release_date' => $cachedData['formatted_release_date'] ?? 'N/A'
             ];
             
             echo json_encode($responseData);
@@ -400,6 +401,7 @@ class AdminController {
             'update_available' => false,
             'release_notes' => 'Impossible de vérifier les mises à jour pour le moment.',
             'remote_version_published_at' => null,
+            'formatted_release_date' => 'N/A',
             'error' => 'API indisponible'
         ];
 
@@ -432,6 +434,7 @@ class AdminController {
         $remote_version = $data['tag_name'] ?? null;
         $release_notes = $data['body'] ?? 'Notes de version non disponibles.';
         $published_at = $data['published_at'] ?? null;
+        $formatted_date = $published_at ? format_date_fr($published_at) : 'N/A';
 
         if (!$remote_version) {
             file_put_contents($cacheFile, json_encode($fallbackResponse), LOCK_EX);
@@ -446,7 +449,8 @@ class AdminController {
             'remote_version' => $remote_version,
             'update_available' => $update_available,
             'release_notes' => $release_notes,
-            'remote_version_published_at' => $published_at
+            'remote_version_published_at' => $published_at,
+            'formatted_release_date' => $formatted_date
         ];
 
         file_put_contents($cacheFile, json_encode($responseData), LOCK_EX);
