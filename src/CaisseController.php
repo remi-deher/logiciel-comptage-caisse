@@ -87,12 +87,10 @@ class CaisseController {
      */
     public function changelog() {
         $cacheDir = __DIR__ . '/../cache';
-        if (!is_dir($cacheDir)) {
-            if (!@mkdir($cacheDir, 0755, true)) {
-                $releases = [['tag_name' => 'Erreur', 'published_at' => date('c'), 'body_html' => 'Le dossier de cache est manquant et ne peut pas être créé.']];
-                require __DIR__ . '/../templates/changelog.php';
-                return;
-            }
+        if (!is_dir($cacheDir) && !@mkdir($cacheDir, 0755, true)) {
+            $releases = [['tag_name' => 'Erreur', 'published_at' => date('c'), 'body_html' => 'Le dossier de cache est manquant et ne peut pas être créé.']];
+            require __DIR__ . '/../templates/changelog.php';
+            return;
         }
         $cacheFile = $cacheDir . '/github_releases_full.json';
         $cacheLifetime = 3600; // 1 heure en secondes
@@ -101,6 +99,7 @@ class CaisseController {
             $releases = json_decode(file_get_contents($cacheFile), true);
         } else {
             $releases = [];
+            
             if (function_exists('curl_init')) {
                 $repo_api_url = 'https://api.github.com/repos/remi-deher/logiciel-comptage-caisse/releases';
                 
@@ -112,15 +111,28 @@ class CaisseController {
                 
                 $response = curl_exec($ch);
                 $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curl_error = curl_error($ch);
                 curl_close($ch);
 
                 if ($http_code == 200) {
                     $releases = json_decode($response, true);
                     file_put_contents($cacheFile, json_encode($releases), LOCK_EX);
+                } else {
+                    // En cas d'échec de l'API, on crée un message d'erreur détaillé
+                    $error_message = "<p>Impossible de contacter GitHub pour récupérer le journal des modifications.</p>";
+                    if ($http_code == 403) {
+                        $error_message .= "<p><strong>Raison :</strong> L'API de GitHub a temporairement limité les requêtes provenant de ce serveur. Veuillez réessayer dans une heure.</p>";
+                    } elseif ($curl_error) {
+                        $error_message .= "<p><strong>Erreur cURL :</strong> " . htmlspecialchars($curl_error) . "</p>";
+                    } else {
+                        $error_message .= "<p><strong>Code de statut HTTP :</strong> " . htmlspecialchars($http_code) . "</p>";
+                    }
+                    $releases = [['tag_name' => 'Erreur de Connexion', 'published_at' => date('c'), 'body_html' => $error_message]];
+                    file_put_contents($cacheFile, json_encode($releases), LOCK_EX);
                 }
-            }
-            if(empty($releases)) {
-                file_put_contents($cacheFile, json_encode([]), LOCK_EX);
+            } else {
+                $releases = [['tag_name' => 'Erreur de Configuration', 'published_at' => date('c'), 'body_html' => '<p>L\'extension cURL de PHP n\'est pas activée sur le serveur.</p>']];
+                file_put_contents($cacheFile, json_encode($releases), LOCK_EX);
             }
         }
         
