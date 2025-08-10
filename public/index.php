@@ -3,7 +3,6 @@
 
 // REDIRECTION VERS L'INSTALLATEUR SI L'APPLICATION N'EST PAS CONFIGURÉE
 if (!file_exists(__DIR__ . '/../config/config.php')) {
-    // On vérifie que le dossier d'installation existe avant de rediriger
     if (is_dir(__DIR__ . '/install')) {
         header('Location: install/'); // Redirige vers le dossier d'installation
         exit;
@@ -26,17 +25,25 @@ $adminController = new AdminController($pdo);
 $page = $_GET['page'] ?? 'calculateur';
 $action = $_REQUEST['action'] ?? null;
 
-// Routes pour la mise à jour Git
-if ($action === 'git_release_check') {
-    $adminController->gitReleaseCheck();
-    exit;
-}
-if ($action === 'git_pull') {
-    $adminController->gitPull();
-    exit;
+// --- Routes pour les actions AJAX (qui ne chargent pas de page complète) ---
+if ($action) {
+    switch ($action) {
+        case 'git_release_check':
+            $adminController->gitReleaseCheck();
+            exit;
+        case 'force_git_release_check': // ROUTE AJOUTÉE
+            $adminController->forceGitReleaseCheck();
+            exit;
+        case 'git_pull':
+            $adminController->gitPull();
+            exit;
+        case 'autosave':
+            $caisseController->autosave();
+            exit;
+    }
 }
 
-// Routage principal
+// --- Routage principal pour l'affichage des pages ---
 switch ($page) {
     case 'historique':
         if ($action === 'delete') {
@@ -70,8 +77,6 @@ switch ($page) {
     default:
         if ($action === 'save') {
             $caisseController->save();
-        } elseif ($action === 'autosave') {
-            $caisseController->autosave();
         } else {
             $caisseController->calculateur();
         }

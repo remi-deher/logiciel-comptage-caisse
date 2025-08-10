@@ -21,6 +21,9 @@ $release_info = 'Information non disponible';
         <p>
             Version actuelle : <strong><?= htmlspecialchars($current_version) ?></strong> |
             <span id="release-info-container">Dernière release : <span id="release-date-info"><?= htmlspecialchars($release_info) ?></span></span>
+            <button id="force-version-check" class="force-check-btn" title="Forcer la vérification">
+                <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
         </p>
         
         <div id="update-container" class="update-container">

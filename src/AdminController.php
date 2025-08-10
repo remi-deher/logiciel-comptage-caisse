@@ -350,7 +350,11 @@ class AdminController {
         exit;
     }
 
-    public function gitReleaseCheck() {
+    public function forceGitReleaseCheck() {
+        $this->gitReleaseCheck(true);
+    }
+
+    public function gitReleaseCheck($force = false) {
         header('Content-Type: application/json');
         
         $cacheDir = __DIR__ . '/../cache';
@@ -365,7 +369,7 @@ class AdminController {
         $version_file = $projectRoot . '/VERSION';
         $local_version = file_exists($version_file) ? trim(file_get_contents($version_file)) : '0.0.0';
 
-        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheLifetime)) {
+        if ($force === false && file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheLifetime)) {
             $cachedData = json_decode(file_get_contents($cacheFile), true);
             $remote_version = $cachedData['remote_version'] ?? $local_version;
             $update_available = version_compare($local_version, $remote_version, '<');
