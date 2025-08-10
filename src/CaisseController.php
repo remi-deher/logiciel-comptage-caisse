@@ -118,7 +118,6 @@ class CaisseController {
                     $releases = json_decode($response, true);
                     file_put_contents($cacheFile, json_encode($releases), LOCK_EX);
                 } else {
-                    // En cas d'échec de l'API, on crée un message d'erreur détaillé
                     $error_message = "<p>Impossible de contacter GitHub pour récupérer le journal des modifications.</p>";
                     if ($http_code == 403) {
                         $error_message .= "<p><strong>Raison :</strong> L'API de GitHub a temporairement limité les requêtes provenant de ce serveur. Veuillez réessayer dans une heure.</p>";
@@ -194,17 +193,31 @@ class CaisseController {
      * Gère la sauvegarde automatique des données du formulaire.
      */
     public function autosave() {
+        ob_start(); // Démarre le buffer pour capturer toute sortie inattendue (warnings, etc.)
+
         $nom_comptage = trim($_POST['nom_comptage'] ?? '');
 
-        if (empty($nom_comptage)) {
-            http_response_code(204); // Pas de contenu à sauvegarder
+        $has_data = false;
+        foreach ($_POST['caisse'] ?? [] as $caisse_data) {
+            foreach ($caisse_data as $value) {
+                if (!empty($value)) {
+                    $has_data = true;
+                    break 2;
+                }
+            }
+        }
+
+        if (empty($nom_comptage) || !$has_data) {
+            ob_end_clean();
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Aucune donnée à sauvegarder.']);
             exit;
         }
 
         $sql_columns = ['nom_comptage', 'explication', 'date_comptage'];
         $sql_values = [
             $nom_comptage,
-            trim($_POST['explication']),
+            trim($_POST['explication'] ?? ''),
             date('Y-m-d H:i:s')
         ];
 
@@ -227,7 +240,7 @@ class CaisseController {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($sql_values);
         
-        // On renvoie une réponse JSON pour le feedback
+        ob_end_clean(); // Nettoie le buffer avant d'envoyer la réponse JSON
         header('Content-Type: application/json');
         echo json_encode(['success' => true, 'message' => 'Sauvegarde auto à ' . date('H:i:s')]);
         exit;

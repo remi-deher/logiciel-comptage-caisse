@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 handleVersionData(data);
                 if (force && icon) {
-                    setTimeout(() => icon.classList.remove('fa-spin'), 500); // Laisse le temps à l'animation de se voir
+                    setTimeout(() => icon.classList.remove('fa-spin'), 500);
                 }
             })
             .catch(error => {
@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (versionInfo && updateButton && releaseInfoContainer) {
-        performVersionCheck(); // Vérification initiale au chargement
+        performVersionCheck();
 
         if (forceCheckBtn) {
             forceCheckBtn.addEventListener('click', () => performVersionCheck(true));
@@ -122,51 +122,13 @@ Voulez-vous mettre à jour l'application maintenant ?`;
     // LOGIQUE SPÉCIFIQUE AUX PAGES
     // ==========================================================================
 
-    // --- Logique pour la page d'Aide ---
-    const helpPage = document.querySelector('.help-grid');
-    if (helpPage) {
-        const modal = document.getElementById('help-modal');
-        const modalContent = document.getElementById('help-modal-content');
-        const closeModalBtn = modal.querySelector('.modal-close');
-
-        helpPage.addEventListener('click', function(event) {
-            const card = event.target.closest('.help-card');
-            if (card) {
-                const title = card.dataset.title;
-                const iconClass = card.dataset.icon;
-                const content = card.dataset.content;
-
-                let html = `<div class="modal-header">
-                                <div class="help-card-icon"><i class="${iconClass}"></i></div>
-                                <h3>${title}</h3>
-                            </div>`;
-                html += content;
-
-                modalContent.innerHTML = html;
-                modal.style.display = 'block';
-            }
-        });
-
-        if(closeModalBtn) {
-            closeModalBtn.onclick = function() { modal.style.display = 'none'; }
-        }
-        window.onclick = function(event) {
-            if (event.target == modal) {
-                modal.style.display = 'none';
-            }
-        }
-    }
-
-
-
     // --- Logique pour la page d'historique ---
-    const historyPage = document.querySelector('.history-grid, .history-table');
+    const historyPage = document.querySelector('.history-grid');
     if (historyPage) {
-        // Logique de la fenêtre modale
         const modal = document.getElementById('details-modal');
         if(modal) {
             const modalContent = document.getElementById('modal-details-content');
-            const closeModalBtn = document.querySelector('.modal-close');
+            const closeModalBtn = modal.querySelector('.modal-close');
 
             historyPage.addEventListener('click', function(event) {
                 const detailsButton = event.target.closest('.details-btn');
@@ -584,7 +546,6 @@ Voulez-vous mettre à jour l'application maintenant ?`;
         
         function getFormStateAsString() {
             const state = {};
-            // On surveille TOUS les champs de saisie pour détecter un changement
             const inputs = caisseForm.querySelectorAll('input[type="number"], input[type="text"], textarea');
             inputs.forEach(input => {
                 if (input.id) {
@@ -593,10 +554,20 @@ Voulez-vous mettre à jour l'application maintenant ?`;
             });
             return JSON.stringify(state);
         }
+
+        function hasUnsavedChanges() {
+            return initialState !== getFormStateAsString();
+        }
         
-        function performAutosave() {
-            autosaveStatus.textContent = 'Sauvegarde en cours...';
-            autosaveStatus.className = 'autosave-status saving';
+        function performAutosave(isFinal = false) {
+            if (!hasUnsavedChanges() && !isFinal) {
+                return;
+            }
+            
+            if (autosaveStatus && !isFinal) {
+                autosaveStatus.textContent = 'Sauvegarde en cours...';
+                autosaveStatus.className = 'autosave-status saving';
+            }
 
             const formData = new FormData(caisseForm);
             let nom = formData.get('nom_comptage');
@@ -604,36 +575,60 @@ Voulez-vous mettre à jour l'application maintenant ?`;
                 nom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
                 formData.set('nom_comptage', nom);
             }
-
-            fetch('index.php?action=autosave', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    autosaveStatus.textContent = data.message;
-                    autosaveStatus.className = 'autosave-status success';
-                    initialState = getFormStateAsString(); // On met à jour l'état de référence
+            
+            if (isFinal) {
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon('index.php?action=autosave', new URLSearchParams(formData));
                 }
-            })
-            .catch(error => {
-                console.error('Erreur de sauvegarde auto:', error);
-                autosaveStatus.textContent = 'Erreur de sauvegarde.';
-                autosaveStatus.className = 'autosave-status error';
-            });
+            } else {
+                fetch('index.php?action=autosave', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) { throw new Error('La réponse du serveur n\'est pas OK'); }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        if (autosaveStatus) {
+                            autosaveStatus.textContent = data.message;
+                            autosaveStatus.className = 'autosave-status success';
+                        }
+                        initialState = getFormStateAsString();
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur de sauvegarde auto:', error);
+                    if (autosaveStatus) {
+                        autosaveStatus.textContent = 'Erreur de sauvegarde.';
+                        autosaveStatus.className = 'autosave-status error';
+                    }
+                });
+            }
         }
 
         caisseForm.addEventListener('input', () => {
             clearTimeout(autosaveTimeout);
-            autosaveStatus.textContent = 'Modifications non enregistrées...';
-            autosaveStatus.className = 'autosave-status';
-            autosaveTimeout = setTimeout(performAutosave, 2500); // Sauvegarde après 2.5s d'inactivité
+            if (autosaveStatus) {
+                autosaveStatus.textContent = 'Modifications non enregistrées...';
+                autosaveStatus.className = 'autosave-status';
+            }
+            autosaveTimeout = setTimeout(() => performAutosave(false), 2500);
         });
 
         caisseForm.addEventListener('submit', function() {
             clearTimeout(autosaveTimeout);
             isSubmitting = true;
+        });
+
+        window.addEventListener('beforeunload', function(e) {
+            if (isSubmitting) {
+                return;
+            }
+            if (hasUnsavedChanges()) {
+                performAutosave(true);
+            }
         });
 
         // --- Initialisation ---
