@@ -361,27 +361,39 @@ class AdminController {
         header('Content-Type: application/json');
         
         $cacheDir = __DIR__ . '/../cache';
-        if (!is_dir($cacheDir)) {
-            if (!@mkdir($cacheDir, 0755, true)) {
-                 echo json_encode(['error' => "Le dossier de cache est manquant et ne peut pas être créé. Veuillez vérifier les permissions."]);
-                 return;
-            }
+        if (!is_dir($cacheDir) && !@mkdir($cacheDir, 0755, true)) {
+             echo json_encode(['error' => "Le dossier de cache est manquant et ne peut pas être créé."]);
+             return;
         }
         $cacheFile = $cacheDir . '/github_release.json';
         $cacheLifetime = 3600; // 1 heure
 
-        // 1. Vérifier le cache
-        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheLifetime)) {
-            echo file_get_contents($cacheFile);
-            return;
-        }
-
-        // 2. Si le cache est invalide, continuer
+        // On lit TOUJOURS la version locale actuelle depuis le fichier
         $projectRoot = dirname(__DIR__);
         $version_file = $projectRoot . '/VERSION';
         $local_version = file_exists($version_file) ? trim(file_get_contents($version_file)) : '0.0.0';
 
-        // Réponse par défaut en cas d'échec de l'API
+        // 1. Vérifier le cache pour les données distantes
+        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheLifetime)) {
+            $cachedData = json_decode(file_get_contents($cacheFile), true);
+            
+            $remote_version = $cachedData['remote_version'] ?? $local_version;
+            $update_available = version_compare($local_version, $remote_version, '<');
+
+            // On reconstruit la réponse avec la version locale à jour
+            $responseData = [
+                'local_version' => $local_version,
+                'remote_version' => $remote_version,
+                'update_available' => $update_available,
+                'release_notes' => $cachedData['release_notes'] ?? 'Notes de version non disponibles.',
+                'remote_version_published_at' => $cachedData['remote_version_published_at'] ?? null
+            ];
+            
+            echo json_encode($responseData);
+            return;
+        }
+
+        // 2. Si le cache est invalide, appeler l'API
         $fallbackResponse = [
             'local_version' => $local_version,
             'remote_version' => $local_version,
@@ -408,10 +420,9 @@ class AdminController {
         
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curl_error = curl_error($ch);
         curl_close($ch);
 
-        if ($curl_error || $http_code != 200) {
+        if ($http_code != 200) {
             file_put_contents($cacheFile, json_encode($fallbackResponse), LOCK_EX);
             echo json_encode($fallbackResponse);
             return;
@@ -438,9 +449,7 @@ class AdminController {
             'remote_version_published_at' => $published_at
         ];
 
-        // 3. Mettre en cache la nouvelle réponse
         file_put_contents($cacheFile, json_encode($responseData), LOCK_EX);
-
         echo json_encode($responseData);
     }
 
