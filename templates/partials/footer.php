@@ -7,7 +7,6 @@ if (file_exists($version_file)) {
     $current_version = trim(file_get_contents($version_file));
 }
 
-// On affiche une valeur par défaut, qui sera mise à jour par JavaScript
 $release_info = 'Information non disponible';
 ?>
     </div> 
@@ -32,6 +31,11 @@ $release_info = 'Information non disponible';
         </div>
     </footer>
 
-    <script src="js/app.js"></script>
+    <!-- Chargement du script principal sur toutes les pages -->
+    <script src="js/main.js"></script>
+    <!-- Chargement du script spécifique à la page, s'il est défini -->
+    <?php if (!empty($page_js)): ?>
+        <script src="js/<?= htmlspecialchars($page_js) ?>"></script>
+    <?php endif; ?>
 </body>
 </html>

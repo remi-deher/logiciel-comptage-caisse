@@ -1,13 +1,20 @@
 <?php
-// templates/historique.php (Interface - Cartes)
+// templates/historique.php
 
-// On injecte les variables PHP nécessaires pour que le JS puisse construire la modale
-echo "<script>const denominations = " . json_encode($denominations) . "; const nomsCaisses = " . json_encode($noms_caisses) . ";</script>";
+$page_js = 'history.js'; // Définit le script JS spécifique à cette page
 
-$page_css = 'historique.css';
+// On prépare les données pour les passer au JavaScript
+$config_data = json_encode([
+    'nomsCaisses' => $noms_caisses ?? [],
+    'denominations' => $denominations ?? []
+]);
+
 require 'partials/header.php';
 require 'partials/navbar.php';
 ?>
+
+<!-- Ce div invisible contient les données de configuration pour le JavaScript -->
+<div id="history-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'></div>
 
 <div class="container">
     <h2><i class="fa-solid fa-clock-rotate-left" style="color: #3498db;"></i> Historique des Comptages</h2>

@@ -1,7 +1,9 @@
 <?php
 // templates/aide.php
 
-$page_css = 'aide.css'; // On lie la feuille de style
+$page_css = 'aide.css'; // Définit la feuille de style spécifique à cette page
+$page_js = 'help.js'; // Définit le script JS spécifique à cette page
+
 require 'partials/header.php';
 require 'partials/navbar.php';
 ?>
