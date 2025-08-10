@@ -88,16 +88,18 @@ class CaisseController {
     public function changelog() {
         $cacheDir = __DIR__ . '/../cache';
         if (!is_dir($cacheDir)) {
-            mkdir($cacheDir, 0755, true);
+            if (!@mkdir($cacheDir, 0755, true)) {
+                $releases = [['tag_name' => 'Erreur', 'published_at' => date('c'), 'body' => 'Le dossier de cache est manquant et ne peut pas être créé.']];
+                require __DIR__ . '/../templates/changelog.php';
+                return;
+            }
         }
         $cacheFile = $cacheDir . '/github_releases_full.json';
         $cacheLifetime = 3600; // 1 heure en secondes
 
-        // 1. Vérifier le cache
         if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheLifetime)) {
             $releases = json_decode(file_get_contents($cacheFile), true);
         } else {
-            // 2. Si le cache est invalide, appeler l'API
             $releases = [];
             if (function_exists('curl_init')) {
                 $repo_api_url = 'https://api.github.com/repos/remi-deher/logiciel-comptage-caisse/releases';
@@ -113,9 +115,11 @@ class CaisseController {
 
                 if ($http_code == 200) {
                     $releases = json_decode($response, true);
-                    // Mettre en cache la nouvelle réponse
                     file_put_contents($cacheFile, json_encode($releases), LOCK_EX);
                 }
+            }
+            if(empty($releases)) {
+                file_put_contents($cacheFile, json_encode([]), LOCK_EX);
             }
         }
         
@@ -134,7 +138,7 @@ class CaisseController {
             date('Y-m-d H:i:s')
         ];
 
-        foreach (range(1, $this->nombre_caisses) as $i) {
+        foreach ($this->noms_caisses as $i => $nom) {
             $caisse_data = $_POST['caisse'][$i] ?? [];
             $sql_columns[] = "c{$i}_fond_de_caisse"; $sql_values[] = get_numeric_value($caisse_data, 'fond_de_caisse');
             $sql_columns[] = "c{$i}_ventes"; $sql_values[] = get_numeric_value($caisse_data, 'ventes');

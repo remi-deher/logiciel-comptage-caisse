@@ -1,6 +1,7 @@
-backups/*
 config/admins.php
 config/config.php
 composer.phar
 /vendor/
 composer.lock
+!/backups/.gitkeep
+!/cache/.gitkeep

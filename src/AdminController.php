@@ -355,17 +355,20 @@ class AdminController {
     }
 
     /**
-     * Vérifie la version de l'application via l'API GitHub Releases, avec un système de cache.
+     * Vérifie la version de l'application via l'API GitHub Releases, avec un système de cache robuste.
      */
     public function gitReleaseCheck() {
         header('Content-Type: application/json');
         
         $cacheDir = __DIR__ . '/../cache';
         if (!is_dir($cacheDir)) {
-            mkdir($cacheDir, 0755, true);
+            if (!@mkdir($cacheDir, 0755, true)) {
+                 echo json_encode(['error' => "Le dossier de cache est manquant et ne peut pas être créé. Veuillez vérifier les permissions."]);
+                 return;
+            }
         }
         $cacheFile = $cacheDir . '/github_release.json';
-        $cacheLifetime = 120; // 2 minutes en secondes
+        $cacheLifetime = 3600; // 1 heure
 
         // 1. Vérifier le cache
         if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheLifetime)) {
@@ -373,16 +376,27 @@ class AdminController {
             return;
         }
 
-        // 2. Si le cache est invalide, on continue
+        // 2. Si le cache est invalide, continuer
+        $projectRoot = dirname(__DIR__);
+        $version_file = $projectRoot . '/VERSION';
+        $local_version = file_exists($version_file) ? trim(file_get_contents($version_file)) : '0.0.0';
+
+        // Réponse par défaut en cas d'échec de l'API
+        $fallbackResponse = [
+            'local_version' => $local_version,
+            'remote_version' => $local_version,
+            'update_available' => false,
+            'release_notes' => 'Impossible de vérifier les mises à jour pour le moment.',
+            'remote_version_published_at' => null,
+            'error' => 'API indisponible'
+        ];
+
         if (!function_exists('curl_init')) {
-            echo json_encode(['error' => 'L\'extension PHP cURL n\'est pas installée ou activée.']);
+            file_put_contents($cacheFile, json_encode($fallbackResponse), LOCK_EX);
+            echo json_encode($fallbackResponse);
             return;
         }
 
-        $projectRoot = dirname(__DIR__);
-        $version_file = $projectRoot . '/VERSION';
-
-        $local_version = file_exists($version_file) ? trim(file_get_contents($version_file)) : '0.0.0';
         $repo_api_url = 'https://api.github.com/repos/remi-deher/logiciel-comptage-caisse/releases/latest';
         
         $ch = curl_init();
@@ -397,23 +411,20 @@ class AdminController {
         $curl_error = curl_error($ch);
         curl_close($ch);
 
-        if ($curl_error) {
-            echo json_encode(['error' => 'Erreur cURL: ' . $curl_error]);
-            return;
-        }
-
-        if ($http_code != 200) {
-            echo json_encode(['error' => 'Impossible de récupérer la version distante. Code HTTP: ' . $http_code]);
+        if ($curl_error || $http_code != 200) {
+            file_put_contents($cacheFile, json_encode($fallbackResponse), LOCK_EX);
+            echo json_encode($fallbackResponse);
             return;
         }
         
         $data = json_decode($response, true);
         $remote_version = $data['tag_name'] ?? null;
         $release_notes = $data['body'] ?? 'Notes de version non disponibles.';
-        $published_at = $data['published_at'] ?? null; // Récupérer la date
+        $published_at = $data['published_at'] ?? null;
 
         if (!$remote_version) {
-            echo json_encode(['error' => 'Impossible de trouver le nom de la version (tag_name) dans la réponse de l\'API.']);
+            file_put_contents($cacheFile, json_encode($fallbackResponse), LOCK_EX);
+            echo json_encode($fallbackResponse);
             return;
         }
 
@@ -424,7 +435,7 @@ class AdminController {
             'remote_version' => $remote_version,
             'update_available' => $update_available,
             'release_notes' => $release_notes,
-            'remote_version_published_at' => $published_at // Ajouter la date au cache
+            'remote_version_published_at' => $published_at
         ];
 
         // 3. Mettre en cache la nouvelle réponse
@@ -460,12 +471,11 @@ class AdminController {
             return;
         }
 
-        // 1. Déterminer le nouvel ID en inspectant la base de données
         try {
             $stmt = $this->pdo->query("SHOW COLUMNS FROM comptages");
             $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
             
-            $existing_ids = [0]; // On commence avec 0 au cas où aucune caisse n'existe
+            $existing_ids = [0];
             foreach ($columns as $column) {
                 if (preg_match('/^c(\d+)_/', $column, $matches)) {
                     $existing_ids[] = (int)$matches[1];
@@ -478,7 +488,6 @@ class AdminController {
             return;
         }
 
-        // 2. Ajouter les colonnes à la base de données
         try {
             $cols_to_add = [];
             $cols_to_add[] = "c{$new_id}_fond_de_caisse DECIMAL(10, 2) DEFAULT 0";
@@ -489,7 +498,6 @@ class AdminController {
                     $cols_to_add[] = "c{$new_id}_{$name} INT DEFAULT 0";
                 }
             }
-            // On ajoute les colonnes une par une pour une meilleure compatibilité
             foreach($cols_to_add as $col) {
                 $this->pdo->exec("ALTER TABLE comptages ADD COLUMN {$col}");
             }
@@ -498,7 +506,6 @@ class AdminController {
             return;
         }
 
-        // 3. Mettre à jour le fichier de configuration
         $noms_caisses[$new_id] = $new_name;
         $this->updateConfigFile(['noms_caisses' => $noms_caisses]);
         $_SESSION['admin_message'] = "Caisse '{$new_name}' (ID: {$new_id}) ajoutée avec succès.";
@@ -529,7 +536,6 @@ class AdminController {
         $id = intval($_POST['caisse_id'] ?? 0);
 
         if ($id > 0 && isset($noms_caisses[$id])) {
-            // 1. Supprimer les colonnes de la base de données
             try {
                 $cols_to_drop = [];
                 $cols_to_drop[] = "c{$id}_fond_de_caisse";
@@ -547,7 +553,6 @@ class AdminController {
                 return;
             }
 
-            // 2. Mettre à jour le fichier de configuration
             $deleted_name = $noms_caisses[$id];
             unset($noms_caisses[$id]);
             $this->updateConfigFile(['noms_caisses' => $noms_caisses]);
@@ -564,7 +569,6 @@ class AdminController {
         global $noms_caisses, $denominations;
         $config_path = __DIR__ . '/../config/config.php';
 
-        // Applique les mises à jour
         if (isset($updates['noms_caisses'])) $noms_caisses = $updates['noms_caisses'];
 
         $new_content = '<?php' . PHP_EOL . PHP_EOL;
