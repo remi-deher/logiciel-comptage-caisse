@@ -1,10 +1,13 @@
 /**
- * Fichier principal JavaScript pour la page du calculateur de caisse.
- * Gère les calculs, les onglets, la synchro WebSocket et la sauvegarde intelligente.
+ * Fichier principal JavaScript.
+ * Gère la navigation responsive, le calculateur et la page d'historique.
  */
 document.addEventListener('DOMContentLoaded', function() {
 
-   // --- Logique pour la barre de navigation responsive (s'applique à toutes les pages) ---
+    // --- Fonctions utilitaires globales ---
+    const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(montant);
+
+    // --- Logique pour la barre de navigation responsive (s'applique à toutes les pages) ---
     const navbarToggler = document.getElementById('navbar-toggler');
     const navbarCollapse = document.getElementById('navbar-collapse');
 
@@ -14,12 +17,78 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- Logique pour la page d'historique ---
+    const historyPage = document.querySelector('.history-grid');
+    if (historyPage) {
+        const modal = document.getElementById('details-modal');
+        const modalContent = document.getElementById('modal-details-content');
+        const closeModalBtn = document.querySelector('.modal-close');
+
+        historyPage.addEventListener('click', function(event) {
+            const detailsButton = event.target.closest('.details-btn');
+            if (detailsButton) {
+                const card = detailsButton.closest('.history-card');
+                // Les données du comptage sont stockées dans l'attribut data-comptage de la carte
+                const comptageData = JSON.parse(card.dataset.comptage);
+                const caisseId = detailsButton.dataset.caisseId;
+                const caisseNom = detailsButton.dataset.caisseNom;
+                
+                // Construire le contenu HTML pour la fenêtre modale
+                let html = `<h3>Détails du comptage pour : ${caisseNom}</h3>`;
+                html += `<p><strong>Nom du comptage :</strong> ${comptageData.nom_comptage}</p>`;
+                html += '<table class="modal-details-table">';
+                html += '<thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead>';
+                html += '<tbody>';
+
+                let totalCaisse = 0;
+                // Boucle sur les billets
+                if (denominations && denominations.billets) {
+                    for (const [name, value] of Object.entries(denominations.billets)) {
+                        const quantite = comptageData[`c${caisseId}_${name}`] || 0;
+                        const totalLigne = quantite * value;
+                        totalCaisse += totalLigne;
+                        html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                    }
+                }
+                // Boucle sur les pièces
+                if (denominations && denominations.pieces) {
+                    for (const [name, value] of Object.entries(denominations.pieces)) {
+                        const quantite = comptageData[`c${caisseId}_${name}`] || 0;
+                        const totalLigne = quantite * value;
+                        totalCaisse += totalLigne;
+                        const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+                        html += `<tr><td>Pièce de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                    }
+                }
+                html += '</tbody></table>';
+                html += `<h4 style="text-align: right; margin-top: 15px;">Total Compté : ${formatEuros(totalCaisse)}</h4>`;
+
+                modalContent.innerHTML = html;
+                modal.style.display = 'block';
+            }
+        });
+
+        // Gérer la fermeture de la modale
+        if(closeModalBtn) {
+            closeModalBtn.onclick = function() {
+                modal.style.display = 'none';
+            }
+        }
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+    }
+
+
+    // --- Logique spécifique à la page du calculateur ---
     const caisseForm = document.getElementById('caisse-form');
     if (!caisseForm) {
+        // Si on n'est pas sur la page du calculateur, on arrête le script ici.
         return;
     }
 
-    // --- Définitions et sélection des éléments du DOM ---
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
     const nomComptageInput = document.getElementById('nom_comptage');
@@ -28,27 +97,24 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusText = statusIndicator ? statusIndicator.querySelector('.status-text') : null;
     let isSubmitting = false;
 
-    // --- Fonctions ---
-    const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(montant);
     const formatDateTimeFr = () => {
         const now = new Date();
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
         return new Intl.DateTimeFormat('fr-FR', options).format(now).replace(/^\w/, c => c.toUpperCase());
     };
 
-    /**
-     * CORRECTION MAJEURE : La fonction calcule maintenant pour chaque caisse
-     * présente dans l'objet `nomsCaisses`, quels que soient leurs IDs.
-     */
     const calculateAllFull = () => {
+        // Vérifie si les variables nécessaires existent (injectées par PHP)
+        if (typeof nomsCaisses === 'undefined' || typeof denominations === 'undefined') {
+            return;
+        }
+
         let totauxCombines = { fdc: 0, total: 0, recette: 0, theorique: 0, ecart: 0 };
         let allCaissesReady = true;
 
-        // Boucle sur les clés (IDs) de l'objet nomsCaisses (ex: "1", "3", "4")
         for (const i of Object.keys(nomsCaisses)) {
             const getVal = (id) => {
                 const element = document.getElementById(id + '_' + i);
-                // On vérifie si l'élément existe avant de lire sa valeur
                 return element ? parseFloat(element.value.replace(',', '.')) || 0 : 0;
             };
 
@@ -152,8 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let conn;
     try {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Adaptez le port si nécessaire, mais cela devrait fonctionner avec la configuration du VHost
-        const wsHost = window.location.host; 
+        const wsHost = window.location.host;
         const wsUrl = `${wsProtocol}//${wsHost}/ws/`;
         conn = new WebSocket(wsUrl);
 
@@ -264,8 +329,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         const nomActuel = nomComptageInput.value.trim();
-        // Sauvegarde seulement si des pièces/billets ont été saisis
-        if (currentDenominationState !== '{}' && nomActuel === '') {
+        if (nomActuel !== '') {
             const formData = new FormData(caisseForm);
             const nouveauNom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
             formData.set('nom_comptage', nouveauNom);
@@ -278,7 +342,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const updateButton = document.getElementById('update-button');
 
     if (versionInfo && updateButton) {
-        let releaseNotes = ''; // Variable pour stocker les notes de version
+        let releaseNotes = '';
 
         fetch('index.php?action=git_release_check')
             .then(response => response.json())
@@ -290,10 +354,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 if (data.update_available) {
-                    versionInfo.innerHTML = `Version <strong>${data.local_version}</strong>.
+                    versionInfo.innerHTML = `Version <strong>${data.local_version}</strong>. 
                         <span style="color: #e67e22;">Mise à jour vers ${data.remote_version} disponible.</span>`;
                     updateButton.style.display = 'inline-block';
-                    releaseNotes = data.release_notes; // On stocke les notes
+                    releaseNotes = data.release_notes;
                 } else {
                     versionInfo.innerHTML = `Version <strong>${data.local_version}</strong>. Vous êtes à jour.`;
                 }
