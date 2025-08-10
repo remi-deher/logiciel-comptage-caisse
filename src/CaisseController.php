@@ -89,7 +89,7 @@ class CaisseController {
         $cacheDir = __DIR__ . '/../cache';
         if (!is_dir($cacheDir)) {
             if (!@mkdir($cacheDir, 0755, true)) {
-                $releases = [['tag_name' => 'Erreur', 'published_at' => date('c'), 'body' => 'Le dossier de cache est manquant et ne peut pas être créé.']];
+                $releases = [['tag_name' => 'Erreur', 'published_at' => date('c'), 'body_html' => 'Le dossier de cache est manquant et ne peut pas être créé.']];
                 require __DIR__ . '/../templates/changelog.php';
                 return;
             }
@@ -107,7 +107,9 @@ class CaisseController {
                 $ch = curl_init();
                 curl_setopt($ch, CURLOPT_URL, $repo_api_url);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-                curl_setopt($ch, CURLOPT_USERAGENT, 'Comptage-Caisse-App-Changelog'); 
+                curl_setopt($ch, CURLOPT_USERAGENT, 'Comptage-Caisse-App-Changelog');
+                // On demande à l'API de nous renvoyer le contenu au format HTML
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/vnd.github.html+json']);
                 
                 $response = curl_exec($ch);
                 $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);

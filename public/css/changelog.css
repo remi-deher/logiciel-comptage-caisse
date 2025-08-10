@@ -58,11 +58,20 @@
     line-height: 1.6;
 }
 
-.release-notes pre {
-    white-space: pre-wrap; /* Conserve les sauts de ligne du changelog */
-    word-wrap: break-word;
-    margin: 0;
-    font-family: inherit;
-    font-size: inherit;
+/* Styles pour le contenu HTML rendu */
+.release-notes ul {
+    padding-left: 20px;
+    margin-top: 10px;
 }
 
+.release-notes p {
+    margin-top: 0;
+}
+
+.release-notes img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+}

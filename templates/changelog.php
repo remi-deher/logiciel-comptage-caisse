@@ -21,8 +21,8 @@ require 'partials/navbar.php';
                     <div class="timeline-content">
                         <h3><?= htmlspecialchars($release['tag_name']) ?> - <span class="release-date"><?= format_date_fr($release['published_at']) ?></span></h3>
                         <div class="release-notes">
-                            <!-- On utilise une balise <pre> pour conserver le formatage du changelog de GitHub -->
-                            <pre><?= htmlspecialchars($release['body']) ?></pre>
+                            <!-- On affiche directement le contenu HTML fourni par l'API -->
+                            <?= $release['body_html'] ?? '<p>Aucune note de version détaillée.</p>' ?>
                         </div>
                     </div>
                 </div>
