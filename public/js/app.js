@@ -24,9 +24,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- 2. Gestion de la mise à jour (maintenant globale) ---
     const versionInfo = document.getElementById('version-info');
     const updateButton = document.getElementById('update-button');
-    const releaseDateInfo = document.getElementById('release-date-info'); // Cible pour la date
+    const releaseInfoContainer = document.getElementById('release-info-container'); // Cible pour le conteneur complet
 
-    if (versionInfo && updateButton) {
+    if (versionInfo && updateButton && releaseInfoContainer) {
         let releaseNotes = '';
 
         fetch('index.php?action=git_release_check')
@@ -34,14 +34,14 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.error) {
                     versionInfo.textContent = "Erreur de vérification.";
-                    if (releaseDateInfo) releaseDateInfo.textContent = "N/A";
+                    releaseInfoContainer.innerHTML = 'Dernière release : N/A';
                     console.error("Détails de l'erreur de l'API:", data);
                     return;
                 }
 
-                // Mise à jour de la date de release dans le pied de page
-                if (releaseDateInfo && data.formatted_release_date) {
-                    releaseDateInfo.textContent = data.formatted_release_date;
+                // Mise à jour de la date et du lien de release dans le pied de page
+                if (data.formatted_release_date && data.release_url) {
+                    releaseInfoContainer.innerHTML = `Dernière release : <a href="${data.release_url}" target="_blank" rel="noopener noreferrer">${data.remote_version}</a> le ${data.formatted_release_date}`;
                 }
 
                 if (data.update_available) {
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 versionInfo.textContent = "Impossible de vérifier la version.";
-                if (releaseDateInfo) releaseDateInfo.textContent = "N/A";
+                releaseInfoContainer.innerHTML = 'Dernière release : N/A';
                 console.error('Erreur lors de la vérification de la version:', error);
             });
 

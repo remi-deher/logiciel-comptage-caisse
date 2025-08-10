@@ -1,6 +1,9 @@
 <?php
 // src/AdminController.php
 
+// On s'assure que les fonctions utilitaires sont disponibles
+require_once __DIR__ . '/Utils.php';
+
 class AdminController {
     private $pdo;
 
@@ -305,10 +308,6 @@ class AdminController {
         }
     }
 
-    /**
-     * Met à jour le fichier de secours avec un nouvel utilisateur/hash.
-     * Si $hash est null, l'utilisateur est supprimé.
-     */
     private function updateFallbackFile($username, $hash) {
         $fallback_file = __DIR__ . '/../config/admins.php';
         if (!is_writable(dirname($fallback_file))) return;
@@ -316,18 +315,15 @@ class AdminController {
         $fallback_admins = file_exists($fallback_file) ? (require $fallback_file) : [];
 
         if ($hash === null) {
-            unset($fallback_admins[$username]); // Suppression
+            unset($fallback_admins[$username]);
         } else {
-            $fallback_admins[$username] = $hash; // Ajout/Mise à jour
+            $fallback_admins[$username] = $hash;
         }
         
         $content = "<?php\n\n// Fichier de secours pour les administrateurs\nreturn " . var_export($fallback_admins, true) . ";\n";
         file_put_contents($fallback_file, $content, LOCK_EX);
     }
     
-    /**
-     * Gère le téléchargement d'un fichier de sauvegarde.
-     */
     private function downloadBackup() {
         $filename = basename($_GET['file'] ?? '');
         $backupDir = __DIR__ . '/../backups';
@@ -354,9 +350,6 @@ class AdminController {
         exit;
     }
 
-    /**
-     * Vérifie la version de l'application via l'API GitHub Releases, avec un système de cache robuste.
-     */
     public function gitReleaseCheck() {
         header('Content-Type: application/json');
         
@@ -366,41 +359,34 @@ class AdminController {
              return;
         }
         $cacheFile = $cacheDir . '/github_release.json';
-        $cacheLifetime = 3600; // 1 heure
+        $cacheLifetime = 3600;
 
-        // On lit TOUJOURS la version locale actuelle depuis le fichier
         $projectRoot = dirname(__DIR__);
         $version_file = $projectRoot . '/VERSION';
         $local_version = file_exists($version_file) ? trim(file_get_contents($version_file)) : '0.0.0';
 
-        // 1. Vérifier le cache pour les données distantes
         if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheLifetime)) {
             $cachedData = json_decode(file_get_contents($cacheFile), true);
-            
             $remote_version = $cachedData['remote_version'] ?? $local_version;
             $update_available = version_compare($local_version, $remote_version, '<');
-
-            // On reconstruit la réponse avec la version locale à jour
             $responseData = [
                 'local_version' => $local_version,
                 'remote_version' => $remote_version,
                 'update_available' => $update_available,
                 'release_notes' => $cachedData['release_notes'] ?? 'Notes de version non disponibles.',
-                'remote_version_published_at' => $cachedData['remote_version_published_at'] ?? null,
+                'release_url' => $cachedData['release_url'] ?? '#',
                 'formatted_release_date' => $cachedData['formatted_release_date'] ?? 'N/A'
             ];
-            
             echo json_encode($responseData);
             return;
         }
 
-        // 2. Si le cache est invalide, appeler l'API
         $fallbackResponse = [
             'local_version' => $local_version,
             'remote_version' => $local_version,
             'update_available' => false,
             'release_notes' => 'Impossible de vérifier les mises à jour pour le moment.',
-            'remote_version_published_at' => null,
+            'release_url' => '#',
             'formatted_release_date' => 'N/A',
             'error' => 'API indisponible'
         ];
@@ -434,6 +420,7 @@ class AdminController {
         $remote_version = $data['tag_name'] ?? null;
         $release_notes = $data['body'] ?? 'Notes de version non disponibles.';
         $published_at = $data['published_at'] ?? null;
+        $release_url = $data['html_url'] ?? '#';
         $formatted_date = $published_at ? format_date_fr($published_at) : 'N/A';
 
         if (!$remote_version) {
@@ -449,7 +436,7 @@ class AdminController {
             'remote_version' => $remote_version,
             'update_available' => $update_available,
             'release_notes' => $release_notes,
-            'remote_version_published_at' => $published_at,
+            'release_url' => $release_url,
             'formatted_release_date' => $formatted_date
         ];
 
@@ -457,9 +444,6 @@ class AdminController {
         echo json_encode($responseData);
     }
 
-    /**
-     * Exécute un git pull pour mettre à jour l'application.
-     */
     public function gitPull() {
         header('Content-Type: application/json');
         $projectRoot = dirname(__DIR__);
@@ -473,9 +457,6 @@ class AdminController {
         ]);
     }
 
-    /**
-     * Ajoute une nouvelle caisse de manière robuste.
-     */
     private function addCaisse() {
         global $noms_caisses, $denominations;
         $new_name = trim($_POST['caisse_name'] ?? '');
@@ -524,9 +505,6 @@ class AdminController {
         $_SESSION['admin_message'] = "Caisse '{$new_name}' (ID: {$new_id}) ajoutée avec succès.";
     }
 
-    /**
-     * Renomme une caisse existante.
-     */
     private function renameCaisse() {
         global $noms_caisses;
         $id = intval($_POST['caisse_id'] ?? 0);
@@ -541,9 +519,6 @@ class AdminController {
         }
     }
 
-    /**
-     * Supprime une caisse et toutes ses données associées.
-     */
     private function deleteCaisse() {
         global $noms_caisses, $denominations;
         $id = intval($_POST['caisse_id'] ?? 0);
@@ -575,9 +550,6 @@ class AdminController {
         }
     }
 
-    /**
-     * Réécrit le fichier de configuration avec les nouvelles valeurs.
-     */
     private function updateConfigFile($updates) {
         global $noms_caisses, $denominations;
         $config_path = __DIR__ . '/../config/config.php';
