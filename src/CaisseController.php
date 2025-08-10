@@ -24,7 +24,9 @@ class CaisseController {
             $stmt->execute([intval($_GET['load'])]);
             $loaded_data = $stmt->fetch() ?: [];
         } else {
-            $stmt = $this->pdo->query("SELECT * FROM comptages ORDER BY id DESC LIMIT 1");
+            // Essayer de charger la dernière sauvegarde auto si elle existe
+            $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
+            $stmt->execute();
             $loaded_data = $stmt->fetch() ?: [];
         }
 
@@ -78,6 +80,47 @@ class CaisseController {
      */
     public function aide() {
         require __DIR__ . '/../templates/aide.php';
+    }
+
+    /**
+     * Gère l'affichage de la page du journal des modifications (changelog).
+     */
+    public function changelog() {
+        $cacheDir = __DIR__ . '/../cache';
+        if (!is_dir($cacheDir)) {
+            mkdir($cacheDir, 0755, true);
+        }
+        $cacheFile = $cacheDir . '/github_releases_full.json';
+        $cacheLifetime = 3600; // 1 heure en secondes
+
+        // 1. Vérifier le cache
+        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheLifetime)) {
+            $releases = json_decode(file_get_contents($cacheFile), true);
+        } else {
+            // 2. Si le cache est invalide, appeler l'API
+            $releases = [];
+            if (function_exists('curl_init')) {
+                $repo_api_url = 'https://api.github.com/repos/remi-deher/logiciel-comptage-caisse/releases';
+                
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $repo_api_url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'Comptage-Caisse-App-Changelog'); 
+                
+                $response = curl_exec($ch);
+                $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($http_code == 200) {
+                    $releases = json_decode($response, true);
+                    // Mettre en cache la nouvelle réponse
+                    file_put_contents($cacheFile, json_encode($releases), LOCK_EX);
+                }
+            }
+        }
+        
+        $page_css = 'changelog.css';
+        require __DIR__ . '/../templates/changelog.php';
     }
     
     /**
@@ -148,7 +191,7 @@ class CaisseController {
             date('Y-m-d H:i:s')
         ];
 
-        foreach (range(1, $this->nombre_caisses) as $i) {
+        foreach ($this->noms_caisses as $i => $nom) {
             $caisse_data = $_POST['caisse'][$i] ?? [];
             $sql_columns[] = "c{$i}_fond_de_caisse"; $sql_values[] = get_numeric_value($caisse_data, 'fond_de_caisse');
             $sql_columns[] = "c{$i}_ventes"; $sql_values[] = get_numeric_value($caisse_data, 'ventes');

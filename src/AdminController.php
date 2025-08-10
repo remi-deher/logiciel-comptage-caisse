@@ -410,6 +410,7 @@ class AdminController {
         $data = json_decode($response, true);
         $remote_version = $data['tag_name'] ?? null;
         $release_notes = $data['body'] ?? 'Notes de version non disponibles.';
+        $published_at = $data['published_at'] ?? null; // Récupérer la date
 
         if (!$remote_version) {
             echo json_encode(['error' => 'Impossible de trouver le nom de la version (tag_name) dans la réponse de l\'API.']);
@@ -422,7 +423,8 @@ class AdminController {
             'local_version' => $local_version,
             'remote_version' => $remote_version,
             'update_available' => $update_available,
-            'release_notes' => $release_notes
+            'release_notes' => $release_notes,
+            'remote_version_published_at' => $published_at // Ajouter la date au cache
         ];
 
         // 3. Mettre en cache la nouvelle réponse

@@ -1,8 +1,8 @@
 <?php
-// templates/historique.php
+// templates/historique.php (Interface - Cartes)
 
-// On injecte les dénominations pour que le JS puisse construire la modale
-echo "<script>const denominations = " . json_encode($denominations) . ";</script>";
+// On injecte les variables PHP nécessaires pour que le JS puisse construire la modale
+echo "<script>const denominations = " . json_encode($denominations) . "; const nomsCaisses = " . json_encode($noms_caisses) . ";</script>";
 
 $page_css = 'historique.css';
 require 'partials/header.php';
@@ -48,30 +48,30 @@ require 'partials/navbar.php';
             <?php foreach ($historique as $comptage):
                 $calculated = calculate_results_from_data($comptage, $nombre_caisses, $denominations);
             ?>
-                <div class="history-card" data-comptage='<?= json_encode($comptage) ?>'>
+                <div class="history-card" data-comptage='<?= htmlspecialchars(json_encode($comptage), ENT_QUOTES, 'UTF-8') ?>'>
                     <div class="history-card-header">
                         <h4><?= htmlspecialchars($comptage['nom_comptage']) ?></h4>
-                        <div class="date"><?= format_date_fr($comptage['date_comptage']) ?></div>
+                        <div class="date"><i class="fa-regular fa-calendar"></i> <?= format_date_fr($comptage['date_comptage']) ?></div>
                         <?php if(!empty($comptage['explication'])): ?>
-                            <p class="explication"><?= htmlspecialchars($comptage['explication']) ?></p>
+                            <p class="explication"><i class="fa-solid fa-lightbulb"></i> <?= htmlspecialchars($comptage['explication']) ?></p>
                         <?php endif; ?>
                     </div>
                     <div class="history-card-body">
                         <div class="summary-line">
-                            Total Compté Global:
+                            <div><i class="fa-solid fa-coins icon-total"></i> Total Compté Global</div>
                             <span><?= format_euros($calculated['combines']['total_compté']) ?></span>
                         </div>
                         <div class="summary-line">
-                            Écart Global:
+                             <div><i class="fa-solid fa-right-left icon-ecart"></i> Écart Global</div>
                             <span class="<?= $calculated['combines']['ecart'] > 0.001 ? 'ecart-positif' : ($calculated['combines']['ecart'] < -0.001 ? 'ecart-negatif' : '') ?>">
                                 <?= format_euros($calculated['combines']['ecart']) ?>
                             </span>
                         </div>
-                        <hr style="border: 0; border-top: 1px solid #e9ecef; margin: 10px 0;">
+                        <hr class="card-divider">
                         <?php foreach($noms_caisses as $num => $nom): 
                             $ecart = $calculated['caisses'][$num]['ecart']; ?>
                             <div class="summary-line">
-                                Écart <?= htmlspecialchars($nom) ?>:
+                                <div class="caisse-name">Écart <?= htmlspecialchars($nom) ?></div>
                                 <span class="<?= $ecart > 0.001 ? 'ecart-positif' : ($ecart < -0.001 ? 'ecart-negatif' : '') ?>">
                                     <?= format_euros($ecart) ?>
                                 </span>
@@ -79,12 +79,14 @@ require 'partials/navbar.php';
                         <?php endforeach; ?>
                     </div>
                     <div class="history-card-footer no-export">
+                        <button class="action-btn-small details-all-btn"><i class="fa-solid fa-layer-group"></i> Ensemble</button>
                         <?php foreach($noms_caisses as $num => $nom): ?>
                             <button class="action-btn-small details-btn" data-caisse-id="<?= $num ?>" data-caisse-nom="<?= htmlspecialchars($nom) ?>">
-                                <i class="fa-solid fa-list-ul"></i> Détails <?= htmlspecialchars($nom) ?>
+                                <i class="fa-solid fa-list-ul"></i> <?= htmlspecialchars($nom) ?>
                             </button>
                         <?php endforeach; ?>
-                        <a href="index.php?page=calculateur&load=<?= $comptage['id'] ?>" class="action-btn-small save-btn"><i class="fa-solid fa-pen-to-square"></i> Charger</a>
+                        <div style="flex-grow: 1;"></div> <!-- Espace flexible -->
+                        <a href="index.php?page=calculateur&load=<?= $comptage['id'] ?>" class="action-btn-small save-btn"><i class="fa-solid fa-pen-to-square"></i></a>
                         <form method="POST" action="index.php?page=historique" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer DÉFINITIVEMENT ce comptage ?');" style="margin:0;">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="id_a_supprimer" value="<?= $comptage['id'] ?>">
@@ -97,7 +99,7 @@ require 'partials/navbar.php';
     <?php endif; ?>
 </div>
 
-<!-- Fenêtre Modale pour les détails (initialement cachée) -->
+<!-- Fenêtre Modale pour les détails -->
 <div id="details-modal" class="modal">
     <div class="modal-content">
         <span class="modal-close">&times;</span>

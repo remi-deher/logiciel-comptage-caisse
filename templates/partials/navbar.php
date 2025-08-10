@@ -16,6 +16,7 @@ $page_active = $_GET['page'] ?? 'calculateur';
             <li class="nav-item"><a href="index.php?page=calculateur" class="<?= ($page_active === 'calculateur') ? 'active' : '' ?>">Calculateur</a></li>
             <li class="nav-item"><a href="index.php?page=historique" class="<?= ($page_active === 'historique') ? 'active' : '' ?>">Historique</a></li>
             <li class="nav-item"><a href="index.php?page=aide" class="<?= ($page_active === 'aide') ? 'active' : '' ?>">Aide</a></li>
+            <li class="nav-item"><a href="index.php?page=changelog" class="<?= ($page_active === 'changelog') ? 'active' : '' ?>">Changelog</a></li>
             <?php if (!empty($_SESSION['is_admin'])): ?>
                 <li class="nav-item"><a href="index.php?page=admin" class="<?= ($page_active === 'admin') ? 'active' : '' ?>">Administration</a></li>
                 <li class="nav-item"><a href="index.php?page=logout">Déconnexion</a></li>

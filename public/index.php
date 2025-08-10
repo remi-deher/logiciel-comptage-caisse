@@ -38,6 +38,10 @@ switch ($page) {
         $caisseController->aide();
         break;
 
+    case 'changelog':
+        $caisseController->changelog();
+        break;
+
     case 'login':
         $adminController->login();
         break;

@@ -18,66 +18,280 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Logique pour la page d'historique ---
-    const historyPage = document.querySelector('.history-grid');
+    const historyPage = document.querySelector('.history-grid, .history-table');
     if (historyPage) {
+        // Logique de la fenêtre modale
         const modal = document.getElementById('details-modal');
-        const modalContent = document.getElementById('modal-details-content');
-        const closeModalBtn = document.querySelector('.modal-close');
+        if(modal) {
+            const modalContent = document.getElementById('modal-details-content');
+            const closeModalBtn = document.querySelector('.modal-close');
 
-        historyPage.addEventListener('click', function(event) {
-            const detailsButton = event.target.closest('.details-btn');
-            if (detailsButton) {
-                const card = detailsButton.closest('.history-card');
-                // Les données du comptage sont stockées dans l'attribut data-comptage de la carte
-                const comptageData = JSON.parse(card.dataset.comptage);
-                const caisseId = detailsButton.dataset.caisseId;
-                const caisseNom = detailsButton.dataset.caisseNom;
+            historyPage.addEventListener('click', function(event) {
+                const detailsButton = event.target.closest('.details-btn');
+                const allDetailsButton = event.target.closest('.details-all-btn');
+
+                // --- Gère le clic sur le bouton de détail d'une seule caisse ---
+                if (detailsButton) {
+                    const card = detailsButton.closest('.history-card');
+                    if (!card || !card.dataset.comptage) return;
+
+                    const comptageData = JSON.parse(card.dataset.comptage);
+                    const caisseId = detailsButton.dataset.caisseId;
+                    const caisseNom = detailsButton.dataset.caisseNom;
+                    
+                    let html = `<div class="modal-header">
+                                    <h3>Détails pour : ${caisseNom}</h3>
+                                    <div class="modal-actions">
+                                        <button class="action-btn modal-export-pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                                        <button class="action-btn modal-export-excel"><i class="fa-solid fa-file-csv"></i> Excel</button>
+                                    </div>
+                                </div>`;
+                    html += `<p><strong>Nom du comptage :</strong> ${comptageData.nom_comptage}</p>`;
+                    html += '<table class="modal-details-table">';
+                    html += '<thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead>';
+                    html += '<tbody>';
+
+                    let totalCaisse = 0;
+                    if (typeof denominations !== 'undefined') {
+                        for (const [name, value] of Object.entries(denominations.billets)) {
+                            const quantite = comptageData[`c${caisseId}_${name}`] || 0;
+                            const totalLigne = quantite * value;
+                            totalCaisse += totalLigne;
+                            html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                        }
+                        for (const [name, value] of Object.entries(denominations.pieces)) {
+                            const quantite = comptageData[`c${caisseId}_${name}`] || 0;
+                            const totalLigne = quantite * value;
+                            totalCaisse += totalLigne;
+                            const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+                            html += `<tr><td>Pièce de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                        }
+                    }
+                    html += '</tbody></table>';
+                    html += `<h4 style="text-align: right; margin-top: 15px;">Total Compté : ${formatEuros(totalCaisse)}</h4>`;
+
+                    modalContent.innerHTML = html;
+                    modal.style.display = 'block';
+                }
+
+                // --- Gère le clic sur le bouton "Ensemble" ---
+                if (allDetailsButton) {
+                    const card = allDetailsButton.closest('.history-card');
+                    if (!card || !card.dataset.comptage) return;
+
+                    const comptageData = JSON.parse(card.dataset.comptage);
+                    
+                    let html = `<div class="modal-header">
+                                    <h3>Détails Complets du Comptage</h3>
+                                    <div class="modal-actions">
+                                        <button class="action-btn modal-export-pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                                        <button class="action-btn modal-export-excel"><i class="fa-solid fa-file-csv"></i> Excel</button>
+                                    </div>
+                                </div>`;
+                    html += `<p><strong>Nom du comptage :</strong> ${comptageData.nom_comptage}</p>`;
+                    
+                    const summaryQuantities = {};
+                    let summaryTotal = 0;
+
+                    if (typeof nomsCaisses !== 'undefined') {
+                        for (const caisseId in nomsCaisses) {
+                            const caisseNom = nomsCaisses[caisseId];
+                            html += `<h4 class="modal-table-title">${caisseNom}</h4>`;
+                            html += '<table class="modal-details-table">';
+                            html += '<thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead>';
+                            html += '<tbody>';
+
+                            let totalCaisse = 0;
+                            if (typeof denominations !== 'undefined') {
+                                for (const [name, value] of Object.entries(denominations.billets)) {
+                                    const quantite = comptageData[`c${caisseId}_${name}`] || 0;
+                                    summaryQuantities[name] = (summaryQuantities[name] || 0) + quantite;
+                                    const totalLigne = quantite * value;
+                                    totalCaisse += totalLigne;
+                                    html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                                }
+                                for (const [name, value] of Object.entries(denominations.pieces)) {
+                                    const quantite = comptageData[`c${caisseId}_${name}`] || 0;
+                                    summaryQuantities[name] = (summaryQuantities[name] || 0) + quantite;
+                                    const totalLigne = quantite * value;
+                                    totalCaisse += totalLigne;
+                                    const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+                                    html += `<tr><td>Pièce de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                                }
+                            }
+                            html += '</tbody></table>';
+                            html += `<h5 class="modal-table-total">Total (${caisseNom}) : ${formatEuros(totalCaisse)}</h5>`;
+                        }
+
+                        html += `<h4 class="modal-table-title">Synthèse Globale</h4>`;
+                        html += '<table class="modal-details-table">';
+                        html += '<thead><tr><th>Dénomination</th><th>Quantité Totale</th><th>Total</th></tr></thead>';
+                        html += '<tbody>';
+
+                        if (typeof denominations !== 'undefined') {
+                            for (const [name, value] of Object.entries(denominations.billets)) {
+                                const quantite = summaryQuantities[name] || 0;
+                                const totalLigne = quantite * value;
+                                summaryTotal += totalLigne;
+                                html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                            }
+                            for (const [name, value] of Object.entries(denominations.pieces)) {
+                                const quantite = summaryQuantities[name] || 0;
+                                const totalLigne = quantite * value;
+                                summaryTotal += totalLigne;
+                                const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+                                html += `<tr><td>Pièce de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                            }
+                        }
+                        html += '</tbody></table>';
+                        html += `<h5 class="modal-table-total">Total Général Compté : ${formatEuros(summaryTotal)}</h5>`;
+                    }
+
+                    modalContent.innerHTML = html;
+                    modal.style.display = 'block';
+                }
+            });
+
+            // --- Gère les clics sur les boutons d'export DANS la modale ---
+            modalContent.addEventListener('click', function(event) {
+                const mainTitle = modalContent.querySelector('h3').textContent;
+                const tables = modalContent.querySelectorAll('.modal-details-table');
                 
-                // Construire le contenu HTML pour la fenêtre modale
-                let html = `<h3>Détails du comptage pour : ${caisseNom}</h3>`;
-                html += `<p><strong>Nom du comptage :</strong> ${comptageData.nom_comptage}</p>`;
-                html += '<table class="modal-details-table">';
-                html += '<thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead>';
-                html += '<tbody>';
+                if (event.target.closest('.modal-export-pdf')) {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    doc.text(mainTitle, 14, 16);
+                    let startY = 25;
 
-                let totalCaisse = 0;
-                // Boucle sur les billets
-                if (denominations && denominations.billets) {
-                    for (const [name, value] of Object.entries(denominations.billets)) {
-                        const quantite = comptageData[`c${caisseId}_${name}`] || 0;
-                        const totalLigne = quantite * value;
-                        totalCaisse += totalLigne;
-                        html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
-                    }
+                    tables.forEach((table, index) => {
+                        const subTitleEl = table.previousElementSibling;
+                        if (subTitleEl && (subTitleEl.tagName === 'H4' || subTitleEl.tagName === 'H5')) {
+                            doc.text(subTitleEl.textContent, 14, startY);
+                            startY += 8;
+                        }
+                        doc.autoTable({
+                            html: table,
+                            startY: startY,
+                        });
+                        startY = doc.autoTable.previous.finalY + 10;
+                        const totalEl = table.nextElementSibling;
+                         if (totalEl && totalEl.tagName === 'H5') {
+                            doc.text(totalEl.textContent, 14, startY);
+                            startY += 15;
+                        }
+                    });
+                    doc.save(`details-${mainTitle.replace(/ /g, '_')}.pdf`);
                 }
-                // Boucle sur les pièces
-                if (denominations && denominations.pieces) {
-                    for (const [name, value] of Object.entries(denominations.pieces)) {
-                        const quantite = comptageData[`c${caisseId}_${name}`] || 0;
-                        const totalLigne = quantite * value;
-                        totalCaisse += totalLigne;
-                        const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
-                        html += `<tr><td>Pièce de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
-                    }
-                }
-                html += '</tbody></table>';
-                html += `<h4 style="text-align: right; margin-top: 15px;">Total Compté : ${formatEuros(totalCaisse)}</h4>`;
 
-                modalContent.innerHTML = html;
-                modal.style.display = 'block';
+                if (event.target.closest('.modal-export-excel')) {
+                    let csvContent = "data:text/csv;charset=utf-8,";
+                    csvContent += mainTitle + '\r\n\r\n';
+
+                    tables.forEach(table => {
+                        const subTitleEl = table.previousElementSibling;
+                        if (subTitleEl && (subTitleEl.tagName === 'H4' || subTitleEl.tagName === 'H5')) {
+                            csvContent += subTitleEl.textContent + '\r\n';
+                        }
+                        const rows = table.querySelectorAll('tr');
+                        rows.forEach(row => {
+                            const cols = row.querySelectorAll('th, td');
+                            const rowData = Array.from(cols).map(col => `"${col.innerText}"`).join(';');
+                            csvContent += rowData + '\r\n';
+                        });
+                        const totalEl = table.nextElementSibling;
+                        if (totalEl && totalEl.tagName === 'H5') {
+                            csvContent += `"${totalEl.textContent}"\r\n`;
+                        }
+                        csvContent += '\r\n';
+                    });
+                    
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", `details-${mainTitle.replace(/ /g, '_')}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            });
+
+            if(closeModalBtn) {
+                closeModalBtn.onclick = function() { modal.style.display = 'none'; }
             }
-        });
-
-        // Gérer la fermeture de la modale
-        if(closeModalBtn) {
-            closeModalBtn.onclick = function() {
-                modal.style.display = 'none';
+            window.onclick = function(event) {
+                if (event.target == modal) { modal.style.display = 'none'; }
             }
         }
-        window.onclick = function(event) {
-            if (event.target == modal) {
-                modal.style.display = 'none';
-            }
+
+        // --- Logique des boutons d'export principaux ---
+        const printBtn = document.getElementById('print-btn');
+        if(printBtn) {
+            printBtn.addEventListener('click', () => window.print());
+        }
+        const pdfBtn = document.getElementById('pdf-btn');
+        if(pdfBtn) {
+            pdfBtn.addEventListener('click', () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const tableData = [];
+                const headers = [['Date', 'Nom du comptage', 'Écart Global']];
+                
+                document.querySelectorAll('.history-card, .history-table tbody tr').forEach(item => {
+                    let date, nom, ecart;
+                    if(item.classList.contains('history-card')) {
+                        date = item.querySelector('.date')?.textContent.trim();
+                        nom = item.querySelector('h4')?.textContent.trim();
+                        ecart = item.querySelector('.summary-line .ecart-positif, .summary-line .ecart-negatif')?.textContent.trim() || '0,00 €';
+                    } else { // C'est une ligne de tableau
+                        date = item.cells[1]?.textContent.trim();
+                        nom = item.cells[0]?.querySelector('strong')?.textContent.trim();
+                        ecart = item.cells[item.cells.length - 2]?.textContent.trim();
+                    }
+                    if(date && nom && ecart) {
+                       tableData.push([date, nom, ecart]);
+                    }
+                });
+
+                doc.autoTable({ head: headers, body: tableData });
+                doc.save('historique-comptages.pdf');
+            });
+        }
+        const excelBtn = document.getElementById('excel-btn');
+        if(excelBtn) {
+            excelBtn.addEventListener('click', () => {
+                let csvContent = "data:text/csv;charset=utf-8,";
+                csvContent += "Date;Nom du comptage;Explication;Ecart Global\r\n";
+                
+                document.querySelectorAll('.history-card, .history-table tbody tr').forEach(item => {
+                    let date, nom, explication, ecart;
+                     if(item.classList.contains('history-card')) {
+                        date = `"${item.querySelector('.date')?.textContent.trim()}"`;
+                        nom = `"${item.querySelector('h4')?.textContent.trim()}"`;
+                        const explicationEl = item.querySelector('.explication');
+                        explication = explicationEl ? `"${explicationEl.textContent.trim()}"` : '""';
+                        const ecartEl = item.querySelector('.summary-line .ecart-positif, .summary-line .ecart-negatif');
+                        ecart = ecartEl ? `"${ecartEl.textContent.trim().replace('.', ',')}"` : '"0,00 €"';
+                    } else { // C'est une ligne de tableau
+                        date = `"${item.cells[1]?.textContent.trim()}"`;
+                        nom = `"${item.cells[0]?.querySelector('strong')?.textContent.trim()}"`;
+                        const explicationEl = item.cells[0]?.querySelector('.explication-text');
+                        explication = explicationEl ? `"${explicationEl.textContent.trim()}"` : '""';
+                        ecart = `"${item.cells[item.cells.length - 2]?.textContent.trim().replace('.', ',')}"`;
+                    }
+                    if(date && nom && ecart) {
+                        let row = [date, nom, explication, ecart].join(';');
+                        csvContent += row + "\r\n";
+                    }
+                });
+
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", "historique-comptages.csv");
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
         }
     }
 
@@ -85,8 +299,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Logique spécifique à la page du calculateur ---
     const caisseForm = document.getElementById('caisse-form');
     if (!caisseForm) {
-        // Si on n'est pas sur la page du calculateur, on arrête le script ici.
-        return;
+        return; // On n'est pas sur la page du calculateur, on arrête le script ici.
     }
 
     const tabLinks = document.querySelectorAll('.tab-link');
@@ -104,10 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     const calculateAllFull = () => {
-        // Vérifie si les variables nécessaires existent (injectées par PHP)
-        if (typeof nomsCaisses === 'undefined' || typeof denominations === 'undefined') {
-            return;
-        }
+        if (typeof nomsCaisses === 'undefined' || typeof denominations === 'undefined') { return; }
 
         let totauxCombines = { fdc: 0, total: 0, recette: 0, theorique: 0, ecart: 0 };
         let allCaissesReady = true;
@@ -128,7 +338,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const fondDeCaisse = getVal('fond_de_caisse');
             const ventes = getVal('ventes');
             const retrocession = getVal('retrocession');
-            
             const recetteTheorique = ventes + retrocession;
             const recetteReelle = totalCompte - fondDeCaisse;
             const ecart = recetteTheorique > 0 ? recetteReelle - recetteTheorique : 0;
@@ -145,9 +354,9 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById(`res-c${i}-recette`).textContent = formatEuros(recetteReelle);
             const ecartEl = document.getElementById(`res-c${i}-ecart`);
             ecartEl.textContent = formatEuros(ecart);
-            ecartEl.className = 'ecart-ok';
-            if (ecart > 0.001) { ecartEl.className = 'ecart-positif'; }
-            if (ecart < -0.001) { ecartEl.className = 'ecart-negatif'; }
+            ecartEl.className = 'total';
+            if (ecart > 0.001) { ecartEl.classList.add('ecart-positif'); }
+            if (ecart < -0.001) { ecartEl.classList.add('ecart-negatif'); }
 
             const topEcartDisplay = document.querySelector(`#ecart-display-caisse${i}`);
             if (topEcartDisplay) {
@@ -197,7 +406,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('res-total-recette').textContent = formatEuros(totauxCombines.recette);
         const ecartTotalEl = document.getElementById('res-total-ecart');
         ecartTotalEl.textContent = formatEuros(totauxCombines.ecart);
-        ecartTotalEl.className = totauxCombines.ecart > 0.001 ? 'ecart-positif' : (totauxCombines.ecart < -0.001 ? 'ecart-negatif' : '');
+        ecartTotalEl.className = 'total';
+        if (totauxCombines.ecart > 0.001) { ecartTotalEl.classList.add('ecart-positif'); }
+        if (totauxCombines.ecart < -0.001) { ecartTotalEl.classList.add('ecart-negatif'); }
         
         if (allCaissesReady) {
             ecartDisplays.forEach(display => {
@@ -324,17 +535,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isSubmitting) {
             return;
         }
+        
         const currentDenominationState = getDenominationStateAsString();
         if (initialDenominationState === currentDenominationState) {
             return;
         }
-        const nomActuel = nomComptageInput.value.trim();
-        if (nomActuel !== '') {
-            const formData = new FormData(caisseForm);
-            const nouveauNom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
-            formData.set('nom_comptage', nouveauNom);
-            navigator.sendBeacon('index.php?page=calculateur&action=autosave', formData);
-        }
+
+        const formData = new FormData(caisseForm);
+        const nouveauNom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
+        formData.set('nom_comptage', nouveauNom);
+        
+        navigator.sendBeacon('index.php?page=calculateur&action=autosave', formData);
     });
 
     // --- Gestion de la mise à jour ---

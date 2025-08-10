@@ -1,0 +1,68 @@
+/* public/css/changelog.css */
+.changelog-timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.changelog-timeline::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 18px;
+    height: 100%;
+    width: 4px;
+    background: #e9ecef;
+    border-radius: 2px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+    padding-left: 50px;
+}
+
+.timeline-icon {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 40px;
+    height: 40px;
+    background-color: #3498db;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2em;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 4px #3498db;
+}
+
+.timeline-content h3 {
+    margin-top: 0;
+    border-bottom: none;
+    font-size: 1.5em;
+}
+
+.timeline-content .release-date {
+    font-size: 0.8em;
+    color: #7f8c8d;
+    font-weight: normal;
+}
+
+.release-notes {
+    margin-top: 10px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    line-height: 1.6;
+}
+
+.release-notes pre {
+    white-space: pre-wrap; /* Conserve les sauts de ligne du changelog */
+    word-wrap: break-word;
+    margin: 0;
+    font-family: inherit;
+    font-size: inherit;
+}
+
