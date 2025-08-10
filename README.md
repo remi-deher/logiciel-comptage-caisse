@@ -2,11 +2,13 @@
 
 ## Fonctionnalité importante
 
-* Prend en charge 2 caisses à l'heure actuelle
+* Prend en charge plusieurs caisse
 * Fonction d'historique des saisies
 * "sauvegarde automatique" des saisies en cas de soucis
 * Possibilité d'exporter les saisies de l'historique
 * Possibilité de travailler à plusieurs en temps réel
+* Interface de gestion pour gérer les caisses, nom, sauevgarde,.....
+* Application responsive
 
 ## Environnement
 

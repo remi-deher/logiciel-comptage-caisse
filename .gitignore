@@ -1,4 +1,4 @@
-backup/*
+backups/*
 config/admins.php
 config/config.php
 composer.phar
