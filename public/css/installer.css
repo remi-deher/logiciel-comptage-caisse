@@ -1,0 +1,148 @@
+/* public/css/installer.css */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #f4f7f9;
+    color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.installer-container {
+    width: 100%;
+    max-width: 700px;
+    background-color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.installer-header {
+    background-color: #34495e;
+    color: white;
+    padding: 20px 30px;
+    text-align: center;
+}
+.installer-header h1 {
+    margin: 0;
+    font-size: 1.8em;
+}
+
+.steps-indicator {
+    display: flex;
+    background-color: #ecf0f1;
+    padding: 10px;
+}
+.step {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    color: #95a5a6;
+    font-weight: bold;
+    font-size: 0.9em;
+    position: relative;
+}
+.step.active {
+    color: #3498db;
+}
+.step:not(:last-child)::after {
+    content: '>';
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #bdc3c7;
+}
+
+.installer-content {
+    padding: 30px 40px;
+}
+.installer-content h2 {
+    margin-top: 0;
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 1em;
+    box-sizing: border-box;
+}
+
+.btn {
+    display: inline-block;
+    background-color: #3498db;
+    color: white;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1.1em;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    float: right;
+}
+.btn:hover {
+    background-color: #2980b9;
+}
+
+.error-box, .success-box {
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+.error-box {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+.success-box {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+.security-warning {
+    font-weight: bold;
+    color: #c0392b;
+    margin-top: 15px;
+}
+
+.checks-list {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0;
+}
+.checks-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    border-bottom: 1px solid #ecf0f1;
+}
+.checks-list li:last-child {
+    border-bottom: none;
+}
+.status-ok {
+    color: #27ae60;
+    font-weight: bold;
+}
+.status-error {
+    color: #c0392b;
+    font-weight: bold;
+}

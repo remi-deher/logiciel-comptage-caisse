@@ -1,5 +1,17 @@
 <?php
 // public/index.php
+
+// REDIRECTION VERS L'INSTALLATEUR SI L'APPLICATION N'EST PAS CONFIGURÉE
+if (!file_exists(__DIR__ . '/../config/config.php')) {
+    // On vérifie que le dossier d'installation existe avant de rediriger
+    if (is_dir(__DIR__ . '/install')) {
+        header('Location: install/'); // Redirige vers le dossier d'installation
+        exit;
+    } else {
+        die("Erreur Critique : Le fichier de configuration est manquant et le dossier d'installation n'a pas été trouvé.");
+    }
+}
+
 session_start();
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../src/Bdd.php';
