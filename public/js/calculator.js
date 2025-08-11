@@ -23,8 +23,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const autosaveStatus = document.getElementById('autosave-status');
     const statusIndicator = document.getElementById('websocket-status-indicator');
     const statusText = statusIndicator ? statusIndicator.querySelector('.status-text') : null;
-    const nomComptageInput = document.getElementById('nom_comptage');
 
+    let autosaveTimeout;
     let isSubmitting = false;
     let initialState = '';
     let conn;
@@ -232,7 +232,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return initialState !== getFormStateAsString();
     }
     
-    function performAutosave() {
+    function performAutosave(isFinal = false) {
+        if (!hasUnsavedChanges() && !isFinal) return;
+        
+        if (autosaveStatus && !isFinal) {
+            autosaveStatus.textContent = 'Sauvegarde en cours...';
+            autosaveStatus.className = 'autosave-status saving';
+        }
+
         const formData = new FormData(caisseForm);
         let nom = formData.get('nom_comptage');
         if (!nom || nom.startsWith('Sauvegarde auto')) {
@@ -240,8 +247,26 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.set('nom_comptage', nom);
         }
         
-        if (navigator.sendBeacon) {
+        if (isFinal && navigator.sendBeacon) {
             navigator.sendBeacon('index.php?action=autosave', new URLSearchParams(formData));
+        } else {
+            fetch('index.php?action=autosave', { method: 'POST', body: formData })
+                .then(response => response.ok ? response.json() : Promise.reject('Server error'))
+                .then(data => {
+                    if (data.success) {
+                        if (autosaveStatus) {
+                            autosaveStatus.textContent = data.message;
+                            autosaveStatus.className = 'autosave-status success';
+                        }
+                        initialState = getFormStateAsString();
+                    }
+                })
+                .catch(() => {
+                    if (autosaveStatus) {
+                        autosaveStatus.textContent = 'Erreur de sauvegarde.';
+                        autosaveStatus.className = 'autosave-status error';
+                    }
+                });
         }
     }
 
@@ -249,6 +274,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!config.isLoadedFromHistory) {
         caisseForm.addEventListener('input', (event) => {
             calculateAllFull();
+            clearTimeout(autosaveTimeout);
+            if (autosaveStatus) {
+                autosaveStatus.textContent = 'Modifications non enregistrées...';
+                autosaveStatus.className = 'autosave-status';
+            }
+            autosaveTimeout = setTimeout(() => performAutosave(false), 2500);
+
             if (conn && conn.readyState === WebSocket.OPEN) {
                 conn.send(JSON.stringify({ id: event.target.id, value: event.target.value }));
             }
@@ -256,11 +288,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         window.addEventListener('beforeunload', () => {
             if (isSubmitting || !hasUnsavedChanges()) return;
-            performAutosave();
+            performAutosave(true);
         });
     }
 
     caisseForm.addEventListener('submit', () => {
+        clearTimeout(autosaveTimeout);
         isSubmitting = true;
     });
 

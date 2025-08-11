@@ -1,16 +1,23 @@
 <?php
 // templates/calculateur.php
 
-$page_js = 'calculator.js';
+$page_js = 'calculator.js'; // Définit le script JS spécifique à cette page
+
 require 'partials/header.php';
 require 'partials/navbar.php';
 
+// On prépare les données pour les passer au JavaScript de manière sécurisée
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
-    'denominations' => $denominations ?? []
+    'denominations' => $denominations ?? [],
+    'isLoadedFromHistory' => $isLoadedFromHistory ?? false
 ]);
+
+// On définit une variable pour ajouter l'attribut 'disabled' plus facilement
+$disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 ?>
 
+<!-- Ce div invisible contient les données de configuration pour le JavaScript -->
 <div id="calculator-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'></div>
 
 <div class="container">
@@ -62,15 +69,15 @@ $config_data = json_encode([
                                 <div class="grid grid-3">
                                     <div class="form-group">
                                         <label>Fond de Caisse (€)</label>
-                                        <input type="text" id="fond_de_caisse_<?= $id ?>" name="caisse[<?= $id ?>][fond_de_caisse]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_fond_de_caisse"] ?? '') ?>">
+                                        <input type="text" id="fond_de_caisse_<?= $id ?>" name="caisse[<?= $id ?>][fond_de_caisse]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_fond_de_caisse"] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                     <div class="form-group">
                                         <label>Total Ventes du Jour (€)</label>
-                                        <input type="text" id="ventes_<?= $id ?>" name="caisse[<?= $id ?>][ventes]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_ventes"] ?? '') ?>">
+                                        <input type="text" id="ventes_<?= $id ?>" name="caisse[<?= $id ?>][ventes]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_ventes"] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                     <div class="form-group">
                                         <label>Rétrocessions / Prélèvements (€)</label>
-                                        <input type="text" id="retrocession_<?= $id ?>" name="caisse[<?= $id ?>][retrocession]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_retrocession"] ?? '') ?>">
+                                        <input type="text" id="retrocession_<?= $id ?>" name="caisse[<?= $id ?>][retrocession]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_retrocession"] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                 </div>
                             </div>
@@ -91,7 +98,7 @@ $config_data = json_encode([
                                     <?php foreach($denominations['billets'] as $name => $valeur): ?>
                                     <div class="form-group">
                                         <label><?= $valeur ?> €</label>
-                                        <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data["c{$id}_{$name}"] ?? '') ?>">
+                                        <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data["c{$id}_{$name}"] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -100,7 +107,7 @@ $config_data = json_encode([
                                     <?php foreach($denominations['pieces'] as $name => $valeur): ?>
                                     <div class="form-group">
                                         <label><?= $valeur >= 1 ? $valeur.' €' : ($valeur*100).' cts' ?></label>
-                                        <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data["c{$id}_{$name}"] ?? '') ?>">
+                                        <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data["c{$id}_{$name}"] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -115,21 +122,45 @@ $config_data = json_encode([
             <h3>Enregistrer le comptage</h3>
             <div class="form-group">
                 <label for="nom_comptage">Donnez un nom à ce comptage</label>
-                <input type="text" id="nom_comptage" name="nom_comptage" required value="<?= htmlspecialchars($loaded_data['nom_comptage'] ?? '') ?>">
+                <input type="text" id="nom_comptage" name="nom_comptage" required value="<?= htmlspecialchars($loaded_data['nom_comptage'] ?? '') ?>" <?= $disabled_attr ?>>
             </div>
             <div class="form-group" style="margin-top: 10px;">
                 <label for="explication">Explication (optionnel)</label>
-                <textarea id="explication" name="explication" rows="3" placeholder="Ex: jour de marché, erreur de rendu monnaie, etc."><?= htmlspecialchars($loaded_data['explication'] ?? '') ?></textarea>
+                <textarea id="explication" name="explication" rows="3" placeholder="Ex: jour de marché, erreur de rendu monnaie, etc." <?= $disabled_attr ?>><?= htmlspecialchars($loaded_data['explication'] ?? '') ?></textarea>
             </div>
             <div class="button-group">
-                <button type="submit" class="save-btn">Enregistrer le Comptage</button>
+                <?php if (!($isLoadedFromHistory ?? false)): ?>
+                    <button type="submit" class="save-btn">Enregistrer le Comptage</button>
+                <?php endif; ?>
                 <div id="autosave-status" class="autosave-status"></div>
             </div>
         </div>
     </form>
 
     <div class="results" id="results-container">
-        <!-- ... (section des résultats inchangée) ... -->
+        <h2><i class="fa-solid fa-chart-pie"></i> Synthèse en Temps Réel</h2>
+        <div class="results-grid">
+            <?php foreach ($noms_caisses as $id => $nom): ?>
+            <div class="result-box">
+                <h3><?= htmlspecialchars($nom) ?></h3>
+                <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id ?>-fdc">0,00 €</span></div>
+                <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id ?>-total">0,00 €</span></div>
+                <hr>
+                <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id ?>-theorique">0,00 €</span></div>
+                <div class="result-line total"><span>Recette réelle :</span> <span id="res-c<?= $id ?>-recette">0,00 €</span></div>
+                <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id ?>-ecart">0,00 €</span></div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <div class="result-box combined-results">
+            <h3>Totaux Combinés</h3>
+            <div class="result-line"><span>Total Fonds de caisse :</span> <span id="res-total-fdc">0,00 €</span></div>
+            <div class="result-line"><span>Total compté (global) :</span> <span id="res-total-total">0,00 €</span></div>
+            <hr>
+            <div class="result-line"><span>Recette théorique totale :</span> <span id="res-total-theorique">0,00 €</span></div>
+            <div class="result-line total"><span>Recette réelle totale :</span> <span id="res-total-recette">0,00 €</span></div>
+            <div class="result-line total"><span>ÉCART TOTAL :</span> <span id="res-total-ecart">0,00 €</span></div>
+        </div>
     </div>
 </div>
 
