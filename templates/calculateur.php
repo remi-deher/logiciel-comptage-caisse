@@ -39,7 +39,6 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
     <form id="caisse-form" action="index.php?page=calculateur" method="post">
         <input type="hidden" name="action" value="save">
 
-        <!-- NOUVELLE SECTION DE SAUVEGARDE EN HAUT -->
         <div class="top-save-section">
             <div class="form-group">
                 <label for="nom_comptage">Nom du comptage</label>
@@ -135,7 +134,6 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
             <?php $is_first = false; endforeach; ?>
     </form>
 
-    <!-- NOUVEL ACCORDÉON POUR LES RÉSULTATS -->
     <div class="accordion-container" style="margin-top: 30px;">
         <div class="accordion-card">
             <div class="accordion-header active">
@@ -154,7 +152,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                 <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id ?>-total">0,00 €</span></div>
                                 <hr>
                                 <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id ?>-theorique">0,00 €</span></div>
-                                <div class="result-line total"><span>Recette réelle :</span> <span id="res-c<?= $id ?>-recette">0,00 €</span></div>
+                                <div class="result-line total"><span>Recette réelle (à retirer) :</span> <span id="res-c<?= $id ?>-recette">0,00 €</span></div>
                                 <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id ?>-ecart">0,00 €</span></div>
                             </div>
                             <?php endforeach; ?>
@@ -165,7 +163,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                             <div class="result-line"><span>Total compté (global) :</span> <span id="res-total-total">0,00 €</span></div>
                             <hr>
                             <div class="result-line"><span>Recette théorique totale :</span> <span id="res-total-theorique">0,00 €</span></div>
-                            <div class="result-line total"><span>Recette réelle totale :</span> <span id="res-total-recette">0,00 €</span></div>
+                            <div class="result-line total"><span>Recette réelle totale (à retirer) :</span> <span id="res-total-recette">0,00 €</span></div>
                             <div class="result-line total"><span>ÉCART TOTAL :</span> <span id="res-total-ecart">0,00 €</span></div>
                         </div>
                     </div>
@@ -178,4 +176,3 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 <?php
 require 'partials/footer.php';
 ?>
-²
