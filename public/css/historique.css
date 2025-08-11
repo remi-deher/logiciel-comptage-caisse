@@ -1,8 +1,32 @@
 /* ==========================================================================
-   public/css/historique.css (Interface - Cartes)
+   public/css/historique.css
    ========================================================================== */
 
-/* --- Section des filtres et actions --- */
+/* --- Onglets de vue --- */
+.view-tabs {
+    border-bottom: 2px solid #e9ecef;
+    margin-bottom: 20px;
+}
+.view-tabs .tab-link {
+    display: inline-block;
+    padding: 10px 20px;
+    font-weight: bold;
+    color: #7f8c8d;
+    text-decoration: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.2s, border-color 0.2s;
+}
+.view-tabs .tab-link:hover {
+    color: #34495e;
+}
+.view-tabs .tab-link.active {
+    color: #3498db;
+    border-bottom-color: #3498db;
+}
+
+/* --- Contrôles (Actions et Filtres) --- */
 .history-controls {
     display: flex;
     flex-wrap: wrap;
@@ -36,12 +60,8 @@
     align-items: center;
     gap: 8px;
 }
-.action-btn:last-child {
-    border-right: none;
-}
-.action-btn:hover {
-    background-color: #f1f3f5;
-}
+.action-btn:last-child { border-right: none; }
+.action-btn:hover { background-color: #f1f3f5; }
 
 .filter-form {
     display: flex;
@@ -49,14 +69,12 @@
     flex-wrap: wrap;
     align-items: flex-end;
 }
-.filter-form .form-group {
-    margin-bottom: 0;
-}
+.filter-form .form-group { margin-bottom: 0; }
 
-/* --- Grille des cartes d'historique --- */
+/* --- Grille des cartes --- */
 .history-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
     gap: 25px;
 }
 
@@ -74,7 +92,6 @@
     transform: translateY(-5px);
     box-shadow: 0 8px 30px rgba(0,0,0,0.1);
 }
-
 .history-card-header {
     padding: 20px;
     border-bottom: 1px solid #e9ecef;
@@ -136,7 +153,51 @@
     font-size: 0.9em;
 }
 
-/* --- Fenêtre Modale pour les détails --- */
+/* --- Pagination (CORRIGÉE) --- */
+.pagination-nav {
+    display: flex;
+    justify-content: flex-start; /* Aligné à gauche pour un défilement correct */
+    margin-bottom: 20px;
+    overflow-x: auto; /* Permet le défilement horizontal sur les petits écrans */
+    padding-bottom: 10px; /* Espace pour la barre de défilement */
+    -webkit-overflow-scrolling: touch; /* Défilement plus fluide sur iOS */
+    scrollbar-width: thin; /* Barre de défilement plus fine sur Firefox */
+}
+.pagination {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    gap: 5px;
+    flex-shrink: 0; /* Empêche la pagination de se compresser */
+}
+.pagination li a, .pagination li span {
+    display: block;
+    padding: 8px 15px;
+    text-decoration: none;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    color: #3498db;
+    border-radius: 5px;
+    transition: all 0.2s;
+}
+.pagination li a:hover {
+    background-color: #eaf5ff;
+    border-color: #aed6f1;
+}
+.pagination li.active span {
+    background-color: #3498db;
+    color: white;
+    border-color: #3498db;
+    cursor: default;
+}
+.pagination li.disabled span {
+    color: #adb5bd;
+    background-color: #e9ecef;
+    cursor: not-allowed;
+}
+
+/* --- Styles pour la Fenêtre Modale (inchangés) --- */
 .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); animation: fadeIn 0.3s; }
 .modal-content { background-color: #fefefe; margin: 5% auto; padding: 25px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 12px; position: relative; animation: slideIn 0.3s; }
 .modal-close { color: #aaa; position: absolute; top: 15px; right: 25px; font-size: 28px; font-weight: bold; cursor: pointer; }
@@ -144,9 +205,9 @@
 
 .modal-header {
     display: flex;
-    justify-content: flex-start; /* MODIFIÉ: Aligne les éléments au début */
+    justify-content: flex-start;
     align-items: center;
-    gap: 20px; /* AJOUTÉ: Crée un espace entre le titre et les boutons */
+    gap: 20px;
     border-bottom: 1px solid #e9ecef;
     padding-bottom: 15px;
     margin-bottom: 15px;
@@ -176,11 +237,31 @@
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideIn { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-/* Styles pour l'impression */
-@media print {
-    body { padding: 0; background-color: #fff; }
-    .navbar, .history-controls, .main-footer, .no-export, .modal { display: none !important; }
-    .container { box-shadow: none; padding: 0; margin: 0; max-width: 100%; }
-    .history-grid { display: block; }
-    .history-card { box-shadow: none; border: 1px solid #ccc; margin-bottom: 20px; page-break-inside: avoid; }
+/* --- Media Queries pour le Responsive --- */
+@media (max-width: 992px) {
+    .history-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .filter-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .filter-form .form-group, .filter-form button, .filter-form a {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .filter-form button, .filter-form a {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .history-grid {
+        grid-template-columns: 1fr; /* Une seule colonne sur les très petits écrans */
+    }
+    .pagination li a, .pagination li span {
+        padding: 6px 12px;
+        font-size: 0.9em;
+    }
 }

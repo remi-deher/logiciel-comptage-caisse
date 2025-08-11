@@ -14,9 +14,6 @@ class CaisseController {
         $this->versionService = new VersionService();
     }
 
-    /**
-     * Gère l'affichage de la page du calculateur.
-     */
     public function calculateur() {
         $loaded_data = [];
         $isLoadedFromHistory = false;
@@ -28,7 +25,6 @@ class CaisseController {
             $stmt->execute([intval($_GET['load'])]);
             $loaded_data = $stmt->fetch() ?: [];
         } else {
-            // Essayer de charger la dernière sauvegarde auto si elle existe
             $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
             $stmt->execute();
             $loaded_data = $stmt->fetch() ?: [];
@@ -47,27 +43,47 @@ class CaisseController {
         require __DIR__ . '/../templates/calculateur.php';
     }
 
-    /**
-     * Gère l'affichage de la page de l'historique.
-     */
     public function historique() {
+        // Définir la pagination
+        $page_courante = isset($_GET['p']) ? (int)$_GET['p'] : 1;
+        $comptages_par_page = 10;
+        $offset = ($page_courante - 1) * $comptages_par_page;
+
+        // Définir la vue (aujourd'hui par défaut)
+        $vue = $_GET['vue'] ?? 'jour';
+
         $date_debut = $_GET['date_debut'] ?? '';
         $date_fin = $_GET['date_fin'] ?? '';
         $recherche = $_GET['recherche'] ?? '';
-        
-        $sql = "SELECT * FROM comptages";
+
+        $sql_base = "FROM comptages";
         $where_clauses = [];
         $bind_values = [];
+
+        if ($vue === 'jour' && empty($date_debut) && empty($date_fin)) {
+            $where_clauses[] = "DATE(date_comptage) = CURDATE()";
+        }
 
         if (!empty($date_debut)) { $where_clauses[] = "date_comptage >= ?"; $bind_values[] = $date_debut . " 00:00:00"; }
         if (!empty($date_fin)) { $where_clauses[] = "date_comptage <= ?"; $bind_values[] = $date_fin . " 23:59:59"; }
         if (!empty($recherche)) { $where_clauses[] = "nom_comptage LIKE ?"; $bind_values[] = "%" . $recherche . "%"; }
-        if (!empty($where_clauses)) { $sql .= " WHERE " . implode(" AND ", $where_clauses); }
-        $sql .= " ORDER BY date_comptage DESC";
 
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($bind_values);
-        $historique = $stmt->fetchAll();
+        $sql_where = "";
+        if (!empty($where_clauses)) {
+            $sql_where = " WHERE " . implode(" AND ", $where_clauses);
+        }
+
+        // Compter le total des enregistrements pour la pagination
+        $stmt_count = $this->pdo->prepare("SELECT COUNT(id) " . $sql_base . $sql_where);
+        $stmt_count->execute($bind_values);
+        $total_comptages = $stmt_count->fetchColumn();
+        $pages_totales = ceil($total_comptages / $comptages_par_page);
+
+        // Récupérer les données pour la page actuelle
+        $sql_data = "SELECT * " . $sql_base . $sql_where . " ORDER BY date_comptage DESC LIMIT {$comptages_par_page} OFFSET {$offset}";
+        $stmt_data = $this->pdo->prepare($sql_data);
+        $stmt_data->execute($bind_values);
+        $historique = $stmt_data->fetchAll();
 
         $message = $_SESSION['message'] ?? null;
         unset($_SESSION['message']);
@@ -80,40 +96,24 @@ class CaisseController {
         require __DIR__ . '/../templates/historique.php';
     }
     
-    /**
-     * Gère l'affichage de la page d'aide.
-     */
     public function aide() {
         require __DIR__ . '/../templates/aide.php';
     }
 
-    /**
-     * Gère l'affichage de la page du journal des modifications (changelog).
-     */
     public function changelog() {
         $releases = $this->versionService->getAllReleases();
-        
         $page_css = 'changelog.css';
         require __DIR__ . '/../templates/changelog.php';
     }
     
-    /**
-     * Gère la sauvegarde manuelle d'un comptage.
-     */
     public function save() {
         $this->handleSave(false);
     }
 
-    /**
-     * Gère la sauvegarde automatique d'un comptage.
-     */
     public function autosave() {
         $this->handleSave(true);
     }
 
-    /**
-     * Logique commune pour la sauvegarde manuelle et automatique.
-     */
     private function handleSave($is_autosave) {
         if ($is_autosave) {
             header('Content-Type: application/json');
@@ -176,9 +176,6 @@ class CaisseController {
         exit;
     }
 
-    /**
-     * Gère la suppression d'un comptage.
-     */
     public function delete() {
         $id_a_supprimer = intval($_POST['id_a_supprimer'] ?? 0);
         if ($id_a_supprimer > 0) {
