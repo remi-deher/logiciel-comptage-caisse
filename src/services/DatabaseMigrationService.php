@@ -10,7 +10,7 @@ class DatabaseMigrationService {
 
     /**
      * Compare le schéma SQL avec la base de données actuelle et génère les requêtes de migration.
-     * @return array Les requêtes SQL à exécuter.
+     * @return array Les requêtes SQL à exécuter ou un tableau d'erreur.
      */
     public function generateMigrationSql() {
         $schemaFile = dirname(__DIR__, 2) . '/config/schema.sql';
@@ -46,6 +46,7 @@ class DatabaseMigrationService {
 
     /**
      * Applique les requêtes de migration à la base de données.
+     * @return array Résultat de l'opération.
      */
     public function applyMigration(array $sqlCommands) {
         try {
