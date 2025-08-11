@@ -60,9 +60,9 @@ class InstallerController
                     'PHP Version >= 7.4' => version_compare(PHP_VERSION, '7.4', '>='),
                     'Extension PDO MySQL' => extension_loaded('pdo_mysql'),
                     'Extension cURL' => extension_loaded('curl'),
-                    'Dossier /config inscriptible' => is_writable(__DIR__ . '/../config'),
-                    'Dossier /cache inscriptible' => is_writable(__DIR__ . '/../cache'),
-                    'Dossier /backups inscriptible' => is_writable(__DIR__ . '/../backups'),
+                    'Dossier /config inscriptible' => is_writable(dirname(__DIR__, 2) . '/config'),
+                    'Dossier /cache inscriptible' => is_writable(dirname(__DIR__, 2) . '/cache'),
+                    'Dossier /backups inscriptible' => is_writable(dirname(__DIR__, 2) . '/backups'),
                 ];
                 break;
             
@@ -94,7 +94,7 @@ class InstallerController
             $pdo = new PDO($dsn, $db['db_user'], $db['db_pass']);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             
-            $schema = file_get_contents(__DIR__ . '/../config/schema.sql');
+            $schema = file_get_contents(dirname(__DIR__, 2) . '/config/schema.sql');
             $pdo->exec($schema);
 
             // 2. Insérer l'administrateur
@@ -119,8 +119,11 @@ class InstallerController
     private function writeConfigFile($db, $caisses)
     {
         $noms_caisses = [];
+        $tpe_par_caisse = [];
         foreach ($caisses as $index => $name) {
-            $noms_caisses[$index + 1] = $name;
+            $caisse_id = $index + 1;
+            $noms_caisses[$caisse_id] = $name;
+            $tpe_par_caisse[$caisse_id] = 0; // Par défaut, 0 TPE pour les nouvelles caisses
         }
 
         $configContent = "<?php\n\n";
@@ -131,20 +134,23 @@ class InstallerController
         $configContent .= "define('DB_PASS', '" . addslashes($db['db_pass']) . "');\n\n";
         $configContent .= "// URL du dépôt Git pour le pied de page\n";
         $configContent .= "define('GIT_REPO_URL', 'https://github.com/remi-deher/logiciel-comptage-caisse');\n\n";
+        $configContent .= "// Fuseau horaire de l'application\n";
+        $configContent .= "define('APP_TIMEZONE', 'Europe/Paris');\n\n";
         $configContent .= "// Configuration de l'application\n";
         $configContent .= '$noms_caisses = ' . var_export($noms_caisses, true) . ";\n";
+        $configContent .= '$tpe_par_caisse = ' . var_export($tpe_par_caisse, true) . ";\n";
         $configContent .= '$denominations = [' . "\n";
         $configContent .= "    'billets' => ['b500' => 500, 'b200' => 200, 'b100' => 100, 'b50' => 50, 'b20' => 20, 'b10' => 10, 'b5' => 5],\n";
         $configContent .= "    'pieces'  => ['p200' => 2, 'p100' => 1, 'p050' => 0.50, 'p020' => 0.20, 'p010' => 0.10, 'p005' => 0.05, 'p002' => 0.02, 'p001' => 0.01]\n";
         $configContent .= "];\n";
 
-        file_put_contents(__DIR__ . '/../config/config.php', $configContent);
+        file_put_contents(dirname(__DIR__, 2) . '/config/config.php', $configContent);
     }
 
     private function writeAdminsFile($username, $hashedPassword)
     {
         $adminsArray = [$username => $hashedPassword];
         $adminsContent = "<?php\n\n// Fichier de secours pour les administrateurs\nreturn " . var_export($adminsArray, true) . ";\n";
-        file_put_contents(__DIR__ . '/../config/admins.php', $adminsContent);
+        file_put_contents(dirname(__DIR__, 2) . '/config/admins.php', $adminsContent);
     }
 }
