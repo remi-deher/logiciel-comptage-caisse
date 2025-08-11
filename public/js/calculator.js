@@ -19,12 +19,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const tabContents = document.querySelectorAll('.tab-content');
     const ecartDisplays = document.querySelectorAll('.ecart-display');
     const autosaveStatus = document.getElementById('autosave-status');
-    const statusIndicator = document.getElementById('websocket-status-indicator'); // Ajout
-    const statusText = statusIndicator ? statusIndicator.querySelector('.status-text') : null; // Ajout
+    const statusIndicator = document.getElementById('websocket-status-indicator');
+    const statusText = statusIndicator ? statusIndicator.querySelector('.status-text') : null;
+    const nomComptageInput = document.getElementById('nom_comptage');
 
     let autosaveTimeout;
     let isSubmitting = false;
     let initialState = '';
+    let conn; // Déclarer la connexion ici
 
     function getFormStateAsString() {
         const state = {};
@@ -79,6 +81,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function calculateAllFull() {
         if (!config.nomsCaisses) return;
         let totauxCombines = { fdc: 0, total: 0, recette: 0, theorique: 0, ecart: 0 };
+        const caissesData = {};
 
         for (const i of Object.keys(config.nomsCaisses)) {
             const getVal = (id) => parseFloat(document.getElementById(`${id}_${i}`)?.value.replace(',', '.') || 0) || 0;
@@ -97,6 +100,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const recetteReelle = totalCompte - fondDeCaisse - retrocession;
             const ecart = recetteReelle - recetteTheorique;
             
+            caissesData[i] = { ecart, recetteReelle };
+
             totauxCombines.fdc += fondDeCaisse;
             totauxCombines.total += totalCompte;
             totauxCombines.recette += recetteReelle;
@@ -112,29 +117,6 @@ document.addEventListener('DOMContentLoaded', function() {
             ecartEl.parentElement.className = 'result-line total';
             if (ecart > 0.001) ecartEl.parentElement.classList.add('ecart-positif');
             if (ecart < -0.001) ecartEl.parentElement.classList.add('ecart-negatif');
-
-            const topEcartDisplay = document.querySelector(`#ecart-display-caisse${i}`);
-            if (topEcartDisplay) {
-                const topEcartDisplayValue = topEcartDisplay.querySelector('.ecart-value');
-                const topEcartExplanation = topEcartDisplay.querySelector('.ecart-explanation');
-                
-                topEcartDisplayValue.textContent = formatEuros(ecart);
-                
-                const wasActive = topEcartDisplay.classList.contains('active');
-                topEcartDisplay.className = 'ecart-display';
-                if (wasActive) topEcartDisplay.classList.add('active');
-                
-                if (Math.abs(ecart) < 0.01) {
-                    topEcartDisplay.classList.add('ecart-ok');
-                    topEcartExplanation.textContent = `La caisse est juste. Montant à retirer : ${formatEuros(recetteReelle)}`;
-                } else if (ecart > 0) {
-                    topEcartDisplay.classList.add('ecart-positif');
-                    topEcartExplanation.textContent = "Il y a un surplus dans la caisse. Vérifiez vos saisies.";
-                } else {
-                    topEcartDisplay.classList.add('ecart-negatif');
-                    topEcartExplanation.textContent = "Il manque de l'argent. Recomptez la caisse.";
-                }
-            }
         }
         
         document.getElementById('res-total-fdc').textContent = formatEuros(totauxCombines.fdc);
@@ -146,73 +128,126 @@ document.addEventListener('DOMContentLoaded', function() {
         ecartTotalEl.parentElement.className = 'result-line total';
         if (totauxCombines.ecart > 0.001) ecartTotalEl.parentElement.classList.add('ecart-positif');
         if (totauxCombines.ecart < -0.001) ecartTotalEl.parentElement.classList.add('ecart-negatif');
+
+        for (const i of Object.keys(config.nomsCaisses)) {
+            const topEcartDisplay = document.querySelector(`#ecart-display-caisse${i}`);
+            if (topEcartDisplay) {
+                const topEcartDisplayValue = topEcartDisplay.querySelector('.ecart-value');
+                const topEcartExplanation = topEcartDisplay.querySelector('.ecart-explanation');
+                const { ecart, recetteReelle } = caissesData[i];
+                
+                topEcartDisplayValue.textContent = formatEuros(ecart);
+                
+                const wasActive = topEcartDisplay.classList.contains('active');
+                topEcartDisplay.className = 'ecart-display';
+                if (wasActive) topEcartDisplay.classList.add('active');
+                
+                if (Math.abs(ecart) < 0.01) {
+                    topEcartDisplay.classList.add('ecart-ok');
+                    if (Math.abs(totauxCombines.ecart) < 0.01) {
+                        topEcartExplanation.innerHTML = `Montant total à retirer (toutes caisses) : <strong>${formatEuros(totauxCombines.recette)}</strong>`;
+                    } else {
+                        topEcartExplanation.textContent = `La caisse est juste. Montant à retirer : ${formatEuros(recetteReelle)}`;
+                    }
+                } else if (ecart > 0) {
+                    topEcartDisplay.classList.add('ecart-positif');
+                    topEcartExplanation.textContent = "Il y a un surplus dans la caisse. Vérifiez vos saisies.";
+                } else {
+                    topEcartDisplay.classList.add('ecart-negatif');
+                    topEcartExplanation.textContent = "Il manque de l'argent. Recomptez la caisse.";
+                }
+            }
+        }
     }
 
-    // --- Logique WebSocket (RÉINTÉGRÉE) ---
-    let conn;
-    try {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = window.location.host;
-        const wsUrl = `${wsProtocol}//${wsHost}/ws/`;
-        conn = new WebSocket(wsUrl);
+    // On n'initialise le WebSocket et la sauvegarde auto que si on n'est pas en mode consultation
+    if (!config.isLoadedFromHistory) {
+        try {
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsHost = window.location.host;
+            const wsUrl = `${wsProtocol}//${wsHost}/ws/`;
+            conn = new WebSocket(wsUrl);
 
-        conn.onopen = (e) => {
-            if(statusIndicator) {
-                statusIndicator.classList.remove('disconnected');
-                statusIndicator.classList.add('connected');
-                statusText.textContent = 'Connecté en temps réel';
-            }
-        };
-        conn.onerror = (e) => {
-            if(statusIndicator) {
-                statusIndicator.classList.remove('connected');
-                statusIndicator.classList.add('disconnected');
-                statusText.textContent = 'Déconnecté';
-            }
-        };
-        conn.onclose = (e) => {
-             if(statusIndicator) {
-                statusIndicator.classList.remove('connected');
-                statusIndicator.classList.add('disconnected');
-                statusText.textContent = 'Déconnecté';
-            }
-        };
+            conn.onopen = (e) => {
+                if(statusIndicator) {
+                    statusIndicator.classList.remove('disconnected');
+                    statusIndicator.classList.add('connected');
+                    statusText.textContent = 'Connecté en temps réel';
+                }
+            };
+            conn.onerror = (e) => {
+                if(statusIndicator) {
+                    statusIndicator.classList.remove('connected');
+                    statusIndicator.classList.add('disconnected');
+                    statusText.textContent = 'Déconnecté';
+                }
+            };
+            conn.onclose = (e) => {
+                 if(statusIndicator) {
+                    statusIndicator.classList.remove('connected');
+                    statusIndicator.classList.add('disconnected');
+                    statusText.textContent = 'Déconnecté';
+                }
+            };
 
-        conn.onmessage = (e) => {
-            try {
-                const data = JSON.parse(e.data);
-                if (data.id && typeof data.value !== 'undefined') {
-                    const input = document.getElementById(data.id);
-                    if (input && input.value !== data.value) {
-                        input.value = data.value;
-                    }
-                } else {
+            conn.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
                     for (const fieldId in data) {
                         const input = document.getElementById(fieldId);
                         if (input) {
                             input.value = data[fieldId];
                         }
                     }
+                    calculateAllFull();
+                    initialState = getFormStateAsString();
+                } catch (error) {
+                    console.error("Erreur de parsing JSON WebSocket:", error);
                 }
-                calculateAllFull();
-                initialState = getFormStateAsString();
-            } catch (error) {
-                console.error("Erreur de parsing JSON WebSocket:", error);
+            };
+        } catch (e) {
+            console.error("Impossible d'initialiser la connexion WebSocket:", e);
+            if(statusIndicator) {
+                statusIndicator.classList.add('disconnected');
+                statusText.textContent = 'Erreur de connexion';
             }
-        };
-    } catch (e) {
-        console.error("Impossible d'initialiser la connexion WebSocket:", e);
+        }
+
+        caisseForm.addEventListener('input', (event) => {
+            calculateAllFull();
+            clearTimeout(autosaveTimeout);
+            if (autosaveStatus) {
+                autosaveStatus.textContent = 'Modifications non enregistrées...';
+                autosaveStatus.className = 'autosave-status';
+            }
+            autosaveTimeout = setTimeout(() => performAutosave(false), 2500);
+
+            if (conn && conn.readyState === WebSocket.OPEN) {
+                conn.send(JSON.stringify({ id: event.target.id, value: event.target.value }));
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (isSubmitting || !hasUnsavedChanges()) return;
+            performAutosave(true);
+        });
+
+    } else {
+        // Si on est en mode consultation, on met à jour l'indicateur et on désactive les champs
         if(statusIndicator) {
             statusIndicator.classList.add('disconnected');
-            statusText.textContent = 'Erreur de connexion';
+            statusText.textContent = 'Consultation';
         }
+        if(autosaveStatus) {
+            autosaveStatus.textContent = 'Sauvegarde auto désactivée';
+        }
+        // On désactive tous les champs de saisie
+        caisseForm.querySelectorAll('input, textarea').forEach(el => el.disabled = true);
+        // On cache le bouton de sauvegarde
+        const saveBtn = caisseForm.querySelector('.save-btn');
+        if (saveBtn) saveBtn.style.display = 'none';
     }
 
-    // Initialisation
-    calculateAllFull();
-    initialState = getFormStateAsString();
-
-    // Bind events
     tabLinks.forEach(link => {
         link.addEventListener('click', (event) => {
             tabLinks.forEach(l => l.classList.remove('active'));
@@ -225,28 +260,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    caisseForm.addEventListener('input', (event) => {
-        calculateAllFull();
-        clearTimeout(autosaveTimeout);
-        if (autosaveStatus) {
-            autosaveStatus.textContent = 'Modifications non enregistrées...';
-            autosaveStatus.className = 'autosave-status';
-        }
-        autosaveTimeout = setTimeout(() => performAutosave(false), 2500);
-
-        // Envoi des données via WebSocket
-        if (conn && conn.readyState === WebSocket.OPEN) {
-            conn.send(JSON.stringify({ id: event.target.id, value: event.target.value }));
-        }
-    });
-
     caisseForm.addEventListener('submit', () => {
         clearTimeout(autosaveTimeout);
         isSubmitting = true;
     });
 
-    window.addEventListener('beforeunload', () => {
-        if (isSubmitting || !hasUnsavedChanges()) return;
-        performAutosave(true);
-    });
+    calculateAllFull();
+    initialState = getFormStateAsString();
 });

@@ -9,7 +9,8 @@ require 'partials/navbar.php';
 // On prépare les données pour les passer au JavaScript de manière sécurisée
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
-    'denominations' => $denominations ?? []
+    'denominations' => $denominations ?? [],
+    'isLoadedFromHistory' => $isLoadedFromHistory ?? false // On ajoute le drapeau ici
 ]);
 ?>
 
@@ -17,6 +18,17 @@ $config_data = json_encode([
 <div id="calculator-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'></div>
 
 <div class="container">
+    <?php if ($isLoadedFromHistory): ?>
+        <div class="history-view-banner">
+            <i class="fa-solid fa-eye"></i>
+            <div>
+                <strong>Mode Consultation</strong>
+                <p>Vous consultez un ancien comptage. Le temps réel et la sauvegarde automatique sont désactivés.</p>
+            </div>
+            <a href="index.php?page=calculateur" class="btn new-btn">Reprendre le comptage en direct</a>
+        </div>
+    <?php endif; ?>
+
     <?php if (isset($message)): ?>
         <p class="session-message"><?= htmlspecialchars($message) ?></p>
     <?php endif; ?>
@@ -44,7 +56,7 @@ $config_data = json_encode([
                 <fieldset>
                     <legend>Saisie pour la <?= htmlspecialchars($nom) ?></legend>
                     
-                    <h3>Informations Initiales</h3>
+                    <h3><i class="fa-solid fa-cash-register"></i> Informations Caisse</h3>
                     <div class="grid grid-3">
                         <div class="form-group">
                             <label>Fond de Caisse (€)</label>
@@ -60,7 +72,7 @@ $config_data = json_encode([
                         </div>
                     </div>
 
-                    <h3>Détail des Espèces</h3>
+                    <h3><i class="fa-solid fa-money-bill-wave"></i> Détail des Espèces</h3>
                     <h4>Billets</h4>
                     <div class="grid">
                         <?php foreach($denominations['billets'] as $name => $valeur): ?>
@@ -101,7 +113,7 @@ $config_data = json_encode([
     </form>
 
     <div class="results" id="results-container">
-        <h2>Synthèse en Temps Réel</h2>
+        <h2><i class="fa-solid fa-chart-pie"></i> Synthèse en Temps Réel</h2>
         <div class="results-grid">
             <?php foreach ($noms_caisses as $id => $nom): ?>
             <div class="result-box">

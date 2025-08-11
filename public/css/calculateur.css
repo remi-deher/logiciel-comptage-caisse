@@ -1,6 +1,47 @@
 /* ==========================================================================
-   public/css/calculateur.css (Responsive)
+   public/css/calculateur.css
    ========================================================================== */
+
+/* --- Bandeau pour le Mode Consultation --- */
+.history-view-banner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background-color: #eaf5ff; /* Bleu clair */
+    color: #2c3e50; /* Texte sombre */
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    border: 1px solid #aed6f1; /* Bordure bleue */
+}
+
+.history-view-banner i {
+    font-size: 1.8em;
+    color: #3498db; /* Bleu principal */
+}
+
+.history-view-banner div {
+    flex-grow: 1; /* Pousse le bouton vers la droite */
+}
+
+.history-view-banner strong {
+    font-size: 1.1em;
+    display: block;
+}
+
+.history-view-banner p {
+    margin: 4px 0 0 0;
+    font-size: 0.9em;
+}
+
+.history-view-banner .btn {
+    flex-shrink: 0; /* Empêche le bouton de rétrécir */
+    padding: 10px 15px;
+    font-size: 0.9em;
+}
+
+
+/* --- Styles existants --- */
 .tab-selector { border-bottom: 2px solid #ccc; margin-bottom: 20px; display: flex; flex-wrap: wrap; }
 .tab-link { background-color: #f1f1f1; border: 1px solid #ccc; border-bottom: none; padding: 10px 15px; cursor: pointer; font-size: 1em; border-radius: 5px 5px 0 0; margin-right: 5px; }
 .tab-link.active { background-color: #fff; border-bottom: 2px solid #fff; margin-bottom: -2px; font-weight: bold; color: #3498db; }
@@ -14,7 +55,6 @@
 .ecart-display.active { display: block; }
 .ecart-display .ecart-value { font-size: 1.5em; display: block; margin-bottom: 5px; }
 .ecart-explanation { font-size: 0.9em; font-style: italic; font-weight: normal; color: #555; margin-top: 8px; min-height: 1.2em; }
-.ecart-explanation-total { font-weight: bold; color: #34495e; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 0.9em; display: none; }
 
 .ecart-display.ecart-ok { background-color: #eafaf1; border-color: #27ae60; }
 .ecart-display.ecart-ok .ecart-value { color: #27ae60; }
@@ -24,26 +64,21 @@
 .ecart-display.ecart-negatif .ecart-value { color: #c0392b; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; }
-.grid-3 { grid-template-columns: 1fr; gap: 15px;} /* Une colonne par défaut pour mobile */
+.grid-2 { grid-template-columns: 1fr 1fr; }
+.grid-3 { grid-template-columns: 1fr; gap: 15px;}
 
 .results { margin-top: 40px; }
-.results-grid { display: grid; grid-template-columns: 1fr; gap: 20px; } /* Une colonne par défaut */
+.results-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .result-box { background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; }
+.result-box .result-line { display: flex; justify-content: space-between; padding: 8px 0; }
+.result-box .result-line.total { font-weight: bold; }
+.result-box .result-line span:last-child { font-family: monospace; }
+.result-box .ecart-positif { color: #f39c12; }
+.result-box .ecart-negatif { color: #c0392b; }
 .combined-results { background-color: #eaf5ff; border: 1px solid #aed6f1; margin-top: 20px; }
 .save-section { margin-top: 30px; padding: 20px; background-color: #e8f5e9; border-radius: 8px; }
 .button-group { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 
-/* --- Media Queries pour le responsive --- */
-@media (min-width: 576px) {
-    .grid-3 {
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    }
-    .results-grid {
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    }
-}
-
-/* NOUVEAUX STYLES POUR L'AUTOSAVE */
 .autosave-status {
     text-align: center;
     font-size: 0.9em;
@@ -51,9 +86,15 @@
     min-height: 1.2em;
     transition: color 0.5s;
 }
-.autosave-status.saving {
-    color: #3498db;
-}
-.autosave-status.success {
-    color: #27ae60;
+.autosave-status.saving { color: #3498db; }
+.autosave-status.success { color: #27ae60; }
+.autosave-status.error { color: #c0392b; }
+
+@media (min-width: 576px) {
+    .grid-3 {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .results-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
 }
