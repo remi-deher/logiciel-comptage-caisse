@@ -19,10 +19,11 @@ class CaisseController {
      */
     public function calculateur() {
         $loaded_data = [];
-        $isLoadedFromHistory = false; // On initialise un drapeau
+        $isLoadedFromHistory = false;
+        $isAutosaveLoaded = false;
 
         if (isset($_GET['load'])) {
-            $isLoadedFromHistory = true; // On active le drapeau si on charge depuis l'historique
+            $isLoadedFromHistory = true;
             $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE id = ?");
             $stmt->execute([intval($_GET['load'])]);
             $loaded_data = $stmt->fetch() ?: [];
@@ -31,6 +32,9 @@ class CaisseController {
             $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
             $stmt->execute();
             $loaded_data = $stmt->fetch() ?: [];
+            if ($loaded_data) {
+                $isAutosaveLoaded = true;
+            }
         }
 
         $message = $_SESSION['message'] ?? null;
@@ -147,10 +151,6 @@ class CaisseController {
             $sql_columns[] = "c{$i}_ventes"; $sql_values[] = get_numeric_value($caisse_data, 'ventes');
             $sql_columns[] = "c{$i}_retrocession"; $sql_values[] = get_numeric_value($caisse_data, 'retrocession');
             
-            // Ajout des données de chèques
-            $sql_columns[] = "c{$i}_cheques_total"; $sql_values[] = get_numeric_value($caisse_data, 'cheques_total');
-            $sql_columns[] = "c{$i}_cheques_nombre"; $sql_values[] = get_numeric_value($caisse_data, 'cheques_nombre');
-
             foreach ($this->denominations as $list) {
                 foreach (array_keys($list) as $name) {
                     $sql_columns[] = "c{$i}_{$name}";
