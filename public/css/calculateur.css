@@ -10,7 +10,7 @@
     background-color: #eaf5ff;
     color: #2c3e50;
     padding: 15px 20px;
-    border-radius: 8px;
+    border-radius: 12px;
     margin-bottom: 25px;
     border: 1px solid #aed6f1;
 }
@@ -20,7 +20,43 @@
 .history-view-banner p { margin: 4px 0 0 0; font-size: 0.9em; }
 .history-view-banner .btn { flex-shrink: 0; padding: 10px 15px; font-size: 0.9em; }
 
-/* --- Styles des onglets (inchangés) --- */
+/* --- NOUVEAUX STYLES POUR LA SAUVEGARDE EN HAUT --- */
+.top-save-section {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 15px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    margin-bottom: 25px;
+}
+.top-save-section .form-group {
+    flex-grow: 1;
+    margin-bottom: 0;
+}
+.top-save-section .form-group label {
+    font-size: 0.9em;
+    margin-bottom: 5px;
+}
+.top-save-section input {
+    padding: 8px;
+}
+.top-save-section .save-btn {
+    padding: 8px 20px;
+    font-size: 1em;
+    flex-shrink: 0;
+}
+.top-save-section .autosave-status {
+    flex-basis: 100%;
+    text-align: right;
+    font-size: 0.85em;
+    min-height: 0;
+    margin-top: 5px;
+}
+
+/* --- Styles des onglets --- */
 .tab-selector { border-bottom: 2px solid #ccc; margin-bottom: 20px; display: flex; flex-wrap: wrap; }
 .tab-link { background-color: #f1f1f1; border: 1px solid #ccc; border-bottom: none; padding: 10px 15px; cursor: pointer; font-size: 1em; border-radius: 5px 5px 0 0; margin-right: 5px; }
 .tab-link.active { background-color: #fff; border-bottom: 2px solid #fff; margin-bottom: -2px; font-weight: bold; color: #3498db; }
@@ -40,7 +76,7 @@
 .ecart-display.ecart-negatif { background-color: #fdedec; border-color: #c0392b; }
 .ecart-display.ecart-negatif .ecart-value { color: #c0392b; }
 
-/* --- NOUVELLE STRUCTURE EN ACCORDÉON --- */
+/* --- STRUCTURE EN ACCORDÉON --- */
 .accordion-container {
     display: flex;
     flex-direction: column;
@@ -89,21 +125,21 @@
     background-color: #fff;
 }
 .accordion-content.open {
-    max-height: 1000px; /* Valeur assez grande pour contenir le contenu */
+    max-height: 1000px;
     transition: max-height 0.5s ease-in, padding 0.5s ease-in;
 }
 .accordion-content-inner {
-    padding: 0 20px 20px 20px;
+    padding: 20px;
 }
+.results h2 { display: none; }
 
-/* --- Styles des grilles de saisie (inchangés) --- */
+/* --- Styles des grilles de saisie --- */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; }
 .grid-2 { grid-template-columns: 1fr 1fr; }
 .grid-3 { grid-template-columns: 1fr; gap: 15px;}
 .tab-content .form-group input { text-align: right; }
 
-/* --- Styles des résultats (inchangés) --- */
-.results { margin-top: 40px; }
+/* --- Styles des résultats --- */
 .results-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .result-box { background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; }
 .result-box .result-line { display: flex; justify-content: space-between; padding: 8px 0; }
@@ -112,13 +148,6 @@
 .result-box .ecart-positif { color: #f39c12; }
 .result-box .ecart-negatif { color: #c0392b; }
 .combined-results { background-color: #eaf5ff; border: 1px solid #aed6f1; margin-top: 20px; }
-.save-section { margin-top: 30px; padding: 20px; background-color: #e8f5e9; border-radius: 8px; }
-.button-group { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
-
-.autosave-status { text-align: center; font-size: 0.9em; color: #7f8c8d; min-height: 1.2em; transition: color 0.5s; }
-.autosave-status.saving { color: #3498db; }
-.autosave-status.success { color: #27ae60; }
-.autosave-status.error { color: #c0392b; }
 
 @media (min-width: 576px) {
     .grid-3 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }

@@ -39,6 +39,22 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
     <form id="caisse-form" action="index.php?page=calculateur" method="post">
         <input type="hidden" name="action" value="save">
 
+        <!-- NOUVELLE SECTION DE SAUVEGARDE EN HAUT -->
+        <div class="top-save-section">
+            <div class="form-group">
+                <label for="nom_comptage">Nom du comptage</label>
+                <input type="text" id="nom_comptage" name="nom_comptage" placeholder="Ex: Comptage du Lundi Soir" value="<?= htmlspecialchars($loaded_data['nom_comptage'] ?? '') ?>" <?= $disabled_attr ?>>
+            </div>
+            <div class="form-group">
+                <label for="explication">Explication (optionnel)</label>
+                <input type="text" id="explication" name="explication" placeholder="Ex: Jour de marché..." value="<?= htmlspecialchars($loaded_data['explication'] ?? '') ?>" <?= $disabled_attr ?>>
+            </div>
+            <?php if (!($isLoadedFromHistory ?? false)): ?>
+                <button type="submit" class="save-btn">Enregistrer</button>
+            <?php endif; ?>
+            <div id="autosave-status" class="autosave-status"></div>
+        </div>
+
         <div class="tab-selector">
             <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
                 <button type="button" class="tab-link <?= $is_first ? 'active' : '' ?>" data-tab="caisse<?= $id ?>"><?= htmlspecialchars($nom) ?></button>
@@ -117,49 +133,44 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                 </div>
             </div>
             <?php $is_first = false; endforeach; ?>
-
-        <div class="save-section">
-            <h3>Enregistrer le comptage</h3>
-            <div class="form-group">
-                <label for="nom_comptage">Donnez un nom à ce comptage</label>
-                <input type="text" id="nom_comptage" name="nom_comptage" required value="<?= htmlspecialchars($loaded_data['nom_comptage'] ?? '') ?>" <?= $disabled_attr ?>>
-            </div>
-            <div class="form-group" style="margin-top: 10px;">
-                <label for="explication">Explication (optionnel)</label>
-                <textarea id="explication" name="explication" rows="3" placeholder="Ex: jour de marché, erreur de rendu monnaie, etc." <?= $disabled_attr ?>><?= htmlspecialchars($loaded_data['explication'] ?? '') ?></textarea>
-            </div>
-            <div class="button-group">
-                <?php if (!($isLoadedFromHistory ?? false)): ?>
-                    <button type="submit" class="save-btn">Enregistrer le Comptage</button>
-                <?php endif; ?>
-                <div id="autosave-status" class="autosave-status"></div>
-            </div>
-        </div>
     </form>
 
-    <div class="results" id="results-container">
-        <h2><i class="fa-solid fa-chart-pie"></i> Synthèse en Temps Réel</h2>
-        <div class="results-grid">
-            <?php foreach ($noms_caisses as $id => $nom): ?>
-            <div class="result-box">
-                <h3><?= htmlspecialchars($nom) ?></h3>
-                <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id ?>-fdc">0,00 €</span></div>
-                <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id ?>-total">0,00 €</span></div>
-                <hr>
-                <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id ?>-theorique">0,00 €</span></div>
-                <div class="result-line total"><span>Recette réelle :</span> <span id="res-c<?= $id ?>-recette">0,00 €</span></div>
-                <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id ?>-ecart">0,00 €</span></div>
+    <!-- NOUVEL ACCORDÉON POUR LES RÉSULTATS -->
+    <div class="accordion-container" style="margin-top: 30px;">
+        <div class="accordion-card">
+            <div class="accordion-header active">
+                <i class="fa-solid fa-chart-pie"></i>
+                <h3>Synthèse en Temps Réel</h3>
+                <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
             </div>
-            <?php endforeach; ?>
-        </div>
-        <div class="result-box combined-results">
-            <h3>Totaux Combinés</h3>
-            <div class="result-line"><span>Total Fonds de caisse :</span> <span id="res-total-fdc">0,00 €</span></div>
-            <div class="result-line"><span>Total compté (global) :</span> <span id="res-total-total">0,00 €</span></div>
-            <hr>
-            <div class="result-line"><span>Recette théorique totale :</span> <span id="res-total-theorique">0,00 €</span></div>
-            <div class="result-line total"><span>Recette réelle totale :</span> <span id="res-total-recette">0,00 €</span></div>
-            <div class="result-line total"><span>ÉCART TOTAL :</span> <span id="res-total-ecart">0,00 €</span></div>
+            <div class="accordion-content open">
+                <div class="accordion-content-inner">
+                    <div class="results" id="results-container">
+                        <div class="results-grid">
+                            <?php foreach ($noms_caisses as $id => $nom): ?>
+                            <div class="result-box">
+                                <h3><?= htmlspecialchars($nom) ?></h3>
+                                <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id ?>-fdc">0,00 €</span></div>
+                                <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id ?>-total">0,00 €</span></div>
+                                <hr>
+                                <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id ?>-theorique">0,00 €</span></div>
+                                <div class="result-line total"><span>Recette réelle :</span> <span id="res-c<?= $id ?>-recette">0,00 €</span></div>
+                                <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id ?>-ecart">0,00 €</span></div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="result-box combined-results">
+                            <h3>Totaux Combinés</h3>
+                            <div class="result-line"><span>Total Fonds de caisse :</span> <span id="res-total-fdc">0,00 €</span></div>
+                            <div class="result-line"><span>Total compté (global) :</span> <span id="res-total-total">0,00 €</span></div>
+                            <hr>
+                            <div class="result-line"><span>Recette théorique totale :</span> <span id="res-total-theorique">0,00 €</span></div>
+                            <div class="result-line total"><span>Recette réelle totale :</span> <span id="res-total-recette">0,00 €</span></div>
+                            <div class="result-line total"><span>ÉCART TOTAL :</span> <span id="res-total-ecart">0,00 €</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -167,3 +178,4 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 <?php
 require 'partials/footer.php';
 ?>
+²

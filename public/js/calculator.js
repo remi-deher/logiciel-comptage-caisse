@@ -3,7 +3,7 @@
  */
 document.addEventListener('DOMContentLoaded', function() {
     const caisseForm = document.getElementById('caisse-form');
-    if (!caisseForm) return; // Ne s'exécute que sur la page du calculateur
+    if (!caisseForm) return;
 
     // --- Fonctions utilitaires ---
     const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(montant);
@@ -25,7 +25,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusText = statusIndicator ? statusIndicator.querySelector('.status-text') : null;
     const nomComptageInput = document.getElementById('nom_comptage');
 
-    let autosaveTimeout;
     let isSubmitting = false;
     let initialState = '';
     let conn;
