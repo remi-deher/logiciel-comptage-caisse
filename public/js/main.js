@@ -68,27 +68,14 @@ document.addEventListener('DOMContentLoaded', function() {
             performVersionCheck();
             if (forceCheckBtn) forceCheckBtn.addEventListener('click', () => performVersionCheck(true));
 
-            updateButton.addEventListener('click', function() {
+            updateButton.addEventListener('click', function(e) {
+                // On empêche le comportement par défaut si c'est un lien <a>
+                e.preventDefault(); 
+                
                 const confirmationMessage = `Une nouvelle version est disponible !\n\n--- NOTES DE VERSION ---\n${window.releaseNotes || 'Non disponible'}\n-------------------------\n\nVoulez-vous mettre à jour l'application maintenant ?`;
                 if (confirm(confirmationMessage)) {
-                    versionInfo.textContent = "Mise à jour en cours...";
-                    updateButton.disabled = true;
-                    fetch('index.php?action=git_pull')
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                versionInfo.innerHTML = `<strong>${data.message}</strong> ${data.message.includes("terminée") ? "Veuillez rafraîchir la page." : ""}`;
-                                updateButton.style.display = 'none';
-                            } else {
-                                versionInfo.textContent = "Erreur lors de la mise à jour.";
-                                alert(`Échec de la mise à jour : ${data.message}\n\nDétails techniques dans la console (F12).`);
-                                updateButton.disabled = false;
-                            }
-                        })
-                        .catch(() => {
-                            versionInfo.textContent = "Erreur lors de la mise à jour.";
-                            updateButton.disabled = false;
-                        });
+                    // On redirige vers la page de mise à jour dédiée
+                    window.location.href = this.href;
                 }
             });
         }

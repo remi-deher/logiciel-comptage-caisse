@@ -28,6 +28,7 @@ require_once __DIR__ . '/../src/services/VersionService.php';
 require_once __DIR__ . '/../src/services/ConfigService.php';
 require_once __DIR__ . '/../src/services/UserService.php';
 require_once __DIR__ . '/../src/services/CaisseManagementService.php';
+require_once __DIR__ . '/../src/services/DatabaseMigrationService.php';
 // On charge les contrôleurs
 require_once __DIR__ . '/../src/CaisseController.php';
 require_once __DIR__ . '/../src/AdminController.php';
@@ -98,7 +99,9 @@ switch ($page) {
     case 'admin':
         $adminController->index();
         break;
-
+    case 'update':
+        $adminController->updatePage();
+        break;
     case 'calculateur':
     default:
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save') {

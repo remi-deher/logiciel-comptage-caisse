@@ -1,0 +1,52 @@
+/* public/css/update.css */
+.update-header { text-align: center; margin-bottom: 30px; }
+.update-header h2 { border-bottom: none; }
+
+.update-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-bottom: 30px;
+}
+
+.update-card {
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    box-shadow: 0 4px 25px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+}
+.update-card h3 {
+    margin: 0;
+    padding: 20px 25px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 1.2em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.release-notes, .update-process { padding: 25px; }
+.release-notes pre, .sql-code {
+    background-color: #2c3e50;
+    color: #ecf0f1;
+    padding: 15px;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: monospace;
+}
+.sql-code { background-color: #fdf6e3; color: #657b83; }
+
+.status-ok, .status-warning, .status-error { font-weight: bold; }
+.status-ok { color: #27ae60; }
+.status-warning { color: #f39c12; }
+.status-error { color: #c0392b; }
+.status-ok i, .status-warning i, .status-error i { margin-right: 8px; }
+
+.update-results { margin-top: 30px; }
+
+@media (max-width: 992px) {
+    .update-grid { grid-template-columns: 1fr; }
+}

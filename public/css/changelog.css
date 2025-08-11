@@ -1,9 +1,67 @@
 /* public/css/changelog.css */
+
+.changelog-main-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+.changelog-main-header h2 {
+    border-bottom: none;
+    display: inline-block;
+    position: relative;
+    padding-bottom: 10px;
+}
+.changelog-main-header h2::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background-color: #3498db;
+}
+
+/* --- Carte de la dernière release --- */
+.latest-release-card {
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    box-shadow: 0 4px 25px rgba(0,0,0,0.07);
+    margin-bottom: 40px;
+    overflow: hidden;
+}
+.latest-release-header {
+    padding: 20px 25px;
+    background-color: #3498db;
+    color: white;
+}
+.latest-release-header h3 {
+    margin: 0;
+    border: none;
+    color: white;
+    font-size: 1.6em;
+}
+.latest-release-header .release-date {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+.latest-release-footer {
+    padding: 15px 25px;
+    background-color: #f8f9fa;
+    text-align: right;
+    border-top: 1px solid #e9ecef;
+}
+
+.timeline-title {
+    margin-bottom: 20px;
+    color: #34495e;
+}
+
+/* --- Frise Chronologique --- */
 .changelog-timeline {
     position: relative;
     padding: 20px 0;
 }
-
 .changelog-timeline::before {
     content: '';
     position: absolute;
@@ -18,7 +76,7 @@
 .timeline-item {
     position: relative;
     margin-bottom: 30px;
-    padding-left: 50px;
+    padding-left: 60px;
 }
 
 .timeline-icon {
@@ -27,7 +85,6 @@
     top: 0;
     width: 40px;
     height: 40px;
-    background-color: #3498db;
     color: white;
     border-radius: 50%;
     display: flex;
@@ -35,43 +92,80 @@
     justify-content: center;
     font-size: 1.2em;
     border: 3px solid #fff;
-    box-shadow: 0 0 0 4px #3498db;
 }
 
-.timeline-content h3 {
-    margin-top: 0;
-    border-bottom: none;
-    font-size: 1.5em;
+.timeline-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
 }
-
-.timeline-content .release-date {
+.timeline-content-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.timeline-content-header h4 {
+    margin: 0;
+    border: none;
+    font-size: 1.4em;
+}
+.timeline-content-header .release-type {
     font-size: 0.8em;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-right: 10px;
+}
+.timeline-content-header .release-date {
+    font-size: 0.9em;
     color: #7f8c8d;
-    font-weight: normal;
 }
 
 .release-notes {
-    margin-top: 10px;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    line-height: 1.6;
+    line-height: 1.7;
+    color: #333;
+    margin-bottom: 15px;
+    flex-grow: 1;
 }
-
-/* Styles pour le contenu HTML rendu */
-.release-notes ul {
-    padding-left: 20px;
-    margin-top: 10px;
-}
-
-.release-notes p {
-    margin-top: 0;
-}
-
+.release-notes ul { padding-left: 20px; margin-top: 10px; }
+.release-notes p { margin-top: 0; }
 .release-notes img {
     max-width: 100%;
     height: auto;
     border-radius: 8px;
     margin: 10px 0;
     border: 1px solid #ddd;
+}
+
+.github-link {
+    display: inline-block;
+    background-color: #ecf0f1;
+    color: #34495e;
+    padding: 8px 15px;
+    border-radius: 20px;
+    text-decoration: none;
+    font-size: 0.9em;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    border: 1px solid #dfe6e9;
+    align-self: flex-end;
+}
+.github-link:hover {
+    background-color: #dfe6e9;
+    color: #2c3e50;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+.github-link i {
+    margin-right: 6px;
+    color: #7f8c8d;
+    transition: color 0.2s ease;
+}
+.github-link:hover i {
+    color: #2c3e50;
 }

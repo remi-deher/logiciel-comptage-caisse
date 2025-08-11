@@ -27,7 +27,7 @@ $release_info = 'Information non disponible';
         
         <div id="update-container" class="update-container">
             <span id="version-info">Vérification de la version...</span>
-            <button id="update-button" class="update-btn" style="display: none;">Mettre à jour</button>
+            <a href="index.php?page=update" id="update-button" class="update-btn" style="display: none; text-decoration: none;">Mettre à jour</a>
         </div>
     </footer>
 
