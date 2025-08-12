@@ -1,8 +1,8 @@
 <?php
 // templates/aide.php
 
-$page_css = 'aide.css'; // On lie la feuille de style spécifique à cette page
-$page_js = 'help.js'; // On lie le script JS spécifique à cette page
+$page_css = 'aide.css'; // Définit la feuille de style spécifique à cette page
+$page_js = 'help.js'; // Définit le script JS spécifique à cette page
 
 require 'partials/header.php';
 require 'partials/navbar.php';
@@ -19,7 +19,7 @@ require 'partials/navbar.php';
         <div class="help-card" 
              data-title="Le Calculateur" 
              data-icon="fa-solid fa-calculator"
-             data-content="<h4>Une interface intuitive</h4><p>La page du calculateur est organisée en sections déroulantes (accordéons) pour une meilleure clarté :</p><ol><li><strong>Informations Caisse :</strong> Saisissez ici le fond de caisse, le total des ventes de la journée et les éventuelles rétrocessions (prélèvements).</li><li><strong>Détail des Espèces :</strong> Renseignez le nombre de billets et de pièces comptés. Le total se calcule automatiquement.</li></ol><h4>Indicateur d'écart en temps réel</h4><p>Situé en haut de la page, cet encadré est votre guide. Il change de couleur et de message pour vous informer de l'état de la caisse active :</p><ul><li><strong style='color: #27ae60;'>Vert :</strong> Parfait ! La caisse est juste. Le message vous indiquera le montant total à retirer.</li><li><strong style='color: #f39c12;'>Orange :</strong> Il y a un surplus d'argent. Vérifiez vos saisies.</li><li><strong style='color: #c0392b;'>Rouge :</strong> Il manque de l'argent. Un recomptage est conseillé.</li></ul>">
+             data-content="<h4>Une interface intuitive</h4><p>La page du calculateur est organisée en sections déroulantes (accordéons) pour une meilleure clarté :</p><ol><li><strong>Informations Caisse :</strong> Saisissez ici le fond de caisse, le total des ventes de la journée et les éventuelles rétrocessions (prélèvements).</li><li><strong>Détail des Espèces :</strong> Renseignez le nombre de billets et de pièces comptés. Le total se calcule automatiquement.</li></ol><h4>Indicateur d'écart en temps réel</h4><p>Situé en haut de la page, cet encadré est votre guide. Il change de couleur et de message pour vous informer de l'état de la caisse active :</p><ul><li><strong style='color: #27ae60;'>Vert :</strong> Félicitations ! L'écart est nul, votre caisse est juste.</li><li><strong style='color: #f39c12;'>Orange :</strong> Il y a un surplus d'argent. Vérifiez vos saisies.</li><li><strong style='color: #c0392b;'>Rouge :</strong> Il manque de l'argent. Un recomptage est conseillé.</li></ul>">
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-calculator"></i></div>
                 <h3>Le Calculateur</h3>

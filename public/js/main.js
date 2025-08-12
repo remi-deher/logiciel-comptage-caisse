@@ -1,13 +1,12 @@
 /**
  * Fichier JavaScript principal de l'application.
- * Contient la logique globale (navbar, version check) chargée sur toutes les pages.
  */
 document.addEventListener('DOMContentLoaded', function() {
 
-    // --- MODULE GLOBAL (s'applique à toutes les pages) ---
     const Global = {
         init: function() {
             this.initNavbar();
+            this.initThemeSwitcher();
             this.initVersionCheck();
         },
 
@@ -17,6 +16,28 @@ document.addEventListener('DOMContentLoaded', function() {
             if (navbarToggler && navbarCollapse) {
                 navbarToggler.addEventListener('click', () => navbarCollapse.classList.toggle('show'));
             }
+        },
+
+        initThemeSwitcher: function() {
+            const switcher = document.getElementById('theme-switcher');
+            if (!switcher) return;
+
+            const applyTheme = (theme) => {
+                document.body.dataset.theme = theme;
+                localStorage.setItem('theme', theme);
+            };
+
+            switcher.addEventListener('click', () => {
+                const currentTheme = document.body.dataset.theme || 'light';
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                applyTheme(newTheme);
+            });
+
+            // Appliquer le thème au chargement
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const defaultTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+            applyTheme(defaultTheme);
         },
 
         initVersionCheck: function() {
@@ -31,13 +52,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.error) {
                     versionInfo.textContent = "Erreur de vérification.";
                     if (releaseInfoContainer) releaseInfoContainer.innerHTML = 'Dernière release : N/A';
+                    console.error("Détails de l'erreur de l'API:", data);
                     return;
                 }
+
                 if (releaseInfoContainer && data.formatted_release_date && data.release_url) {
                     releaseInfoContainer.innerHTML = `Dernière release : <a href="${data.release_url}" target="_blank" rel="noopener noreferrer">${data.remote_version}</a> le ${data.formatted_release_date}`;
                 }
+
                 if (data.update_available) {
-                    versionInfo.innerHTML = `Version <strong>${data.local_version}</strong>. <span style="color: #e67e22;">Mise à jour vers ${data.remote_version} disponible.</span>`;
+                    versionInfo.innerHTML = `Version <strong>${data.local_version}</strong>. 
+                        <span style="color: #e67e22;">Mise à jour vers ${data.remote_version} disponible.</span>`;
                     updateButton.style.display = 'inline-block';
                     window.releaseNotes = data.release_notes;
                 } else {
@@ -56,31 +81,42 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(response => response.json())
                     .then(data => {
                         handleVersionData(data);
-                        if (force && icon) setTimeout(() => icon.classList.remove('fa-spin'), 500);
+                        if (force && icon) {
+                            setTimeout(() => icon.classList.remove('fa-spin'), 500);
+                        }
                     })
-                    .catch(() => {
+                    .catch(error => {
                         versionInfo.textContent = "Impossible de vérifier la version.";
                         if (releaseInfoContainer) releaseInfoContainer.innerHTML = 'Dernière release : N/A';
+                        console.error('Erreur lors de la vérification de la version:', error);
                         if (force && icon) icon.classList.remove('fa-spin');
                     });
             };
 
             performVersionCheck();
-            if (forceCheckBtn) forceCheckBtn.addEventListener('click', () => performVersionCheck(true));
+
+            if (forceCheckBtn) {
+                forceCheckBtn.addEventListener('click', () => performVersionCheck(true));
+            }
 
             updateButton.addEventListener('click', function(e) {
-                // On empêche le comportement par défaut si c'est un lien <a>
                 e.preventDefault(); 
                 
-                const confirmationMessage = `Une nouvelle version est disponible !\n\n--- NOTES DE VERSION ---\n${window.releaseNotes || 'Non disponible'}\n-------------------------\n\nVoulez-vous mettre à jour l'application maintenant ?`;
+                const confirmationMessage = `
+Une nouvelle version est disponible !
+
+--- NOTES DE VERSION ---
+${window.releaseNotes || 'Non disponible'}
+-------------------------
+
+Voulez-vous mettre à jour l'application maintenant ?`;
+
                 if (confirm(confirmationMessage)) {
-                    // On redirige vers la page de mise à jour dédiée
                     window.location.href = this.href;
                 }
             });
         }
     };
 
-    // Initialisation du module global
     Global.init();
 });

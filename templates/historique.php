@@ -10,34 +10,42 @@ $config_data = json_encode([
 require 'partials/header.php';
 require 'partials/navbar.php';
 
-// Fonction d'aide pour générer la pagination
+// NOUVELLE FONCTION DE PAGINATION "INTELLIGENTE"
 function renderPagination($page_courante, $pages_totales) {
     $params = $_GET;
     unset($params['p']);
     $query_string = http_build_query($params);
+    $window = 1; // Nombre de pages à afficher de chaque côté de la page active
 
     echo '<ul class="pagination">';
     // Bouton Précédent
     if ($page_courante > 1) {
-        echo '<li><a href="?p=' . ($page_courante - 1) . '&' . $query_string . '">«</a></li>';
+        echo '<li><a href="?p=' . ($page_courante - 1) . '&' . $query_string . '">« Préc.</a></li>';
     } else {
-        echo '<li class="disabled"><span>«</span></li>';
+        echo '<li class="disabled"><span>« Préc.</span></li>';
     }
 
     // Liens des pages
     for ($i = 1; $i <= $pages_totales; $i++) {
-        if ($i == $page_courante) {
-            echo '<li class="active"><span>' . $i . '</span></li>';
-        } else {
-            echo '<li><a href="?p=' . $i . '&' . $query_string . '">' . $i . '</a></li>';
+        // Conditions pour afficher le numéro de page
+        if ($i == 1 || $i == $pages_totales || ($i >= $page_courante - $window && $i <= $page_courante + $window)) {
+            if ($i == $page_courante) {
+                echo '<li class="active"><span>' . $i . '</span></li>';
+            } else {
+                echo '<li><a href="?p=' . $i . '&' . $query_string . '">' . $i . '</a></li>';
+            }
+        } 
+        // Conditions pour afficher les ellipses (...)
+        elseif (($i == $page_courante - $window - 1) || ($i == $page_courante + $window + 1)) {
+            echo '<li class="disabled"><span>...</span></li>';
         }
     }
     
     // Bouton Suivant
     if ($page_courante < $pages_totales) {
-        echo '<li><a href="?p=' . ($page_courante + 1) . '&' . $query_string . '">»</a></li>';
+        echo '<li><a href="?p=' . ($page_courante + 1) . '&' . $query_string . '">Suiv. »</a></li>';
     } else {
-        echo '<li class="disabled"><span>»</span></li>';
+        echo '<li class="disabled"><span>Suiv. »</span></li>';
     }
     echo '</ul>';
 }
@@ -92,7 +100,6 @@ function renderPagination($page_courante, $pages_totales) {
 
         <div class="history-grid">
             <?php foreach ($historique as $comptage):
-                // On s'assure que les variables existent avant de les utiliser
                 $nombre_caisses_actuel = isset($nombre_caisses) ? $nombre_caisses : count($noms_caisses);
                 $denominations_actuel = isset($denominations) ? $denominations : [];
                 $calculated = calculate_results_from_data($comptage, $nombre_caisses_actuel, $denominations_actuel);

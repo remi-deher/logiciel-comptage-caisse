@@ -1,17 +1,28 @@
 /* ==========================================================================
-   public/css/navbar.css (Responsive)
+   public/css/navbar.css (Avec Thème Sombre)
    ========================================================================== */
 .navbar {
-    background-color: #34495e;
+    max-width: 1200px;
+    margin: 20px auto 0 auto; /* Centre la navbar et ajoute de l'espace */
+    box-sizing: border-box;
+    width: 100%;
     padding: 0 20px;
-    border-radius: 8px 8px 0 0;
+    background-color: #34495e;
+    border-radius: 12px 12px 0 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 15px;
     position: relative;
+    border: 1px solid #4a6883;
+    border-bottom: none;
 }
+body[data-theme="dark"] .navbar {
+    background-color: #212529;
+    border-color: #343a40;
+}
+
 .navbar-brand {
     color: white;
     font-size: 1.5em;
@@ -20,7 +31,6 @@
     padding: 15px 0;
 }
 
-/* --- Styles pour le menu sur grand écran --- */
 .navbar-collapse {
     display: flex;
     align-items: center;
@@ -42,10 +52,12 @@
 .nav-item a:hover, .nav-item a.active {
     background-color: #2c3e50;
 }
+body[data-theme="dark"] .nav-item a:hover, body[data-theme="dark"] .nav-item a.active {
+    background-color: #343a40;
+}
 
-/* --- Bouton "Hamburger" pour mobile --- */
 .navbar-toggler {
-    display: none; /* Caché par défaut */
+    display: none;
     background: none;
     border: none;
     color: white;
@@ -53,82 +65,68 @@
     cursor: pointer;
 }
 
-/* --- Indicateur de statut WebSocket --- */
-.status-indicator {
+.navbar-controls {
     display: flex;
     align-items: center;
-    padding: 8px 12px;
-    border-radius: 18px;
-    font-size: 0.9em;
-    font-weight: bold;
-    color: white;
-    background-color: #f39c12; /* Orange pour "Connexion..." */
-    transition: background-color 0.5s ease;
+    gap: 10px;
 }
-.status-indicator .status-dot {
-    width: 10px;
-    height: 10px;
+
+/* --- Bouton de Thème --- */
+.theme-switch-btn {
+    background: none;
+    border: 2px solid #7f8c8d;
+    color: #ecf0f1;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
-    background-color: white;
-    margin-right: 8px;
-    animation: pulse 2s infinite;
+    cursor: pointer;
+    font-size: 1.2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
 }
-.status-indicator.connected { background-color: #27ae60; }
-.status-indicator.connected .status-dot { animation: none; }
-.status-indicator.disconnected { background-color: #c0392b; }
-.status-indicator.disconnected .status-dot { animation: none; background-color: #f5c6cb; }
-@keyframes pulse {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+.theme-switch-btn:hover {
+    border-color: white;
+    transform: rotate(15deg);
 }
+.theme-switch-btn .fa-sun { display: none; }
+.theme-switch-btn .fa-moon { display: block; }
 
+body[data-theme="dark"] .theme-switch-btn .fa-sun { display: block; }
+body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
 
-/* --- Media Query pour les écrans de moins de 992px --- */
-@media (max-width: 992px) {
-    .navbar-toggler {
-        display: block; /* Affiche le bouton hamburger */
+/* ... (le reste des styles de la navbar reste identique) ... */
+
+@media (max-width: 1200px) {
+    .navbar, .container {
+        margin-left: 10px;
+        margin-right: 10px;
     }
+}
+
+@media (max-width: 992px) {
+    .navbar-toggler { display: block; }
     .navbar-collapse {
-        display: none; /* Cache le menu par défaut */
+        display: none;
         flex-direction: column;
         align-items: stretch;
         width: 100%;
         background-color: #3f5870;
         padding: 10px 0;
     }
-    .navbar-collapse.show {
-        display: flex; /* Affiche le menu quand la classe 'show' est ajoutée par JS */
+    body[data-theme="dark"] .navbar-collapse {
+        background-color: #2c3034;
     }
-    .navbar-nav {
-        flex-direction: column;
-        width: 100%;
-    }
-    .nav-item a {
-        padding: 15px 20px;
-        border-bottom: 1px solid #4a6883;
-    }
-    .nav-item:last-child a {
-        border-bottom: none;
-    }
-    .status-indicator {
-        margin: 10px 20px;
-        justify-content: center;
-    }
+    .navbar-collapse.show { display: flex; }
+    .navbar-nav { flex-direction: column; width: 100%; }
+    .nav-item a { padding: 15px 20px; border-bottom: 1px solid #4a6883; }
+    body[data-theme="dark"] .nav-item a { border-bottom: 1px solid #343a40; }
+    .nav-item:last-child a { border-bottom: none; }
+    .navbar-controls { margin: 10px 20px; justify-content: center; }
 }
 
-/* --- NOUVELLE Media Query pour centrer les liens sur grand écran --- */
 @media (min-width: 992.01px) {
-    .navbar-collapse {
-        flex-grow: 1;
-        justify-content: flex-end; /* Pousse l'indicateur de statut vers la droite */
-    }
-
-    .navbar-nav {
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        width: auto; /* Annule le width: 100% du mode mobile */
-    }
+    .navbar-collapse { flex-grow: 1; justify-content: flex-end; }
+    .navbar-nav { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: auto; }
 }

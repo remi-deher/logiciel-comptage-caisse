@@ -1,5 +1,5 @@
 /* ==========================================================================
-   public/css/calculateur.css (Nouvelle Interface - Accordéon)
+   public/css/calculateur.css (Avec Thème Sombre)
    ========================================================================== */
 
 /* --- Bandeau pour le Mode Consultation --- */
@@ -7,94 +7,70 @@
     display: flex;
     align-items: center;
     gap: 20px;
-    background-color: #eaf5ff;
-    color: #2c3e50;
+    background-color: rgba(52, 152, 219, 0.1);
+    color: var(--color-text-primary);
     padding: 15px 20px;
     border-radius: 12px;
     margin-bottom: 25px;
-    border: 1px solid #aed6f1;
+    border: 1px solid rgba(52, 152, 219, 0.3);
 }
-.history-view-banner i { font-size: 1.8em; color: #3498db; }
+.history-view-banner i { font-size: 1.8em; color: var(--color-primary); }
 .history-view-banner div { flex-grow: 1; }
 .history-view-banner strong { font-size: 1.1em; display: block; }
-.history-view-banner p { margin: 4px 0 0 0; font-size: 0.9em; }
+.history-view-banner p { margin: 4px 0 0 0; font-size: 0.9em; color: var(--color-text-secondary); }
 .history-view-banner .btn { flex-shrink: 0; padding: 10px 15px; font-size: 0.9em; }
 
+/* --- Section de sauvegarde en haut --- */
+.top-save-section {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 15px;
+    padding: 20px;
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    margin-bottom: 25px;
+}
+.top-save-section .form-group { flex-grow: 1; margin-bottom: 0; }
+.top-save-section .form-group label { font-size: 0.9em; margin-bottom: 5px; }
+.top-save-section input { padding: 8px; }
+.top-save-section .save-btn { padding: 8px 20px; font-size: 1em; flex-shrink: 0; }
+.top-save-section .autosave-status { flex-basis: 100%; text-align: right; font-size: 0.85em; min-height: 0; margin-top: 5px; }
+
 /* --- Styles des onglets --- */
-.tab-selector { border-bottom: 2px solid #ccc; margin-bottom: 20px; display: flex; flex-wrap: wrap; }
-.tab-link { background-color: #f1f1f1; border: 1px solid #ccc; border-bottom: none; padding: 10px 15px; cursor: pointer; font-size: 1em; border-radius: 5px 5px 0 0; margin-right: 5px; }
-.tab-link.active { background-color: #fff; border-bottom: 2px solid #fff; margin-bottom: -2px; font-weight: bold; color: #3498db; }
+.tab-selector { border-bottom: 2px solid var(--color-border-light); margin-bottom: 20px; display: flex; flex-wrap: wrap; }
+.tab-link { background-color: var(--color-surface-alt); border: 1px solid var(--color-border-light); border-bottom: none; padding: 10px 15px; cursor: pointer; font-size: 1em; border-radius: 5px 5px 0 0; margin-right: 5px; color: var(--color-text-secondary); }
+.tab-link:hover { background-color: var(--color-surface-alt-hover); }
+.tab-link.active { background-color: var(--color-surface); border-bottom: 2px solid var(--color-surface); font-weight: bold; color: var(--color-primary); }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
 /* --- Indicateur d'écart en haut --- */
 .ecart-display-container { text-align: center; }
-.ecart-display { display: none; padding: 15px; margin-bottom: 20px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1.1em; font-weight: bold; transition: background-color 0.3s, border-color 0.3s; }
+.ecart-display { display: none; padding: 15px; margin-bottom: 20px; border: 2px solid var(--color-border-light); border-radius: 8px; font-size: 1.1em; font-weight: bold; transition: background-color 0.3s, border-color 0.3s; }
 .ecart-display.active { display: block; }
 .ecart-display .ecart-value { font-size: 1.5em; display: block; margin-bottom: 5px; }
-.ecart-explanation { font-size: 0.9em; font-style: italic; font-weight: normal; color: #555; margin-top: 8px; min-height: 1.2em; }
-.ecart-display.ecart-ok { background-color: #eafaf1; border-color: #27ae60; }
-.ecart-display.ecart-ok .ecart-value { color: #27ae60; }
-.ecart-display.ecart-positif { background-color: #fef5e7; border-color: #f39c12; }
-.ecart-display.ecart-positif .ecart-value { color: #f39c12; }
-.ecart-display.ecart-negatif { background-color: #fdedec; border-color: #c0392b; }
-.ecart-display.ecart-negatif .ecart-value { color: #c0392b; }
+.ecart-explanation { font-size: 0.9em; font-style: italic; font-weight: normal; color: var(--color-text-secondary); margin-top: 8px; min-height: 1.2em; }
+.ecart-display.ecart-ok { background-color: rgba(39, 174, 96, 0.1); border-color: var(--color-success); }
+.ecart-display.ecart-ok .ecart-value { color: var(--color-success); }
+.ecart-display.ecart-positif { background-color: rgba(243, 156, 18, 0.1); border-color: var(--color-warning); }
+.ecart-display.ecart-positif .ecart-value { color: var(--color-warning); }
+.ecart-display.ecart-negatif { background-color: rgba(192, 57, 43, 0.1); border-color: var(--color-danger); }
+.ecart-display.ecart-negatif .ecart-value { color: var(--color-danger); }
 
 /* --- STRUCTURE EN ACCORDÉON --- */
-.accordion-container {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-.accordion-card {
-    border: 1px solid #e9ecef;
-    border-radius: 12px;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-.accordion-header {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 20px;
-    cursor: pointer;
-    background-color: #f8f9fa;
-    transition: background-color 0.2s;
-}
-.accordion-header:hover {
-    background-color: #e9ecef;
-}
-.accordion-header i {
-    font-size: 1.2em;
-    color: #3498db;
-}
-.accordion-header h3 {
-    margin: 0;
-    border: none;
-    padding: 0;
-    font-size: 1.3em;
-    flex-grow: 1;
-}
-.accordion-toggle-icon {
-    font-size: 1.2em;
-    transition: transform 0.3s ease;
-}
-.accordion-header.active .accordion-toggle-icon {
-    transform: rotate(180deg);
-}
-.accordion-content {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.4s ease-out, padding 0.4s ease-out;
-    background-color: #fff;
-}
-.accordion-content.open {
-    max-height: 1000px;
-    transition: max-height 0.5s ease-in, padding 0.5s ease-in;
-}
-.accordion-content-inner {
-    padding: 20px;
-}
+.accordion-container { display: flex; flex-direction: column; gap: 15px; }
+.accordion-card { border: 1px solid var(--color-border-light); border-radius: 12px; overflow: hidden; transition: all 0.3s ease; }
+.accordion-header { display: flex; align-items: center; gap: 15px; padding: 20px; cursor: pointer; background-color: var(--color-surface-alt); transition: background-color 0.2s; }
+.accordion-header:hover { background-color: var(--color-surface-alt-hover); }
+.accordion-header i { font-size: 1.2em; color: var(--color-primary); }
+.accordion-header h3 { margin: 0; border: none; padding: 0; font-size: 1.3em; flex-grow: 1; }
+.accordion-toggle-icon { font-size: 1.2em; transition: transform 0.3s ease; }
+.accordion-header.active .accordion-toggle-icon { transform: rotate(180deg); }
+.accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out, padding 0.4s ease-out; background-color: var(--color-surface); }
+.accordion-content.open { max-height: 1000px; transition: max-height 0.5s ease-in, padding 0.5s ease-in; }
+.accordion-content-inner { padding: 20px; }
 .results h2 { display: none; }
 
 /* --- Styles des grilles de saisie --- */
@@ -105,90 +81,18 @@
 
 /* --- Styles des résultats --- */
 .results-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-.result-box { background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #e9ecef; }
+.result-box { background-color: var(--color-surface-alt); padding: 20px; border-radius: 8px; border: 1px solid var(--color-border-light); }
 .result-box .result-line { display: flex; justify-content: space-between; padding: 8px 0; }
 .result-box .result-line.total { font-weight: bold; }
 .result-box .result-line span:last-child { font-family: monospace; }
-.result-box .ecart-positif { color: #f39c12; }
-.result-box .ecart-negatif { color: #c0392b; }
-.combined-results { background-color: #eaf5ff; border: 1px solid #aed6f1; margin-top: 20px; }
+.result-box .ecart-positif { color: var(--color-warning); }
+.result-box .ecart-negatif { color: var(--color-danger); }
+.combined-results { background-color: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); }
 
-/* --- NOUVEAUX STYLES POUR LA SECTION DE SAUVEGARDE --- */
-.save-section {
-    margin-top: 40px;
-    padding: 25px 30px;
-    background-color: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 12px;
-}
-
-.save-section-header {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 20px;
-}
-
-.save-section-header i {
-    font-size: 1.5em;
-    color: #27ae60; /* Vert pour l'icône de sauvegarde */
-}
-
-.save-section-header h3 {
-    margin: 0;
-    border: none;
-    padding: 0;
-    font-size: 1.4em;
-    color: #2c3e50;
-}
-
-.save-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 20px;
-}
-
-.form-group.with-icon {
-    position: relative;
-}
-
-.form-group.with-icon .input-icon {
-    position: absolute;
-    left: 15px;
-    top: 50%;
-    transform: translateY(25%); /* Ajustement pour la hauteur du label */
-    color: #95a5a6;
-    pointer-events: none;
-}
-
-.form-group.with-icon input {
-    padding-left: 40px; /* Espace pour l'icône */
-}
-
-.save-section .button-group {
-    margin-top: 0;
-    align-items: center;
-}
-
-.save-section .save-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.1em;
-    padding: 12px 25px;
-    width: auto; /* Pour que le bouton ne prenne pas toute la largeur */
-}
-
-.save-section .autosave-status {
-    margin-top: 10px;
-}
-
-@media (max-width: 768px) {
-    .save-grid {
-        grid-template-columns: 1fr;
-    }
-}
+.autosave-status { text-align: center; font-size: 0.9em; color: var(--color-text-muted); min-height: 1.2em; transition: color 0.5s; }
+.autosave-status.saving { color: var(--color-primary); }
+.autosave-status.success { color: var(--color-success); }
+.autosave-status.error { color: var(--color-danger); }
 
 @media (min-width: 576px) {
     .grid-3 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }

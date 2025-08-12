@@ -1,30 +1,78 @@
 /* ==========================================================================
-   public/css/styles.css (Responsive)
+   public/css/styles.css (Avec Thème Sombre Amélioré)
    ========================================================================== */
+
+/* --- Définition des variables de couleur --- */
+:root {
+    --color-bg: #f4f7f9;
+    --color-surface: #ffffff;
+    --color-surface-alt: #f8f9fa;
+    --color-surface-alt-hover: #e9ecef;
+    --color-text-primary: #2c3e50;
+    --color-text-secondary: #555;
+    --color-text-muted: #7f8c8d;
+    --color-border: #ccc;
+    --color-border-light: #e9ecef;
+    --color-primary: #3498db;
+    --color-primary-dark: #2980b9;
+    --color-success: #27ae60;
+    --color-success-dark: #229954;
+    --color-danger: #c0392b;
+    --color-danger-dark: #a93226;
+    --color-warning: #f39c12;
+    --shadow-color: rgba(0,0,0,0.1);
+    --input-placeholder-color: #95a5a6;
+}
+
+body[data-theme="dark"] {
+    --color-bg: #212529;
+    --color-surface: #2c3034;
+    --color-surface-alt: #343a40;
+    --color-surface-alt-hover: #495057;
+    --color-text-primary: #ecf0f1;
+    --color-text-secondary: #bdc3c7;
+    --color-text-muted: #95a5a6;
+    --color-border: #495057;
+    --color-border-light: #3a3a3a;
+    --color-primary: #3498db;
+    --color-primary-dark: #2980b9;
+    --color-success: #2ecc71;
+    --color-success-dark: #27ae60;
+    --color-danger: #e74c3c;
+    --color-danger-dark: #c0392b;
+    --color-warning: #f1c40f;
+    --shadow-color: rgba(0,0,0,0.4);
+    --input-placeholder-color: #7f8c8d;
+}
+
 body { 
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
     margin: 0; 
-    padding: 10px;
-    background-color: #f4f7f9; 
-    color: #333; 
+    padding: 0;
+    background-color: var(--color-bg); 
+    color: var(--color-text-primary); 
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    transition: background-color 0.3s, color 0.3s;
+    color-scheme: light dark;
 }
 .container { 
     width: 100%;
-    max-width: 1200px; /* Largeur max augmentée pour les grands écrans */
-    margin: 0 auto; 
-    background-color: #fff; 
+    max-width: 1200px;
+    margin: 0 auto 20px auto;
+    background-color: var(--color-surface); 
     padding: 15px;
-    border-radius: 0 0 8px 8px; /* On enlève le radius en haut pour coller à la navbar */
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 4px 15px var(--shadow-color);
     flex-grow: 1;
     box-sizing: border-box;
+    border: 1px solid var(--color-border-light);
+    border-top: none;
 }
 h2, h3 { 
-    color: #2c3e50; 
-    border-bottom: 2px solid #3498db; 
+    color: var(--color-text-primary); 
+    border-bottom: 2px solid var(--color-primary); 
     padding-bottom: 10px; 
 }
 .form-group { 
@@ -35,37 +83,56 @@ h2, h3 {
 .form-group label { 
     font-weight: bold; 
     margin-bottom: 5px; 
-    color: #555; 
+    color: var(--color-text-secondary); 
     display: block; 
 }
 .form-group input, .form-group select, .form-group textarea { 
     width: 100%; 
     box-sizing: border-box; 
     padding: 10px; 
-    border: 1px solid #ccc; 
-    border-radius: 4px; 
-    font-size: 1em; 
+    border: 1px solid var(--color-border); 
+    border-radius: 6px; 
+    font-size: 1em;
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+    transition: border-color 0.2s, background-color 0.2s;
+}
+.form-group input::placeholder, .form-group textarea::placeholder {
+    color: var(--input-placeholder-color);
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
 }
 .form-group textarea { text-align: left; resize: vertical; }
 
-/* Styles des boutons */
-.save-btn, .new-btn, .delete-btn { 
-    font-size: 1.1em; 
+/* --- Styles des boutons (Material Design Inspired) --- */
+.save-btn, .new-btn, .delete-btn {
+    font-size: 0.9em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
     color: white;
-    padding: 12px 15px;
+    padding: 10px 20px;
     border: none;
     cursor: pointer;
-    border-radius: 5px;
+    border-radius: 6px;
     text-align: center;
-    transition: background-color 0.2s, transform 0.2s;
+    transition: box-shadow 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    -webkit-tap-highlight-color: transparent;
 }
 .save-btn:hover, .new-btn:hover, .delete-btn:hover {
-    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.25);
 }
-.save-btn { background-color: #27ae60; } /* Vert */
-.new-btn { background-color: #3498db; } /* Bleu */
-.delete-btn { background-color: #c0392b; } /* Rouge */
-.delete-btn:hover { background-color: #a93226; }
+.save-btn { background-color: var(--color-success); }
+.save-btn:hover { background-color: var(--color-success-dark); }
+.new-btn { background-color: var(--color-primary); }
+.new-btn:hover { background-color: var(--color-primary-dark); }
+.delete-btn { background-color: var(--color-danger); }
+.delete-btn:hover { background-color: var(--color-danger-dark); }
+
 
 /* Messages de session */
 .session-message, .error { 
@@ -75,32 +142,33 @@ h2, h3 {
     margin-bottom: 20px; 
 }
 .session-message {
-    background-color: #d4edda; 
-    color: #155724; 
-    border-color: #c3e6cb; 
+    background-color: #d4edda; color: #155724; border-color: #c3e6cb; 
 }
 .error {
-    color: #c0392b;
-    background: #fdedec;
-    border-color: #e5a0a0;
-    text-align: center;
+    color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; text-align: center;
 }
+body[data-theme="dark"] .session-message {
+    background-color: #1c3a24; color: #a3d9b1; border-color: #2a5735;
+}
+body[data-theme="dark"] .error {
+    background-color: #3b1f23; color: #f1b0b7; border-color: #582c33;
+}
+
 
 /* Styles pour le footer */
 .main-footer {
     text-align: center;
     padding: 20px 0;
     margin-top: auto;
-    color: #7f8c8d;
+    color: var(--color-text-muted);
     font-size: 0.9em;
 }
 .main-footer p { margin: 5px 0; }
-.main-footer a { color: #3498db; text-decoration: none; font-weight: bold; }
+.main-footer a { color: var(--color-primary); text-decoration: none; font-weight: bold; }
 .main-footer a:hover { text-decoration: underline; }
 
 /* Responsive */
 @media (min-width: 768px) {
-    body { padding: 20px; }
     .container { padding: 30px; }
-    .save-btn, .new-btn, .delete-btn { font-size: 1.2em; }
+    .save-btn, .new-btn, .delete-btn { font-size: 1em; padding: 12px 25px; }
 }
