@@ -27,5 +27,4 @@ $page_css = $page_css ?? '';
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="<?= htmlspecialchars($body_class) ?>">
-```php
 <?php

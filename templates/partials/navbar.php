@@ -1,5 +1,6 @@
+<?php
 // Fichier : templates/partials/navbar.php
-// Modification pour ajouter le lien vers la page de statistiques.
+// Mise à jour pour ajouter le lien vers la page de statistiques.
 $page_active = $_GET['page'] ?? 'calculateur';
 ?>
 <nav class="navbar">
