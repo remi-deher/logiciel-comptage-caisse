@@ -3,7 +3,7 @@
    ========================================================================== */
 .navbar {
     max-width: 1200px;
-    margin: 20px auto 0 auto; /* Centre la navbar et ajoute de l'espace */
+    margin: 20px auto 0 auto;
     box-sizing: border-box;
     width: 100%;
     padding: 0 20px;
@@ -71,6 +71,37 @@ body[data-theme="dark"] .nav-item a:hover, body[data-theme="dark"] .nav-item a.a
     gap: 10px;
 }
 
+/* --- Indicateur de statut WebSocket (CORRIGÉ) --- */
+.status-indicator {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 18px;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: white;
+    background-color: var(--color-warning); /* Utilise la variable de couleur */
+    transition: background-color 0.5s ease;
+}
+.status-indicator .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: white;
+    margin-right: 8px;
+    animation: pulse 2s infinite;
+}
+.status-indicator.connected { background-color: var(--color-success); }
+.status-indicator.connected .status-dot { animation: none; }
+.status-indicator.disconnected { background-color: var(--color-danger); }
+.status-indicator.disconnected .status-dot { animation: none; background-color: rgba(255, 255, 255, 0.7); }
+@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+
 /* --- Bouton de Thème --- */
 .theme-switch-btn {
     background: none;
@@ -95,8 +126,6 @@ body[data-theme="dark"] .nav-item a:hover, body[data-theme="dark"] .nav-item a.a
 
 body[data-theme="dark"] .theme-switch-btn .fa-sun { display: block; }
 body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
-
-/* ... (le reste des styles de la navbar reste identique) ... */
 
 @media (max-width: 1200px) {
     .navbar, .container {

@@ -8,7 +8,7 @@ require 'partials/header.php';
 require 'partials/navbar.php';
 ?>
 
-<div class="container">
+<div class="container" id="help-page">
     <div class="help-header">
         <h2><i class="fa-solid fa-circle-question" style="color: #3498db;"></i> Guide d'Utilisation</h2>
         <p style="font-size: 1.1em;">Cliquez sur une section pour obtenir des explications détaillées.</p>

@@ -1,9 +1,6 @@
-/**
- * Module JavaScript pour la page Historique.
- */
 document.addEventListener('DOMContentLoaded', function() {
-    const historyPage = document.querySelector('.history-grid');
-    if (!historyPage) return; // Ne s'exécute que sur la page d'historique
+    const historyPage = document.getElementById('history-page');
+    if (!historyPage) return;
 
     const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(montant);
     
@@ -51,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 html += `<h4 style="text-align: right; margin-top: 15px;">Total Compté : ${formatEuros(totalCaisse)}</h4>`;
 
                 modalContent.innerHTML = html;
-                modal.style.display = 'block';
+                modal.style.display = 'flex';
             }
 
             if (allDetailsButton) {
@@ -117,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 modalContent.innerHTML = html;
-                modal.style.display = 'block';
+                modal.style.display = 'flex';
             }
         });
 
@@ -190,61 +187,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- LOGIQUE POUR LES BOUTONS D'EXPORT PRINCIPAUX ---
     const printBtn = document.getElementById('print-btn');
     if(printBtn) {
         printBtn.addEventListener('click', () => window.print());
-    }
-
-    const pdfBtn = document.getElementById('pdf-btn');
-    if(pdfBtn) {
-        pdfBtn.addEventListener('click', () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const tableData = [];
-            const headers = [['Date', 'Nom du comptage', 'Écart Global']];
-            
-            document.querySelectorAll('.history-card').forEach(card => {
-                const date = card.querySelector('.date')?.textContent.trim();
-                const nom = card.querySelector('h4')?.textContent.trim();
-                const ecart = card.querySelector('.summary-line .ecart-positif, .summary-line .ecart-negatif')?.textContent.trim() || '0,00 €';
-                if(date && nom) {
-                   tableData.push([date, nom, ecart]);
-                }
-            });
-
-            doc.autoTable({ head: headers, body: tableData });
-            doc.save('historique-comptages.pdf');
-        });
-    }
-
-    const excelBtn = document.getElementById('excel-btn');
-    if(excelBtn) {
-        excelBtn.addEventListener('click', () => {
-            let csvContent = "data:text/csv;charset=utf-8,";
-            csvContent += "Date;Nom du comptage;Explication;Ecart Global\r\n";
-            
-            document.querySelectorAll('.history-card').forEach(card => {
-                const date = `"${card.querySelector('.date')?.textContent.trim()}"`;
-                const nom = `"${card.querySelector('h4')?.textContent.trim()}"`;
-                const explicationEl = card.querySelector('.explication');
-                const explication = explicationEl ? `"${explicationEl.textContent.trim()}"` : '""';
-                const ecartEl = card.querySelector('.summary-line .ecart-positif, .summary-line .ecart-negatif');
-                const ecart = ecartEl ? `"${ecartEl.textContent.trim().replace('.', ',')}"` : '"0,00 €"';
-                
-                if(date && nom) {
-                    let row = [date, nom, explication, ecart].join(';');
-                    csvContent += row + "\r\n";
-                }
-            });
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "historique-comptages.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
     }
 });

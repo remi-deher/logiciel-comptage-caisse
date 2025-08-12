@@ -53,7 +53,7 @@ function renderPagination($page_courante, $pages_totales) {
 
 <div id="history-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'></div>
 
-<div class="container">
+<div class="container" id="history-page"> 
     <h2><i class="fa-solid fa-clock-rotate-left" style="color: #3498db;"></i> Historique des Comptages</h2>
 
     <div class="view-tabs">

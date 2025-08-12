@@ -2,7 +2,7 @@
  * Module JavaScript pour la page d'Aide.
  */
 document.addEventListener('DOMContentLoaded', function() {
-    const helpPage = document.querySelector('.help-grid');
+    const helpPage = document.getElementById('help-page');
     if (!helpPage) return; // Ne s'exécute que sur la page d'aide
 
     const modal = document.getElementById('help-modal');
@@ -24,16 +24,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 html += content;
 
                 modalContent.innerHTML = html;
-                modal.style.display = 'block';
+                modal.classList.add('visible'); // On utilise une classe pour afficher
             }
         });
 
         if(closeModalBtn) {
-            closeModalBtn.onclick = function() { modal.style.display = 'none'; }
+            closeModalBtn.onclick = function() {
+                modal.classList.remove('visible');
+            }
         }
         window.onclick = function(event) {
             if (event.target == modal) {
-                modal.style.display = 'none';
+                modal.classList.remove('visible');
             }
         }
     }
