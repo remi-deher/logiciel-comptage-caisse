@@ -1,46 +1,7 @@
 // Fichier : public/js/stats.js
-// Mise à jour pour récupérer et afficher les KPI et un nouveau graphique.
+// Mise à jour pour améliorer l'apparence des graphiques et les KPI.
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Fonction pour dessiner le graphique en barres
-    function drawVentesChart(data) {
-        const ctx = document.getElementById('ventesChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: data.labels,
-                datasets: data.datasets.map(dataset => ({
-                    ...dataset,
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.2)',
-                        'rgba(54, 162, 235, 0.2)',
-                        'rgba(255, 206, 86, 0.2)',
-                        'rgba(75, 192, 192, 0.2)',
-                        'rgba(153, 102, 255, 0.2)',
-                        'rgba(255, 159, 64, 0.2)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(255, 159, 64, 1)'
-                    ],
-                    borderWidth: 1
-                }))
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-    }
-
     // Fonction pour dessiner le graphique en secteurs
     function drawRepartitionChart(data) {
         const ctx = document.getElementById('repartitionChart').getContext('2d');
@@ -52,26 +13,44 @@ document.addEventListener('DOMContentLoaded', function() {
                     label: 'Répartition des ventes',
                     data: data.data,
                     backgroundColor: [
-                        'rgba(255, 99, 132, 0.2)',
-                        'rgba(54, 162, 235, 0.2)',
-                        'rgba(255, 206, 86, 0.2)',
-                        'rgba(75, 192, 192, 0.2)',
-                        'rgba(153, 102, 255, 0.2)',
-                        'rgba(255, 159, 64, 0.2)'
+                        'rgba(255, 99, 132, 0.8)',
+                        'rgba(54, 162, 235, 0.8)',
+                        'rgba(255, 206, 86, 0.8)',
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(153, 102, 255, 0.8)',
+                        'rgba(255, 159, 64, 0.8)'
                     ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(255, 159, 64, 1)'
-                    ],
-                    borderWidth: 1
+                    borderColor: '#fff',
+                    borderWidth: 2
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            usePointStyle: true,
+                            boxWidth: 8,
+                            padding: 15
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed !== null) {
+                                    label += new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(context.parsed);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
             }
         });
     }
@@ -85,20 +64,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-    // Correction : Le script de la bibliothèque Chart.js doit être chargé dans le header
-    // pour être disponible avant que ce script ne s'exécute.
-    // Une fois que le DOM est chargé, on peut récupérer les données et les afficher.
     fetch('index.php?action=get_stats_data')
         .then(response => response.json())
         .then(data => {
             if (data) {
-                // Afficher le graphique des ventes si les données existent
-                if (data.labels && data.datasets) {
-                    drawVentesChart(data);
-                } else {
-                    console.error('Données de graphiques des ventes invalides reçues:', data);
-                }
-
                 // Afficher le graphique de répartition si les données existent
                 if (data.repartition) {
                     drawRepartitionChart(data.repartition);
@@ -116,10 +85,38 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Erreur lors de la récupération des données de statistiques:', error);
-            // Si la requête échoue, on peut mettre à jour les emplacements avec un message d'erreur
             document.getElementById('total-comptages').textContent = "Erreur";
             document.getElementById('total-ventes').textContent = "Erreur";
             document.getElementById('ventes-moyennes').textContent = "Erreur";
             document.getElementById('total-retrocession').textContent = "Erreur";
         });
+
+    // Logique pour le style accordéon
+    const accordionHeaders = document.querySelectorAll('.accordion-header');
+    accordionHeaders.forEach(header => {
+        header.addEventListener('click', () => {
+            const accordionItem = header.parentNode;
+            const content = header.nextElementSibling;
+            
+            const isExpanded = header.getAttribute('aria-expanded') === 'true' || false;
+            header.setAttribute('aria-expanded', !isExpanded);
+            
+            if (isExpanded) {
+                content.style.maxHeight = 0;
+                content.style.padding = '0 20px';
+            } else {
+                content.style.maxHeight = content.scrollHeight + 'px';
+                content.style.padding = '20px';
+            }
+        });
+    });
+    // CORRIGÉ : Au lieu de simuler un clic, on définit directement l'état initial
+    const firstAccordionHeader = document.querySelector('.accordion-item');
+    if (firstAccordionHeader) {
+        const content = firstAccordionHeader.querySelector('.accordion-content');
+        const header = firstAccordionHeader.querySelector('.accordion-header');
+        header.setAttribute('aria-expanded', 'true');
+        content.style.maxHeight = content.scrollHeight + 'px';
+        content.style.padding = '20px';
+    }
 });

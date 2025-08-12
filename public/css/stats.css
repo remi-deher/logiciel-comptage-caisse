@@ -1,80 +1,193 @@
 /* Fichier : public/css/stats.css */
-/* NOUVEAU FICHIER CSS pour la page de statistiques.
-   Mise à jour pour styliser les KPI et améliorer le responsive design. */
+/* Mise à jour pour un design plus moderne et une meilleure ergonomie, avec un style accordéon. */
 
-.page-content {
-    max-width: 900px;
-    margin: 20px auto;
-    padding: 20px; /* Padding standard */
-    background-color: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    box-sizing: border-box; /* S'assure que le padding ne cause pas de débordement */
+body {
+    background-color: #f0f2f5;
+    font-family: 'Arial', sans-serif;
 }
 
-h1 {
+.page-content {
+    max-width: 1100px;
+    margin: 30px auto;
+    padding: 30px;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    box-sizing: border-box;
+}
+
+.page-header {
     text-align: center;
+    margin-bottom: 40px;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 20px;
+}
+
+.page-header h1 {
+    font-size: 2.5em;
     color: #333;
-    border-bottom: 2px solid #ddd;
-    padding-bottom: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
+}
+
+.page-header .subtitle {
+    font-size: 1.2em;
+    color: #777;
 }
 
 .kpi-container {
     display: flex;
-    justify-content: center; /* Centrage pour éviter le débordement sur les bords */
+    justify-content: center;
     flex-wrap: wrap;
-    margin-bottom: 30px;
-    gap: 15px; /* Ajoute un espace entre les cartes */
+    margin-bottom: 40px;
+    gap: 20px;
 }
 
 .kpi-card {
-    background-color: #f4f4f4;
-    border-radius: 8px;
-    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    padding: 25px;
     text-align: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    flex: 1 1 200px; /* Nouvelle propriété Flex pour une meilleure adaptabilité */
-    box-sizing: border-box; /* Inclut padding et bordure dans la taille de l'élément */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    flex: 1 1 200px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid #e9ecef;
+    min-width: 180px;
+    box-sizing: border-box;
+}
+
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.1);
 }
 
 .kpi-card h3 {
     margin: 0;
-    font-size: 1.2em;
-    color: #555;
+    font-size: 1em;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .kpi-card p {
     margin-top: 10px;
-    font-size: 2em;
+    font-size: 2.5em;
     font-weight: bold;
-    color: #333;
+    color: #343a40;
+}
+
+.chart-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 30px;
+    align-items: start;
 }
 
 .chart-container {
-    margin-top: 30px;
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    position: relative;
+    box-sizing: border-box;
+    height: 400px;
+}
+
+.chart-container canvas {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    display: block;
+    margin: auto;
 }
 
 .chart-container h2 {
     text-align: center;
-    margin-bottom: 15px;
-    color: #555;
+    margin-bottom: 20px;
+    color: #495057;
+    font-size: 1.5em;
+}
+
+/* Styles pour l'accordéon */
+.accordion-item {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.accordion-header {
+    width: 100%;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #343a40;
+    transition: background-color 0.3s ease;
+}
+
+.accordion-header:hover {
+    background-color: #e9ecef;
+}
+
+.accordion-icon {
+    width: 20px;
+    height: 20px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19 13H5v-2h14v2z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    transition: transform 0.3s ease;
+}
+
+.accordion-header[aria-expanded="false"] .accordion-icon {
+    transform: rotate(180deg);
+}
+
+.accordion-content {
+    max-height: 0;
+    padding: 0 20px;
+    transition: max-height 0.4s ease-out, padding 0.4s ease-out;
+}
+
+.accordion-content h3, .accordion-content h2 {
+    margin-top: 20px;
+}
+.accordion-item:first-of-type .accordion-header[aria-expanded="true"] + .accordion-content {
+    max-height: fit-content;
 }
 
 /* Media Queries pour le responsive design */
-@media (max-width: 768px) {
+@media (max-width: 992px) {
     .page-content {
-        padding: 10px;
-        margin: 10px;
+        padding: 20px;
+        margin: 20px auto;
     }
+    .chart-section {
+        grid-template-columns: 1fr;
+    }
+    .chart-container {
+        height: 350px;
+    }
+}
 
+@media (max-width: 576px) {
+    .page-header h1 {
+        font-size: 2em;
+    }
     .kpi-container {
         flex-direction: column;
+        gap: 15px;
     }
-
     .kpi-card {
         flex: none;
         width: 100%;
-        margin-bottom: 15px;
     }
 }
