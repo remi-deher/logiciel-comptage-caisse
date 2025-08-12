@@ -1,14 +1,15 @@
 /* Fichier : public/css/stats.css */
 /* NOUVEAU FICHIER CSS pour la page de statistiques.
-   Mise à jour pour styliser les KPI. */
+   Mise à jour pour styliser les KPI et améliorer le responsive design. */
 
 .page-content {
     max-width: 900px;
     margin: 20px auto;
-    padding: 10px; /* Réduit le padding sur les petits écrans */
+    padding: 20px; /* Padding standard */
     background-color: #fff;
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-sizing: border-box; /* S'assure que le padding ne cause pas de débordement */
 }
 
 h1 {
@@ -21,9 +22,10 @@ h1 {
 
 .kpi-container {
     display: flex;
-    justify-content: space-around;
+    justify-content: center; /* CORRIGÉ : Centrage pour éviter le débordement sur les bords */
     flex-wrap: wrap;
     margin-bottom: 30px;
+    gap: 15px; /* Ajoute un espace entre les cartes */
 }
 
 .kpi-card {
@@ -31,10 +33,9 @@ h1 {
     border-radius: 8px;
     padding: 20px;
     text-align: center;
-    margin: 10px;
-    flex: 1;
-    min-width: 200px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    flex: 1 1 220px; /* CORRIGÉ : Nouvelle propriété Flex pour une meilleure adaptabilité */
+    box-sizing: border-box; /* Inclut padding et bordure dans la taille de l'élément */
 }
 
 .kpi-card h3 {
