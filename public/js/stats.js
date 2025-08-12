@@ -1,9 +1,9 @@
-// Fichier : public/js/stats.js
-// CORRIGÉ : La fonction loadStats est mise à jour pour gérer les filtres correctement.
-
 document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour dessiner le graphique en secteurs
     let repartitionChart;
+    let kpiData = {}; // Variable pour stocker les données des KPI
+    let caisses = []; // Variable pour stocker les noms des caisses
+
     function drawRepartitionChart(data) {
         const ctx = document.getElementById('repartitionChart').getContext('2d');
         if (repartitionChart) {
@@ -65,11 +65,12 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('total-ventes').textContent = kpis.total_ventes + ' €';
         document.getElementById('ventes-moyennes').textContent = kpis.ventes_moyennes + ' €';
         document.getElementById('total-retrocession').textContent = kpis.total_retrocession + ' €';
+        kpiData = kpis; // Sauvegarde des données KPI
     }
 
 
     // Fonction principale pour charger les données et les graphiques
-    function loadStats(dateDebut = '', dateFin = '', caisse = '') {
+    function loadStats(dateDebut = '', dateFin = '') {
         // Construction de l'URL avec les paramètres de filtre
         let url = new URL('index.php?action=get_stats_data', window.location.origin);
         if (dateDebut) {
@@ -78,24 +79,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (dateFin) {
             url.searchParams.append('date_fin', dateFin);
         }
-        if (caisse) {
-            url.searchParams.append('caisse', caisse);
-        }
-
+    
         fetch(url)
             .then(response => response.json())
             .then(data => {
                 if (data) {
-                    // Afficher le graphique de répartition si les données existent
                     if (data.repartition) {
                         drawRepartitionChart(data.repartition);
                     } else {
                         console.error('Données de répartition invalides reçues:', data);
                     }
     
-                    // Appel de la nouvelle fonction pour mettre à jour les KPI
                     if (data.kpis) {
                         updateKpi(data.kpis);
+                    }
+
+                    if (data.caisses) {
+                        caisses = data.caisses;
                     }
                 } else {
                     console.error('Données de statistiques invalides reçues:', data);
@@ -110,6 +110,47 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+    // Gérer le clic sur les cartes KPI
+    const kpiCards = document.querySelectorAll('.kpi-card');
+    const modal = document.getElementById('details-modal');
+    const modalContent = document.getElementById('modal-details-content');
+    const closeModalBtn = modal.querySelector('.modal-close');
+
+    kpiCards.forEach(card => {
+        card.addEventListener('click', function(event) {
+            const kpi = card.dataset.kpi;
+            const title = card.dataset.title;
+            
+            let html = `<div class="modal-header"><h3>Détails pour "${title}"</h3></div>`;
+            html += `<table class="modal-details-table"><thead><tr><th>Caisse</th><th>Valeur</th></tr></thead><tbody>`;
+
+            caisses.forEach(caisse => {
+                let value = 'N/A';
+                // CORRIGÉ : Utilise une logique plus robuste pour récupérer la valeur correcte
+                if (kpi === 'total_comptages') {
+                    // Pour le total de comptages, c'est une valeur globale, pas par caisse
+                    value = 'Non applicable';
+                } else if (kpi === 'total_ventes') {
+                    value = caisse.total_ventes;
+                } else if (kpi === 'ventes_moyennes') {
+                    value = caisse.moyenne_ventes;
+                } else if (kpi === 'total_retrocession') {
+                    value = caisse.total_retrocession;
+                }
+                
+                html += `<tr><td>${caisse.nom}</td><td>${value !== 'Non applicable' ? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value) : value}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            
+            modalContent.innerHTML = html;
+            modal.style.display = 'flex';
+        });
+    });
+
+    if(closeModalBtn) {
+        closeModalBtn.onclick = function() { modal.style.display = 'none'; }
+    }
+
     // Gestion du formulaire de filtre
     const filterForm = document.getElementById('stats-filter-form');
     if (filterForm) {
@@ -117,8 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const dateDebut = document.getElementById('date_debut').value;
             const dateFin = document.getElementById('date_fin').value;
-            const caisse = document.getElementById('caisse_filter').value;
-            loadStats(dateDebut, dateFin, caisse);
+            loadStats(dateDebut, dateFin);
         });
     }
 
@@ -137,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('date_debut').value = formatDate(startDate);
                 document.getElementById('date_fin').value = formatDate(today);
 
-                loadStats(formatDate(startDate), formatDate(today), document.getElementById('caisse_filter').value);
+                loadStats(formatDate(startDate), formatDate(today));
             });
         });
     }
@@ -148,7 +188,6 @@ document.addEventListener('DOMContentLoaded', function() {
         resetBtn.addEventListener('click', function() {
             document.getElementById('date_debut').value = '';
             document.getElementById('date_fin').value = '';
-            document.getElementById('caisse_filter').value = '';
             loadStats();
         });
     }
@@ -157,7 +196,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const accordionHeaders = document.querySelectorAll('.accordion-header');
     accordionHeaders.forEach(header => {
         header.addEventListener('click', () => {
-            const accordionItem = header.parentNode;
             const content = header.nextElementSibling;
             
             const isExpanded = header.getAttribute('aria-expanded') === 'true' || false;
@@ -172,6 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
     const firstAccordionItem = document.querySelector('.accordion-item');
     if (firstAccordionItem) {
         const content = firstAccordionItem.querySelector('.accordion-content');

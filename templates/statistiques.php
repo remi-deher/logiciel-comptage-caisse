@@ -33,15 +33,6 @@ require_once __DIR__ . '/partials/navbar.php';
                 <label for="date_fin">Date de fin :</label>
                 <input type="date" id="date_fin" name="date_fin">
             </div>
-            <div class="input-group">
-                <label for="caisse_filter">Filtrer par caisse :</label>
-                <select id="caisse_filter" name="caisse">
-                    <option value="">Toutes les caisses</option>
-                    <?php foreach ($noms_caisses as $i => $nom): ?>
-                        <option value="c<?= $i ?>"><?= htmlspecialchars($nom) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
             <button type="submit" class="filter-btn">Filtrer</button>
             <button type="button" id="reset-filter-btn" class="reset-btn">Réinitialiser</button>
         </form>
@@ -56,21 +47,25 @@ require_once __DIR__ . '/partials/navbar.php';
         <div class="accordion-content" id="kpi-content">
             <!-- Section pour afficher les KPI -->
             <div class="kpi-container">
-                <div class="kpi-card">
+                <div class="kpi-card" data-kpi="total_comptages" data-title="Nombre total de comptages">
                     <h3>Nombre total de comptages</h3>
                     <p id="total-comptages">Chargement...</p>
+                    <button class="details-btn">Détails</button>
                 </div>
-                <div class="kpi-card">
+                <div class="kpi-card" data-kpi="total_ventes" data-title="Ventes totales">
                     <h3>Ventes totales</h3>
                     <p id="total-ventes">Chargement...</p>
+                    <button class="details-btn">Détails</button>
                 </div>
-                <div class="kpi-card">
+                <div class="kpi-card" data-kpi="ventes_moyennes" data-title="Ventes moyennes">
                     <h3>Ventes moyennes</h3>
                     <p id="ventes-moyennes">Chargement...</p>
+                    <button class="details-btn">Détails</button>
                 </div>
-                <div class="kpi-card">
+                <div class="kpi-card" data-kpi="total_retrocession" data-title="Rétrocessions totales">
                     <h3>Rétrocessions totales</h3>
                     <p id="total-retrocession">Chargement...</p>
+                    <button class="details-btn">Détails</button>
                 </div>
             </div>
         </div>
@@ -91,6 +86,14 @@ require_once __DIR__ . '/partials/navbar.php';
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Fenêtre Modale pour les détails des KPI -->
+<div id="details-modal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <div id="modal-details-content"></div>
     </div>
 </div>
 

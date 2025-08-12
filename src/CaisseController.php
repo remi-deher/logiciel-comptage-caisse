@@ -1,6 +1,6 @@
 <?php
 // Fichier : src/CaisseController.php
-// CORRIGÉ : La méthode historique est mise à jour pour gérer les filtres de date et de caisse.
+// CORRIGÉ : La méthode getStatsData renvoie maintenant les données par caisse et les KPI spécifiques à chaque caisse.
 
 class CaisseController {
     private $pdo;
@@ -16,6 +16,68 @@ class CaisseController {
         $this->denominations = $denominations;
         $this->tpe_par_caisse = $tpe_par_caisse;
         $this->versionService = new VersionService();
+    }
+
+    private function _getWhereClauseAndBindings($date_debut, $date_fin, $recherche, $caisse_filtre, $vue = 'tout') {
+        $where_clauses = [];
+        $bind_values = [];
+
+        if ($vue === 'jour' && empty($date_debut) && empty($date_fin)) {
+            $where_clauses[] = "DATE(date_comptage) = CURDATE()";
+        }
+
+        if (!empty($date_debut)) {
+            $where_clauses[] = "date_comptage >= ?";
+            $bind_values[] = $date_debut . " 00:00:00";
+        }
+        if (!empty($date_fin)) {
+            $where_clauses[] = "date_comptage <= ?";
+            $bind_values[] = $date_fin . " 23:59:59";
+        }
+        if (!empty($recherche)) {
+            $where_clauses[] = "nom_comptage LIKE ?";
+            $bind_values[] = "%" . $recherche . "%";
+        }
+        // CORRIGÉ : La construction de la clause WHERE pour le filtre de caisse est maintenant correcte.
+        if (!empty($caisse_filtre)) {
+            $where_clauses[] = "`{$caisse_filtre}` IS NOT NULL";
+        }
+
+        $sql_where = "";
+        if (!empty($where_clauses)) {
+            $sql_where = " WHERE " . implode(" AND ", $where_clauses);
+        }
+
+        return ['sql_where' => $sql_where, 'bind_values' => $bind_values];
+    }
+
+    public function calculateur() {
+        $loaded_data = [];
+        $isLoadedFromHistory = false;
+        $isAutosaveLoaded = false;
+
+        if (isset($_GET['load'])) {
+            $isLoadedFromHistory = true;
+            $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE id = ?");
+            $stmt->execute([intval($_GET['load'])]);
+            $loaded_data = $stmt->fetch() ?: [];
+        } else {
+            $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
+            $stmt->execute();
+            $loaded_data = $stmt->fetch() ?: [];
+            if ($loaded_data) {
+                $isAutosaveLoaded = true;
+            }
+        }
+
+        $message = $_SESSION['message'] ?? null;
+        unset($_SESSION['message']);
+
+        $noms_caisses = $this->noms_caisses;
+        $denominations = $this->denominations;
+        
+        $page_css = 'calculateur.css';
+        require __DIR__ . '/../templates/calculateur.php';
     }
 
     public function historique() {
@@ -34,26 +96,11 @@ class CaisseController {
         $caisse_filtre = $_GET['caisse'] ?? '';
         
         $sql_base = "FROM comptages";
-        $where_clauses = [];
-        $bind_values = [];
-
-        if ($vue === 'jour' && empty($date_debut) && empty($date_fin)) {
-            $where_clauses[] = "DATE(date_comptage) = CURDATE()";
-        }
-
-        if (!empty($date_debut)) { $where_clauses[] = "date_comptage >= ?"; $bind_values[] = $date_debut . " 00:00:00"; }
-        if (!empty($date_fin)) { $where_clauses[] = "date_comptage <= ?"; $bind_values[] = $date_fin . " 23:59:59"; }
-        if (!empty($recherche)) { $where_clauses[] = "nom_comptage LIKE ?"; $bind_values[] = "%" . $recherche . "%"; }
         
-        // Ajout du filtre par caisse
-        if (!empty($caisse_filtre)) {
-            $where_clauses[] = "{$caisse_filtre} IS NOT NULL";
-        }
-
-        $sql_where = "";
-        if (!empty($where_clauses)) {
-            $sql_where = " WHERE " . implode(" AND ", $where_clauses);
-        }
+        // CORRIGÉ : Utilisation de la nouvelle méthode privée pour les filtres
+        $filter_params = $this->_getWhereClauseAndBindings($date_debut, $date_fin, $recherche, $caisse_filtre, $vue);
+        $sql_where = $filter_params['sql_where'];
+        $bind_values = $filter_params['bind_values'];
 
         // Compter le total des enregistrements pour la pagination
         $stmt_count = $this->pdo->prepare("SELECT COUNT(id) " . $sql_base . $sql_where);
@@ -89,39 +136,39 @@ class CaisseController {
     public function getStatsData() {
         header('Content-Type: application/json');
         
-        // CORRIGÉ : Prise en compte des filtres de date et de caisse
+        // Récupération des filtres
         $date_debut = $_GET['date_debut'] ?? null;
         $date_fin = $_GET['date_fin'] ?? null;
-        $caisse_filtre = $_GET['caisse'] ?? null;
 
-        $where_clauses = [];
-        $bind_values = [];
-
-        if (!empty($date_debut)) {
-            $where_clauses[] = "date_comptage >= ?";
-            $bind_values[] = $date_debut . " 00:00:00";
-        }
-        if (!empty($date_fin)) {
-            $where_clauses[] = "date_comptage <= ?";
-            $bind_values[] = $date_fin . " 23:59:59";
-        }
-        $sql_where = "";
-        if (!empty($where_clauses)) {
-            $sql_where = " WHERE " . implode(" AND ", $where_clauses);
-        }
+        // CORRIGÉ : Utilisation de la nouvelle méthode privée pour les filtres
+        $filter_params = $this->_getWhereClauseAndBindings($date_debut, $date_fin, null, null, 'tout');
+        $sql_where = $filter_params['sql_where'];
+        $bind_values = $filter_params['bind_values'];
         
         // Dynamiquement construire les colonnes de sélection et les datasets
-        $select_cols = [];
         $sum_cols_ventes = [];
         $sum_cols_retrocession = [];
         $repartition_labels = [];
         $repartition_data = [];
+        $caisses_data = [];
 
         foreach ($this->noms_caisses as $i => $nom_caisse) {
-            $select_cols[] = "c{$i}_ventes";
             $sum_cols_ventes[] = "SUM(c{$i}_ventes)";
             $sum_cols_retrocession[] = "SUM(c{$i}_retrocession)";
             $repartition_labels[] = $nom_caisse;
+
+            // Préparation de la requête pour les détails par caisse
+            $stmt = $this->pdo->prepare("SELECT SUM(c{$i}_ventes) AS total_ventes, AVG(c{$i}_ventes) AS moyenne_ventes, SUM(c{$i}_retrocession) AS total_retrocession FROM comptages" . $sql_where);
+            $stmt->execute($bind_values);
+            $caisse_stats = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            $caisses_data[] = [
+                'id' => $i,
+                'nom' => $nom_caisse,
+                'total_ventes' => round(floatval($caisse_stats['total_ventes']), 2),
+                'moyenne_ventes' => round(floatval($caisse_stats['moyenne_ventes']), 2),
+                'total_retrocession' => round(floatval($caisse_stats['total_retrocession']), 2)
+            ];
         }
 
         $sum_cols_ventes_str = implode(' + ', $sum_cols_ventes);
@@ -143,19 +190,13 @@ class CaisseController {
         $total_retrocession = $stmt_total_retrocession->fetchColumn();
 
         // Récupération des données pour le graphique de répartition
-        if ($caisse_filtre) {
-            // Si une caisse est filtrée, le graphique en secteurs est inutile
-            $repartition_data = [];
-            $repartition_labels = [];
-        } else {
-            $repartition_sql = "SELECT " . implode(', ', array_map(fn($i) => "SUM(c{$i}_ventes) AS ventes_c{$i}", array_keys($this->noms_caisses))) . " FROM comptages" . $sql_where;
-            $repartition_stmt = $this->pdo->prepare($repartition_sql);
-            $repartition_stmt->execute($bind_values);
-            $repartition_result = $repartition_stmt->fetch(PDO::FETCH_ASSOC);
+        $repartition_sql = "SELECT " . implode(', ', array_map(fn($i) => "SUM(c{$i}_ventes) AS ventes_c{$i}", array_keys($this->noms_caisses))) . " FROM comptages" . $sql_where;
+        $repartition_stmt = $this->pdo->prepare($repartition_sql);
+        $repartition_stmt->execute($bind_values);
+        $repartition_result = $repartition_stmt->fetch(PDO::FETCH_ASSOC);
 
-            foreach ($this->noms_caisses as $i => $nom_caisse) {
-                $repartition_data[] = floatval($repartition_result["ventes_c{$i}"]);
-            }
+        foreach ($this->noms_caisses as $i => $nom_caisse) {
+            $repartition_data[] = floatval($repartition_result["ventes_c{$i}"]);
         }
         
         echo json_encode([
@@ -168,7 +209,8 @@ class CaisseController {
                 'total_ventes' => round($total_ventes, 2),
                 'ventes_moyennes' => round($ventes_moyennes, 2),
                 'total_retrocession' => round($total_retrocession, 2)
-            ]
+            ],
+            'caisses' => $caisses_data, // Ajout des données par caisse
         ]);
     }
     
