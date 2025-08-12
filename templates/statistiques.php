@@ -16,9 +16,40 @@ require_once __DIR__ . '/partials/navbar.php';
         <p class="subtitle">Analyse des données de comptage de caisse</p>
     </header>
 
+    <!-- Section des filtres de recherche -->
+    <div class="filter-section">
+        <h3>Filtres de recherche</h3>
+        <div class="filter-buttons">
+            <button type="button" class="quick-filter-btn" data-days="0">Aujourd'hui</button>
+            <button type="button" class="quick-filter-btn" data-days="1">Hier</button>
+            <button type="button" class="quick-filter-btn" data-days="7">7 derniers jours</button>
+        </div>
+        <form id="stats-filter-form" class="filter-form">
+            <div class="input-group">
+                <label for="date_debut">Date de début :</label>
+                <input type="date" id="date_debut" name="date_debut">
+            </div>
+            <div class="input-group">
+                <label for="date_fin">Date de fin :</label>
+                <input type="date" id="date_fin" name="date_fin">
+            </div>
+            <div class="input-group">
+                <label for="caisse_filter">Filtrer par caisse :</label>
+                <select id="caisse_filter" name="caisse">
+                    <option value="">Toutes les caisses</option>
+                    <?php foreach ($noms_caisses as $i => $nom): ?>
+                        <option value="c<?= $i ?>"><?= htmlspecialchars($nom) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <button type="submit" class="filter-btn">Filtrer</button>
+            <button type="button" id="reset-filter-btn" class="reset-btn">Réinitialiser</button>
+        </form>
+    </div>
+
     <!-- Section Accordéon pour les KPI -->
     <div class="accordion-item">
-        <button class="accordion-header" aria-expanded="false" aria-controls="kpi-content">
+        <button class="accordion-header" aria-expanded="true" aria-controls="kpi-content">
             <h3>Indicateurs de performance (KPI)</h3>
             <span class="accordion-icon"></span>
         </button>

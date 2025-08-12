@@ -34,6 +34,102 @@ body {
     color: #777;
 }
 
+/* Styles pour la section de filtre */
+.filter-section {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.filter-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #343a40;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 10px;
+}
+
+.filter-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+}
+
+.filter-form .input-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 150px;
+}
+
+.filter-form label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+.filter-form input[type="date"] {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 1em;
+}
+
+.filter-form .filter-btn, .filter-form .reset-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.filter-form .filter-btn {
+    background-color: #007bff;
+    color: #fff;
+}
+
+.filter-form .filter-btn:hover {
+    background-color: #0056b3;
+}
+
+.filter-form .reset-btn {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+.filter-form .reset-btn:hover {
+    background-color: #5a6268;
+}
+
+.filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.quick-filter-btn {
+    background-color: #e9ecef;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.quick-filter-btn:hover {
+    background-color: #dee2e6;
+    transform: translateY(-2px);
+}
+
 .kpi-container {
     display: flex;
     justify-content: center;
@@ -160,10 +256,6 @@ body {
 .accordion-content h3, .accordion-content h2 {
     margin-top: 20px;
 }
-.accordion-item:first-of-type .accordion-header[aria-expanded="true"] + .accordion-content {
-    max-height: fit-content;
-}
-
 /* Media Queries pour le responsive design */
 @media (max-width: 992px) {
     .page-content {

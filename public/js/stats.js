@@ -1,11 +1,15 @@
 // Fichier : public/js/stats.js
-// Mise à jour pour améliorer l'apparence des graphiques et les KPI.
+// CORRIGÉ : La fonction loadStats est mise à jour pour gérer les filtres correctement.
 
 document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour dessiner le graphique en secteurs
+    let repartitionChart;
     function drawRepartitionChart(data) {
         const ctx = document.getElementById('repartitionChart').getContext('2d');
-        new Chart(ctx, {
+        if (repartitionChart) {
+            repartitionChart.destroy();
+        }
+        repartitionChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: data.labels,
@@ -64,32 +68,90 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-    fetch('index.php?action=get_stats_data')
-        .then(response => response.json())
-        .then(data => {
-            if (data) {
-                // Afficher le graphique de répartition si les données existent
-                if (data.repartition) {
-                    drawRepartitionChart(data.repartition);
-                } else {
-                    console.error('Données de répartition invalides reçues:', data);
-                }
+    // Fonction principale pour charger les données et les graphiques
+    function loadStats(dateDebut = '', dateFin = '', caisse = '') {
+        // Construction de l'URL avec les paramètres de filtre
+        let url = new URL('index.php?action=get_stats_data', window.location.origin);
+        if (dateDebut) {
+            url.searchParams.append('date_debut', dateDebut);
+        }
+        if (dateFin) {
+            url.searchParams.append('date_fin', dateFin);
+        }
+        if (caisse) {
+            url.searchParams.append('caisse', caisse);
+        }
 
-                // Appel de la nouvelle fonction pour mettre à jour les KPI
-                if (data.kpis) {
-                    updateKpi(data.kpis);
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data) {
+                    // Afficher le graphique de répartition si les données existent
+                    if (data.repartition) {
+                        drawRepartitionChart(data.repartition);
+                    } else {
+                        console.error('Données de répartition invalides reçues:', data);
+                    }
+    
+                    // Appel de la nouvelle fonction pour mettre à jour les KPI
+                    if (data.kpis) {
+                        updateKpi(data.kpis);
+                    }
+                } else {
+                    console.error('Données de statistiques invalides reçues:', data);
                 }
-            } else {
-                console.error('Données de statistiques invalides reçues:', data);
-            }
-        })
-        .catch(error => {
-            console.error('Erreur lors de la récupération des données de statistiques:', error);
-            document.getElementById('total-comptages').textContent = "Erreur";
-            document.getElementById('total-ventes').textContent = "Erreur";
-            document.getElementById('ventes-moyennes').textContent = "Erreur";
-            document.getElementById('total-retrocession').textContent = "Erreur";
+            })
+            .catch(error => {
+                console.error('Erreur lors de la récupération des données de statistiques:', error);
+                document.getElementById('total-comptages').textContent = "Erreur";
+                document.getElementById('total-ventes').textContent = "Erreur";
+                document.getElementById('ventes-moyennes').textContent = "Erreur";
+                document.getElementById('total-retrocession').textContent = "Erreur";
+            });
+    }
+
+    // Gestion du formulaire de filtre
+    const filterForm = document.getElementById('stats-filter-form');
+    if (filterForm) {
+        filterForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const dateDebut = document.getElementById('date_debut').value;
+            const dateFin = document.getElementById('date_fin').value;
+            const caisse = document.getElementById('caisse_filter').value;
+            loadStats(dateDebut, dateFin, caisse);
         });
+    }
+
+    // Gestion des boutons de filtre rapide
+    const quickFilterBtns = document.querySelectorAll('.quick-filter-btn');
+    if (quickFilterBtns) {
+        quickFilterBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const days = parseInt(this.dataset.days);
+                const today = new Date();
+                const startDate = new Date();
+                startDate.setDate(today.getDate() - days);
+
+                const formatDate = (date) => date.toISOString().split('T')[0];
+
+                document.getElementById('date_debut').value = formatDate(startDate);
+                document.getElementById('date_fin').value = formatDate(today);
+
+                loadStats(formatDate(startDate), formatDate(today), document.getElementById('caisse_filter').value);
+            });
+        });
+    }
+
+    // Gestion du bouton de réinitialisation
+    const resetBtn = document.getElementById('reset-filter-btn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function() {
+            document.getElementById('date_debut').value = '';
+            document.getElementById('date_fin').value = '';
+            document.getElementById('caisse_filter').value = '';
+            loadStats();
+        });
+    }
 
     // Logique pour le style accordéon
     const accordionHeaders = document.querySelectorAll('.accordion-header');
@@ -110,13 +172,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-    // CORRIGÉ : Au lieu de simuler un clic, on définit directement l'état initial
-    const firstAccordionHeader = document.querySelector('.accordion-item');
-    if (firstAccordionHeader) {
-        const content = firstAccordionHeader.querySelector('.accordion-content');
-        const header = firstAccordionHeader.querySelector('.accordion-header');
+    const firstAccordionItem = document.querySelector('.accordion-item');
+    if (firstAccordionItem) {
+        const content = firstAccordionItem.querySelector('.accordion-content');
+        const header = firstAccordionItem.querySelector('.accordion-header');
         header.setAttribute('aria-expanded', 'true');
         content.style.maxHeight = content.scrollHeight + 'px';
         content.style.padding = '20px';
     }
+
+    // Chargement initial des statistiques
+    loadStats();
 });

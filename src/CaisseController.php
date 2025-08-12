@@ -103,83 +103,84 @@ class CaisseController {
     public function statistiques() {
         $page_css = 'stats.css';
         $page_js = 'stats.js';
+        // Passage du tableau de noms de caisses à la vue
+        $noms_caisses = $this->noms_caisses;
         require __DIR__ . '/../templates/statistiques.php';
     }
 
     public function getStatsData() {
         header('Content-Type: application/json');
         
-        // Dynamiquement construire la requête SQL en fonction du nombre de caisses
-        $select_cols = ['nom_comptage'];
-        $sum_cols = [];
-        $datasets = [];
+        // CORRIGÉ : Prise en compte des filtres de date et de caisse
+        $date_debut = $_GET['date_debut'] ?? null;
+        $date_fin = $_GET['date_fin'] ?? null;
+        $caisse_filtre = $_GET['caisse'] ?? null;
+
+        $where_clauses = [];
+        $bind_values = [];
+
+        if (!empty($date_debut)) {
+            $where_clauses[] = "date_comptage >= ?";
+            $bind_values[] = $date_debut . " 00:00:00";
+        }
+        if (!empty($date_fin)) {
+            $where_clauses[] = "date_comptage <= ?";
+            $bind_values[] = $date_fin . " 23:59:59";
+        }
+        $sql_where = "";
+        if (!empty($where_clauses)) {
+            $sql_where = " WHERE " . implode(" AND ", $where_clauses);
+        }
+        
+        // Dynamiquement construire les colonnes de sélection et les datasets
+        $select_cols = [];
+        $sum_cols_ventes = [];
+        $sum_cols_retrocession = [];
         $repartition_labels = [];
         $repartition_data = [];
 
         foreach ($this->noms_caisses as $i => $nom_caisse) {
             $select_cols[] = "c{$i}_ventes";
-            $sum_cols[] = "SUM(c{$i}_ventes)";
-            $datasets[] = ['label' => "Ventes {$nom_caisse}", 'data' => []];
+            $sum_cols_ventes[] = "SUM(c{$i}_ventes)";
+            $sum_cols_retrocession[] = "SUM(c{$i}_retrocession)";
             $repartition_labels[] = $nom_caisse;
         }
-        $select_cols_str = implode(', ', $select_cols);
-        $sum_cols_str = implode(' + ', $sum_cols);
 
-        // On récupère les 10 derniers comptages
-        $sql = "SELECT {$select_cols_str} FROM comptages ORDER BY date_comptage DESC LIMIT 10";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute();
-        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $labels = [];
-        
-        foreach ($data as $row) {
-            $labels[] = $row['nom_comptage'];
-            foreach ($this->noms_caisses as $i => $nom_caisse) {
-                $datasets[$i]['data'][] = floatval($row["c{$i}_ventes"]);
-            }
-        }
-
-        // Inverser les tableaux pour avoir les données les plus anciennes à gauche du graphique
-        $labels = array_reverse($labels);
-        foreach ($datasets as $i => $dataset) {
-            $datasets[$i]['data'] = array_reverse($datasets[$i]['data']);
-        }
+        $sum_cols_ventes_str = implode(' + ', $sum_cols_ventes);
+        $sum_cols_retrocession_str = implode(' + ', $sum_cols_retrocession);
         
         // Récupérer les KPI
-        $stmt_total_comptages = $this->pdo->prepare("SELECT COUNT(*) FROM comptages");
-        $stmt_total_comptages->execute();
+        $stmt_total_comptages = $this->pdo->prepare("SELECT COUNT(*) FROM comptages" . $sql_where);
+        $stmt_total_comptages->execute($bind_values);
         $total_comptages = $stmt_total_comptages->fetchColumn();
 
-        $stmt_total_ventes = $this->pdo->prepare("SELECT {$sum_cols_str} FROM comptages");
-        $stmt_total_ventes->execute();
+        $stmt_total_ventes = $this->pdo->prepare("SELECT {$sum_cols_ventes_str} FROM comptages" . $sql_where);
+        $stmt_total_ventes->execute($bind_values);
         $total_ventes = $stmt_total_ventes->fetchColumn();
         
         $ventes_moyennes = $total_comptages > 0 ? $total_ventes / $total_comptages : 0;
         
-        // Calculer les rétrocessions totales et la répartition pour le graphique
-        $sum_retrocession_cols = [];
-        foreach ($this->noms_caisses as $i => $nom_caisse) {
-            $sum_retrocession_cols[] = "SUM(c{$i}_retrocession)";
-        }
-        $sum_retrocession_str = implode(' + ', $sum_retrocession_cols);
-        $stmt_total_retrocession = $this->pdo->prepare("SELECT {$sum_retrocession_str} FROM comptages");
-        $stmt_total_retrocession->execute();
+        $stmt_total_retrocession = $this->pdo->prepare("SELECT {$sum_cols_retrocession_str} FROM comptages" . $sql_where);
+        $stmt_total_retrocession->execute($bind_values);
         $total_retrocession = $stmt_total_retrocession->fetchColumn();
 
         // Récupération des données pour le graphique de répartition
-        $repartition_sql = "SELECT " . implode(', ', array_map(fn($i) => "SUM(c{$i}_ventes) AS ventes_c{$i}", array_keys($this->noms_caisses))) . " FROM comptages";
-        $repartition_stmt = $this->pdo->prepare($repartition_sql);
-        $repartition_stmt->execute();
-        $repartition_result = $repartition_stmt->fetch(PDO::FETCH_ASSOC);
+        if ($caisse_filtre) {
+            // Si une caisse est filtrée, le graphique en secteurs est inutile
+            $repartition_data = [];
+            $repartition_labels = [];
+        } else {
+            $repartition_sql = "SELECT " . implode(', ', array_map(fn($i) => "SUM(c{$i}_ventes) AS ventes_c{$i}", array_keys($this->noms_caisses))) . " FROM comptages" . $sql_where;
+            $repartition_stmt = $this->pdo->prepare($repartition_sql);
+            $repartition_stmt->execute($bind_values);
+            $repartition_result = $repartition_stmt->fetch(PDO::FETCH_ASSOC);
 
-        foreach ($this->noms_caisses as $i => $nom_caisse) {
-            $repartition_data[] = floatval($repartition_result["ventes_c{$i}"]);
+            foreach ($this->noms_caisses as $i => $nom_caisse) {
+                $repartition_data[] = floatval($repartition_result["ventes_c{$i}"]);
+            }
         }
-
+        
         echo json_encode([
-            'labels' => $labels,
-            'datasets' => $datasets,
             'repartition' => [
                 'labels' => $repartition_labels,
                 'data' => $repartition_data
