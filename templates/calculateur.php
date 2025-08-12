@@ -39,21 +39,6 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
     <form id="caisse-form" action="index.php?page=calculateur" method="post">
         <input type="hidden" name="action" value="save">
 
-        <div class="top-save-section">
-            <div class="form-group">
-                <label for="nom_comptage">Nom du comptage</label>
-                <input type="text" id="nom_comptage" name="nom_comptage" placeholder="Ex: Comptage du Lundi Soir" value="<?= htmlspecialchars($loaded_data['nom_comptage'] ?? '') ?>" <?= $disabled_attr ?>>
-            </div>
-            <div class="form-group">
-                <label for="explication">Explication (optionnel)</label>
-                <input type="text" id="explication" name="explication" placeholder="Ex: Jour de marché..." value="<?= htmlspecialchars($loaded_data['explication'] ?? '') ?>" <?= $disabled_attr ?>>
-            </div>
-            <?php if (!($isLoadedFromHistory ?? false)): ?>
-                <button type="submit" class="save-btn">Enregistrer</button>
-            <?php endif; ?>
-            <div id="autosave-status" class="autosave-status"></div>
-        </div>
-
         <div class="tab-selector">
             <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
                 <button type="button" class="tab-link <?= $is_first ? 'active' : '' ?>" data-tab="caisse<?= $id ?>"><?= htmlspecialchars($nom) ?></button>
@@ -132,6 +117,24 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                 </div>
             </div>
             <?php $is_first = false; endforeach; ?>
+
+        <div class="save-section">
+            <h3>Enregistrer le comptage</h3>
+            <div class="form-group">
+                <label for="nom_comptage">Donnez un nom à ce comptage</label>
+                <input type="text" id="nom_comptage" name="nom_comptage" value="<?= htmlspecialchars($loaded_data['nom_comptage'] ?? '') ?>" <?= $disabled_attr ?>>
+            </div>
+            <div class="form-group" style="margin-top: 10px;">
+                <label for="explication">Explication (optionnel)</label>
+                <textarea id="explication" name="explication" rows="3" placeholder="Ex: jour de marché, erreur de rendu monnaie, etc." <?= $disabled_attr ?>><?= htmlspecialchars($loaded_data['explication'] ?? '') ?></textarea>
+            </div>
+            <div class="button-group">
+                <?php if (!($isLoadedFromHistory ?? false)): ?>
+                    <button type="submit" class="save-btn">Enregistrer le Comptage</button>
+                <?php endif; ?>
+                <div id="autosave-status" class="autosave-status"></div>
+            </div>
+        </div>
     </form>
 
     <div class="accordion-container" style="margin-top: 30px;">
