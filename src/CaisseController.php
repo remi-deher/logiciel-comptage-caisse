@@ -1,17 +1,20 @@
 <?php
 // Fichier : src/CaisseController.php
-// Corrections apportées à la méthode getStatsData() pour gérer dynamiquement les caisses.
+// CORRIGÉ : Le constructeur accepte maintenant l'argument $tpe_par_caisse.
 
 class CaisseController {
     private $pdo;
     private $noms_caisses;
     private $denominations;
+    private $tpe_par_caisse;
     private $versionService;
 
-    public function __construct($pdo, $noms_caisses, $denominations) {
+    // CORRECTION : Ajout de $tpe_par_caisse au constructeur pour correspondre à index.php
+    public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse) {
         $this->pdo = $pdo;
         $this->noms_caisses = $noms_caisses;
         $this->denominations = $denominations;
+        $this->tpe_par_caisse = $tpe_par_caisse;
         $this->versionService = new VersionService();
     }
 
@@ -98,32 +101,30 @@ class CaisseController {
     }
     
     public function statistiques() {
-        // La page de statistiques n'a pas besoin de données passées directement à la vue PHP.
-        // Les données seront chargées via une requête AJAX.
-        $page_css = 'stats.css'; // Nouveau fichier CSS
-        $page_js = 'stats.js';   // Nouveau fichier JS
+        $page_css = 'stats.css';
+        $page_js = 'stats.js';
         require __DIR__ . '/../templates/statistiques.php';
     }
 
     public function getStatsData() {
         header('Content-Type: application/json');
         
-        // Dynamiquement construire la requête SQL en fonction du nombre de caisses
         $select_cols = ['nom_comptage'];
+        $sum_cols = [];
         $datasets = [];
         foreach ($this->noms_caisses as $i => $nom_caisse) {
             $select_cols[] = "c{$i}_ventes";
+            $sum_cols[] = "SUM(c{$i}_ventes)";
             $datasets[] = ['label' => "Ventes {$nom_caisse}", 'data' => []];
         }
         $select_cols_str = implode(', ', $select_cols);
+        $sum_cols_str = implode(' + ', $sum_cols);
 
-        // On récupère les 10 derniers comptages
         $sql = "SELECT {$select_cols_str} FROM comptages ORDER BY date_comptage DESC LIMIT 10";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
         $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Préparer les données pour le format attendu par Chart.js
         $labels = [];
         
         foreach ($data as $row) {
@@ -133,15 +134,29 @@ class CaisseController {
             }
         }
 
-        // Inverser les tableaux pour avoir les données les plus anciennes à gauche du graphique
         $labels = array_reverse($labels);
         foreach ($datasets as $i => $dataset) {
             $datasets[$i]['data'] = array_reverse($datasets[$i]['data']);
         }
+        
+        $stmt_total_comptages = $this->pdo->prepare("SELECT COUNT(*) FROM comptages");
+        $stmt_total_comptages->execute();
+        $total_comptages = $stmt_total_comptages->fetchColumn();
+
+        $stmt_total_ventes = $this->pdo->prepare("SELECT {$sum_cols_str} FROM comptages");
+        $stmt_total_ventes->execute();
+        $total_ventes = $stmt_total_ventes->fetchColumn();
+        
+        $ventes_moyennes = $total_comptages > 0 ? $total_ventes / $total_comptages : 0;
 
         echo json_encode([
             'labels' => $labels,
-            'datasets' => $datasets
+            'datasets' => $datasets,
+            'kpis' => [
+                'total_comptages' => $total_comptages,
+                'total_ventes' => round($total_ventes, 2),
+                'ventes_moyennes' => round($ventes_moyennes, 2)
+            ]
         ]);
     }
     

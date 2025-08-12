@@ -1,7 +1,6 @@
 <?php
 // Fichier : templates/statistiques.php
-// Cette page affiche les statistiques des comptages sous forme de graphiques.
-// Elle inclut l'en-tête, la barre de navigation et le pied de page de l'application.
+// Mise à jour pour inclure les emplacements des KPI.
 
 // On inclut l'en-tête de la page.
 // On passe le nom du fichier CSS et JS spécifique à cette page.
@@ -13,6 +12,22 @@ require_once __DIR__ . '/partials/navbar.php';
 
 <div class="page-content">
     <h1>Statistiques des comptages</h1>
+
+    <!-- Section pour afficher les KPI -->
+    <div class="kpi-container">
+        <div class="kpi-card">
+            <h3>Nombre total de comptages</h3>
+            <p id="total-comptages">Chargement...</p>
+        </div>
+        <div class="kpi-card">
+            <h3>Ventes totales</h3>
+            <p id="total-ventes">Chargement...</p>
+        </div>
+        <div class="kpi-card">
+            <h3>Ventes moyennes</h3>
+            <p id="ventes-moyennes">Chargement...</p>
+        </div>
+    </div>
 
     <div class="chart-container">
         <h2>Ventes des 10 derniers comptages</h2>

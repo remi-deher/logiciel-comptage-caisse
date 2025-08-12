@@ -1,6 +1,6 @@
 <?php
 // Fichier : public/index.php
-// Modifications pour ajouter une route vers la page de statistiques.
+// CORRIGÉ : L'instanciation de CaisseController est maintenant correcte.
 
 // On charge la configuration d'abord pour avoir accès au fuseau horaire
 if (file_exists(__DIR__ . '/../config/config.php')) {
@@ -42,6 +42,7 @@ if (!isset($tpe_par_caisse)) {
 }
 
 $pdo = Bdd::getPdo();
+// CORRECTION : Le constructeur de CaisseController prend maintenant 4 arguments.
 $caisseController = new CaisseController($pdo, $noms_caisses, $denominations, $tpe_par_caisse);
 $adminController = new AdminController($pdo);
 $authController = new AuthController($pdo);

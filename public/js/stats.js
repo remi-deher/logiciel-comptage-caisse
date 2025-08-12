@@ -1,6 +1,5 @@
 // Fichier : public/js/stats.js
-// NOUVEAU SCRIPT JavaScript pour gérer les graphiques.
-// Il utilise Chart.js pour dessiner l'histogramme.
+// Mise à jour pour récupérer et afficher les KPI.
 
 document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour dessiner le graphique
@@ -41,24 +40,36 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // Fonction pour mettre à jour les KPI dans le HTML
+    function updateKpi(kpis) {
+        document.getElementById('total-comptages').textContent = kpis.total_comptages;
+        document.getElementById('total-ventes').textContent = kpis.total_ventes + ' €';
+        document.getElementById('ventes-moyennes').textContent = kpis.ventes_moyennes + ' €';
+    }
 
-    // Charger la bibliothèque Chart.js via CDN
-    const script = document.createElement('script');
-    script.src = "https://cdn.jsdelivr.net/npm/chart.js";
-    script.onload = () => {
-        // Une fois que Chart.js est chargé, on récupère les données
-        fetch('index.php?action=get_stats_data')
-            .then(response => response.json())
-            .then(data => {
-                if (data && data.labels && data.datasets) {
-                    drawChart(data);
-                } else {
-                    console.error('Données de statistiques invalides reçues:', data);
+
+    // Correction : Le script de la bibliothèque Chart.js doit être chargé dans le header
+    // pour être disponible avant que ce script ne s'exécute.
+    // Une fois que le DOM est chargé, on peut récupérer les données et les afficher.
+    fetch('index.php?action=get_stats_data')
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.labels && data.datasets) {
+                drawChart(data);
+                // Appel de la nouvelle fonction pour mettre à jour les KPI
+                if (data.kpis) {
+                    updateKpi(data.kpis);
                 }
-            })
-            .catch(error => {
-                console.error('Erreur lors de la récupération des données de statistiques:', error);
-            });
-    };
-    document.head.appendChild(script);
+            } else {
+                console.error('Données de statistiques invalides reçues:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur lors de la récupération des données de statistiques:', error);
+            // Si la requête échoue, on peut mettre à jour les emplacements avec un message d'erreur
+            document.getElementById('total-comptages').textContent = "Erreur";
+            document.getElementById('total-ventes').textContent = "Erreur";
+            document.getElementById('ventes-moyennes').textContent = "Erreur";
+        });
 });

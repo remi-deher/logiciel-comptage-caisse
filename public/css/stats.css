@@ -1,0 +1,62 @@
+```css
+/* Fichier : public/css/stats.css */
+/* NOUVEAU FICHIER CSS pour la page de statistiques.
+   Mise à jour pour styliser les KPI. */
+
+.page-content {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #333;
+    border-bottom: 2px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.kpi-container {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
+}
+
+.kpi-card {
+    background-color: #f4f4f4;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    margin: 10px;
+    flex: 1;
+    min-width: 200px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.kpi-card h3 {
+    margin: 0;
+    font-size: 1.2em;
+    color: #555;
+}
+
+.kpi-card p {
+    margin-top: 10px;
+    font-size: 2em;
+    font-weight: bold;
+    color: #333;
+}
+
+.chart-container {
+    margin-top: 30px;
+}
+
+.chart-container h2 {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #555;
+}
