@@ -18,35 +18,6 @@ class CaisseController {
         $this->versionService = new VersionService();
     }
 
-    public function calculateur() {
-        $loaded_data = [];
-        $isLoadedFromHistory = false;
-        $isAutosaveLoaded = false;
-
-        if (isset($_GET['load'])) {
-            $isLoadedFromHistory = true;
-            $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE id = ?");
-            $stmt->execute([intval($_GET['load'])]);
-            $loaded_data = $stmt->fetch() ?: [];
-        } else {
-            $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
-            $stmt->execute();
-            $loaded_data = $stmt->fetch() ?: [];
-            if ($loaded_data) {
-                $isAutosaveLoaded = true;
-            }
-        }
-
-        $message = $_SESSION['message'] ?? null;
-        unset($_SESSION['message']);
-
-        $noms_caisses = $this->noms_caisses;
-        $denominations = $this->denominations;
-        
-        $page_css = 'calculateur.css';
-        require __DIR__ . '/../templates/calculateur.php';
-    }
-
     public function historique() {
         // Définir la pagination
         $page_courante = isset($_GET['p']) ? (int)$_GET['p'] : 1;

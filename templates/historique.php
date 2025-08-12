@@ -1,6 +1,6 @@
 <?php
 // Fichier : templates/historique.php
-// Mise à jour pour inclure les nouveaux filtres de recherche.
+// Mise à jour pour retirer le filtre par caisse.
 
 $page_js = 'history.js';
 $config_data = json_encode([
@@ -78,15 +78,6 @@ function renderPagination($page_courante, $pages_totales) {
             <div class="form-group">
                 <label for="date_fin">Date de fin :</label>
                 <input type="date" id="date_fin" name="date_fin" value="<?= htmlspecialchars($date_fin) ?>">
-            </div>
-            <div class="form-group">
-                <label for="caisse_filter">Filtrer par caisse :</label>
-                <select id="caisse_filter" name="caisse">
-                    <option value="">Toutes les caisses</option>
-                    <?php foreach ($noms_caisses as $i => $nom): ?>
-                        <option value="c<?= $i ?>_ventes" <?= ($caisse_filtre == "c{$i}_ventes" ? 'selected' : '') ?>><?= htmlspecialchars($nom) ?></option>
-                    <?php endforeach; ?>
-                </select>
             </div>
             <div class="form-group">
                 <label for="recherche">Recherche :</label>
