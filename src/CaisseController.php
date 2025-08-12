@@ -1,6 +1,6 @@
 <?php
 // Fichier : src/CaisseController.php
-// CORRIGÉ : Le constructeur accepte maintenant l'argument $tpe_par_caisse.
+// CORRIGÉ : La méthode getStatsData inclut maintenant les données pour le graphique de répartition.
 
 class CaisseController {
     private $pdo;
@@ -109,17 +109,23 @@ class CaisseController {
     public function getStatsData() {
         header('Content-Type: application/json');
         
+        // Dynamiquement construire la requête SQL en fonction du nombre de caisses
         $select_cols = ['nom_comptage'];
         $sum_cols = [];
         $datasets = [];
+        $repartition_labels = [];
+        $repartition_data = [];
+
         foreach ($this->noms_caisses as $i => $nom_caisse) {
             $select_cols[] = "c{$i}_ventes";
             $sum_cols[] = "SUM(c{$i}_ventes)";
             $datasets[] = ['label' => "Ventes {$nom_caisse}", 'data' => []];
+            $repartition_labels[] = $nom_caisse;
         }
         $select_cols_str = implode(', ', $select_cols);
         $sum_cols_str = implode(' + ', $sum_cols);
 
+        // On récupère les 10 derniers comptages
         $sql = "SELECT {$select_cols_str} FROM comptages ORDER BY date_comptage DESC LIMIT 10";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
@@ -134,11 +140,13 @@ class CaisseController {
             }
         }
 
+        // Inverser les tableaux pour avoir les données les plus anciennes à gauche du graphique
         $labels = array_reverse($labels);
         foreach ($datasets as $i => $dataset) {
             $datasets[$i]['data'] = array_reverse($datasets[$i]['data']);
         }
         
+        // Récupérer les KPI
         $stmt_total_comptages = $this->pdo->prepare("SELECT COUNT(*) FROM comptages");
         $stmt_total_comptages->execute();
         $total_comptages = $stmt_total_comptages->fetchColumn();
@@ -148,14 +156,39 @@ class CaisseController {
         $total_ventes = $stmt_total_ventes->fetchColumn();
         
         $ventes_moyennes = $total_comptages > 0 ? $total_ventes / $total_comptages : 0;
+        
+        // Calculer les rétrocessions totales et la répartition pour le graphique
+        $sum_retrocession_cols = [];
+        foreach ($this->noms_caisses as $i => $nom_caisse) {
+            $sum_retrocession_cols[] = "SUM(c{$i}_retrocession)";
+        }
+        $sum_retrocession_str = implode(' + ', $sum_retrocession_cols);
+        $stmt_total_retrocession = $this->pdo->prepare("SELECT {$sum_retrocession_str} FROM comptages");
+        $stmt_total_retrocession->execute();
+        $total_retrocession = $stmt_total_retrocession->fetchColumn();
+
+        // Récupération des données pour le graphique de répartition
+        $repartition_sql = "SELECT " . implode(', ', array_map(fn($i) => "SUM(c{$i}_ventes) AS ventes_c{$i}", array_keys($this->noms_caisses))) . " FROM comptages";
+        $repartition_stmt = $this->pdo->prepare($repartition_sql);
+        $repartition_stmt->execute();
+        $repartition_result = $repartition_stmt->fetch(PDO::FETCH_ASSOC);
+
+        foreach ($this->noms_caisses as $i => $nom_caisse) {
+            $repartition_data[] = floatval($repartition_result["ventes_c{$i}"]);
+        }
 
         echo json_encode([
             'labels' => $labels,
             'datasets' => $datasets,
+            'repartition' => [
+                'labels' => $repartition_labels,
+                'data' => $repartition_data
+            ],
             'kpis' => [
                 'total_comptages' => $total_comptages,
                 'total_ventes' => round($total_ventes, 2),
-                'ventes_moyennes' => round($ventes_moyennes, 2)
+                'ventes_moyennes' => round($ventes_moyennes, 2),
+                'total_retrocession' => round($total_retrocession, 2)
             ]
         ]);
     }

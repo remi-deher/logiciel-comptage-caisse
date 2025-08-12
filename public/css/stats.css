@@ -22,7 +22,7 @@ h1 {
 
 .kpi-container {
     display: flex;
-    justify-content: center; /* CORRIGÉ : Centrage pour éviter le débordement sur les bords */
+    justify-content: center; /* Centrage pour éviter le débordement sur les bords */
     flex-wrap: wrap;
     margin-bottom: 30px;
     gap: 15px; /* Ajoute un espace entre les cartes */
@@ -34,7 +34,7 @@ h1 {
     padding: 20px;
     text-align: center;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    flex: 1 1 220px; /* CORRIGÉ : Nouvelle propriété Flex pour une meilleure adaptabilité */
+    flex: 1 1 200px; /* Nouvelle propriété Flex pour une meilleure adaptabilité */
     box-sizing: border-box; /* Inclut padding et bordure dans la taille de l'élément */
 }
 
