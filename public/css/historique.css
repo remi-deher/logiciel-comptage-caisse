@@ -100,7 +100,59 @@
 .ecart-positif { color: var(--color-warning); }
 .ecart-negatif { color: var(--color-danger); }
 .card-divider { border-top: 1px solid var(--color-border-light); margin: 15px 0; }
-.history-card-footer { background-color: var(--color-surface-alt); border-top: 1px solid var(--color-border-light); padding: 15px 20px; display: flex; justify-content: flex-start; gap: 10px; flex-wrap: wrap; }
+
+/* --- NOUVEAUX STYLES POUR LE FOOTER DE LA CARTE --- */
+.history-card-footer { 
+    background-color: var(--color-surface-alt); 
+    border-top: 1px solid var(--color-border-light); 
+    padding: 15px 20px; 
+    display: flex; 
+    justify-content: flex-start; 
+    gap: 10px; 
+    flex-wrap: wrap;
+    align-items: center;
+}
+.action-btn-small {
+    padding: 8px 12px;
+    font-size: 0.85em;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+}
+
+/* Style pour "Ensemble" et les boutons de détails par caisse */
+.details-all-btn, .details-btn {
+    background-color: var(--color-surface);
+    color: var(--color-text-secondary);
+    border-color: var(--color-border-light);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+body[data-theme="dark"] .details-all-btn, body[data-theme="dark"] .details-btn {
+    background-color: var(--color-surface-alt-hover);
+    border-color: var(--color-border);
+}
+
+.details-all-btn:hover, .details-btn:hover {
+    background-color: var(--color-surface-alt-hover);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px var(--shadow-color);
+}
+body[data-theme="dark"] .details-all-btn:hover, body[data-theme="dark"] .details-btn:hover {
+    background-color: var(--color-bg);
+}
+
+.save-btn.action-btn-small, .delete-btn.action-btn-small {
+    box-shadow: none;
+}
+
 
 /* --- Pagination --- */
 .pagination-nav {
@@ -152,7 +204,7 @@
     cursor: not-allowed;
 }
 
-/* --- Fenêtre Modale (CORRIGÉE) --- */
+/* --- Fenêtre Modale (inchangée) --- */
 .modal { 
     display: none; 
     position: fixed; 
@@ -163,11 +215,15 @@
     height: 100%; 
     background-color: rgba(0,0,0,0.6); 
     animation: fadeIn 0.3s; 
-    /* Utilisation de flexbox pour un centrage robuste */
     align-items: center;
     justify-content: center;
     padding: 20px;
     box-sizing: border-box;
+}
+.modal.visible {
+    display: flex;
+    opacity: 1;
+    pointer-events: auto;
 }
 .modal-content { 
     background-color: var(--color-surface); 
