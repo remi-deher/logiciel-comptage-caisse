@@ -1,35 +1,86 @@
 /* ==========================================================================
-   public/css/admin.css (Responsive)
+   public/css/admin.css (Nouvelle Interface)
    ========================================================================== */
 
-/* --- Page de Connexion --- */
+/* --- Page de Connexion (Nouveaux Styles) --- */
 body.login-page-body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #eef2f5;
+    background-color: #f4f7f9;
+    background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.login-wrapper {
+    width: 100%;
+    padding: 20px;
 }
 .login-container {
-    max-width: 400px;
+    max-width: 420px;
     width: 100%;
+    margin: 0 auto;
     padding: 40px;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative; /* Ajouté pour le positionnement du bouton retour */
 }
-.login-container h2 {
-    text-align: center;
-    margin-bottom: 25px;
-    color: #2c3e50;
-    border-bottom: none;
-    font-size: 1.8em;
-}
-.login-container .form-group { margin-bottom: 20px; }
-.login-container input[type="text"], .login-container input[type="password"] { text-align: left; }
-.login-container .error { margin-bottom: 20px; }
-.login-container button { width: 100%; padding: 12px; font-size: 1.1em; }
 
-/* --- Page d'Administration --- */
+/* NOUVEAUX STYLES POUR LE BOUTON DE RETOUR */
+.return-button {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    width: 35px;
+    height: 35px;
+    background-color: #ecf0f1;
+    color: #7f8c8d;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 1.2em;
+    transition: all 0.2s ease;
+}
+.return-button:hover {
+    background-color: #dfe6e9;
+    color: #34495e;
+    transform: rotate(90deg);
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+.login-header h2 {
+    border-bottom: none;
+    font-size: 2em;
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+}
+.login-header p {
+    margin: 0;
+    color: #7f8c8d;
+}
+.login-container .form-group.with-icon {
+    position: relative;
+    margin-bottom: 20px;
+}
+.login-container .form-group .input-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #95a5a6;
+    pointer-events: none;
+}
+.login-container .form-group input {
+    padding-left: 45px;
+}
+
+/* --- Styles de la Page d'Administration (inchangés) --- */
 .admin-header {
     margin-bottom: 30px;
     padding-bottom: 20px;
@@ -45,7 +96,7 @@ body.login-page-body {
 
 .admin-grid {
     display: grid;
-    grid-template-columns: 1fr; /* Une colonne par défaut pour mobile */
+    grid-template-columns: 1fr;
     gap: 25px;
 }
 
@@ -98,15 +149,13 @@ body.login-page-body {
 .admin-card .form-group:last-child { margin-bottom: 0; }
 .admin-card .save-btn { width: 100%; }
 
-/* --- Media Queries pour le responsive --- */
 @media (min-width: 768px) {
     .admin-grid {
-        grid-template-columns: 1fr 1fr; /* Deux colonnes sur tablette */
+        grid-template-columns: 1fr 1fr;
     }
 }
 @media (min-width: 1200px) {
     .admin-grid {
-        /* Permet d'avoir 2 ou 3 colonnes selon la place disponible */
         grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
     }
 }
