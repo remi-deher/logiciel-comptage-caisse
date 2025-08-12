@@ -1,5 +1,6 @@
 <?php
-// public/index.php
+// Fichier : public/index.php
+// Modifications pour ajouter une route vers la page de statistiques.
 
 // On charge la configuration d'abord pour avoir accès au fuseau horaire
 if (file_exists(__DIR__ . '/../config/config.php')) {
@@ -67,6 +68,10 @@ if ($ajax_action) {
         case 'autosave':
             $caisseController->autosave();
             exit;
+        case 'get_stats_data':
+            // Nouvelle route pour récupérer les données de statistiques
+            $caisseController->getStatsData();
+            exit;
     }
 }
 
@@ -86,6 +91,11 @@ switch ($page) {
 
     case 'changelog':
         $caisseController->changelog();
+        break;
+
+    case 'statistiques':
+        // Nouvelle route pour la page de statistiques
+        $caisseController->statistiques();
         break;
 
     case 'login':

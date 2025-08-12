@@ -1,5 +1,5 @@
-<?php
-// templates/partials/navbar.php
+// Fichier : templates/partials/navbar.php
+// Modification pour ajouter le lien vers la page de statistiques.
 $page_active = $_GET['page'] ?? 'calculateur';
 ?>
 <nav class="navbar">
@@ -13,6 +13,7 @@ $page_active = $_GET['page'] ?? 'calculateur';
         <ul class="navbar-nav">
             <li class="nav-item"><a href="index.php?page=calculateur" class="<?= ($page_active === 'calculateur') ? 'active' : '' ?>">Calculateur</a></li>
             <li class="nav-item"><a href="index.php?page=historique" class="<?= ($page_active === 'historique') ? 'active' : '' ?>">Historique</a></li>
+            <li class="nav-item"><a href="index.php?page=statistiques" class="<?= ($page_active === 'statistiques') ? 'active' : '' ?>">Statistiques</a></li>
             <li class="nav-item"><a href="index.php?page=aide" class="<?= ($page_active === 'aide') ? 'active' : '' ?>">Aide</a></li>
             <li class="nav-item"><a href="index.php?page=changelog" class="<?= ($page_active === 'changelog') ? 'active' : '' ?>">Changelog</a></li>
             <?php if (!empty($_SESSION['is_admin'])): ?>

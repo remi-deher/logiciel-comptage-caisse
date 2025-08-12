@@ -1,5 +1,6 @@
 <?php
-// src/CaisseController.php
+// Fichier : src/CaisseController.php
+// Corrections apportées à la méthode getStatsData() pour gérer dynamiquement les caisses.
 
 class CaisseController {
     private $pdo;
@@ -94,6 +95,54 @@ class CaisseController {
 
         $page_css = 'historique.css';
         require __DIR__ . '/../templates/historique.php';
+    }
+    
+    public function statistiques() {
+        // La page de statistiques n'a pas besoin de données passées directement à la vue PHP.
+        // Les données seront chargées via une requête AJAX.
+        $page_css = 'stats.css'; // Nouveau fichier CSS
+        $page_js = 'stats.js';   // Nouveau fichier JS
+        require __DIR__ . '/../templates/statistiques.php';
+    }
+
+    public function getStatsData() {
+        header('Content-Type: application/json');
+        
+        // Dynamiquement construire la requête SQL en fonction du nombre de caisses
+        $select_cols = ['nom_comptage'];
+        $datasets = [];
+        foreach ($this->noms_caisses as $i => $nom_caisse) {
+            $select_cols[] = "c{$i}_ventes";
+            $datasets[] = ['label' => "Ventes {$nom_caisse}", 'data' => []];
+        }
+        $select_cols_str = implode(', ', $select_cols);
+
+        // On récupère les 10 derniers comptages
+        $sql = "SELECT {$select_cols_str} FROM comptages ORDER BY date_comptage DESC LIMIT 10";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
+        $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Préparer les données pour le format attendu par Chart.js
+        $labels = [];
+        
+        foreach ($data as $row) {
+            $labels[] = $row['nom_comptage'];
+            foreach ($this->noms_caisses as $i => $nom_caisse) {
+                $datasets[$i]['data'][] = floatval($row["c{$i}_ventes"]);
+            }
+        }
+
+        // Inverser les tableaux pour avoir les données les plus anciennes à gauche du graphique
+        $labels = array_reverse($labels);
+        foreach ($datasets as $i => $dataset) {
+            $datasets[$i]['data'] = array_reverse($datasets[$i]['data']);
+        }
+
+        echo json_encode([
+            'labels' => $labels,
+            'datasets' => $datasets
+        ]);
     }
     
     public function aide() {
