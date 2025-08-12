@@ -1,9 +1,13 @@
+// Fichier JavaScript pour la page d'historique.
+
 document.addEventListener('DOMContentLoaded', function() {
     const historyPage = document.getElementById('history-page');
     if (!historyPage) return;
 
+    // Fonction d'aide pour formater les montants en euros
     const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(montant);
     
+    // Récupère la configuration (noms de caisses, dénominations) depuis l'élément data
     const configElement = document.getElementById('history-data');
     const config = configElement ? JSON.parse(configElement.dataset.config) : {};
 
@@ -12,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const modalContent = document.getElementById('modal-details-content');
         const closeModalBtn = modal.querySelector('.modal-close');
 
+        // Gère l'affichage de la fenêtre modale pour les détails
         historyPage.addEventListener('click', function(event) {
             const detailsButton = event.target.closest('.details-btn');
             const allDetailsButton = event.target.closest('.details-all-btn');
@@ -118,6 +123,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
+        // Gère les exports PDF et Excel dans la fenêtre modale
         modalContent.addEventListener('click', function(event) {
             const mainTitle = modalContent.querySelector('h3').textContent;
             const tables = modalContent.querySelectorAll('.modal-details-table');
@@ -190,5 +196,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const printBtn = document.getElementById('print-btn');
     if(printBtn) {
         printBtn.addEventListener('click', () => window.print());
+    }
+
+    // NOUVEAUTÉ : Logique pour les boutons de filtre rapide
+    const quickFilterBtns = document.querySelectorAll('.quick-filter-btn');
+    if (quickFilterBtns) {
+        quickFilterBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const days = parseInt(this.dataset.days);
+                const today = new Date();
+                const startDate = new Date();
+                startDate.setDate(today.getDate() - days);
+
+                const formatDate = (date) => date.toISOString().split('T')[0];
+
+                const form = document.getElementById('history-filter-form');
+                form.querySelector('#date_debut').value = formatDate(startDate);
+                form.querySelector('#date_fin').value = formatDate(today);
+                form.submit();
+            });
+        });
+    }
+
+    // NOUVEAUTÉ : Gère le bouton de réinitialisation des filtres
+    const resetBtn = document.querySelector('.filter-section .action-btn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function() {
+            document.getElementById('date_debut').value = '';
+            document.getElementById('date_fin').value = '';
+            document.getElementById('caisse_filter').value = '';
+            document.getElementById('recherche').value = '';
+            document.getElementById('history-filter-form').submit();
+        });
     }
 });

@@ -1,3 +1,4 @@
+/* Fichier : public/css/historique.css */
 /* ==========================================================================
    public/css/historique.css (Avec Thème Sombre Amélioré)
    ========================================================================== */
@@ -71,6 +72,57 @@
     align-items: flex-end;
 }
 .filter-form .form-group { margin-bottom: 0; }
+
+/* Styles pour la nouvelle section de filtre */
+.filter-section {
+    background-color: var(--color-surface-alt); 
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 10px var(--shadow-color);
+}
+.filter-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--color-text-primary);
+    border-bottom: 1px solid var(--color-border-light);
+    padding-bottom: 10px;
+}
+.filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.quick-filter-btn {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: 6px;
+    padding: 8px 15px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    color: var(--color-text-secondary);
+}
+.quick-filter-btn:hover {
+    background-color: var(--color-surface-alt-hover);
+    transform: translateY(-2px);
+}
+.filter-form .new-btn, .filter-form .action-btn {
+    align-self: flex-end;
+}
+.filter-form select {
+    padding: 8px;
+    border: 1px solid var(--color-border-light);
+    border-radius: 6px;
+    font-size: 1em;
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+}
+
 
 /* --- Grille des cartes --- */
 .history-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 25px; }

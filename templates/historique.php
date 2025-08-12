@@ -1,5 +1,6 @@
 <?php
-// templates/historique.php
+// Fichier : templates/historique.php
+// Mise à jour pour inclure les nouveaux filtres de recherche.
 
 $page_js = 'history.js';
 $config_data = json_encode([
@@ -56,9 +57,44 @@ function renderPagination($page_courante, $pages_totales) {
 <div class="container" id="history-page"> 
     <h2><i class="fa-solid fa-clock-rotate-left" style="color: #3498db;"></i> Historique des Comptages</h2>
 
-    <div class="view-tabs">
-        <a href="index.php?page=historique&vue=jour" class="tab-link <?= ($vue === 'jour') ? 'active' : '' ?>">Comptages du jour</a>
-        <a href="index.php?page=historique&vue=tout" class="tab-link <?= ($vue === 'tout') ? 'active' : '' ?>">Tous les comptages</a>
+    <!-- Anciens onglets de vue retirés pour laisser la place aux filtres avancés -->
+
+    <!-- NOUVELLE SECTION DE FILTRES -->
+    <div class="filter-section">
+        <h3>Filtres</h3>
+        <div class="filter-buttons">
+            <button type="button" class="quick-filter-btn" data-days="0">Aujourd'hui</button>
+            <button type="button" class="quick-filter-btn" data-days="1">Hier</button>
+            <button type="button" class="quick-filter-btn" data-days="7">7 derniers jours</button>
+            <button type="button" class="quick-filter-btn" data-days="30">30 derniers jours</button>
+        </div>
+        <form id="history-filter-form" class="filter-form" action="index.php" method="GET">
+            <input type="hidden" name="page" value="historique">
+            <input type="hidden" name="vue" value="tout">
+            <div class="form-group">
+                <label for="date_debut">Date de début :</label>
+                <input type="date" id="date_debut" name="date_debut" value="<?= htmlspecialchars($date_debut) ?>">
+            </div>
+            <div class="form-group">
+                <label for="date_fin">Date de fin :</label>
+                <input type="date" id="date_fin" name="date_fin" value="<?= htmlspecialchars($date_fin) ?>">
+            </div>
+            <div class="form-group">
+                <label for="caisse_filter">Filtrer par caisse :</label>
+                <select id="caisse_filter" name="caisse">
+                    <option value="">Toutes les caisses</option>
+                    <?php foreach ($noms_caisses as $i => $nom): ?>
+                        <option value="c<?= $i ?>_ventes" <?= ($caisse_filtre == "c{$i}_ventes" ? 'selected' : '') ?>><?= htmlspecialchars($nom) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="recherche">Recherche :</label>
+                <input type="text" id="recherche" name="recherche" placeholder="Nom du comptage..." value="<?= htmlspecialchars($recherche) ?>">
+            </div>
+            <button type="submit" class="new-btn">Filtrer</button>
+            <a href="index.php?page=historique&vue=tout" class="action-btn" style="background-color: #7f8c8d;">Réinitialiser</a>
+        </form>
     </div>
 
     <?php if (isset($message)): ?>
@@ -71,24 +107,6 @@ function renderPagination($page_courante, $pages_totales) {
             <button id="pdf-btn" class="action-btn no-export"><i class="fa-solid fa-file-pdf"></i> PDF</button>
             <button id="excel-btn" class="action-btn no-export"><i class="fa-solid fa-file-csv"></i> Excel</button>
         </div>
-        <form action="index.php" method="GET" class="filter-form">
-            <input type="hidden" name="page" value="historique">
-            <input type="hidden" name="vue" value="<?= htmlspecialchars($vue) ?>">
-            <div class="form-group">
-                <label>Date début</label>
-                <input type="date" name="date_debut" value="<?= htmlspecialchars($date_debut) ?>">
-            </div>
-            <div class="form-group">
-                <label>Date fin</label>
-                <input type="date" name="date_fin" value="<?= htmlspecialchars($date_fin) ?>">
-            </div>
-            <div class="form-group">
-                <label>Recherche</label>
-                <input type="text" name="recherche" placeholder="Nom du comptage..." value="<?= htmlspecialchars($recherche) ?>">
-            </div>
-            <button type="submit" class="new-btn">Filtrer</button>
-            <a href="index.php?page=historique&vue=<?= htmlspecialchars($vue) ?>" class="action-btn" style="background-color: #7f8c8d;">Reset</a>
-        </form>
     </div>
 
     <?php if (empty($historique)): ?>

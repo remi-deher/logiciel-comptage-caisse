@@ -1,6 +1,6 @@
 <?php
 // Fichier : src/CaisseController.php
-// CORRIGÉ : La méthode getStatsData inclut maintenant les données pour le graphique de répartition.
+// CORRIGÉ : La méthode historique est mise à jour pour gérer les filtres de date et de caisse.
 
 class CaisseController {
     private $pdo;
@@ -56,10 +56,12 @@ class CaisseController {
         // Définir la vue (aujourd'hui par défaut)
         $vue = $_GET['vue'] ?? 'jour';
 
+        // CORRIGÉ : Prise en compte des filtres de date et de caisse
         $date_debut = $_GET['date_debut'] ?? '';
         $date_fin = $_GET['date_fin'] ?? '';
         $recherche = $_GET['recherche'] ?? '';
-
+        $caisse_filtre = $_GET['caisse'] ?? '';
+        
         $sql_base = "FROM comptages";
         $where_clauses = [];
         $bind_values = [];
@@ -71,6 +73,11 @@ class CaisseController {
         if (!empty($date_debut)) { $where_clauses[] = "date_comptage >= ?"; $bind_values[] = $date_debut . " 00:00:00"; }
         if (!empty($date_fin)) { $where_clauses[] = "date_comptage <= ?"; $bind_values[] = $date_fin . " 23:59:59"; }
         if (!empty($recherche)) { $where_clauses[] = "nom_comptage LIKE ?"; $bind_values[] = "%" . $recherche . "%"; }
+        
+        // Ajout du filtre par caisse
+        if (!empty($caisse_filtre)) {
+            $where_clauses[] = "{$caisse_filtre} IS NOT NULL";
+        }
 
         $sql_where = "";
         if (!empty($where_clauses)) {
