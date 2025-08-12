@@ -3,7 +3,7 @@
  */
 document.addEventListener('DOMContentLoaded', function() {
     const caisseForm = document.getElementById('caisse-form');
-    if (!caisseForm) return;
+    if (!caisseForm) return; // Ne s'exécute que sur la page du calculateur
 
     // --- Fonctions utilitaires ---
     const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(montant);
@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (el) el.textContent = value;
         };
 
+        // Première boucle pour calculer toutes les valeurs
         for (const i of Object.keys(config.nomsCaisses)) {
             const getVal = (id) => parseFloat(document.getElementById(`${id}_${i}`)?.value.replace(',', '.') || 0) || 0;
             
@@ -102,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // Mettre à jour les totaux combinés en bas
         updateElementText('res-total-fdc', formatEuros(totauxCombines.fdc));
         updateElementText('res-total-total', formatEuros(totauxCombines.total));
         updateElementText('res-total-theorique', formatEuros(totauxCombines.theorique));
@@ -115,6 +117,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (totauxCombines.ecart < -0.001) ecartTotalEl.parentElement.classList.add('ecart-negatif');
         }
 
+        // Seconde boucle pour mettre à jour l'affichage du haut avec la connaissance des totaux
         for (const i of Object.keys(config.nomsCaisses)) {
             const topEcartDisplay = document.querySelector(`#ecart-display-caisse${i}`);
             if (topEcartDisplay) {
@@ -134,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (Math.abs(totauxCombines.ecart) < 0.01) {
                             topEcartExplanation.innerHTML = `Montant total à retirer (toutes caisses) : <strong>${formatEuros(totauxCombines.recette)}</strong>`;
                         } else {
-                            topEcartExplanation.textContent = `La caisse est juste. Montant à retirer : ${formatEuros(recetteReelle)}`;
+                            topEcartExplanation.innerHTML = `Cette caisse est juste (retrait : <strong>${formatEuros(recetteReelle)}</strong>), mais un écart existe sur une autre caisse.`;
                         }
                     } else if (ecart > 0) {
                         topEcartDisplay.classList.add('ecart-positif');
