@@ -132,6 +132,54 @@ body {
     transform: translateY(-2px);
 }
 
+/* NOUVEAU: Styles pour les boutons d'exportation */
+.export-buttons-container {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.export-btn {
+    padding: 10px 20px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background-color: #fff;
+    cursor: pointer;
+    font-size: 1em;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #555;
+    margin: 0 5px;
+}
+
+.export-btn:hover {
+    background-color: #f8f9fa;
+    border-color: #3498db;
+    color: #3498db;
+    transform: translateY(-2px);
+}
+
+.export-btn i {
+    font-size: 1.2em;
+}
+
+/* Styles pour le tableau de la modale */
+.modal-details-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+.modal-details-table th, .modal-details-table td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+}
+.modal-details-table th {
+    background-color: #f8f9fa;
+}
+
+
 .kpi-container {
     display: flex;
     justify-content: center;
@@ -151,8 +199,8 @@ body {
     border: 1px solid #e9ecef;
     min-width: 180px;
     box-sizing: border-box;
-    cursor: pointer; /* Ajoute un curseur pour indiquer que la carte est cliquable */
-    position: relative; /* Nécessaire pour le positionnement du bouton */
+    cursor: pointer;
+    position: relative;
 }
 
 .kpi-card:hover {

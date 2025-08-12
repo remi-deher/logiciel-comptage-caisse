@@ -38,6 +38,13 @@ require_once __DIR__ . '/partials/navbar.php';
         </form>
     </div>
 
+    <!-- NOUVEAU: Boutons d'exportation -->
+    <div class="export-buttons-container">
+        <button id="print-stats-btn" class="export-btn"><i class="fa-solid fa-print"></i> Imprimer</button>
+        <button id="pdf-stats-btn" class="export-btn"><i class="fa-solid fa-file-pdf"></i> Exporter en PDF</button>
+        <button id="excel-stats-btn" class="export-btn"><i class="fa-solid fa-file-csv"></i> Exporter en CSV</button>
+    </div>
+
     <!-- Section Accordéon pour les KPI -->
     <div class="accordion-item">
         <button class="accordion-header" aria-expanded="true" aria-controls="kpi-content">
@@ -50,22 +57,18 @@ require_once __DIR__ . '/partials/navbar.php';
                 <div class="kpi-card" data-kpi="total_comptages" data-title="Nombre total de comptages">
                     <h3>Nombre total de comptages</h3>
                     <p id="total-comptages">Chargement...</p>
-                    <button class="details-btn">Détails</button>
                 </div>
                 <div class="kpi-card" data-kpi="total_ventes" data-title="Ventes totales">
                     <h3>Ventes totales</h3>
                     <p id="total-ventes">Chargement...</p>
-                    <button class="details-btn">Détails</button>
                 </div>
                 <div class="kpi-card" data-kpi="ventes_moyennes" data-title="Ventes moyennes">
                     <h3>Ventes moyennes</h3>
                     <p id="ventes-moyennes">Chargement...</p>
-                    <button class="details-btn">Détails</button>
                 </div>
                 <div class="kpi-card" data-kpi="total_retrocession" data-title="Rétrocessions totales">
                     <h3>Rétrocessions totales</h3>
                     <p id="total-retrocession">Chargement...</p>
-                    <button class="details-btn">Détails</button>
                 </div>
             </div>
         </div>

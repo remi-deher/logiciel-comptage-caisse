@@ -1,3 +1,6 @@
+// Fichier : public/js/stats.js
+// Ajout de la logique pour les exports de données (Impression, PDF, CSV).
+
 document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour dessiner le graphique en secteurs
     let repartitionChart;
@@ -126,9 +129,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             caisses.forEach(caisse => {
                 let value = 'N/A';
-                // CORRIGÉ : Utilise une logique plus robuste pour récupérer la valeur correcte
                 if (kpi === 'total_comptages') {
-                    // Pour le total de comptages, c'est une valeur globale, pas par caisse
                     value = 'Non applicable';
                 } else if (kpi === 'total_ventes') {
                     value = caisse.total_ventes;
@@ -222,4 +223,150 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Chargement initial des statistiques
     loadStats();
+    
+    // NOUVEAU: Logique pour les boutons d'exportation
+    document.getElementById('print-stats-btn').addEventListener('click', () => window.print());
+
+    document.getElementById('pdf-stats-btn').addEventListener('click', () => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        const dateDebut = document.getElementById('date_debut').value;
+        const dateFin = document.getElementById('date_fin').value;
+
+        const formatDate = (dateString) => {
+            if (!dateString) return 'Toutes les dates';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('fr-FR');
+        };
+        const fileName = `statistiques_${formatDate(dateDebut)}_${formatDate(dateFin)}.pdf`;
+
+        let y = 15;
+        doc.setFontSize(18);
+        doc.text("Tableau de bord des statistiques", 14, y);
+        y += 10;
+        doc.setFontSize(12);
+        doc.text(`Analyse des données du ${formatDate(dateDebut)} au ${formatDate(dateFin)}`, 14, y);
+        y += 15;
+
+        // KPI
+        doc.setFontSize(14);
+        doc.text("Indicateurs de performance (KPI)", 14, y);
+        y += 10;
+
+        const kpiTableData = [
+            ["Indicateur", "Valeur"],
+            ["Nombre total de comptages", kpiData.total_comptages],
+            ["Ventes totales", new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(kpiData.total_ventes)],
+            ["Ventes moyennes", new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(kpiData.ventes_moyennes)],
+            ["Rétrocessions totales", new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(kpiData.total_retrocession)],
+        ];
+
+        doc.autoTable({
+            startY: y,
+            head: [kpiTableData[0]],
+            body: kpiTableData.slice(1),
+            theme: 'striped'
+        });
+        y = doc.autoTable.previous.finalY + 15;
+
+        // Détails par caisse
+        doc.setFontSize(14);
+        doc.text("Détails par caisse", 14, y);
+        y += 10;
+
+        const detailsTableData = [
+            ["Caisse", "Ventes totales", "Ventes moyennes", "Rétrocessions totales"],
+        ];
+        
+        caisses.forEach(caisse => {
+            detailsTableData.push([
+                caisse.nom,
+                new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(caisse.total_ventes),
+                new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(caisse.moyenne_ventes),
+                new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(caisse.total_retrocession),
+            ]);
+        });
+
+        doc.autoTable({
+            startY: y,
+            head: [detailsTableData[0]],
+            body: detailsTableData.slice(1),
+            theme: 'striped'
+        });
+        y = doc.autoTable.previous.finalY + 15;
+
+        // Graphique de répartition
+        doc.setFontSize(14);
+        doc.text("Répartition des ventes par caisse", 14, y);
+        y += 10;
+
+        const repartitionTableData = [
+            ['Caisse', 'Ventes'],
+        ];
+        
+        const repartitionLabels = repartitionChart.data.labels;
+        const repartitionValues = repartitionChart.data.datasets[0].data;
+
+        repartitionLabels.forEach((label, index) => {
+            repartitionTableData.push([
+                label,
+                new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(repartitionValues[index])
+            ]);
+        });
+
+        doc.autoTable({
+            startY: y,
+            head: [repartitionTableData[0]],
+            body: repartitionTableData.slice(1),
+            theme: 'striped'
+        });
+
+        doc.save(fileName);
+    });
+
+    document.getElementById('excel-stats-btn').addEventListener('click', () => {
+        const dateDebut = document.getElementById('date_debut').value;
+        const dateFin = document.getElementById('date_fin').value;
+        const formatDate = (dateString) => {
+            if (!dateString) return 'Toutes les dates';
+            return dateString;
+        };
+        const fileName = `statistiques_${formatDate(dateDebut)}_${formatDate(dateFin)}.csv`;
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+        
+        // KPI
+        csvContent += "Indicateurs de performance (KPI)\r\n";
+        csvContent += "Indicateur;Valeur\r\n";
+        csvContent += `Nombre total de comptages;${kpiData.total_comptages}\r\n`;
+        csvContent += `Ventes totales;${kpiData.total_ventes} €\r\n`;
+        csvContent += `Ventes moyennes;${kpiData.ventes_moyennes} €\r\n`;
+        csvContent += `Rétrocessions totales;${kpiData.total_retrocession} €\r\n\r\n`;
+        
+        // Détails par caisse
+        csvContent += "Détails par caisse\r\n";
+        csvContent += "Caisse;Ventes totales;Ventes moyennes;Rétrocessions totales\r\n";
+        caisses.forEach(caisse => {
+            csvContent += `"${caisse.nom}";"${caisse.total_ventes} €";"${caisse.moyenne_ventes} €";"${caisse.total_retrocession} €"\r\n`;
+        });
+        csvContent += "\r\n";
+
+        // Graphique de répartition
+        csvContent += "Répartition des ventes par caisse\r\n";
+        csvContent += "Caisse;Ventes\r\n";
+        const repartitionLabels = repartitionChart.data.labels;
+        const repartitionValues = repartitionChart.data.datasets[0].data;
+        repartitionLabels.forEach((label, index) => {
+            csvContent += `"${label}";"${repartitionValues[index]} €"\r\n`;
+        });
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
 });
