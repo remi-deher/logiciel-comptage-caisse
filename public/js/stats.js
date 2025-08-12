@@ -1,4 +1,5 @@
 // Fichier : public/js/stats.js
+// CORRIGÉ : La logique d'affichage de la modale a été mise à jour pour gérer toutes les données.
 // Ajout de la logique pour les exports de données (Impression, PDF, CSV).
 
 document.addEventListener('DOMContentLoaded', function() {
