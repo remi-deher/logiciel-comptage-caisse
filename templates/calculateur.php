@@ -50,6 +50,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                 <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
                     Écart Caisse Actuelle : <span class="ecart-value">0,00 €</span>
                     <p class="ecart-explanation"></p> 
+                    <div id="withdrawal-suggestion-caisse<?= $id ?>" class="withdrawal-suggestion-box"></div>
                 </div>
                 <?php $is_first = false; endforeach; ?>
         </div>

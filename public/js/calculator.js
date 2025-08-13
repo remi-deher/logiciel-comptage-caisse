@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Configuration et Éléments du DOM ---
     const configElement = document.getElementById('calculator-data');
     const config = configElement ? JSON.parse(configElement.dataset.config) : {};
-    
+
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
     const ecartDisplays = document.querySelectorAll('.ecart-display');
@@ -47,11 +47,49 @@ document.addEventListener('DOMContentLoaded', function() {
             tabContents.forEach(c => c.classList.remove('active'));
             event.currentTarget.classList.add('active');
             document.getElementById(event.currentTarget.dataset.tab)?.classList.add('active');
-            
+
             ecartDisplays.forEach(display => display.classList.remove('active'));
             document.getElementById(`ecart-display-${event.currentTarget.dataset.tab}`)?.classList.add('active');
         });
     });
+
+    // --- Nouvelle fonction pour générer les suggestions de retrait ---
+    function generateWithdrawalSuggestion(amountToWithdraw, currentCounts, denominations) {
+        let remainingAmount = amountToWithdraw;
+        const suggestions = {};
+
+        // Définir les minimums à garder par dénomination
+        const minToKeep = {
+            'b5': 2,  // Conserver au moins 2 billets de 5€
+            'p200': 5,  // Conserver au moins 5 pièces de 2€
+            'p100': 10 // Conserver au moins 10 pièces de 1€
+        };
+
+        // Combinaison des billets et des pièces, triée de manière décroissante
+        const allDenominations = [
+            ...Object.entries(denominations.billets),
+            ...Object.entries(denominations.pieces)
+        ].sort((a, b) => b[1] - a[1]);
+
+        for (const [name, value] of allDenominations) {
+            if (remainingAmount <= 0) break;
+
+            const countInCaisse = parseInt(currentCounts[name]) || 0;
+            const toKeep = minToKeep[name] || 0;
+            const availableToRemove = Math.max(0, countInCaisse - toKeep);
+
+            const numToRemove = Math.min(
+                Math.floor(remainingAmount / value),
+                availableToRemove
+            );
+
+            if (numToRemove > 0) {
+                suggestions[name] = numToRemove;
+                remainingAmount -= numToRemove * value;
+            }
+        }
+        return suggestions;
+    }
 
     // --- Logique de Calcul ---
     function calculateAllFull() {
@@ -69,22 +107,25 @@ document.addEventListener('DOMContentLoaded', function() {
         // Première boucle pour calculer toutes les valeurs
         for (const i of Object.keys(config.nomsCaisses)) {
             const getVal = (id) => parseFloat(document.getElementById(`${id}_${i}`)?.value.replace(',', '.') || 0) || 0;
-            
+
             let totalCompte = 0;
+            const currentCounts = {};
             for (const type in config.denominations) {
                 for (const name in config.denominations[type]) {
-                    totalCompte += getVal(name) * config.denominations[type][name];
+                    const count = getVal(name);
+                    totalCompte += count * config.denominations[type][name];
+                    currentCounts[name] = count;
                 }
             }
-            
+
             const fondDeCaisse = getVal('fond_de_caisse');
             const ventes = getVal('ventes');
             const retrocession = getVal('retrocession');
             const recetteTheorique = ventes;
             const recetteReelle = totalCompte - fondDeCaisse - retrocession;
             const ecart = recetteReelle - recetteTheorique;
-            
-            caissesData[i] = { ecart, recetteReelle };
+
+            caissesData[i] = { ecart, recetteReelle, currentCounts };
 
             totauxCombines.fdc += fondDeCaisse;
             totauxCombines.total += totalCompte;
@@ -110,13 +151,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (ecart < -0.001) ecartEl.parentElement.classList.add('ecart-negatif');
             }
         }
-        
+
         // Mettre à jour les totaux combinés en bas
         updateElementText('res-total-fdc', formatEuros(totauxCombines.fdc));
         updateElementText('res-total-total', formatEuros(totauxCombines.total));
         updateElementText('res-total-theorique', formatEuros(totauxCombines.theorique));
         updateElementText('res-total-recette', formatEuros(totauxCombines.recette));
-        
+
         const ecartTotalEl = document.getElementById('res-total-ecart');
         if (ecartTotalEl) {
             ecartTotalEl.textContent = formatEuros(totauxCombines.ecart);
@@ -128,36 +169,62 @@ document.addEventListener('DOMContentLoaded', function() {
         // Seconde boucle pour mettre à jour l'affichage du haut avec la connaissance des totaux
         for (const i of Object.keys(config.nomsCaisses)) {
             const topEcartDisplay = document.querySelector(`#ecart-display-caisse${i}`);
-            if (topEcartDisplay) {
+            const withdrawalSuggestionBox = document.querySelector(`#withdrawal-suggestion-caisse${i}`);
+
+            if (topEcartDisplay && withdrawalSuggestionBox) {
                 const topEcartDisplayValue = topEcartDisplay.querySelector('.ecart-value');
                 const topEcartExplanation = topEcartDisplay.querySelector('.ecart-explanation');
-                const { ecart, recetteReelle } = caissesData[i];
-                
+                const { ecart, recetteReelle, currentCounts } = caissesData[i];
+
                 if (topEcartDisplayValue) topEcartDisplayValue.textContent = formatEuros(ecart);
-                
+
                 const wasActive = topEcartDisplay.classList.contains('active');
                 topEcartDisplay.className = 'ecart-display';
                 if (wasActive) topEcartDisplay.classList.add('active');
-                
-                if (topEcartExplanation) {
-                    if (Math.abs(ecart) < 0.01) {
-                        topEcartDisplay.classList.add('ecart-ok');
-                        let explanation = `<strong>Montant à retirer pour cette caisse :</strong> <strong>${formatEuros(recetteReelle)}</strong>.`;
-                        if (Object.keys(config.nomsCaisses).length > 1) {
-                            explanation += `<br>Montant total à retirer (caisses justes) : <strong>${formatEuros(combinedRecetteForZeroEcart)}</strong>`;
-                            if (caissesAvecEcart.length > 0) {
-                                explanation += `<br><strong>Caisse(s) avec écart :</strong> `;
-                                explanation += caissesAvecEcart.map(c => `${c.nom} (<span style="color: var(--color-danger);">${formatEuros(c.ecart)}</span>)`).join(', ');
-                            }
-                        }
-                        topEcartExplanation.innerHTML = explanation;
-                    } else if (ecart > 0) {
-                        topEcartDisplay.classList.add('ecart-positif');
-                        topEcartExplanation.textContent = "Il y a un surplus dans la caisse. Vérifiez vos saisies.";
-                    } else {
-                        topEcartDisplay.classList.add('ecart-negatif');
-                        topEcartExplanation.textContent = "Il manque de l'argent. Recomptez la caisse.";
+
+                // Réinitialiser les explications et les suggestions
+                topEcartExplanation.innerHTML = '';
+                withdrawalSuggestionBox.innerHTML = '';
+                withdrawalSuggestionBox.classList.remove('visible');
+
+                if (Math.abs(ecart) < 0.01) {
+                    topEcartDisplay.classList.add('ecart-ok');
+
+                    let explanation = `<strong>Montant à retirer pour cette caisse :</strong> <strong>${formatEuros(recetteReelle)}</strong>.<br>`;
+                    if (Object.keys(config.nomsCaisses).length > 1) {
+                        explanation += `<br>Montant total à retirer (caisses justes) : <strong>${formatEuros(combinedRecetteForZeroEcart)}</strong>`;
                     }
+                    topEcartExplanation.innerHTML = explanation;
+
+                    // Générer et afficher les suggestions de retrait dans le nouveau cadre
+                    const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, config.denominations);
+                    let suggestionHtml = `<strong>Suggestion de retrait :</strong><ul>`;
+                    const allDenominations = [...Object.entries(config.denominations.billets), ...Object.entries(config.denominations.pieces)].sort((a, b) => b[1] - a[1]);
+                    let hasSuggestions = false;
+                    for (const [name, value] of allDenominations) {
+                         if (suggestions[name] && suggestions[name] > 0) {
+                             suggestionHtml += `<li>${suggestions[name]}x ${value >= 1 ? `${value} €` : `${value * 100} cts`}</li>`;
+                             hasSuggestions = true;
+                         }
+                    }
+                    suggestionHtml += `</ul>`;
+
+                    if (hasSuggestions) {
+                        withdrawalSuggestionBox.innerHTML = suggestionHtml;
+                        withdrawalSuggestionBox.classList.add('visible');
+                    }
+
+                    if (caissesAvecEcart.length > 0) {
+                        topEcartExplanation.innerHTML += `<br><strong>Caisse(s) avec écart :</strong> `;
+                        topEcartExplanation.innerHTML += caissesAvecEcart.map(c => `${c.nom} (<span style="color: var(--color-danger);">${formatEuros(c.ecart)}</span>)`).join(', ');
+                    }
+
+                } else if (ecart > 0) {
+                    topEcartDisplay.classList.add('ecart-positif');
+                    topEcartExplanation.textContent = "Il y a un surplus dans la caisse. Vérifiez vos saisies.";
+                } else {
+                    topEcartDisplay.classList.add('ecart-negatif');
+                    topEcartExplanation.textContent = "Il manque de l'argent. Recomptez la caisse.";
                 }
             }
         }
@@ -246,7 +313,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function hasUnsavedChanges() {
         return initialState !== getFormStateAsString();
     }
-    
+
     function performAutosaveOnExit() {
         const formData = new FormData(caisseForm);
         let nom = formData.get('nom_comptage');
@@ -254,7 +321,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
             formData.set('nom_comptage', nom);
         }
-        
+
         if (navigator.sendBeacon) {
             navigator.sendBeacon('index.php?action=autosave', new URLSearchParams(formData));
         }
