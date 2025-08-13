@@ -58,6 +58,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!config.nomsCaisses) return;
         let totauxCombines = { fdc: 0, total: 0, recette: 0, theorique: 0, ecart: 0 };
         const caissesData = {};
+        const caissesAvecEcart = [];
+        let combinedRecetteForZeroEcart = 0;
 
         const updateElementText = (id, value) => {
             const el = document.getElementById(id);
@@ -89,6 +91,12 @@ document.addEventListener('DOMContentLoaded', function() {
             totauxCombines.recette += recetteReelle;
             totauxCombines.theorique += recetteTheorique;
             totauxCombines.ecart += ecart;
+
+            if (Math.abs(ecart) < 0.01) {
+                combinedRecetteForZeroEcart += recetteReelle;
+            } else {
+                caissesAvecEcart.push({ nom: config.nomsCaisses[i], ecart: ecart });
+            }
 
             updateElementText(`res-c${i}-fdc`, formatEuros(fondDeCaisse));
             updateElementText(`res-c${i}-total`, formatEuros(totalCompte));
@@ -134,11 +142,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (topEcartExplanation) {
                     if (Math.abs(ecart) < 0.01) {
                         topEcartDisplay.classList.add('ecart-ok');
-                        if (Math.abs(totauxCombines.ecart) < 0.01) {
-                            topEcartExplanation.innerHTML = `Montant total à retirer (toutes caisses) : <strong>${formatEuros(totauxCombines.recette)}</strong>`;
-                        } else {
-                            topEcartExplanation.innerHTML = `Cette caisse est juste (retrait : <strong>${formatEuros(recetteReelle)}</strong>), mais un écart existe sur une autre caisse.`;
+                        let explanation = `Montant à retirer pour cette caisse : <strong>${formatEuros(recetteReelle)}</strong>.`;
+                        if (Object.keys(config.nomsCaisses).length > 1) {
+                            explanation += `<br>Montant total à retirer (caisses justes) : <strong>${formatEuros(combinedRecetteForZeroEcart)}</strong>`;
+                            if (caissesAvecEcart.length > 0) {
+                                explanation += `<br>Caisse(s) avec écart : `;
+                                explanation += caissesAvecEcart.map(c => `${c.nom} (${formatEuros(c.ecart)})`).join(', ');
+                            }
                         }
+                        topEcartExplanation.innerHTML = explanation;
                     } else if (ecart > 0) {
                         topEcartDisplay.classList.add('ecart-positif');
                         topEcartExplanation.textContent = "Il y a un surplus dans la caisse. Vérifiez vos saisies.";
