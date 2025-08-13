@@ -46,13 +46,13 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
         </div>
         
         <div class="ecart-display-container">
-            <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
-                <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
-                    Écart Caisse Actuelle : <span class="ecart-value">0,00 €</span>
-                    <p class="ecart-explanation"></p> 
-                    <div id="withdrawal-suggestion-caisse<?= $id ?>" class="withdrawal-suggestion-box"></div>
-                </div>
-                <?php $is_first = false; endforeach; ?>
+    <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
+        <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
+            Écart Caisse Actuelle : <span class="ecart-value">0,00 €</span>
+            <p class="ecart-explanation"></p>
+        </div>
+        <div id="suggestion-accordion-caisse<?= $id ?>" class="suggestion-accordion-container"></div>
+        <?php $is_first = false; endforeach; ?>
         </div>
 
         <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>

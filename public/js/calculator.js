@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Configuration et Éléments du DOM ---
     const configElement = document.getElementById('calculator-data');
     const config = configElement ? JSON.parse(configElement.dataset.config) : {};
-
+    
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
     const ecartDisplays = document.querySelectorAll('.ecart-display');
@@ -34,11 +34,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function initAccordion() {
         const accordionHeaders = document.querySelectorAll('.accordion-header');
         accordionHeaders.forEach(header => {
-            header.addEventListener('click', function() {
-                this.classList.toggle('active');
-                this.nextElementSibling.classList.toggle('open');
-            });
+            header.removeEventListener('click', toggleAccordion); // Empêche l'ajout de multiples écouteurs
+            header.addEventListener('click', toggleAccordion);
         });
+    }
+
+    function toggleAccordion() {
+        this.classList.toggle('active');
+        this.nextElementSibling.classList.toggle('open');
     }
 
     tabLinks.forEach(link => {
@@ -46,10 +49,14 @@ document.addEventListener('DOMContentLoaded', function() {
             tabLinks.forEach(l => l.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
             event.currentTarget.classList.add('active');
-            document.getElementById(event.currentTarget.dataset.tab)?.classList.add('active');
-
+            const targetTab = document.getElementById(event.currentTarget.dataset.tab);
+            if (targetTab) {
+                targetTab.classList.add('active');
+            }
+            
             ecartDisplays.forEach(display => display.classList.remove('active'));
             document.getElementById(`ecart-display-${event.currentTarget.dataset.tab}`)?.classList.add('active');
+            calculateAllFull(); // Recalculer pour mettre à jour la suggestion
         });
     });
 
@@ -94,6 +101,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Logique de Calcul ---
     function calculateAllFull() {
         if (!config.nomsCaisses) return;
+        
+        const activeTab = document.querySelector('.tab-link.active')?.dataset.tab;
+
         let totauxCombines = { fdc: 0, total: 0, recette: 0, theorique: 0, ecart: 0 };
         const caissesData = {};
         const caissesAvecEcart = [];
@@ -107,7 +117,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Première boucle pour calculer toutes les valeurs
         for (const i of Object.keys(config.nomsCaisses)) {
             const getVal = (id) => parseFloat(document.getElementById(`${id}_${i}`)?.value.replace(',', '.') || 0) || 0;
-
+            
             let totalCompte = 0;
             const currentCounts = {};
             for (const type in config.denominations) {
@@ -117,14 +127,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentCounts[name] = count;
                 }
             }
-
+            
             const fondDeCaisse = getVal('fond_de_caisse');
             const ventes = getVal('ventes');
             const retrocession = getVal('retrocession');
             const recetteTheorique = ventes;
             const recetteReelle = totalCompte - fondDeCaisse - retrocession;
             const ecart = recetteReelle - recetteTheorique;
-
+            
             caissesData[i] = { ecart, recetteReelle, currentCounts };
 
             totauxCombines.fdc += fondDeCaisse;
@@ -151,13 +161,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (ecart < -0.001) ecartEl.parentElement.classList.add('ecart-negatif');
             }
         }
-
+        
         // Mettre à jour les totaux combinés en bas
         updateElementText('res-total-fdc', formatEuros(totauxCombines.fdc));
         updateElementText('res-total-total', formatEuros(totauxCombines.total));
         updateElementText('res-total-theorique', formatEuros(totauxCombines.theorique));
         updateElementText('res-total-recette', formatEuros(totauxCombines.recette));
-
+        
         const ecartTotalEl = document.getElementById('res-total-ecart');
         if (ecartTotalEl) {
             ecartTotalEl.textContent = formatEuros(totauxCombines.ecart);
@@ -169,49 +179,74 @@ document.addEventListener('DOMContentLoaded', function() {
         // Seconde boucle pour mettre à jour l'affichage du haut avec la connaissance des totaux
         for (const i of Object.keys(config.nomsCaisses)) {
             const topEcartDisplay = document.querySelector(`#ecart-display-caisse${i}`);
-            const withdrawalSuggestionBox = document.querySelector(`#withdrawal-suggestion-caisse${i}`);
+            const suggestionAccordionContainer = document.querySelector(`#suggestion-accordion-caisse${i}`);
 
-            if (topEcartDisplay && withdrawalSuggestionBox) {
+            if (topEcartDisplay && suggestionAccordionContainer) {
                 const topEcartDisplayValue = topEcartDisplay.querySelector('.ecart-value');
                 const topEcartExplanation = topEcartDisplay.querySelector('.ecart-explanation');
                 const { ecart, recetteReelle, currentCounts } = caissesData[i];
-
+                
                 if (topEcartDisplayValue) topEcartDisplayValue.textContent = formatEuros(ecart);
-
+                
                 const wasActive = topEcartDisplay.classList.contains('active');
                 topEcartDisplay.className = 'ecart-display';
                 if (wasActive) topEcartDisplay.classList.add('active');
 
-                // Réinitialiser les explications et les suggestions
+                // Réinitialiser les explications et le conteneur de suggestion
                 topEcartExplanation.innerHTML = '';
-                withdrawalSuggestionBox.innerHTML = '';
-                withdrawalSuggestionBox.classList.remove('visible');
-
+                suggestionAccordionContainer.innerHTML = '';
+                
                 if (Math.abs(ecart) < 0.01) {
                     topEcartDisplay.classList.add('ecart-ok');
-
+                    
                     let explanation = `<strong>Montant à retirer pour cette caisse :</strong> <strong>${formatEuros(recetteReelle)}</strong>.<br>`;
                     if (Object.keys(config.nomsCaisses).length > 1) {
                         explanation += `<br>Montant total à retirer (caisses justes) : <strong>${formatEuros(combinedRecetteForZeroEcart)}</strong>`;
                     }
                     topEcartExplanation.innerHTML = explanation;
 
-                    // Générer et afficher les suggestions de retrait dans le nouveau cadre
-                    const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, config.denominations);
-                    let suggestionHtml = `<strong>Suggestion de retrait :</strong><ul>`;
-                    const allDenominations = [...Object.entries(config.denominations.billets), ...Object.entries(config.denominations.pieces)].sort((a, b) => b[1] - a[1]);
-                    let hasSuggestions = false;
-                    for (const [name, value] of allDenominations) {
-                         if (suggestions[name] && suggestions[name] > 0) {
-                             suggestionHtml += `<li>${suggestions[name]}x ${value >= 1 ? `${value} €` : `${value * 100} cts`}</li>`;
-                             hasSuggestions = true;
-                         }
-                    }
-                    suggestionHtml += `</ul>`;
+                    // Générer et afficher les suggestions de retrait uniquement pour la caisse active
+                    if (`caisse${i}` === activeTab) {
+                        const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, config.denominations);
+                        let suggestionHtml = `
+                            <div class="accordion-card">
+                                <div class="accordion-header">
+                                    <i class="fa-solid fa-sack-dollar"></i>
+                                    <h3>Suggestion de retrait</h3>
+                                    <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="accordion-content-inner" style="text-align: center;">
+                                        <p>Pour clôturer la caisse, retirez le montant suivant :</p>
+                                        <h4>Billets</h4>
+                                        <table class="withdrawal-table">
+                                            <thead><tr><th>Dénomination</th><th>Quantité</th></tr></thead>
+                                            <tbody>`;
 
-                    if (hasSuggestions) {
-                        withdrawalSuggestionBox.innerHTML = suggestionHtml;
-                        withdrawalSuggestionBox.classList.add('visible');
+                        let hasSuggestions = false;
+                        for (const [name, value] of Object.entries(config.denominations.billets).sort((a, b) => b[1] - a[1])) {
+                            if (suggestions[name] && suggestions[name] > 0) {
+                                hasSuggestions = true;
+                                suggestionHtml += `<tr><td>${value} €</td><td>${suggestions[name]}</td></tr>`;
+                            }
+                        }
+
+                        suggestionHtml += `</tbody></table><h4>Pièces</h4><table class="withdrawal-table"><thead><tr><th>Dénomination</th><th>Quantité</th></tr></thead><tbody>`;
+
+                        for (const [name, value] of Object.entries(config.denominations.pieces).sort((a, b) => b[1] - a[1])) {
+                            if (suggestions[name] && suggestions[name] > 0) {
+                                hasSuggestions = true;
+                                const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+                                suggestionHtml += `<tr><td>${label}</td><td>${suggestions[name]}</td></tr>`;
+                            }
+                        }
+
+                        suggestionHtml += `</tbody></table></div></div></div>`;
+
+                        if (hasSuggestions) {
+                            suggestionAccordionContainer.innerHTML = suggestionHtml;
+                            initAccordion(); // Réinitialise les événements de l'accordéon pour le nouvel élément
+                        }
                     }
 
                     if (caissesAvecEcart.length > 0) {
@@ -313,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function hasUnsavedChanges() {
         return initialState !== getFormStateAsString();
     }
-
+    
     function performAutosaveOnExit() {
         const formData = new FormData(caisseForm);
         let nom = formData.get('nom_comptage');
@@ -321,7 +356,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
             formData.set('nom_comptage', nom);
         }
-
+        
         if (navigator.sendBeacon) {
             navigator.sendBeacon('index.php?action=autosave', new URLSearchParams(formData));
         }
