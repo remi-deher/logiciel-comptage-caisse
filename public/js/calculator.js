@@ -142,12 +142,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (topEcartExplanation) {
                     if (Math.abs(ecart) < 0.01) {
                         topEcartDisplay.classList.add('ecart-ok');
-                        let explanation = `Montant à retirer pour cette caisse : <strong>${formatEuros(recetteReelle)}</strong>.`;
+                        let explanation = `<strong>Montant à retirer pour cette caisse :</strong> <strong>${formatEuros(recetteReelle)}</strong>.`;
                         if (Object.keys(config.nomsCaisses).length > 1) {
                             explanation += `<br>Montant total à retirer (caisses justes) : <strong>${formatEuros(combinedRecetteForZeroEcart)}</strong>`;
                             if (caissesAvecEcart.length > 0) {
-                                explanation += `<br>Caisse(s) avec écart : `;
-                                explanation += caissesAvecEcart.map(c => `${c.nom} (${formatEuros(c.ecart)})`).join(', ');
+                                explanation += `<br><strong>Caisse(s) avec écart :</strong> `;
+                                explanation += caissesAvecEcart.map(c => `${c.nom} (<span style="color: var(--color-danger);">${formatEuros(c.ecart)}</span>)`).join(', ');
                             }
                         }
                         topEcartExplanation.innerHTML = explanation;
