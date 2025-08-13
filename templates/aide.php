@@ -15,11 +15,10 @@ require 'partials/navbar.php';
     </div>
 
     <div class="help-grid">
-        <!-- Carte Calculateur -->
         <div class="help-card" 
              data-title="Le Calculateur" 
              data-icon="fa-solid fa-calculator"
-             data-content="<h4>Une interface intuitive</h4><p>La page du calculateur est organisée en sections déroulantes (accordéons) pour une meilleure clarté :</p><ol><li><strong>Informations Caisse :</strong> Saisissez ici le fond de caisse, le total des ventes de la journée et les éventuelles rétrocessions (prélèvements).</li><li><strong>Détail des Espèces :</strong> Renseignez le nombre de billets et de pièces comptés. Le total se calcule automatiquement.</li></ol><h4>Indicateur d'écart en temps réel</h4><p>Situé en haut de la page, cet encadré est votre guide. Il change de couleur et de message pour vous informer de l'état de la caisse active :</p><ul><li><strong style='color: #27ae60;'>Vert :</strong> Félicitations ! L'écart est nul, votre caisse est juste.</li><li><strong style='color: #f39c12;'>Orange :</strong> Il y a un surplus d'argent. Vérifiez vos saisies.</li><li><strong style='color: #c0392b;'>Rouge :</strong> Il manque de l'argent. Un recomptage est conseillé.</li></ul>">
+             data-content="<h4>Une interface intuitive</h4><p>La page du calculateur est organisée en sections déroulantes (accordéons) pour une meilleure clarté :</p><ol><li><strong>Informations Caisse :</strong> Saisissez ici le fond de caisse, le total des ventes de la journée et les éventuelles rétrocessions (prélèvements).</li><li><strong>Détail des Espèces :</strong> Renseignez le nombre de billets et de pièces comptés. Le total se calcule automatiquement.</li></ol><h4>Indicateur d'écart en temps réel</h4><p>Situé en haut de la page, cet encadré est votre guide. Il change de couleur et de message pour vous informer de l'état de la caisse active :</p><ul><li><strong style='color: #27ae60;'>Vert :</strong> Félicitations ! L'écart est nul, votre caisse est juste. Un accordéon <strong>Suggestion de retrait</strong> apparaîtra pour vous indiquer la composition exacte de l'argent à retirer pour clôturer la caisse.</li><li><strong style='color: #f39c12;'>Orange :</strong> Il y a un surplus d'argent. Vérifiez vos saisies.</li><li><strong style='color: #c0392b;'>Rouge :</strong> Il manque de l'argent. Un recomptage est conseillé.</li></ul>">
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-calculator"></i></div>
                 <h3>Le Calculateur</h3>
@@ -27,11 +26,10 @@ require 'partials/navbar.php';
             <p>La page principale pour saisir vos comptages et voir les résultats en direct.</p>
         </div>
 
-        <!-- Carte Historique -->
         <div class="help-card"
              data-title="L'Historique"
              data-icon="fa-solid fa-history"
-             data-content="<h4>Retrouvez et analysez vos comptages</h4><p>La page d'historique affiche par défaut les comptages du jour pour un accès rapide. Vous pouvez basculer sur la vue 'Tous les comptages' grâce aux onglets.</p><ul><li><strong>Filtrage puissant :</strong> Utilisez les champs en haut pour rechercher un comptage par nom ou pour filtrer par une période spécifique.</li><li><strong>Pagination :</strong> Naviguez facilement entre les pages de résultats grâce aux contrôles en haut et en bas de la liste.</li><li><strong>Détails et Exports :</strong> Sur chaque carte, cliquez sur le nom d'une caisse pour voir son décompte détaillé. Cliquez sur 'Ensemble' pour une vue complète avec une synthèse globale. Depuis cette fenêtre, vous pouvez exporter les détails en PDF ou Excel.</li></ul>">
+             data-content="<h4>Retrouvez et analysez vos comptages</h4><p>La page d'historique affiche par défaut les comptages du jour pour un accès rapide. Vous pouvez basculer sur la vue 'Tous les comptages' grâce aux onglets.</p><ul><li><strong>Filtrage puissant :</strong> Utilisez les champs en haut pour rechercher un comptage par nom ou pour filtrer par une période spécifique.</li><li><strong>Pagination :</strong> Naviguez facilement entre les pages de résultats grâce aux contrôles en haut et en bas de la liste.</li><li><strong>Détails et Exports :</strong> Sur chaque carte, cliquez sur le nom d'une caisse pour voir son décompte détaillé. Cliquez sur 'Ensemble' pour une vue complète avec une synthèse globale. Depuis cette fenêtre, vous pouvez exporter les détails en PDF ou Excel.</li></ul><h4>Mode Consultation</h4><p>En cliquant sur un comptage depuis l'historique, vous passez en <strong>Mode Consultation</strong>. Dans ce mode, toutes les modifications en temps réel et la sauvegarde automatique sont désactivées pour vous permettre de consulter les données sans risque de les modifier. Un bandeau spécial vous l'indique en haut de la page.</p>">
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-history"></i></div>
                 <h3>L'Historique</h3>
@@ -39,7 +37,6 @@ require 'partials/navbar.php';
             <p>Consultez, filtrez et exportez tous vos comptages enregistrés.</p>
         </div>
 
-        <!-- Carte Temps Réel -->
         <div class="help-card"
              data-title="Collaboration en Temps Réel"
              data-icon="fa-solid fa-wifi"
@@ -51,7 +48,6 @@ require 'partials/navbar.php';
             <p>Travaillez à plusieurs sur le même comptage et voyez les modifications instantanément.</p>
         </div>
 
-        <!-- Carte Fonctionnalités Avancées -->
         <div class="help-card"
              data-title="Fonctionnalités Avancées"
              data-icon="fa-solid fa-star"
@@ -63,7 +59,6 @@ require 'partials/navbar.php';
             <p>Découvrez la sauvegarde de sécurité et le système de mise à jour intelligent.</p>
         </div>
 
-        <!-- Carte Changelog -->
         <div class="help-card"
              data-title="Journal des Modifications"
              data-icon="fa-solid fa-rocket"
@@ -75,7 +70,6 @@ require 'partials/navbar.php';
             <p>Suivez l'évolution de l'application et les dernières nouveautés.</p>
         </div>
 
-        <!-- Carte Administration -->
         <div class="help-card"
              data-title="Panneau d'Administration"
              data-icon="fa-solid fa-toolbox"
@@ -89,13 +83,11 @@ require 'partials/navbar.php';
     </div>
 </div>
 
-<!-- Fenêtre Modale pour les détails de l'aide -->
 <div id="help-modal" class="modal">
     <div class="modal-content">
         <span class="modal-close">&times;</span>
         <div id="help-modal-content">
-            <!-- Le contenu des détails sera injecté ici par JavaScript -->
-        </div>
+            </div>
     </div>
 </div>
 

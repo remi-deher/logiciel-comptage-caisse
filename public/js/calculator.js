@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', function() {
             totauxCombines.fdc += fondDeCaisse;
             totauxCombines.total += totalCompte;
             totauxCombines.recette += recetteReelle;
-            totauxCombines.theorique += recetteTheorique;
+            totauxCombines.theorique += recetteReelle;
             totauxCombines.ecart += ecart;
 
             if (Math.abs(ecart) < 0.01) {
@@ -216,9 +216,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
                                 </div>
                                 <div class="accordion-content">
-                                    <div class="accordion-content-inner" style="text-align: center;">
-                                        <p>Pour clôturer la caisse, retirez le montant suivant :</p>
-                                        <h4>Billets</h4>
+                                    <div class="accordion-content-inner">
+                                        <p style="text-align: center;">Pour clôturer la caisse, retirez le montant suivant :</p>
+                                        <h4><i class="fa-solid fa-money-bill"></i> Billets</h4>
                                         <table class="withdrawal-table">
                                             <thead><tr><th>Dénomination</th><th>Quantité</th></tr></thead>
                                             <tbody>`;
@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         }
 
-                        suggestionHtml += `</tbody></table><h4>Pièces</h4><table class="withdrawal-table"><thead><tr><th>Dénomination</th><th>Quantité</th></tr></thead><tbody>`;
+                        suggestionHtml += `</tbody></table><h4><i class="fa-solid fa-coins"></i> Pièces</h4><table class="withdrawal-table"><thead><tr><th>Dénomination</th><th>Quantité</th></tr></thead><tbody>`;
 
                         for (const [name, value] of Object.entries(config.denominations.pieces).sort((a, b) => b[1] - a[1])) {
                             if (suggestions[name] && suggestions[name] > 0) {
