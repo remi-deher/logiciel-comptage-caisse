@@ -15,8 +15,8 @@ require 'partials/navbar.php';
     </div>
 
     <div class="help-grid">
-        <div class="help-card" 
-             data-title="Le Calculateur" 
+        <div class="help-card"
+             data-title="Le Calculateur"
              data-icon="fa-solid fa-calculator"
              data-content="<h4>Une interface intuitive</h4><p>La page du calculateur est organisée en sections déroulantes (accordéons) pour une meilleure clarté :</p><ol><li><strong>Informations Caisse :</strong> Saisissez ici le fond de caisse, le total des ventes de la journée et les éventuelles rétrocessions (prélèvements).</li><li><strong>Détail des Espèces :</strong> Renseignez le nombre de billets et de pièces comptés. Le total se calcule automatiquement.</li></ol><h4>Indicateur d'écart en temps réel</h4><p>Situé en haut de la page, cet encadré est votre guide. Il change de couleur et de message pour vous informer de l'état de la caisse active :</p><ul><li><strong style='color: #27ae60;'>Vert :</strong> Félicitations ! L'écart est nul, votre caisse est juste. Un accordéon <strong>Suggestion de retrait</strong> apparaîtra pour vous indiquer la composition exacte de l'argent à retirer pour clôturer la caisse.</li><li><strong style='color: #f39c12;'>Orange :</strong> Il y a un surplus d'argent. Vérifiez vos saisies.</li><li><strong style='color: #c0392b;'>Rouge :</strong> Il manque de l'argent. Un recomptage est conseillé.</li></ul>">
             <div class="help-card-header">
@@ -29,12 +29,23 @@ require 'partials/navbar.php';
         <div class="help-card"
              data-title="L'Historique"
              data-icon="fa-solid fa-history"
-             data-content="<h4>Retrouvez et analysez vos comptages</h4><p>La page d'historique affiche par défaut les comptages du jour pour un accès rapide. Vous pouvez basculer sur la vue 'Tous les comptages' grâce aux onglets.</p><ul><li><strong>Filtrage puissant :</strong> Utilisez les champs en haut pour rechercher un comptage par nom ou pour filtrer par une période spécifique.</li><li><strong>Pagination :</strong> Naviguez facilement entre les pages de résultats grâce aux contrôles en haut et en bas de la liste.</li><li><strong>Détails et Exports :</strong> Sur chaque carte, cliquez sur le nom d'une caisse pour voir son décompte détaillé. Cliquez sur 'Ensemble' pour une vue complète avec une synthèse globale. Depuis cette fenêtre, vous pouvez exporter les détails en PDF ou Excel.</li></ul><h4>Mode Consultation</h4><p>En cliquant sur un comptage depuis l'historique, vous passez en <strong>Mode Consultation</strong>. Dans ce mode, toutes les modifications en temps réel et la sauvegarde automatique sont désactivées pour vous permettre de consulter les données sans risque de les modifier. Un bandeau spécial vous l'indique en haut de la page.</p>">
+             data-content="<h4>Retrouvez et analysez vos comptages</h4><p>La page d'historique affiche par défaut les comptages du jour pour un accès rapide. Vous pouvez basculer sur la vue 'Tous les comptages' grâce aux onglets.</p><ul><li><strong>Filtrage puissant :</strong> Utilisez les champs en haut pour rechercher un comptage par nom ou pour filtrer par une période spécifique. Des boutons de filtre rapide sont également disponibles pour 'Aujourd'hui', 'Hier', '7 derniers jours', et '30 derniers jours'.</li><li><strong>Pagination :</strong> Naviguez facilement entre les pages de résultats grâce aux contrôles en haut et en bas de la liste.</li><li><strong>Détails et Exports :</strong> Sur chaque carte, cliquez sur le nom d'une caisse pour voir son décompte détaillé. Cliquez sur 'Ensemble' pour une vue complète avec une synthèse globale. Depuis cette fenêtre, vous pouvez exporter les détails en PDF ou Excel.</li></ul><h4>Mode Consultation</h4><p>En cliquant sur un comptage depuis l'historique, vous passez en <strong>Mode Consultation</strong>. Dans ce mode, toutes les modifications en temps réel et la sauvegarde automatique sont désactivées pour vous permettre de consulter les données sans risque de les modifier. Un bandeau spécial vous l'indique en haut de la page.</p>">
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-history"></i></div>
                 <h3>L'Historique</h3>
             </div>
             <p>Consultez, filtrez et exportez tous vos comptages enregistrés.</p>
+        </div>
+        
+        <div class="help-card"
+             data-title="Les Statistiques"
+             data-icon="fa-solid fa-chart-pie"
+             data-content="<h4>Analysez vos données</h4><p>La page de statistiques vous offre un tableau de bord complet pour analyser vos données de comptage. Elle se divise en plusieurs sections :</p><ul><li><strong>Filtres :</strong> Vous pouvez filtrer les données par période grâce à des boutons de raccourci ('Aujourd'hui', '7 derniers jours', etc.) ou en choisissant une période personnalisée.</li><li><strong>Indicateurs Clés (KPI) :</strong> Une série de cartes vous donne des informations importantes en un coup d'œil, comme le nombre total de comptages, les ventes totales et les ventes moyennes. En cliquant sur ces cartes, vous obtenez un détail par caisse dans une fenêtre modale.</li><li><strong>Graphiques :</strong> Un graphique en secteurs vous montre la répartition des ventes entre vos différentes caisses, vous aidant à visualiser les performances de chacune.</li><li><strong>Exports :</strong> Exportez l'ensemble du tableau de bord au format PDF ou CSV en un clic.</li></ul>">
+            <div class="help-card-header">
+                <div class="help-card-icon"><i class="fa-solid fa-chart-pie"></i></div>
+                <h3>Les Statistiques</h3>
+            </div>
+            <p>Visualisez la répartition des ventes et des indicateurs clés via un tableau de bord complet.</p>
         </div>
 
         <div class="help-card"
@@ -73,7 +84,7 @@ require 'partials/navbar.php';
         <div class="help-card"
              data-title="Panneau d'Administration"
              data-icon="fa-solid fa-toolbox"
-             data-content="<p>Cette section, accessible via un compte sécurisé, est le centre de contrôle technique de l'application. Elle est réservée aux utilisateurs ayant les droits d'administration.</p><h4>Fonctions principales :</h4><ul><li><strong>Gestion des Caisses :</strong> Vous pouvez ajouter de nouvelles caisses, renommer celles qui existent, ou en supprimer. La suppression d'une caisse entraîne la suppression de toutes les données associées.</li><li><strong>Configuration :</strong> Modifiez les paramètres de connexion à la base de données et choisissez le fuseau horaire de l'application pour que toutes les dates soient correctes.</li><li><strong>Sécurité :</strong> Gérez les comptes des autres administrateurs et créez des sauvegardes complètes de votre base de données en un clic.</li></ul>">
+             data-content="<p>Cette section, accessible via un compte sécurisé, est le centre de contrôle technique de l'application. Elle est réservée aux utilisateurs ayant les droits d'administration.</p><h4>Fonctions principales :</h4><ul><li><strong>Gestion des Caisses :</strong> Vous pouvez ajouter de nouvelles caisses, renommer celles qui existent, ou en supprimer. L'ajout et la suppression de caisses entraînent des modifications directes sur la structure de la base de données (ajout ou suppression de colonnes).</li><li><strong>Configuration :</strong> Modifiez les paramètres de connexion à la base de données et choisissez le fuseau horaire de l'application pour que toutes les dates soient correctes.</li><li><strong>Sécurité :</strong> Gérez les comptes des autres administrateurs, mettez à jour leur mot de passe et créez des sauvegardes complètes de votre base de données en un clic.</li></ul>">
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-toolbox"></i></div>
                 <h3>Panneau d'Administration</h3>
