@@ -99,38 +99,22 @@
     .results-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 }
 
-/* Nouveau style pour le cadre de suggestion */
-.withdrawal-suggestion-box {
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    padding: 15px;
-    margin-top: 15px;
-    display: none; /* Caché par défaut */
-    text-align: left;
-}
-
-.withdrawal-suggestion-box.visible {
+/* Nouveau style pour les totaux par ligne */
+.total-line {
     display: block;
-}
-.withdrawal-suggestion-box strong {
-    color: var(--color-text-primary);
-    font-size: 1.1em;
-}
-.withdrawal-suggestion-box ul {
-    list-style: none;
-    padding: 0;
-    margin-top: 10px;
-}
-.withdrawal-suggestion-box li {
-    font-family: monospace;
-    padding: 4px 0;
-    border-bottom: 1px solid var(--color-border-light);
-}
-.withdrawal-suggestion-box li:last-child {
-    border-bottom: none;
+    text-align: right;
+    margin-top: 5px;
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
+    font-weight: bold;
 }
 
+/* Ajustement pour les petits écrans */
+@media (max-width: 576px) {
+    .total-line { font-size: 0.8em; }
+}
+
+/* Style pour la suggestion de retrait */
 .withdrawal-table {
     width: 80%;
     margin: 10px auto;

@@ -20,12 +20,10 @@ $config_data = json_encode([
     'isLoadedFromHistory' => $isLoadedFromHistory ?? false
 ]);
 
-
 // On définit une variable pour ajouter l'attribut 'disabled' plus facilement
 $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 ?>
 
-<!-- Ce div invisible contient les données de configuration pour le JavaScript -->
 <div id="calculator-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'></div>
 
 <div class="container">
@@ -66,7 +64,6 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
         <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
             <div id="caisse<?= $id ?>" class="tab-content <?= $is_first ? 'active' : '' ?>">
                 <div class="accordion-container">
-                    <!-- Accordéon 1: Informations Caisse -->
                     <div class="accordion-card">
                         <div class="accordion-header active">
                             <i class="fa-solid fa-cash-register"></i>
@@ -93,7 +90,6 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                         </div>
                     </div>
 
-                    <!-- Accordéon 2: Détail des Espèces -->
                     <div class="accordion-card">
                         <div class="accordion-header active">
                             <i class="fa-solid fa-money-bill-wave"></i>
@@ -108,6 +104,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                     <div class="form-group">
                                         <label><?= $valeur ?> €</label>
                                         <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data["c{$id}_{$name}"] ?? '') ?>" <?= $disabled_attr ?>>
+                                        <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 €</span>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -117,6 +114,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                     <div class="form-group">
                                         <label><?= $valeur >= 1 ? $valeur.' €' : ($valeur*100).' cts' ?></label>
                                         <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data["c{$id}_{$name}"] ?? '') ?>" <?= $disabled_attr ?>>
+                                        <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 €</span>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>

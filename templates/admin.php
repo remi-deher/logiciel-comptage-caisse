@@ -16,31 +16,44 @@
     <?php endif; ?>
 
     <div class="admin-grid">
-        <div class="admin-card">
+        <!-- NOUVELLE CARTE: Configuration des Retraits -->
+        <div class="admin-card full-width-card">
             <h3><i class="fa-solid fa-sack-dollar"></i> Configuration des Retraits</h3>
             <div class="admin-card-content">
                 <p>Définissez la quantité minimale de chaque dénomination à conserver dans la caisse lors d'une suggestion de retrait.</p>
                 <form action="index.php?page=admin" method="POST">
                     <input type="hidden" name="action" value="update_withdrawal_config">
-                    <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));">
-                        <?php foreach($denominations['billets'] as $name => $value): ?>
-                        <div class="form-group">
-                            <label for="min_<?= $name ?>">Min. <?= $value ?> €</label>
-                            <input type="number" id="min_<?= $name ?>" name="min_to_keep[<?= $name ?>]" value="<?= htmlspecialchars($min_to_keep[$name] ?? 0) ?>" min="0" step="1">
+                    <div class="withdrawal-grid">
+                        <div class="grid-column">
+                            <h4>Billets</h4>
+                            <div class="grid">
+                                <?php foreach($denominations['billets'] as $name => $value): ?>
+                                <div class="form-group">
+                                    <label for="min_<?= $name ?>">Min. <?= $value ?> €</label>
+                                    <input type="number" id="min_<?= $name ?>" name="min_to_keep[<?= $name ?>]" value="<?= htmlspecialchars($min_to_keep[$name] ?? 0) ?>" min="0" step="1">
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
-                        <?php endforeach; ?>
-                        <?php foreach($denominations['pieces'] as $name => $value): ?>
-                        <div class="form-group">
-                            <label for="min_<?= $name ?>">Min. <?= $value >= 1 ? $value.' €' : ($value*100).' cts' ?></label>
-                            <input type="number" id="min_<?= $name ?>" name="min_to_keep[<?= $name ?>]" value="<?= htmlspecialchars($min_to_keep[$name] ?? 0) ?>" min="0" step="1">
+                        <div class="grid-column">
+                            <h4>Pièces</h4>
+                            <div class="grid">
+                                <?php foreach($denominations['pieces'] as $name => $value): ?>
+                                <div class="form-group">
+                                    <label for="min_<?= $name ?>">Min. <?= $value >= 1 ? $value.' €' : ($value*100).' cts' ?></label>
+                                    <input type="number" id="min_<?= $name ?>" name="min_to_keep[<?= $name ?>]" value="<?= htmlspecialchars($min_to_keep[$name] ?? 0) ?>" min="0" step="1">
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
-                        <?php endforeach; ?>
                     </div>
-                    <button type="submit" class="save-btn"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
+                    <!-- NOUVEAU: Ajout de la classe 'mt-4' pour la marge -->
+                    <button type="submit" class="save-btn mt-4"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
                 </form>
             </div>
         </div>
         
+        <!-- Carte : Configuration Générale -->
         <div class="admin-card">
             <h3><i class="fa-solid fa-sliders"></i>Configuration Générale</h3>
             <div class="admin-card-content">
@@ -63,6 +76,7 @@
             </div>
         </div>
 
+        <!-- Carte : Gestion des Caisses -->
         <div class="admin-card">
             <h3><i class="fa-solid fa-cash-register"></i>Gestion des Caisses</h3>
             <div class="admin-card-content">
@@ -82,7 +96,7 @@
                                     <form action="index.php?page=admin" method="POST" onsubmit="return confirm('ATTENTION : La suppression d\'une caisse est irréversible et effacera toutes les données de comptage associées. Êtes-vous sûr ?');">
                                         <input type="hidden" name="action" value="delete_caisse">
                                         <input type="hidden" name="caisse_id" value="<?= $id ?>">
-                                        <button type="submit" class="action-btn-small delete-btn"><i class="fa-solid fa-trash-can"></i></button>
+                                        <button type="submit" class="action-btn-small delete-btn" <?= (str_starts_with($_SESSION['admin_username'], $username)) ? 'disabled' : '' ?> title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
                                     </form>
                                 </td>
                             </tr>
@@ -99,6 +113,7 @@
             </div>
         </div>
 
+        <!-- Carte : Sécurité & Accès -->
         <div class="admin-card">
             <h3><i class="fa-solid fa-shield-halved"></i>Sécurité & Accès</h3>
             <div class="admin-card-content">
@@ -157,6 +172,7 @@
             </div>
         </div>
 
+        <!-- Carte : Maintenance -->
         <div class="admin-card">
             <h3><i class="fa-solid fa-database"></i>Maintenance</h3>
              <div class="admin-card-content">
@@ -182,6 +198,7 @@
             </div>
         </div>
 
+        <!-- Carte : Configuration Technique -->
         <div class="admin-card">
             <h3><i class="fa-solid fa-sliders"></i>Configuration Technique</h3>
             <div class="admin-card-content">

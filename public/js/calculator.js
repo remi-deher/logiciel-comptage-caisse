@@ -123,7 +123,12 @@ document.addEventListener('DOMContentLoaded', function() {
             for (const type in config.denominations) {
                 for (const name in config.denominations[type]) {
                     const count = getVal(name);
-                    totalCompte += count * config.denominations[type][name];
+                    
+                    // NOUVEAU : Calcul et affichage du total pour chaque dénomination
+                    const totalLigne = count * config.denominations[type][name];
+                    updateElementText(`total_${name}_${i}`, formatEuros(totalLigne));
+                    
+                    totalCompte += totalLigne;
                     currentCounts[name] = count;
                 }
             }

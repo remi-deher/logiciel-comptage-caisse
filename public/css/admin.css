@@ -159,3 +159,37 @@ body.login-page-body {
         grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
     }
 }
+
+/* Règle pour la carte pleine largeur dans la grille */
+.admin-grid .full-width-card {
+    grid-column: 1 / -1;
+}
+
+/* NOUVEAU: Styles pour la grille de configuration des retraits */
+.withdrawal-grid {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.withdrawal-grid .grid-column {
+    flex: 1 1 45%;
+}
+
+.withdrawal-grid h4 {
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+@media (max-width: 768px) {
+    .withdrawal-grid {
+        flex-direction: column;
+        gap: 20px;
+    }
+}
+
+/* NOUVEAU: Marge pour séparer le bouton des champs de saisie */
+.mt-4 {
+    margin-top: 1rem; /* 16px */
+}
