@@ -126,6 +126,13 @@ class InstallerController
             $tpe_par_caisse[$caisse_id] = 0; // Par défaut, 0 TPE pour les nouvelles caisses
         }
 
+        // NOUVEAU : Définition des valeurs par défaut pour la nouvelle variable
+        $min_to_keep = [
+            'b5' => 2,
+            'p200' => 5,
+            'p100' => 10,
+        ];
+
         $configContent = "<?php\n\n";
         $configContent .= "// Paramètres de connexion à la base de données\n";
         $configContent .= "define('DB_HOST', '" . addslashes($db['db_host']) . "');\n";

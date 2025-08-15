@@ -17,6 +17,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const configElement = document.getElementById('calculator-data');
     const config = configElement ? JSON.parse(configElement.dataset.config) : {};
     
+    // NOUVEAU: Utilisation de la valeur du fichier de configuration
+    const minToKeep = config.minToKeep || {}; 
+
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
     const ecartDisplays = document.querySelectorAll('.ecart-display');
@@ -66,12 +69,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const suggestions = {};
 
         // Définir les minimums à garder par dénomination
-        const minToKeep = {
-            'b5': 2,  // Conserver au moins 2 billets de 5€
-            'p200': 5,  // Conserver au moins 5 pièces de 2€
-            'p100': 10 // Conserver au moins 10 pièces de 1€
-        };
-
+        // ANCIEN CODE : const minToKeep = { 'b5': 2, 'p200': 5, 'p100': 10 };
+        // NOUVEAU CODE : La variable minToKeep est maintenant un argument
+        
         // Combinaison des billets et des pièces, triée de manière décroissante
         const allDenominations = [
             ...Object.entries(denominations.billets),

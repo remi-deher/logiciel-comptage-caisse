@@ -29,6 +29,7 @@ class AdminController {
                 // Actions de configuration
                 case 'update_db_config': $this->updateDbConfig(); break;
                 case 'update_app_config': $this->updateAppConfig(); break;
+                case 'update_withdrawal_config': $this->updateWithdrawalConfig(); break;
                 
                 // Actions de sauvegarde
                 case 'create_backup': $this->createBackup(); break;
@@ -57,6 +58,14 @@ class AdminController {
 
     private function dashboard() {
         global $noms_caisses;
+        global $min_to_keep; // Assure que la variable est accessible ici
+        global $denominations;
+        
+        // S'assure que la variable existe et est un tableau, sinon l'initialise
+        if (!isset($min_to_keep) || !is_array($min_to_keep)) {
+            $min_to_keep = [];
+        }
+
         $backups = $this->backupService->getBackups();
         $admins = $this->userService->getAdminsList();
         $caisses = $noms_caisses;
@@ -64,6 +73,12 @@ class AdminController {
         
         $page_css = 'admin.css';
         require __DIR__ . '/../templates/admin.php';
+    }
+
+    private function updateWithdrawalConfig() {
+        $updates = ['min_to_keep' => $_POST['min_to_keep'] ?? []];
+        $result = $this->configService->updateConfigFile($updates);
+        $_SESSION['admin_message'] = $result['success'] ? "Configuration des suggestions de retrait mise à jour." : $result['message'];
     }
 
     private function updateAppConfig() {

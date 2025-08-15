@@ -6,12 +6,20 @@ $page_js = 'calculator.js'; // Définit le script JS spécifique à cette page
 require 'partials/header.php';
 require 'partials/navbar.php';
 
+// NOUVEAU : On s'assure que la variable existe pour le JSON
+global $min_to_keep;
+if (!isset($min_to_keep)) {
+    $min_to_keep = [];
+}
+
 // On prépare les données pour les passer au JavaScript de manière sécurisée
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
     'denominations' => $denominations ?? [],
+    'minToKeep' => $min_to_keep, // NOUVEAU : Ajout de la variable
     'isLoadedFromHistory' => $isLoadedFromHistory ?? false
 ]);
+
 
 // On définit une variable pour ajouter l'attribut 'disabled' plus facilement
 $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
