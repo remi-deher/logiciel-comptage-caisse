@@ -156,6 +156,8 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
 }
 
 @media (min-width: 992.01px) {
+    /* CORRECTION : Suppression du positionnement absolu pour éviter le chevauchement */
     .navbar-collapse { flex-grow: 1; justify-content: flex-end; }
-    .navbar-nav { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: auto; }
+    .navbar-nav { position: static; left: auto; top: auto; transform: none; width: auto; display: flex; align-items: center; }
+    .navbar-controls { margin-left: 15px; } /* Ajustement de la marge pour les contrôles */
 }

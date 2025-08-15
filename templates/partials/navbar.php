@@ -4,8 +4,7 @@
 $page_active = $_GET['page'] ?? 'calculateur';
 ?>
 <nav class="navbar">
-    <a href="index.php?page=calculateur" class="navbar-brand">&#128176; Comptage Caisse</a>
-    
+    <a href="index.php?page=calculateur" class="navbar-brand">&#128176;</a>
     <button class="navbar-toggler" id="navbar-toggler" aria-label="Toggle navigation">
         <i class="fa-solid fa-bars"></i>
     </button>
