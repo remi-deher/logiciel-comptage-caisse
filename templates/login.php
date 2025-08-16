@@ -1,18 +1,13 @@
 <?php
 // templates/login.php
-$body_class = 'login-page-body'; // Classe pour le body
 require 'partials/header.php';
+require 'partials/navbar.php';
 ?>
-<div class="login-wrapper">
-    <div class="login-container">
-        <!-- NOUVEAU BOUTON DE RETOUR -->
-        <a href="index.php?page=calculateur" class="return-button" title="Retour au calculateur">
-            <i class="fa-solid fa-times"></i>
-        </a>
-
+<div class="container">
+    <div class="admin-card login-card">
         <div class="login-header">
-            <h2>&#128176; Comptage Caisse</h2>
-            <p>Connectez-vous à votre espace d'administration</p>
+            <h2><i class="fa-solid fa-toolbox"></i>Panneau d'Administration</h2>
+            <p>Connectez-vous pour continuer</p>
         </div>
 
         <?php if (isset($error)): ?>
@@ -33,7 +28,5 @@ require 'partials/header.php';
     </div>
 </div>
 <?php
-// Pas de footer sur la page de connexion
+require 'partials/footer.php';
 ?>
-</body>
-</html>

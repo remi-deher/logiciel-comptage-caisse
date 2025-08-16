@@ -33,6 +33,8 @@ class AdminController {
                 
                 // Actions de sauvegarde
                 case 'create_backup': $this->createBackup(); break;
+                // NOUVEAU: Action de suppression de sauvegarde
+                case 'delete_backup': $this->deleteBackup(); break;
                 
                 // Actions utilisateur
                 case 'sync_single_admin': $this->userService->syncSingleAdmin($_POST['username'] ?? ''); break;
@@ -58,10 +60,9 @@ class AdminController {
 
     private function dashboard() {
         global $noms_caisses;
-        global $min_to_keep; // Assure que la variable est accessible ici
+        global $min_to_keep;
         global $denominations;
         
-        // S'assure que la variable existe et est un tableau, sinon l'initialise
         if (!isset($min_to_keep) || !is_array($min_to_keep)) {
             $min_to_keep = [];
         }
@@ -104,29 +105,82 @@ class AdminController {
         $result = $this->backupService->createBackup();
         $_SESSION[$result['success'] ? 'admin_message' : 'admin_error'] = $result['message'];
     }
+
+    private function deleteBackup() {
+        $filename = basename($_POST['file'] ?? '');
+        $backupDir = dirname(__DIR__, 2) . '/backups';
+        $filePath = $backupDir . '/' . $filename;
+    
+        // Vérification de la validité du nom de fichier
+        if (empty($filename) || !preg_match('/^[a-zA-Z0-9\-\.]+\.sql\.gz$/', $filename)) {
+            $_SESSION['admin_error'] = "Nom de fichier non valide.";
+            return;
+        }
+    
+        // Vérification de l'existence du fichier et du chemin
+        $realBackupDir = realpath($backupDir);
+        $realFilePath = realpath($filePath);
+    
+        if ($realFilePath === false || strpos($realFilePath, $realBackupDir) !== 0) {
+            $_SESSION['admin_error'] = "Fichier de sauvegarde non valide ou introuvable.";
+            return;
+        }
+    
+        // NOUVEAU : Vérification plus explicite de la permission d'écriture
+        if (!is_writable($realFilePath)) {
+            $_SESSION['admin_error'] = "Erreur : Le fichier '{$filename}' n'est pas accessible en écriture. Vérifiez les permissions du dossier '/backups'.";
+            return;
+        }
+    
+        // Tentative de suppression
+        if (unlink($realFilePath)) {
+            $_SESSION['admin_message'] = "La sauvegarde '{$filename}' a été supprimée avec succès.";
+        } else {
+            $_SESSION['admin_error'] = "Erreur inconnue lors de la suppression du fichier.";
+        }
+    }
     
     private function downloadBackup() {
         $filename = basename($_GET['file'] ?? '');
         $backupDir = dirname(__DIR__, 2) . '/backups';
         $filePath = $backupDir . '/' . $filename;
-
-        if (empty($filename) || !file_exists($filePath) || strpos(realpath($filePath), realpath($backupDir)) !== 0) {
+    
+        // Vérification de la validité du nom de fichier
+        if (empty($filename) || !preg_match('/^[a-zA-Z0-9\-\.]+\.sql\.gz$/', $filename)) {
+            $_SESSION['admin_error'] = "Nom de fichier non valide.";
+            header('Location: index.php?page=admin');
+            exit;
+        }
+    
+        // Vérification de l'existence du fichier et du chemin
+        $realBackupDir = realpath($backupDir);
+        $realFilePath = realpath($filePath);
+    
+        if ($realFilePath === false || strpos($realFilePath, $realBackupDir) !== 0) {
             $_SESSION['admin_error'] = "Fichier de sauvegarde non valide ou introuvable.";
             header('Location: index.php?page=admin');
             exit;
         }
-
+    
+        // NOUVEAU : Vérification plus explicite de la permission de lecture
+        if (!is_readable($realFilePath)) {
+            $_SESSION['admin_error'] = "Erreur : Le fichier '{$filename}' n'est pas accessible en lecture. Vérifiez les permissions du dossier '/backups'.";
+            header('Location: index.php?page=admin');
+            exit;
+        }
+    
+        // Envoie les headers pour forcer le téléchargement
         header('Content-Description: File Transfer');
         header('Content-Type: application/gzip');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Expires: 0');
         header('Cache-Control: must-revalidate');
         header('Pragma: public');
-        header('Content-Length: ' . filesize($filePath));
+        header('Content-Length: ' . filesize($realFilePath));
         
         ob_clean();
         flush();
-        readfile($filePath);
+        readfile($realFilePath);
         exit;
     }
 

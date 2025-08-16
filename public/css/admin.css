@@ -2,52 +2,15 @@
    public/css/admin.css (Nouvelle Interface)
    ========================================================================== */
 
-/* --- Page de Connexion (Nouveaux Styles) --- */
-body.login-page-body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #f4f7f9;
-    background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-.login-wrapper {
-    width: 100%;
-    padding: 20px;
-}
-.login-container {
+/* --- Page de Connexion (Styles mis à jour pour correspondre au thème de l'application) --- */
+.login-card {
     max-width: 420px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 40px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
-    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    position: relative; /* Ajouté pour le positionnement du bouton retour */
-}
-
-/* NOUVEAUX STYLES POUR LE BOUTON DE RETOUR */
-.return-button {
-    position: absolute;
-    top: 15px;
-    left: 15px;
-    width: 35px;
-    height: 35px;
-    background-color: #ecf0f1;
-    color: #7f8c8d;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
-    font-size: 1.2em;
-    transition: all 0.2s ease;
-}
-.return-button:hover {
-    background-color: #dfe6e9;
-    color: #34495e;
-    transform: rotate(90deg);
+    margin: 40px auto;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    box-shadow: 0 4px 25px var(--shadow-color);
+    padding: 25px;
 }
 
 .login-header {
@@ -58,33 +21,34 @@ body.login-page-body {
     border-bottom: none;
     font-size: 2em;
     margin: 0 0 10px 0;
-    color: #2c3e50;
+    color: var(--color-text-primary);
 }
 .login-header p {
     margin: 0;
-    color: #7f8c8d;
+    color: var(--color-text-muted);
 }
-.login-container .form-group.with-icon {
+.login-card .form-group.with-icon {
     position: relative;
     margin-bottom: 20px;
 }
-.login-container .form-group .input-icon {
+.login-card .form-group .input-icon {
     position: absolute;
     left: 15px;
     top: 50%;
     transform: translateY(-50%);
-    color: #95a5a6;
+    color: var(--color-text-muted);
     pointer-events: none;
 }
-.login-container .form-group input {
+.login-card .form-group input {
     padding-left: 45px;
+    border-color: var(--color-border);
 }
 
-/* --- Styles de la Page d'Administration (inchangés) --- */
+/* --- Styles de la Page d'Administration --- */
 .admin-header {
     margin-bottom: 30px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid var(--color-border-light);
 }
 .admin-header h2 {
     border-bottom: none;
@@ -92,7 +56,10 @@ body.login-page-body {
     align-items: center;
     gap: 10px;
 }
-.admin-header i { color: #3498db; }
+.admin-header h2 i { 
+    color: var(--color-primary); 
+    transition: color 0.3s ease;
+}
 
 .admin-grid {
     display: grid;
@@ -101,10 +68,10 @@ body.login-page-body {
 }
 
 .admin-card {
-    background-color: #fff;
-    border: 1px solid #e9ecef;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
     border-radius: 12px;
-    box-shadow: 0 4px 25px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 25px var(--shadow-color);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -112,38 +79,67 @@ body.login-page-body {
 .admin-card h3 {
     margin: 0;
     padding: 20px 25px;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
+    background-color: var(--color-surface-alt);
+    border-bottom: 1px solid var(--color-border-light);
     font-size: 1.2em;
     display: flex;
     align-items: center;
     gap: 10px;
 }
-.admin-card h3 i { color: #95a5a6; }
+.admin-card h3 i { color: var(--color-text-muted); }
 .admin-card-content { padding: 25px; flex-grow: 1; }
-.admin-card-footer { padding: 20px 25px; background-color: #f8f9fa; border-top: 1px solid #e9ecef; }
+.admin-card-footer { padding: 20px 25px; background-color: var(--color-surface-alt); border-top: 1px solid var(--color-border-light); }
 
 .admin-table { width: 100%; border-collapse: collapse; }
-.admin-table th, .admin-table td { padding: 15px 0; border-bottom: 1px solid #e9ecef; text-align: left; vertical-align: middle; }
+.admin-table th, .admin-table td { padding: 15px 0; border-bottom: 1px solid var(--color-border-light); text-align: left; vertical-align: middle; }
 .admin-table tbody tr:last-child td { border-bottom: none; }
 .admin-table td:last-child { text-align: right; }
 
 .backup-list { list-style: none; padding: 0; margin: 0; }
-.backup-list li { background-color: #f8f9fa; padding: 12px 18px; border: 1px solid #e9ecef; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-.backup-list li:hover { background-color: #f1f3f5; }
+.backup-list li { 
+    background-color: var(--color-surface-alt); 
+    padding: 12px 18px; 
+    border: 1px solid var(--color-border-light); 
+    border-radius: 6px; 
+    margin-bottom: 8px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    flex-wrap: wrap; 
+    gap: 10px; 
+}
+.backup-list li:hover { background-color: var(--color-surface-alt-hover); }
 
 .inline-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.inline-input { flex-grow: 1; text-align: left !important; min-width: 150px; }
+.inline-input { 
+    flex-grow: 1; 
+    text-align: left !important; 
+    min-width: 150px; 
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+}
 .action-btn-small { padding: 8px 12px; font-size: 0.9em; flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; }
 
-.download-link { font-size: 0.9em; font-weight: bold; text-decoration: none; padding: 8px 12px; background: #27ae60; color: white; border-radius: 5px; transition: background-color 0.2s; }
-.download-link:hover { background: #229954; }
+.download-link { 
+    font-size: 0.9em; 
+    font-weight: bold; 
+    text-decoration: none; 
+    padding: 8px 12px; 
+    background: var(--color-success); 
+    color: white; 
+    border-radius: 5px; 
+    transition: background-color 0.2s; 
+}
+.download-link:hover { background: var(--color-success-dark); }
 .download-link i { margin-right: 5px; }
 
 .status-tag { padding: 4px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; color: white; display: inline-block; }
-.status-ok { background-color: #27ae60; }
-.status-warning { background-color: #f39c12; }
-.status-partial { background-color: #e67e22; }
+.status-ok { background-color: var(--color-success); }
+.status-warning { background-color: var(--color-warning); }
+.status-partial { background-color: var(--color-warning-dark); }
 
 .admin-card .form-group { margin-bottom: 15px; }
 .admin-card .form-group:last-child { margin-bottom: 0; }
@@ -188,8 +184,6 @@ body.login-page-body {
         gap: 20px;
     }
 }
-
-/* NOUVEAU: Marge pour séparer le bouton des champs de saisie */
 .mt-4 {
     margin-top: 1rem; /* 16px */
 }

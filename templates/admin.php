@@ -96,7 +96,7 @@
                                     <form action="index.php?page=admin" method="POST" onsubmit="return confirm('ATTENTION : La suppression d\'une caisse est irréversible et effacera toutes les données de comptage associées. Êtes-vous sûr ?');">
                                         <input type="hidden" name="action" value="delete_caisse">
                                         <input type="hidden" name="caisse_id" value="<?= $id ?>">
-                                        <button type="submit" class="action-btn-small delete-btn" <?= (str_starts_with($_SESSION['admin_username'], $username)) ? 'disabled' : '' ?> title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
+                                        <button type="submit" class="action-btn-small delete-btn" <?= (isset($_SESSION['admin_username']) && str_starts_with($_SESSION['admin_username'], $username)) ? 'disabled' : '' ?> title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
                                     </form>
                                 </td>
                             </tr>
@@ -146,10 +146,10 @@
                                             <button type="submit" class="action-btn-small new-btn" title="Synchroniser"><i class="fa-solid fa-rotate"></i></button>
                                         </form>
                                     <?php endif; ?>
-                                    <form action="index.php?page=admin" method="POST" style="margin:0; display: inline-block;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet administrateur ?');">
+                                    <form action="index.php?page=admin" method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet administrateur ?');">
                                         <input type="hidden" name="action" value="delete_admin">
                                         <input type="hidden" name="username" value="<?= htmlspecialchars($username) ?>">
-                                        <button type="submit" class="action-btn-small delete-btn" <?= (str_starts_with($_SESSION['admin_username'], $username)) ? 'disabled' : '' ?> title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
+                                        <button type="submit" class="action-btn-small delete-btn" <?= (isset($_SESSION['admin_username']) && str_starts_with($_SESSION['admin_username'], $username)) ? 'disabled' : '' ?> title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
                                     </form>
                                 </td>
                             </tr>
@@ -188,7 +188,14 @@
                         <?php foreach($backups as $backup): ?>
                             <li>
                                 <span><i class="fa-solid fa-file-zipper"></i> <?= htmlspecialchars($backup) ?></span>
-                                <a href="index.php?page=admin&action=download_backup&file=<?= urlencode($backup) ?>" class="download-link"><i class="fa-solid fa-cloud-arrow-down"></i></a>
+                                <div class="action-buttons">
+                                    <a href="index.php?page=admin&action=download_backup&file=<?= urlencode($backup) ?>" class="download-link"><i class="fa-solid fa-cloud-arrow-down"></i></a>
+                                    <form action="index.php?page=admin" method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette sauvegarde ?');" style="display:inline;">
+                                        <input type="hidden" name="action" value="delete_backup">
+                                        <input type="hidden" name="file" value="<?= htmlspecialchars($backup) ?>">
+                                        <button type="submit" class="action-btn-small delete-btn"><i class="fa-solid fa-trash-can"></i></button>
+                                    </form>
+                                </div>
                             </li>
                         <?php endforeach; ?>
                     </ul>
