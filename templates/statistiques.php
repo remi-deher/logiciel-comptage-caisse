@@ -1,9 +1,7 @@
 <?php
 // Fichier : templates/statistiques.php
-// Mise à jour pour améliorer l'ergonomie et l'apparence de la page avec un style accordéon.
+// Nouvelle page de statistiques fonctionnelle.
 
-// On inclut l'en-tête de la page.
-// On passe le nom du fichier CSS et JS spécifique à cette page.
 $page_css = 'stats.css';
 $page_js = 'stats.js';
 require_once __DIR__ . '/partials/header.php';
@@ -23,6 +21,7 @@ require_once __DIR__ . '/partials/navbar.php';
             <button type="button" class="quick-filter-btn" data-days="0">Aujourd'hui</button>
             <button type="button" class="quick-filter-btn" data-days="1">Hier</button>
             <button type="button" class="quick-filter-btn" data-days="7">7 derniers jours</button>
+            <button type="button" class="quick-filter-btn" data-days="30">30 derniers jours</button>
         </div>
         <form id="stats-filter-form" class="filter-form">
             <div class="input-group">
@@ -45,48 +44,25 @@ require_once __DIR__ . '/partials/navbar.php';
         <button id="excel-stats-btn" class="export-btn"><i class="fa-solid fa-file-csv"></i> Exporter en CSV</button>
     </div>
 
-    <!-- Section Accordéon pour les KPI -->
-    <div class="accordion-item card">
-        <button class="accordion-header" aria-expanded="true" aria-controls="kpi-content">
-            <h3>Indicateurs de performance (KPI)</h3>
-            <span class="accordion-icon"></span>
-        </button>
-        <div class="accordion-content" id="kpi-content">
-            <!-- Section pour afficher les KPI -->
-            <div class="kpi-container">
-                <div class="kpi-card" data-kpi="total_comptages" data-title="Nombre total de comptages">
-                    <h3>Nombre total de comptages</h3>
-                    <p id="total-comptages">Chargement...</p>
-                </div>
-                <div class="kpi-card" data-kpi="total_ventes" data-title="Ventes totales">
-                    <h3>Ventes totales</h3>
-                    <p id="total-ventes">Chargement...</p>
-                </div>
-                <div class="kpi-card" data-kpi="ventes_moyennes" data-title="Ventes moyennes">
-                    <h3>Ventes moyennes</h3>
-                    <p id="ventes-moyennes">Chargement...</p>
-                </div>
-                <div class="kpi-card" data-kpi="total_retrocession" data-title="Rétrocessions totales">
-                    <h3>Rétrocessions totales</h3>
-                    <p id="total-retrocession">Chargement...</p>
-                </div>
+    <!-- Indicateurs de performance (KPI) -->
+    <div class="card section-kpi">
+        <h3>Indicateurs de performance (KPI)</h3>
+        <div class="kpi-container">
+            <div class="kpi-card" data-kpi="total_comptages" data-title="Nombre total de comptages">
+                <h3>Nombre total de comptages</h3>
+                <p id="total-comptages">Chargement...</p>
             </div>
-        </div>
-    </div>
-    
-    <!-- Section Accordéon pour les graphiques -->
-    <div class="accordion-item card">
-        <button class="accordion-header" aria-expanded="false" aria-controls="charts-content">
-            <h3>Graphiques d'analyse</h3>
-            <span class="accordion-icon"></span>
-        </button>
-        <div class="accordion-content" id="charts-content">
-            <div class="chart-section">
-                <div class="card chart-container">
-                    <h2>Répartition des ventes par caisse</h2>
-                    <!-- Nouveau canevas pour le graphique en secteurs -->
-                    <canvas id="repartitionChart"></canvas>
-                </div>
+            <div class="kpi-card" data-kpi="total_ventes" data-title="Ventes totales">
+                <h3>Ventes totales</h3>
+                <p id="total-ventes">Chargement...</p>
+            </div>
+            <div class="kpi-card" data-kpi="ventes_moyennes" data-title="Ventes moyennes">
+                <h3>Ventes moyennes</h3>
+                <p id="ventes-moyennes">Chargement...</p>
+            </div>
+            <div class="kpi-card" data-kpi="total_retrocession" data-title="Rétrocessions totales">
+                <h3>Rétrocessions totales</h3>
+                <p id="total-retrocession">Chargement...</p>
             </div>
         </div>
     </div>
@@ -101,6 +77,5 @@ require_once __DIR__ . '/partials/navbar.php';
 </div>
 
 <?php
-// On inclut le pied de page
 require_once __DIR__ . '/partials/footer.php';
 ?>
