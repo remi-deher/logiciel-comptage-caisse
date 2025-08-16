@@ -1,6 +1,6 @@
 <?php
 // Fichier : templates/statistiques.php
-// Nouvelle page de statistiques fonctionnelle.
+// Nouvelle version de la page de statistiques avec des fonctionnalités de graphique avancées.
 
 $page_css = 'stats.css';
 $page_js = 'stats.js';
@@ -37,7 +37,7 @@ require_once __DIR__ . '/partials/navbar.php';
         </form>
     </div>
 
-    <!-- NOUVEAU: Boutons d'exportation -->
+    <!-- Boutons d'exportation -->
     <div class="export-buttons-container">
         <button id="print-stats-btn" class="export-btn"><i class="fa-solid fa-print"></i> Imprimer</button>
         <button id="pdf-stats-btn" class="export-btn"><i class="fa-solid fa-file-pdf"></i> Exporter en PDF</button>
@@ -63,6 +63,36 @@ require_once __DIR__ . '/partials/navbar.php';
             <div class="kpi-card" data-kpi="total_retrocession" data-title="Rétrocessions totales">
                 <h3>Rétrocessions totales</h3>
                 <p id="total-retrocession">Chargement...</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Section pour les graphiques -->
+    <div class="card section-charts">
+        <div class="chart-controls">
+            <h3>Graphiques d'analyse</h3>
+            <div class="input-group">
+                <label for="data-selector">Sélectionner les données :</label>
+                <select id="data-selector">
+                    <option value="evolution" selected>Évolution des ventes par jour</option>
+                    <option value="repartition">Répartition des ventes par caisse</option>
+                    <option value="comparaison">Comparaison des ventes par caisse</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="chart-type-selector">Sélectionner le type de graphique :</label>
+                <select id="chart-type-selector">
+                    <option value="line" selected>Graphique linéaire</option>
+                    <option value="bar">Graphique à barres</option>
+                    <option value="doughnut">Graphique en secteurs</option>
+                </select>
+            </div>
+            <button id="generate-chart-btn" class="filter-btn">Générer le graphique</button>
+        </div>
+        <div class="chart-display">
+            <div class="card chart-container">
+                <h2 id="chart-title">Évolution des ventes par jour</h2>
+                <canvas id="mainChart"></canvas>
             </div>
         </div>
     </div>
