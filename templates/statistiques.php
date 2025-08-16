@@ -87,12 +87,11 @@ require_once __DIR__ . '/partials/navbar.php';
                     <option value="doughnut">Graphique en secteurs</option>
                 </select>
             </div>
-            <button id="generate-chart-btn" class="filter-btn">Générer le graphique</button>
         </div>
         <div class="chart-display">
             <div class="card chart-container">
                 <h2 id="chart-title">Évolution des ventes par jour</h2>
-                <canvas id="mainChart"></canvas>
+                <div id="mainChart"></div>
             </div>
         </div>
     </div>
@@ -106,6 +105,7 @@ require_once __DIR__ . '/partials/navbar.php';
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <?php
 require_once __DIR__ . '/partials/footer.php';
 ?>

@@ -8,10 +8,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let mainChart;
 
     const chartTitleElement = document.getElementById('chart-title');
-    const chartCanvas = document.getElementById('mainChart');
+    const chartContainer = document.getElementById('mainChart');
     const chartTypeSelector = document.getElementById('chart-type-selector');
     const dataSelector = document.getElementById('data-selector');
-    const generateChartBtn = document.getElementById('generate-chart-btn');
     const modal = document.getElementById('details-modal');
     const modalContent = document.getElementById('modal-details-content');
     const closeModalBtn = modal ? modal.querySelector('.modal-close') : null;
@@ -21,106 +20,105 @@ document.addEventListener('DOMContentLoaded', function() {
     const resetBtn = document.getElementById('reset-filter-btn');
 
     const chartColors = [
-        'rgba(255, 99, 132, 0.8)',
-        'rgba(54, 162, 235, 0.8)',
-        'rgba(255, 206, 86, 0.8)',
-        'rgba(75, 192, 192, 0.8)',
-        'rgba(153, 102, 255, 0.8)',
-        'rgba(255, 159, 64, 0.8)'
+        '#FF6384',
+        '#36A2EB',
+        '#FFCE56',
+        '#4BC0C0',
+        '#9966FF',
+        '#FF9F40'
     ];
     
-    // Fonction principale de mise à jour des graphiques
+    // Fonction principale de mise à jour des graphiques avec ApexCharts
     function updateChart() {
-        if (!chartCanvas) {
-            console.error("Élément canvas 'mainChart' introuvable. Le graphique ne sera pas affiché.");
+        if (!chartContainer) {
+            console.error("Élément conteneur 'mainChart' introuvable.");
             return;
         }
-
+        
+        // Données à afficher
         const selectedData = dataSelector.value;
         const selectedChartType = chartTypeSelector.value;
         const dataToDisplay = chartData[selectedData];
-        let title = dataSelector.options[dataSelector.selectedIndex].text;
+        const title = dataSelector.options[dataSelector.selectedIndex].text;
         
         if (!dataToDisplay || !dataToDisplay.labels || dataToDisplay.data.length === 0) {
             if (mainChart) {
                 mainChart.destroy();
+                mainChart = null;
             }
             chartTitleElement.textContent = title + " (pas de données)";
             return;
         }
 
-        const ctx = chartCanvas.getContext('2d');
-        if (mainChart) {
-            mainChart.destroy();
-        }
-
-        const datasets = [];
-        let labels = [];
-
-        if (selectedData === 'evolution') {
-            labels = dataToDisplay.labels;
-            datasets.push({
-                label: 'Ventes totales',
-                data: dataToDisplay.data,
-                borderColor: chartColors[1],
-                backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                fill: true,
-                tension: 0.4
-            });
-        } else if (selectedData === 'repartition' || selectedData === 'comparaison') {
-            labels = dataToDisplay.labels;
-             datasets.push({
-                label: title,
-                data: dataToDisplay.data,
-                backgroundColor: chartColors,
-                borderColor: selectedChartType === 'doughnut' ? '#fff' : chartColors,
-                borderWidth: selectedChartType === 'doughnut' ? 2 : 1
-            });
-        }
-
-        mainChart = new Chart(ctx, {
-            type: selectedChartType,
-            data: {
-                labels: labels,
-                datasets: datasets
+        // Configuration pour ApexCharts
+        let chartOptions = {
+            chart: {
+                type: selectedChartType === 'doughnut' ? 'pie' : selectedChartType,
+                height: 350,
+                toolbar: { show: false }
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: selectedChartType === 'doughnut' ? 'right' : 'top',
-                        labels: {
-                            usePointStyle: selectedChartType === 'doughnut',
-                            boxWidth: 8,
-                            padding: 15,
-                            color: getComputedStyle(document.body).getPropertyValue('--color-text-primary')
-                        }
+            series: [{
+                name: 'Ventes',
+                data: dataToDisplay.data
+            }],
+            labels: dataToDisplay.labels,
+            colors: chartColors,
+            title: {
+                text: title,
+                align: 'center',
+                style: {
+                    color: getComputedStyle(document.body).getPropertyValue('--color-text-primary')
+                }
+            },
+            responsive: [{
+                breakpoint: 480,
+                options: {
+                    chart: { width: 200 },
+                    legend: { position: 'bottom' }
+                }
+            }],
+            theme: {
+                mode: document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'
+            },
+            yaxis: {
+                labels: {
+                    formatter: function (value) {
+                        return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
                     },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) { label += ': '; }
-                                const value = context.parsed.y !== undefined ? context.parsed.y : context.parsed;
-                                label += new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
-                                return label;
-                            }
-                        }
-                    }
-                },
-                scales: selectedChartType === 'doughnut' ? {} : {
-                    x: {
-                        grid: { color: getComputedStyle(document.body).getPropertyValue('--color-border') },
-                        ticks: { color: getComputedStyle(document.body).getPropertyValue('--color-text-secondary') }
-                    },
-                    y: {
-                        grid: { color: getComputedStyle(document.body).getPropertyValue('--color-border') },
-                        ticks: { color: getComputedStyle(document.body).getPropertyValue('--color-text-secondary') }
+                    style: {
+                        colors: getComputedStyle(document.body).getPropertyValue('--color-text-secondary')
                     }
                 }
+            },
+            xaxis: {
+                labels: {
+                    style: {
+                        colors: getComputedStyle(document.body).getPropertyValue('--color-text-secondary')
+                    }
+                }
+            },
+            legend: {
+                labels: {
+                    colors: getComputedStyle(document.body).getPropertyValue('--color-text-primary')
+                }
             }
-        });
+        };
+
+        // Gérer les cas spécifiques aux graphiques
+        if (selectedChartType === 'line' || selectedChartType === 'bar') {
+            chartOptions.series = [{ name: 'Ventes', data: dataToDisplay.data }];
+            chartOptions.xaxis.categories = dataToDisplay.labels;
+            delete chartOptions.labels;
+        }
+
+        // Création ou mise à jour du graphique
+        if (mainChart) {
+            mainChart.updateOptions(chartOptions);
+        } else {
+            mainChart = new ApexCharts(chartContainer, chartOptions);
+            mainChart.render();
+        }
+
         chartTitleElement.textContent = title;
     }
 
@@ -131,16 +129,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const doughnutOption = chartTypeSelector.querySelector('option[value="doughnut"]');
         const lineOption = chartTypeSelector.querySelector('option[value="line"]');
 
-        if (selectedData === 'repartition' || selectedData === 'comparaison') {
+        if (selectedData === 'repartition') {
             doughnutOption.disabled = false;
-            lineOption.disabled = (selectedData === 'repartition');
-            if(chartTypeSelector.value === 'line' && selectedData === 'repartition') {
+            lineOption.disabled = true;
+            if (chartTypeSelector.value === 'line' || chartTypeSelector.value === 'bar') {
+                chartTypeSelector.value = 'doughnut';
+            }
+        } else if (selectedData === 'comparaison') {
+            doughnutOption.disabled = true;
+            lineOption.disabled = false;
+            if (chartTypeSelector.value === 'doughnut' || chartTypeSelector.value === 'line') {
                 chartTypeSelector.value = 'bar';
             }
         } else { // evolution
             doughnutOption.disabled = true;
             lineOption.disabled = false;
-            if(chartTypeSelector.value === 'doughnut') {
+            if (chartTypeSelector.value === 'doughnut' || chartTypeSelector.value === 'bar') {
                 chartTypeSelector.value = 'line';
             }
         }
@@ -149,10 +153,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     function updateKpi(kpis) {
-        document.getElementById('total-comptages').textContent = kpis.total_comptages;
-        document.getElementById('total-ventes').textContent = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(kpis.total_ventes);
-        document.getElementById('ventes-moyennes').textContent = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(kpis.ventes_moyennes);
-        document.getElementById('total-retrocession').textContent = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(kpis.total_retrocession);
+        // Ajout de vérifications pour éviter les erreurs "Cannot set properties of null"
+        const totalComptagesEl = document.getElementById('total-comptages');
+        if(totalComptagesEl) totalComptagesEl.textContent = kpis.total_comptages;
+        
+        const totalVentesEl = document.getElementById('total-ventes');
+        if(totalVentesEl) totalVentesEl.textContent = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(kpis.total_ventes);
+        
+        const ventesMoyennesEl = document.getElementById('ventes-moyennes');
+        if(ventesMoyennesEl) ventesMoyennesEl.textContent = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(kpis.ventes_moyennes);
+        
+        const totalRetrocessionEl = document.getElementById('total-retrocession');
+        if(totalRetrocessionEl) totalRetrocessionEl.textContent = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(kpis.total_retrocession);
+        
         kpiData = kpis;
     }
 
@@ -184,10 +197,19 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Erreur lors de la récupération des données de statistiques:', error);
-                document.getElementById('total-comptages').textContent = "Erreur";
-                document.getElementById('total-ventes').textContent = "Erreur";
-                document.getElementById('ventes-moyennes').textContent = "Erreur";
-                document.getElementById('total-retrocession').textContent = "Erreur";
+                
+                // Mettre à jour les éléments si ils existent
+                const totalComptagesEl = document.getElementById('total-comptages');
+                if(totalComptagesEl) totalComptagesEl.textContent = "Erreur";
+
+                const totalVentesEl = document.getElementById('total-ventes');
+                if(totalVentesEl) totalVentesEl.textContent = "Erreur";
+
+                const ventesMoyennesEl = document.getElementById('ventes-moyennes');
+                if(ventesMoyennesEl) ventesMoyennesEl.textContent = "Erreur";
+
+                const totalRetrocessionEl = document.getElementById('total-retrocession');
+                if(totalRetrocessionEl) totalRetrocessionEl.textContent = "Erreur";
             });
     }
 
@@ -223,14 +245,9 @@ document.addEventListener('DOMContentLoaded', function() {
             loadStats(document.getElementById('date_debut').value, document.getElementById('date_fin').value);
         });
     }
-
-    if (generateChartBtn) {
-        generateChartBtn.addEventListener('click', updateChart);
-    }
     
-    if (dataSelector) {
-        dataSelector.addEventListener('change', updateChartTypeOptions);
-    }
+    dataSelector.addEventListener('change', updateChartTypeOptions);
+    chartTypeSelector.addEventListener('change', updateChart);
 
     quickFilterBtns.forEach(btn => {
         btn.addEventListener('click', function() {
