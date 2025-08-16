@@ -10,14 +10,14 @@ require_once __DIR__ . '/partials/header.php';
 require_once __DIR__ . '/partials/navbar.php';
 ?>
 
-<div class="page-content">
+<div class="container">
     <header class="page-header">
         <h1>Tableau de bord des statistiques</h1>
         <p class="subtitle">Analyse des données de comptage de caisse</p>
     </header>
 
     <!-- Section des filtres de recherche -->
-    <div class="filter-section">
+    <div class="card filter-section">
         <h3>Filtres de recherche</h3>
         <div class="filter-buttons">
             <button type="button" class="quick-filter-btn" data-days="0">Aujourd'hui</button>
@@ -46,7 +46,7 @@ require_once __DIR__ . '/partials/navbar.php';
     </div>
 
     <!-- Section Accordéon pour les KPI -->
-    <div class="accordion-item">
+    <div class="accordion-item card">
         <button class="accordion-header" aria-expanded="true" aria-controls="kpi-content">
             <h3>Indicateurs de performance (KPI)</h3>
             <span class="accordion-icon"></span>
@@ -75,14 +75,14 @@ require_once __DIR__ . '/partials/navbar.php';
     </div>
     
     <!-- Section Accordéon pour les graphiques -->
-    <div class="accordion-item">
+    <div class="accordion-item card">
         <button class="accordion-header" aria-expanded="false" aria-controls="charts-content">
             <h3>Graphiques d'analyse</h3>
             <span class="accordion-icon"></span>
         </button>
         <div class="accordion-content" id="charts-content">
             <div class="chart-section">
-                <div class="chart-container">
+                <div class="card chart-container">
                     <h2>Répartition des ventes par caisse</h2>
                     <!-- Nouveau canevas pour le graphique en secteurs -->
                     <canvas id="repartitionChart"></canvas>
