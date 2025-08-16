@@ -4,8 +4,150 @@
 document.addEventListener('DOMContentLoaded', function() {
     let kpiData = {};
     let caisses = [];
+    let chartData = {};
+    let mainChart;
+
+    const chartTitleElement = document.getElementById('chart-title');
+    const chartCanvas = document.getElementById('mainChart');
+    const chartTypeSelector = document.getElementById('chart-type-selector');
+    const dataSelector = document.getElementById('data-selector');
+    const generateChartBtn = document.getElementById('generate-chart-btn');
+    const modal = document.getElementById('details-modal');
+    const modalContent = document.getElementById('modal-details-content');
+    const closeModalBtn = modal ? modal.querySelector('.modal-close') : null;
+    const kpiCards = document.querySelectorAll('.kpi-card');
+    const filterForm = document.getElementById('stats-filter-form');
+    const quickFilterBtns = document.querySelectorAll('.quick-filter-btn');
+    const resetBtn = document.getElementById('reset-filter-btn');
+
+    const chartColors = [
+        'rgba(255, 99, 132, 0.8)',
+        'rgba(54, 162, 235, 0.8)',
+        'rgba(255, 206, 86, 0.8)',
+        'rgba(75, 192, 192, 0.8)',
+        'rgba(153, 102, 255, 0.8)',
+        'rgba(255, 159, 64, 0.8)'
+    ];
     
-    // Met à jour les KPI dans le HTML
+    // Fonction principale de mise à jour des graphiques
+    function updateChart() {
+        if (!chartCanvas) {
+            console.error("Élément canvas 'mainChart' introuvable. Le graphique ne sera pas affiché.");
+            return;
+        }
+
+        const selectedData = dataSelector.value;
+        const selectedChartType = chartTypeSelector.value;
+        const dataToDisplay = chartData[selectedData];
+        let title = dataSelector.options[dataSelector.selectedIndex].text;
+        
+        if (!dataToDisplay || !dataToDisplay.labels || dataToDisplay.data.length === 0) {
+            if (mainChart) {
+                mainChart.destroy();
+            }
+            chartTitleElement.textContent = title + " (pas de données)";
+            return;
+        }
+
+        const ctx = chartCanvas.getContext('2d');
+        if (mainChart) {
+            mainChart.destroy();
+        }
+
+        const datasets = [];
+        let labels = [];
+
+        if (selectedData === 'evolution') {
+            labels = dataToDisplay.labels;
+            datasets.push({
+                label: 'Ventes totales',
+                data: dataToDisplay.data,
+                borderColor: chartColors[1],
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                fill: true,
+                tension: 0.4
+            });
+        } else if (selectedData === 'repartition' || selectedData === 'comparaison') {
+            labels = dataToDisplay.labels;
+             datasets.push({
+                label: title,
+                data: dataToDisplay.data,
+                backgroundColor: chartColors,
+                borderColor: selectedChartType === 'doughnut' ? '#fff' : chartColors,
+                borderWidth: selectedChartType === 'doughnut' ? 2 : 1
+            });
+        }
+
+        mainChart = new Chart(ctx, {
+            type: selectedChartType,
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: selectedChartType === 'doughnut' ? 'right' : 'top',
+                        labels: {
+                            usePointStyle: selectedChartType === 'doughnut',
+                            boxWidth: 8,
+                            padding: 15,
+                            color: getComputedStyle(document.body).getPropertyValue('--color-text-primary')
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                const value = context.parsed.y !== undefined ? context.parsed.y : context.parsed;
+                                label += new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: selectedChartType === 'doughnut' ? {} : {
+                    x: {
+                        grid: { color: getComputedStyle(document.body).getPropertyValue('--color-border') },
+                        ticks: { color: getComputedStyle(document.body).getPropertyValue('--color-text-secondary') }
+                    },
+                    y: {
+                        grid: { color: getComputedStyle(document.body).getPropertyValue('--color-border') },
+                        ticks: { color: getComputedStyle(document.body).getPropertyValue('--color-text-secondary') }
+                    }
+                }
+            }
+        });
+        chartTitleElement.textContent = title;
+    }
+
+    // Met à jour les options de type de graphique en fonction des données sélectionnées
+    function updateChartTypeOptions() {
+        const selectedData = dataSelector.value;
+        const barOption = chartTypeSelector.querySelector('option[value="bar"]');
+        const doughnutOption = chartTypeSelector.querySelector('option[value="doughnut"]');
+        const lineOption = chartTypeSelector.querySelector('option[value="line"]');
+
+        if (selectedData === 'repartition' || selectedData === 'comparaison') {
+            doughnutOption.disabled = false;
+            lineOption.disabled = (selectedData === 'repartition');
+            if(chartTypeSelector.value === 'line' && selectedData === 'repartition') {
+                chartTypeSelector.value = 'bar';
+            }
+        } else { // evolution
+            doughnutOption.disabled = true;
+            lineOption.disabled = false;
+            if(chartTypeSelector.value === 'doughnut') {
+                chartTypeSelector.value = 'line';
+            }
+        }
+        updateChart();
+    }
+
+
     function updateKpi(kpis) {
         document.getElementById('total-comptages').textContent = kpis.total_comptages;
         document.getElementById('total-ventes').textContent = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(kpis.total_ventes);
@@ -22,18 +164,22 @@ document.addEventListener('DOMContentLoaded', function() {
     
         fetch(url)
             .then(response => {
-                if (!response.ok) {
-                    throw new Error('Réponse du serveur non valide.');
-                }
+                if (!response.ok) { throw new Error('Réponse du serveur non valide.'); }
                 return response.json();
             })
             .then(data => {
                 if (data && data.kpis && data.caisses) {
-                    updateKpi(data.kpis);
+                    kpiData = data.kpis;
                     caisses = data.caisses;
+                    chartData = {
+                        evolution: data.evolution,
+                        repartition: data.repartition,
+                        comparaison: { labels: data.caisses.map(c => c.nom), data: data.caisses.map(c => c.total_ventes) }
+                    };
+                    updateKpi(kpiData);
+                    updateChartTypeOptions();
                 } else {
                     console.error('Données de statistiques invalides reçues:', data);
-                    // Gérer l'affichage des erreurs si les données sont invalides
                 }
             })
             .catch(error => {
@@ -46,17 +192,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Événements
-    const modal = document.getElementById('details-modal');
-    const modalContent = document.getElementById('modal-details-content');
-    const closeModalBtn = modal ? modal.querySelector('.modal-close') : null;
-    const kpiCards = document.querySelectorAll('.kpi-card');
-    const filterForm = document.getElementById('stats-filter-form');
-    const quickFilterBtns = document.querySelectorAll('.quick-filter-btn');
-    const resetBtn = document.getElementById('reset-filter-btn');
-    const chartSelector = document.getElementById('chart-selector');
-    const repartitionChartContainer = document.getElementById('repartition-chart-container');
-    const evolutionChartContainer = document.getElementById('evolution-chart-container');
-    
     kpiCards.forEach(card => {
         card.addEventListener('click', function() {
             const kpi = this.dataset.kpi;
@@ -68,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 html += `<tr><td>${caisse.nom}</td><td>${value !== 'Non applicable' ? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value) : value}</td></tr>`;
             });
             html += `</tbody></table>`;
-            modalContent.innerHTML = html;
+            document.getElementById('modal-details-content').innerHTML = html;
             modal.style.display = 'flex';
         });
     });
@@ -82,7 +217,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
     
-
     if (filterForm) {
         filterForm.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -90,20 +224,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    if (generateChartBtn) {
+        generateChartBtn.addEventListener('click', updateChart);
+    }
+    
+    if (dataSelector) {
+        dataSelector.addEventListener('change', updateChartTypeOptions);
+    }
+
     quickFilterBtns.forEach(btn => {
         btn.addEventListener('click', function() {
             const days = parseInt(this.dataset.days);
             const today = new Date();
             const startDate = new Date();
-            if (days > 0) {
-                startDate.setDate(today.getDate() - days);
-            }
-
+            if (days > 0) { startDate.setDate(today.getDate() - days); }
             const formatDate = (date) => date.toISOString().split('T')[0];
-
             document.getElementById('date_debut').value = formatDate(startDate);
             document.getElementById('date_fin').value = formatDate(today);
-
             loadStats(formatDate(startDate), formatDate(today));
         });
     });
@@ -115,8 +252,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadStats();
         });
     }
-    
-    // Chargement initial des statistiques
+
     loadStats();
 
     document.getElementById('print-stats-btn').addEventListener('click', () => window.print());
@@ -190,6 +326,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         y = doc.autoTable.previous.finalY + 15;
         
+        // Données du graphique actuellement affiché
+        const currentChartData = chartData[dataSelector.value];
+        const chartTitle = chartTitleElement.textContent;
+        doc.setFontSize(14);
+        doc.text(chartTitle, 14, y);
+        y += 10;
+        const chartTableData = [
+            ['Label', 'Valeur'],
+        ];
+        currentChartData.labels.forEach((label, index) => {
+            chartTableData.push([
+                label,
+                new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(currentChartData.data[index])
+            ]);
+        });
+        doc.autoTable({
+            startY: y,
+            head: [chartTableData[0]],
+            body: chartTableData.slice(1),
+            theme: 'striped'
+        });
+        y = doc.autoTable.previous.finalY + 15;
+
         doc.save(fileName);
     });
 
@@ -217,6 +376,16 @@ document.addEventListener('DOMContentLoaded', function() {
         csvContent += "Caisse;Ventes totales;Ventes moyennes;Rétrocessions totales\r\n";
         caisses.forEach(caisse => {
             csvContent += `"${caisse.nom}";"${caisse.total_ventes} €";"${caisse.moyenne_ventes} €";"${caisse.total_retrocession} €"\r\n`;
+        });
+        csvContent += "\r\n";
+
+        // Données du graphique actuellement affiché
+        const currentChartData = chartData[dataSelector.value];
+        const chartTitle = chartTitleElement.textContent;
+        csvContent += `${chartTitle}\r\n`;
+        csvContent += "Label;Valeur\r\n";
+        currentChartData.labels.forEach((label, index) => {
+            csvContent += `"${label}";"${currentChartData.data[index]} €"\r\n`;
         });
         csvContent += "\r\n";
         
