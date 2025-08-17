@@ -126,13 +126,19 @@ class InstallerController
             $tpe_par_caisse[$caisse_id] = 0; // Par défaut, 0 TPE pour les nouvelles caisses
         }
 
-        // NOUVEAU : Définition des valeurs par défaut pour la nouvelle variable
+        // NOUVEAU : Définition des valeurs par défaut pour la nouvelle variable $denominations
+        $denominations = [
+            'billets' => ['b500' => 500, 'b200' => 200, 'b100' => 100, 'b50' => 50, 'b20' => 20, 'b10' => 10, 'b5' => 5],
+            'pieces'  => ['p200' => 2, 'p100' => 1, 'p050' => 0.50, 'p020' => 0.20, 'p010' => 0.10, 'p005' => 0.05, 'p002' => 0.02, 'p001' => 0.01]
+        ];
+
+        // NOUVEAU : Définition des valeurs par défaut pour la nouvelle variable $min_to_keep
         $min_to_keep = [
             'b5' => 2,
             'p200' => 5,
             'p100' => 10,
         ];
-
+        
         $configContent = "<?php\n\n";
         $configContent .= "// Paramètres de connexion à la base de données\n";
         $configContent .= "define('DB_HOST', '" . addslashes($db['db_host']) . "');\n";
@@ -146,10 +152,8 @@ class InstallerController
         $configContent .= "// Configuration de l'application\n";
         $configContent .= '$noms_caisses = ' . var_export($noms_caisses, true) . ";\n";
         $configContent .= '$tpe_par_caisse = ' . var_export($tpe_par_caisse, true) . ";\n";
-        $configContent .= '$denominations = [' . "\n";
-        $configContent .= "    'billets' => ['b500' => 500, 'b200' => 200, 'b100' => 100, 'b50' => 50, 'b20' => 20, 'b10' => 10, 'b5' => 5],\n";
-        $configContent .= "    'pieces'  => ['p200' => 2, 'p100' => 1, 'p050' => 0.50, 'p020' => 0.20, 'p010' => 0.10, 'p005' => 0.05, 'p002' => 0.02, 'p001' => 0.01]\n";
-        $configContent .= "];\n";
+        $configContent .= '$denominations = ' . var_export($denominations, true) . ";\n";
+        $configContent .= '$min_to_keep = ' . var_export($min_to_keep, true) . ";\n";
 
         file_put_contents(dirname(__DIR__, 2) . '/config/config.php', $configContent);
     }

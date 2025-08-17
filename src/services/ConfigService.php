@@ -17,7 +17,7 @@ class ConfigService {
      * @return array ['success' => bool, 'message' => string|null]
      */
     public function updateConfigFile($updates) {
-        global $noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep; // NOUVEAU: Ajout de $min_to_keep
+        global $noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep;
 
         // On charge les valeurs actuelles pour ne pas les écraser
         $current_defines = [
@@ -39,9 +39,12 @@ class ConfigService {
         if (isset($updates['tpe_par_caisse'])) {
             $tpe_par_caisse = $updates['tpe_par_caisse'];
         }
-        // NOUVEAU : Application des mises à jour pour les minimums
         if (isset($updates['min_to_keep'])) {
             $min_to_keep = $updates['min_to_keep'];
+        }
+        // NOUVEAU : Application des mises à jour pour les dénominations
+        if (isset($updates['denominations'])) {
+            $denominations = $updates['denominations'];
         }
 
         // On construit le nouveau contenu du fichier de configuration
@@ -58,7 +61,7 @@ class ConfigService {
         $new_content .= '$noms_caisses = ' . var_export($noms_caisses, true) . ";\n";
         $new_content .= '$tpe_par_caisse = ' . var_export($tpe_par_caisse, true) . ";\n";
         $new_content .= '$denominations = ' . var_export($denominations, true) . ";\n";
-        $new_content .= '$min_to_keep = ' . var_export($min_to_keep, true) . ";\n"; // NOUVEAU: Écriture de la nouvelle variable
+        $new_content .= '$min_to_keep = ' . var_export($min_to_keep, true) . ";\n";
 
         if (is_writable($this->configPath)) {
             file_put_contents($this->configPath, $new_content, LOCK_EX);

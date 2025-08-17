@@ -344,6 +344,41 @@ body[data-theme="dark"] .modal-details-table th { background-color: #495057; }
     .filter-form .form-group, .filter-form button, .filter-form a { width: 100%; box-sizing: border-box; }
     .filter-form button, .filter-form a { justify-content: center; }
     .pagination-nav { justify-content: flex-start; }
+
+    /* NOUVEAU: Optimisation du tableau sur mobile */
+    .modal-details-table, .modal-details-table thead, .modal-details-table tbody, .modal-details-table th, .modal-details-table td, .modal-details-table tr { 
+        display: block; 
+    }
+    .modal-details-table thead tr { 
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+    .modal-details-table tr {
+        border: 1px solid var(--color-border);
+        margin-bottom: var(--space-md);
+        border-radius: var(--space-sm);
+        background-color: var(--color-surface-alt);
+    }
+    .modal-details-table td {
+        border: none;
+        position: relative;
+        padding-left: 50%;
+        text-align: left;
+    }
+    .modal-details-table td:before {
+        content: attr(data-label);
+        position: absolute;
+        left: var(--space-md);
+        width: 45%;
+        padding-right: 10px;
+        white-space: nowrap;
+        font-weight: bold;
+        color: var(--color-text-secondary);
+    }
+    .modal-details-table td:last-child {
+        border-bottom: 1px solid var(--color-border);
+    }
 }
 @media (max-width: 480px) {
     .history-grid { grid-template-columns: 1fr; }
@@ -359,3 +394,4 @@ body[data-theme="dark"] .modal-details-table th { background-color: #495057; }
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
+
