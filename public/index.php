@@ -12,7 +12,7 @@ date_default_timezone_set(defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Europe/Paris
 // REDIRECTION VERS L'INSTALLATEUR SI L'APPLICATION N'EST PAS CONFIGURÉE
 if (!file_exists(__DIR__ . '/../config/config.php')) {
     if (is_dir(__DIR__ . '/install')) {
-        header('Location: install/'); // Redirige vers le dossier d'installation
+        header('Location: install/');
         exit;
     } else {
         die("Erreur Critique : Le fichier de configuration est manquant et le dossier d'installation n'a pas été trouvé.");
@@ -31,10 +31,13 @@ require_once __DIR__ . '/../src/services/CaisseManagementService.php';
 require_once __DIR__ . '/../src/services/DatabaseMigrationService.php';
 require_once __DIR__ . '/../src/services/FilterService.php';
 // On charge les contrôleurs
-require_once __DIR__ . '/../src/CaisseController.php';
 require_once __DIR__ . '/../src/AdminController.php';
 require_once __DIR__ . '/../src/AuthController.php';
 require_once __DIR__ . '/../src/StatistiquesController.php';
+require_once __DIR__ . '/../src/AideController.php';
+require_once __DIR__ . '/../src/ChangelogController.php';
+require_once __DIR__ . '/../src/CalculateurController.php';
+require_once __DIR__ . '/../src/HistoriqueController.php';
 
 
 // Pour la compatibilité ascendante, on s'assure que la variable TPE existe
@@ -43,11 +46,14 @@ if (!isset($tpe_par_caisse)) {
 }
 
 $pdo = Bdd::getPdo();
-// CORRIGÉ : L'instanciation de CaisseController est maintenant correcte.
-$caisseController = new CaisseController($pdo, $noms_caisses, $denominations, $tpe_par_caisse);
 $adminController = new AdminController($pdo);
 $authController = new AuthController($pdo);
 $statistiquesController = new StatistiquesController($pdo, $noms_caisses, $denominations);
+$aideController = new AideController();
+$changelogController = new ChangelogController();
+$calculateurController = new CalculateurController($pdo, $noms_caisses, $denominations, $tpe_par_caisse);
+$historiqueController = new HistoriqueController($pdo, $noms_caisses, $denominations, $tpe_par_caisse);
+
 
 $page = $_GET['page'] ?? 'calculateur';
 $action = $_REQUEST['action'] ?? null;
@@ -69,7 +75,7 @@ if ($ajax_action) {
             $adminController->gitPull();
             exit;
         case 'autosave':
-            $caisseController->autosave();
+            $calculateurController->autosave();
             exit;
         case 'get_stats_data':
             // Nouvelle route pour récupérer les données de statistiques
@@ -82,22 +88,21 @@ if ($ajax_action) {
 switch ($page) {
     case 'historique':
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
-            $caisseController->delete();
+            $historiqueController->delete();
         } else {
-            $caisseController->historique();
+            $historiqueController->historique();
         }
         break;
     
     case 'aide':
-        $caisseController->aide();
+        $aideController->index();
         break;
 
     case 'changelog':
-        $caisseController->changelog();
+        $changelogController->index();
         break;
 
     case 'statistiques':
-        // Nouvelle route pour la page de statistiques
         $statistiquesController->statistiques();
         break;
 
@@ -112,15 +117,15 @@ switch ($page) {
     case 'admin':
         $adminController->index();
         break;
-    case 'update':
-        $adminController->updatePage();
-        break;
+
     case 'calculateur':
     default:
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save') {
-            $caisseController->save();
+            $calculateurController->save();
         } else {
-            $caisseController->calculateur();
+            $calculateurController->calculateur();
         }
         break;
 }
+
+?>
