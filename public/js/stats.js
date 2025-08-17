@@ -1,5 +1,5 @@
 // Fichier : public/js/stats.js
-// Logique pour la page de statistiques.
+// Logique pour la page de statistiques en utilisant ApexCharts.
 
 document.addEventListener('DOMContentLoaded', function() {
     let kpiData = {};
@@ -28,18 +28,17 @@ document.addEventListener('DOMContentLoaded', function() {
         '#FF9F40'
     ];
     
-    // Fonction principale de mise à jour des graphiques avec ApexCharts
+    // Fonction principale de mise à jour des graphiques
     function updateChart() {
         if (!chartContainer) {
             console.error("Élément conteneur 'mainChart' introuvable.");
             return;
         }
-        
-        // Données à afficher
+
         const selectedData = dataSelector.value;
-        const selectedChartType = chartTypeSelector.value;
+        let selectedChartType = chartTypeSelector.value;
         const dataToDisplay = chartData[selectedData];
-        const title = dataSelector.options[dataSelector.selectedIndex].text;
+        let title = dataSelector.options[dataSelector.selectedIndex].text;
         
         if (!dataToDisplay || !dataToDisplay.labels || dataToDisplay.data.length === 0) {
             if (mainChart) {
@@ -49,26 +48,37 @@ document.addEventListener('DOMContentLoaded', function() {
             chartTitleElement.textContent = title + " (pas de données)";
             return;
         }
+        
+        let apexChartType = selectedChartType;
+        if (selectedChartType === 'doughnut') {
+            apexChartType = 'pie';
+        }
 
-        // Configuration pour ApexCharts
-        let chartOptions = {
+        const series = [{
+            name: title,
+            data: dataToDisplay.data
+        }];
+        
+        let labels;
+        let categories;
+
+        if (selectedChartType === 'doughnut') {
+            labels = dataToDisplay.labels;
+        } else {
+            categories = dataToDisplay.labels;
+        }
+
+        const options = {
             chart: {
-                type: selectedChartType === 'doughnut' ? 'pie' : selectedChartType,
+                type: apexChartType,
                 height: 350,
                 toolbar: { show: false }
             },
-            series: [{
-                name: 'Ventes',
-                data: dataToDisplay.data
-            }],
-            labels: dataToDisplay.labels,
+            series: series,
+            labels: labels,
             colors: chartColors,
             title: {
-                text: title,
-                align: 'center',
-                style: {
-                    color: getComputedStyle(document.body).getPropertyValue('--color-text-primary')
-                }
+                text: title
             },
             responsive: [{
                 breakpoint: 480,
@@ -84,13 +94,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 labels: {
                     formatter: function (value) {
                         return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
-                    },
-                    style: {
-                        colors: getComputedStyle(document.body).getPropertyValue('--color-text-secondary')
                     }
                 }
             },
             xaxis: {
+                categories: categories,
                 labels: {
                     style: {
                         colors: getComputedStyle(document.body).getPropertyValue('--color-text-secondary')
@@ -103,49 +111,52 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         };
-
-        // Gérer les cas spécifiques aux graphiques
-        if (selectedChartType === 'line' || selectedChartType === 'bar') {
-            chartOptions.series = [{ name: 'Ventes', data: dataToDisplay.data }];
-            chartOptions.xaxis.categories = dataToDisplay.labels;
-            delete chartOptions.labels;
+        
+        if (selectedChartType === 'pie') {
+            options.series = dataToDisplay.data;
+            options.labels = dataToDisplay.labels;
+            delete options.xaxis;
+            delete options.yaxis;
         }
-
-        // Création ou mise à jour du graphique
+        
         if (mainChart) {
-            mainChart.updateOptions(chartOptions);
+            mainChart.updateOptions(options);
         } else {
-            mainChart = new ApexCharts(chartContainer, chartOptions);
+            mainChart = new ApexCharts(chartContainer, options);
             mainChart.render();
         }
 
         chartTitleElement.textContent = title;
     }
 
-    // Met à jour les options de type de graphique en fonction des données sélectionnées
     function updateChartTypeOptions() {
         const selectedData = dataSelector.value;
         const barOption = chartTypeSelector.querySelector('option[value="bar"]');
         const doughnutOption = chartTypeSelector.querySelector('option[value="doughnut"]');
         const lineOption = chartTypeSelector.querySelector('option[value="line"]');
 
-        if (selectedData === 'repartition') {
+        doughnutOption.disabled = true;
+        lineOption.disabled = true;
+        barOption.disabled = true;
+        
+        if (selectedData === 'evolution') {
+            lineOption.disabled = false;
+            barOption.disabled = false;
+        } else if (selectedData === 'repartition') {
             doughnutOption.disabled = false;
-            lineOption.disabled = true;
-            if (chartTypeSelector.value === 'line' || chartTypeSelector.value === 'bar') {
-                chartTypeSelector.value = 'doughnut';
-            }
+            barOption.disabled = false;
         } else if (selectedData === 'comparaison') {
-            doughnutOption.disabled = true;
             lineOption.disabled = false;
-            if (chartTypeSelector.value === 'doughnut' || chartTypeSelector.value === 'line') {
-                chartTypeSelector.value = 'bar';
-            }
-        } else { // evolution
-            doughnutOption.disabled = true;
-            lineOption.disabled = false;
-            if (chartTypeSelector.value === 'doughnut' || chartTypeSelector.value === 'bar') {
+            barOption.disabled = false;
+        }
+        
+        if (chartTypeSelector.options[chartTypeSelector.selectedIndex].disabled) {
+            if (lineOption && !lineOption.disabled) {
                 chartTypeSelector.value = 'line';
+            } else if (barOption && !barOption.disabled) {
+                chartTypeSelector.value = 'bar';
+            } else if (doughnutOption && !doughnutOption.disabled) {
+                chartTypeSelector.value = 'doughnut';
             }
         }
         updateChart();
@@ -214,6 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Événements
+
     kpiCards.forEach(card => {
         card.addEventListener('click', function() {
             const kpi = this.dataset.kpi;
