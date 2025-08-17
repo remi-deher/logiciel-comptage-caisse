@@ -212,24 +212,29 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const chartColors = ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6'];
     
+    // CORRIGÉ: Fonction de rendu des mini-graphiques avec ApexCharts
     function renderMiniChart(element, data) {
         if (!data || data.every(val => val === 0)) {
             element.innerHTML = '<p class="no-chart-data">Pas de données de vente.</p>';
             return;
         }
 
+        element.innerHTML = '';
+        
         const labels = Object.values(globalConfig.nomsCaisses);
         const options = {
             chart: {
-                type: 'pie',
+                type: 'donut',
                 height: 150,
-                toolbar: { show: false },
-                sparkline: { enabled: true }
+                toolbar: { show: false }
             },
             series: data,
             labels: labels,
             colors: chartColors,
             legend: { show: false },
+            dataLabels: {
+                enabled: false,
+            },
             tooltip: {
                 y: {
                     formatter: function (value, { seriesIndex, dataPointIndex, w }) {
@@ -300,58 +305,66 @@ document.addEventListener('DOMContentLoaded', function() {
         globalChart.render();
     }
 
+    // CORRIGÉ: Fonction de rendu des cartes pour éviter le problème d'innerHTML
     function renderHistoriqueCards(historique) {
         historyGrid.innerHTML = '';
         if (historique.length === 0) {
             historyGrid.innerHTML = '<p>Aucun enregistrement trouvé pour ces critères.</p>';
             return;
         }
-
         historique.forEach(comptage => {
             const calculated = calculateResults(comptage);
             const caisseVentesData = Object.entries(globalConfig.nomsCaisses).map(([num, nom]) => {
                 return calculated.caisses[num]?.ventes || 0;
             });
-            const cardHtml = `
-                <div class="history-card" data-comptage='${JSON.stringify(comptage)}'>
-                    <div class="history-card-header">
-                        <h4>${comptage.nom_comptage}</h4>
-                        <div class="date"><i class="fa-regular fa-calendar"></i> ${formatDateFr(comptage.date_comptage)}</div>
-                        ${comptage.explication ? `<p class="explication"><i class="fa-solid fa-lightbulb"></i> ${comptage.explication}</p>` : ''}
+
+            // Crée un conteneur pour la carte
+            const cardDiv = document.createElement('div');
+            cardDiv.classList.add('history-card');
+            cardDiv.dataset.comptage = JSON.stringify(comptage);
+
+            // Génère le HTML pour le contenu de la carte
+            cardDiv.innerHTML = `
+                <div class="history-card-header">
+                    <h4>${comptage.nom_comptage}</h4>
+                    <div class="date"><i class="fa-regular fa-calendar"></i> ${formatDateFr(comptage.date_comptage)}</div>
+                    ${comptage.explication ? `<p class="explication"><i class="fa-solid fa-lightbulb"></i> ${comptage.explication}</p>` : ''}
+                </div>
+                <div class="history-card-body">
+                    <div class="summary-line">
+                        <div><i class="fa-solid fa-coins icon-total"></i> Total Compté Global</div>
+                        <span>${formatEuros(calculated.combines.total_compté)}</span>
                     </div>
-                    <div class="history-card-body">
-                        <div class="summary-line">
-                            <div><i class="fa-solid fa-coins icon-total"></i> Total Compté Global</div>
-                            <span>${formatEuros(calculated.combines.total_compté)}</span>
-                        </div>
-                        <div class="summary-line">
-                             <div><i class="fa-solid fa-right-left icon-ecart"></i> Écart Global</div>
-                            <span class="${calculated.combines.ecart > 0.001 ? 'ecart-positif' : (calculated.combines.ecart < -0.001 ? 'ecart-negatif' : '')}">
-                                ${formatEuros(calculated.combines.ecart)}
-                            </span>
-                        </div>
-                        <hr class="card-divider">
-                        <div class="mini-chart-container"></div>
+                    <div class="summary-line">
+                         <div><i class="fa-solid fa-right-left icon-ecart"></i> Écart Global</div>
+                        <span class="${calculated.combines.ecart > 0.001 ? 'ecart-positif' : (calculated.combines.ecart < -0.001 ? 'ecart-negatif' : '')}">
+                            ${formatEuros(calculated.combines.ecart)}
+                        </span>
                     </div>
-                    <div class="history-card-footer no-export">
-                        <button class="action-btn-small details-all-btn"><i class="fa-solid fa-layer-group"></i> Ensemble</button>
-                        ${Object.entries(globalConfig.nomsCaisses).map(([num, nom]) => `
-                            <button class="action-btn-small details-btn" data-caisse-id="${num}" data-caisse-nom="${nom}">
-                                <i class="fa-solid fa-list-ul"></i> ${nom}
-                            </button>
-                        `).join('')}
-                        <div style="flex-grow: 1;"></div>
-                        <a href="index.php?page=calculateur&load=${comptage.id}" class="action-btn-small save-btn"><i class="fa-solid fa-pen-to-square"></i></a>
-                        <button type="button" class="action-btn-small delete-btn delete-comptage-btn" data-id-to-delete="${comptage.id}"><i class="fa-solid fa-trash-can"></i></button>
-                    </div>
+                    <hr class="card-divider">
+                    <div class="mini-chart-container"></div>
+                </div>
+                <div class="history-card-footer no-export">
+                    <button class="action-btn-small details-all-btn"><i class="fa-solid fa-layer-group"></i> Ensemble</button>
+                    ${Object.entries(globalConfig.nomsCaisses).map(([num, nom]) => `
+                        <button class="action-btn-small details-btn" data-caisse-id="${num}" data-caisse-nom="${nom}">
+                            <i class="fa-solid fa-list-ul"></i> ${nom}
+                        </button>
+                    `).join('')}
+                    <div style="flex-grow: 1;"></div>
+                    <a href="index.php?page=calculateur&load=${comptage.id}" class="action-btn-small save-btn"><i class="fa-solid fa-pen-to-square"></i></a>
+                    <button type="button" class="action-btn-small delete-btn delete-comptage-btn" data-id-to-delete="${comptage.id}"><i class="fa-solid fa-trash-can"></i></button>
                 </div>`;
             
-            historyGrid.innerHTML += cardHtml;
-            const lastCard = historyGrid.lastElementChild;
-            const miniChartElement = lastCard.querySelector('.mini-chart-container');
+            // Ajoute la nouvelle carte à la grille
+            historyGrid.appendChild(cardDiv);
+            
+            // Trouve le conteneur du graphique dans la carte nouvellement ajoutée et rend le graphique
+            const miniChartElement = cardDiv.querySelector('.mini-chart-container');
             renderMiniChart(miniChartElement, caisseVentesData);
         });
     }
+
 
     function renderPagination(currentPage, totalPages) {
         if (!paginationNav) return;
@@ -531,6 +544,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    const exportCsvBtn = document.getElementById('excel-btn');
+    if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.delete('page');
+            const exportUrl = `index.php?action=export_csv&${urlParams.toString()}`;
+            window.location.href = exportUrl;
+        });
+    }
+
     const initialParams = Object.fromEntries(new URLSearchParams(window.location.search).entries());
     loadHistoriqueData(initialParams);
 

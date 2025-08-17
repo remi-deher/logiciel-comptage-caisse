@@ -98,4 +98,61 @@ class HistoriqueController {
         }
         exit;
     }
+
+    // NOUVEAU: Méthode pour exporter au format CSV
+    public function exportCsv() {
+        $date_debut = $_GET['date_debut'] ?? '';
+        $date_fin = $_GET['date_fin'] ?? '';
+        $recherche = $_GET['recherche'] ?? '';
+        
+        $filter_params = $this->filterService->getWhereClauseAndBindings($date_debut, $date_fin, $recherche);
+        $sql_where = $filter_params['sql_where'];
+        $bind_values = $filter_params['bind_values'];
+
+        $sql_data = "SELECT * FROM comptages" . $sql_where . " ORDER BY date_comptage DESC";
+        $stmt_data = $this->pdo->prepare($sql_data);
+        $stmt_data->execute($bind_values);
+        $historique = $stmt_data->fetchAll();
+
+        $filename = "export-comptages-" . date('Y-m-d') . ".csv";
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        $output = fopen('php://output', 'w');
+        
+        // En-têtes CSV
+        $header = ['ID', 'Nom', 'Date', 'Explication'];
+        foreach ($this->noms_caisses as $id => $nom) {
+            $header[] = "Caisse {$id} - Nom";
+            $header[] = "Caisse {$id} - Fond de caisse";
+            $header[] = "Caisse {$id} - Ventes";
+            $header[] = "Caisse {$id} - Rétrocession";
+            foreach ($this->denominations as $type => $denoms) {
+                foreach ($denoms as $key => $value) {
+                    $label = ($value >= 1) ? "{$value} €" : "{$value} cts";
+                    $header[] = "Caisse {$id} - {$label}";
+                }
+            }
+        }
+        fputcsv($output, $header, ';');
+
+        // Données
+        foreach ($historique as $row) {
+            $rowData = [$row['id'], $row['nom_comptage'], $row['date_comptage'], $row['explication']];
+            foreach ($this->noms_caisses as $id => $nom) {
+                $rowData[] = $nom;
+                $rowData[] = str_replace('.', ',', $row["c{$id}_fond_de_caisse"]);
+                $rowData[] = str_replace('.', ',', $row["c{$id}_ventes"]);
+                $rowData[] = str_replace('.', ',', $row["c{$id}_retrocession"]);
+                foreach ($this->denominations as $type => $denoms) {
+                    foreach ($denoms as $key => $value) {
+                        $rowData[] = $row["c{$id}_{$key}"];
+                    }
+                }
+            }
+            fputcsv($output, $rowData, ';');
+        }
+        fclose($output);
+        exit;
+    }
 }

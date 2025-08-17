@@ -87,13 +87,15 @@ if ($ajax_action) {
         case 'delete_historique_data': // NOUVEAU
             $historiqueController->delete();
             exit;
+        case 'export_csv': // NOUVEAU
+            $historiqueController->exportCsv();
+            exit;
     }
 }
 
 // --- Routage principal pour l'affichage des pages ---
 switch ($page) {
     case 'historique':
-        // La logique de suppression est maintenant gérée par l'action AJAX ci-dessus
         $historiqueController->historique();
         break;
     
