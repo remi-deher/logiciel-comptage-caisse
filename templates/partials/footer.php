@@ -14,8 +14,8 @@ $release_info = 'Information non disponible';
     <footer class="main-footer">
         <p>
             Développé par DEHER Rémi |
-            <a href="[https://opensource.org/license/mit](https://opensource.org/license/mit)" target="_blank" rel="noopener noreferrer">Licence MIT</a> |
-            <a href="[https://github.com/remi-deher/logiciel-comptage-caisse](https://github.com/remi-deher/logiciel-comptage-caisse)" target="_blank" rel="noopener noreferrer">Dépôt GitHub</a>
+            <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer">Licence MIT</a> |
+            <a href="https://github.com/remi-deher/logiciel-comptage-caisse" target="_blank" rel="noopener noreferrer">Dépôt GitHub</a>
         </p>
 
         <p>
@@ -32,9 +32,7 @@ $release_info = 'Information non disponible';
         </div>
     </footer>
 
-    <!-- Chargement du script principal sur toutes les pages -->
     <script src="js/main.js"></script>
-    <!-- Chargement du script spécifique à la page, s'il est défini -->
     <?php if (!empty($page_js)): ?>
         <script src="js/<?= htmlspecialchars($page_js) ?>"></script>
     <?php endif; ?>
