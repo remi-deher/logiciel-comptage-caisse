@@ -1,5 +1,5 @@
 // Fichier : public/js/stats.js
-// Logique pour la page de statistiques en utilisant ApexCharts.
+// Logique pour la page de statistiques.
 
 document.addEventListener('DOMContentLoaded', function() {
     let kpiData = {};
@@ -48,31 +48,33 @@ document.addEventListener('DOMContentLoaded', function() {
             chartTitleElement.textContent = title + " (pas de données)";
             return;
         }
-        
+
         let apexChartType = selectedChartType;
         if (selectedChartType === 'doughnut') {
             apexChartType = 'pie';
         }
 
-        const series = [{
-            name: title,
-            data: dataToDisplay.data
-        }];
-        
+        let series;
         let labels;
         let categories;
-
-        if (selectedChartType === 'doughnut') {
-            labels = dataToDisplay.labels;
+        
+        if (selectedData === 'radar') {
+             series = dataToDisplay.series;
+             labels = dataToDisplay.labels;
+             categories = null;
         } else {
-            categories = dataToDisplay.labels;
+             series = [{
+                name: title,
+                data: dataToDisplay.data
+            }];
+             labels = selectedChartType === 'doughnut' ? dataToDisplay.labels : null;
+             categories = selectedChartType !== 'doughnut' ? dataToDisplay.labels : null;
         }
 
         const options = {
             chart: {
                 type: apexChartType,
-                height: 350,
-                toolbar: { show: false }
+                height: 350
             },
             series: series,
             labels: labels,
@@ -117,8 +119,13 @@ document.addEventListener('DOMContentLoaded', function() {
             options.labels = dataToDisplay.labels;
             delete options.xaxis;
             delete options.yaxis;
+        } else if (selectedChartType === 'radar') {
+            options.xaxis = {
+                categories: dataToDisplay.labels,
+            };
+            delete options.labels;
         }
-        
+
         if (mainChart) {
             mainChart.updateOptions(options);
         } else {
@@ -131,25 +138,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateChartTypeOptions() {
         const selectedData = dataSelector.value;
-        const barOption = chartTypeSelector.querySelector('option[value="bar"]');
-        const doughnutOption = chartTypeSelector.querySelector('option[value="doughnut"]');
-        const lineOption = chartTypeSelector.querySelector('option[value="line"]');
+        const availableChartTypes = {
+            'evolution': ['line', 'bar'],
+            'repartition': ['bar', 'doughnut'],
+            'comparaison': ['line', 'bar'],
+            'funnel': ['bar'],
+            'radar': ['radar']
+        };
 
-        doughnutOption.disabled = true;
-        lineOption.disabled = true;
-        barOption.disabled = true;
-        
-        if (selectedData === 'evolution') {
-            lineOption.disabled = false;
-            barOption.disabled = false;
-        } else if (selectedData === 'repartition') {
-            doughnutOption.disabled = false;
-            barOption.disabled = false;
-        } else if (selectedData === 'comparaison') {
-            lineOption.disabled = false;
-            barOption.disabled = false;
-        }
-        
+        const availableOptions = availableChartTypes[selectedData];
+        chartTypeSelector.innerHTML = '';
+        availableOptions.forEach(option => {
+            const el = document.createElement('option');
+            el.value = option;
+            el.textContent = option.charAt(0).toUpperCase() + option.slice(1);
+            if (option === 'doughnut') {
+                el.textContent = 'Graphique en secteurs';
+            } else if (option === 'funnel') {
+                 el.textContent = 'Graphique entonnoir';
+            } else if (option === 'radar') {
+                 el.textContent = 'Graphique radar';
+            }
+            chartTypeSelector.appendChild(el);
+        });
+
         if (chartTypeSelector.options[chartTypeSelector.selectedIndex].disabled) {
             const firstAvailable = chartTypeSelector.querySelector('option:not([disabled])');
             if (firstAvailable) {
@@ -195,7 +207,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     chartData = {
                         evolution: data.evolution,
                         repartition: data.repartition,
-                        comparaison: { labels: data.caisses.map(c => c.nom), data: data.caisses.map(c => c.total_ventes) }
+                        comparaison: { labels: data.caisses.map(c => c.nom), data: data.caisses.map(c => c.total_ventes) },
+                        funnel: data.funnel,
+                        radar: data.radar
                     };
                     updateKpi(kpiData);
                     updateChartTypeOptions();
@@ -222,7 +236,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Événements
-
     kpiCards.forEach(card => {
         card.addEventListener('click', function() {
             const kpi = this.dataset.kpi;

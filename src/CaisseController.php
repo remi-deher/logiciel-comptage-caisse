@@ -221,6 +221,28 @@ class CaisseController {
             $evolution_dates[] = (new DateTime($row['date']))->format('d/m/Y');
             $evolution_ventes[] = floatval($row['total_ventes']);
         }
+        
+        // NOUVEAU: Données pour le graphique en entonnoir
+        $funnel_data = [
+            'labels' => ['Ventes', 'Rétrocessions', 'Total réel'],
+            'data' => [
+                $total_ventes,
+                $total_retrocession,
+                $total_ventes - $total_retrocession
+            ]
+        ];
+
+        // NOUVEAU: Données pour le graphique radar
+        $radar_labels = array_keys($this->noms_caisses);
+        $radar_data = [];
+        $radar_data_ventes = array_column($caisses_data, 'total_ventes');
+        $radar_data_ventes_moyennes = array_column($caisses_data, 'moyenne_ventes');
+        $radar_data_retrocession = array_column($caisses_data, 'total_retrocession');
+
+        $radar_data[] = ['name' => 'Ventes totales', 'data' => $radar_data_ventes];
+        $radar_data[] = ['name' => 'Ventes moyennes', 'data' => $radar_data_ventes_moyennes];
+        $radar_data[] = ['name' => 'Rétrocessions', 'data' => $radar_data_retrocession];
+
 
         echo json_encode([
             'repartition' => [
@@ -237,6 +259,11 @@ class CaisseController {
             'evolution' => [
                 'labels' => $evolution_dates,
                 'data' => $evolution_ventes
+            ],
+            'funnel' => $funnel_data,
+            'radar' => [
+                'labels' => $radar_labels,
+                'series' => $radar_data
             ]
         ]);
     }

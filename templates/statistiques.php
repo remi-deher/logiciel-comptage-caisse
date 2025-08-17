@@ -14,7 +14,6 @@ require_once __DIR__ . '/partials/navbar.php';
         <p class="subtitle">Analyse des données de comptage de caisse</p>
     </header>
 
-    <!-- Section des filtres de recherche -->
     <div class="card filter-section">
         <h3>Filtres de recherche</h3>
         <div class="filter-buttons">
@@ -37,14 +36,12 @@ require_once __DIR__ . '/partials/navbar.php';
         </form>
     </div>
 
-    <!-- Boutons d'exportation -->
     <div class="export-buttons-container">
         <button id="print-stats-btn" class="export-btn"><i class="fa-solid fa-print"></i> Imprimer</button>
         <button id="pdf-stats-btn" class="export-btn"><i class="fa-solid fa-file-pdf"></i> Exporter en PDF</button>
         <button id="excel-stats-btn" class="export-btn"><i class="fa-solid fa-file-csv"></i> Exporter en CSV</button>
     </div>
 
-    <!-- Indicateurs de performance (KPI) -->
     <div class="card section-kpi">
         <h3>Indicateurs de performance (KPI)</h3>
         <div class="kpi-container">
@@ -67,7 +64,6 @@ require_once __DIR__ . '/partials/navbar.php';
         </div>
     </div>
     
-    <!-- Section pour les graphiques -->
     <div class="card section-charts">
         <div class="chart-controls">
             <h3>Graphiques d'analyse</h3>
@@ -77,6 +73,8 @@ require_once __DIR__ . '/partials/navbar.php';
                     <option value="evolution" selected>Évolution des ventes par jour</option>
                     <option value="repartition">Répartition des ventes par caisse</option>
                     <option value="comparaison">Comparaison des ventes par caisse</option>
+                    <option value="funnel">Flux de transactions (Entonnoir)</option>
+                    <option value="radar">Comparaison des KPI (Radar)</option>
                 </select>
             </div>
             <div class="input-group">
@@ -85,6 +83,8 @@ require_once __DIR__ . '/partials/navbar.php';
                     <option value="line" selected>Graphique linéaire</option>
                     <option value="bar">Graphique à barres</option>
                     <option value="doughnut">Graphique en secteurs</option>
+                    <option value="funnel">Graphique entonnoir</option>
+                    <option value="radar">Graphique radar</option>
                 </select>
             </div>
         </div>
@@ -97,7 +97,6 @@ require_once __DIR__ . '/partials/navbar.php';
     </div>
 </div>
 
-<!-- Fenêtre Modale pour les détails des KPI -->
 <div id="details-modal" class="modal">
     <div class="modal-content">
         <span class="modal-close">&times;</span>
