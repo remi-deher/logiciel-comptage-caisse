@@ -1,5 +1,5 @@
 // Fichier : public/js/stats.js
-// Logique pour la page de statistiques.
+// Logique pour la page de statistiques en utilisant ApexCharts.
 
 document.addEventListener('DOMContentLoaded', function() {
     let kpiData = {};
@@ -36,11 +36,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const selectedData = dataSelector.value;
-        let selectedChartType = chartTypeSelector.value;
+        const selectedChartType = chartTypeSelector.value;
         const dataToDisplay = chartData[selectedData];
         let title = dataSelector.options[dataSelector.selectedIndex].text;
         
-        if (!dataToDisplay || !dataToDisplay.labels || dataToDisplay.data.length === 0) {
+        if (!dataToDisplay || (dataToDisplay.labels && dataToDisplay.labels.length === 0)) {
             if (mainChart) {
                 mainChart.destroy();
                 mainChart = null;
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
             chartTitleElement.textContent = title + " (pas de données)";
             return;
         }
-
+        
         let apexChartType = selectedChartType;
         if (selectedChartType === 'doughnut') {
             apexChartType = 'pie';
@@ -57,18 +57,22 @@ document.addEventListener('DOMContentLoaded', function() {
         let series;
         let labels;
         let categories;
-        
+
         if (selectedData === 'radar') {
-             series = dataToDisplay.series;
-             labels = dataToDisplay.labels;
-             categories = null;
+            series = dataToDisplay.series;
+            labels = dataToDisplay.labels;
+            categories = null;
+        } else if (selectedChartType === 'doughnut') {
+            series = dataToDisplay.data;
+            labels = dataToDisplay.labels;
+            categories = null;
         } else {
-             series = [{
+            series = [{
                 name: title,
                 data: dataToDisplay.data
             }];
-             labels = selectedChartType === 'doughnut' ? dataToDisplay.labels : null;
-             categories = selectedChartType !== 'doughnut' ? dataToDisplay.labels : null;
+            categories = dataToDisplay.labels;
+            labels = null;
         }
 
         const options = {
@@ -113,17 +117,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         };
-        
-        if (selectedChartType === 'pie') {
-            options.series = dataToDisplay.data;
-            options.labels = dataToDisplay.labels;
+
+        // Gérer les cas spécifiques
+        if (selectedChartType === 'doughnut' || selectedChartType === 'funnel' || selectedChartType === 'pie') {
             delete options.xaxis;
             delete options.yaxis;
-        } else if (selectedChartType === 'radar') {
-            options.xaxis = {
-                categories: dataToDisplay.labels,
-            };
-            delete options.labels;
         }
 
         if (mainChart) {
@@ -142,7 +140,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'evolution': ['line', 'bar'],
             'repartition': ['bar', 'doughnut'],
             'comparaison': ['line', 'bar'],
-            'funnel': ['bar'],
+            'funnel': ['bar'], // ApexCharts n'a pas de type 'funnel', 'bar' est la meilleure alternative
             'radar': ['radar']
         };
 
@@ -162,18 +160,15 @@ document.addEventListener('DOMContentLoaded', function() {
             chartTypeSelector.appendChild(el);
         });
 
-        if (chartTypeSelector.options[chartTypeSelector.selectedIndex].disabled) {
-            const firstAvailable = chartTypeSelector.querySelector('option:not([disabled])');
-            if (firstAvailable) {
-                chartTypeSelector.value = firstAvailable.value;
-            }
+        const firstAvailable = chartTypeSelector.querySelector('option');
+        if (firstAvailable) {
+            chartTypeSelector.value = firstAvailable.value;
         }
         updateChart();
     }
 
 
     function updateKpi(kpis) {
-        // Ajout de vérifications pour éviter les erreurs "Cannot set properties of null"
         const totalComptagesEl = document.getElementById('total-comptages');
         if(totalComptagesEl) totalComptagesEl.textContent = kpis.total_comptages;
         
@@ -220,7 +215,6 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Erreur lors de la récupération des données de statistiques:', error);
                 
-                // Mettre à jour les éléments si ils existent
                 const totalComptagesEl = document.getElementById('total-comptages');
                 if(totalComptagesEl) totalComptagesEl.textContent = "Erreur";
 
@@ -235,7 +229,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    // Événements
     kpiCards.forEach(card => {
         card.addEventListener('click', function() {
             const kpi = this.dataset.kpi;

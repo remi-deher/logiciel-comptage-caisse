@@ -164,11 +164,13 @@ class CaisseController {
         $repartition_labels = [];
         $repartition_data = [];
         $caisses_data = [];
-
+        $sum_cols_all_caisse_ventes = [];
+        
         foreach ($this->noms_caisses as $i => $nom_caisse) {
             $sum_cols_ventes[] = "SUM(c{$i}_ventes)";
             $sum_cols_retrocession[] = "SUM(c{$i}_retrocession)";
             $repartition_labels[] = $nom_caisse;
+            $sum_cols_all_caisse_ventes[] = "c{$i}_ventes";
 
             $stmt = $this->pdo->prepare("SELECT SUM(c{$i}_ventes) AS total_ventes, AVG(c{$i}_ventes) AS moyenne_ventes, SUM(c{$i}_retrocession) AS total_retrocession FROM comptages" . $sql_where);
             $stmt->execute($bind_values);
@@ -185,6 +187,7 @@ class CaisseController {
 
         $sum_cols_ventes_str = implode(' + ', $sum_cols_ventes);
         $sum_cols_retrocession_str = implode(' + ', $sum_cols_retrocession);
+        $sum_cols_all_caisse_ventes_str = implode(' + ', $sum_cols_all_caisse_ventes);
         
         $stmt_total_comptages = $this->pdo->prepare("SELECT COUNT(*) FROM comptages" . $sql_where);
         $stmt_total_comptages->execute($bind_values);
@@ -231,7 +234,7 @@ class CaisseController {
                 $total_ventes - $total_retrocession
             ]
         ];
-
+        
         // NOUVEAU: Données pour le graphique radar
         $radar_labels = array_keys($this->noms_caisses);
         $radar_data = [];
