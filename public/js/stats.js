@@ -1,5 +1,6 @@
 // Fichier : public/js/stats.js
 // Logique pour la page de statistiques en utilisant ApexCharts.
+// Mise à jour pour le nouveau schéma de données.
 
 document.addEventListener('DOMContentLoaded', function() {
     let kpiData = {};
@@ -61,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (selectedData === 'radar') {
             series = dataToDisplay.series;
             labels = dataToDisplay.labels;
-            categories = null;
+            categories = dataToDisplay.labels;
         } else if (selectedChartType === 'doughnut') {
             series = dataToDisplay.data;
             labels = dataToDisplay.labels;
@@ -199,10 +200,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data && data.kpis && data.caisses) {
                     kpiData = data.kpis;
                     caisses = data.caisses;
+                    
+                    // Mise à jour de la structure des données pour correspondre au nouveau format
                     chartData = {
-                        evolution: data.evolution,
-                        repartition: data.repartition,
-                        comparaison: { labels: data.caisses.map(c => c.nom), data: data.caisses.map(c => c.total_ventes) },
+                        evolution: {
+                            labels: data.evolution.labels,
+                            data: data.evolution.data
+                        },
+                        repartition: {
+                            labels: data.repartition.labels,
+                            data: data.repartition.data
+                        },
+                        comparaison: { 
+                            labels: data.caisses.map(c => c.nom), 
+                            data: data.caisses.map(c => c.total_ventes) 
+                        },
                         funnel: data.funnel,
                         radar: data.radar
                     };

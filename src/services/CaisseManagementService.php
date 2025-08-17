@@ -17,63 +17,49 @@ class CaisseManagementService {
      * Ajoute une nouvelle caisse à la base de données et au fichier de configuration.
      */
     public function addCaisse($new_name) {
-        global $noms_caisses, $denominations;
-        
         if (empty($new_name)) {
             $_SESSION['admin_error'] = "Le nom de la nouvelle caisse ne peut pas être vide.";
             return;
         }
-        
+
         try {
-            $stmt = $this->pdo->query("SHOW COLUMNS FROM comptages");
-            $columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            
-            $existing_ids = [];
-            foreach ($columns as $column) {
-                if (preg_match('/^c(\d+)_/', $column, $matches)) {
-                    $existing_ids[] = (int)$matches[1];
-                }
-            }
-            
-            $new_id = empty($existing_ids) ? 1 : max($existing_ids) + 1;
+            // Étape 1 : Ajouter la nouvelle caisse à la table 'caisses'
+            $stmt = $this->pdo->prepare("INSERT INTO caisses (nom_caisse) VALUES (?)");
+            $stmt->execute([$new_name]);
+            $new_id = $this->pdo->lastInsertId();
 
-            if (!is_int($new_id) || $new_id <= 0) {
-                throw new Exception("Erreur critique lors de la génération de l'ID de la nouvelle caisse.");
-            }
+            // Étape 2 : Mettre à jour la configuration pour qu'elle inclue la nouvelle caisse
+            global $noms_caisses;
+            $noms_caisses[$new_id] = $new_name;
+            $result = $this->configService->updateConfigFile(['noms_caisses' => $noms_caisses]);
 
-            $cols_to_add = [];
-            $cols_to_add[] = "c{$new_id}_fond_de_caisse DECIMAL(10, 2) DEFAULT 0";
-            $cols_to_add[] = "c{$new_id}_ventes DECIMAL(10, 2) DEFAULT 0";
-            $cols_to_add[] = "c{$new_id}_retrocession DECIMAL(10, 2) DEFAULT 0";
-            foreach ($denominations as $list) {
-                foreach (array_keys($list) as $name) {
-                    $cols_to_add[] = "c{$new_id}_{$name} INT DEFAULT 0";
-                }
-            }
-            
-            foreach($cols_to_add as $col) {
-                $this->pdo->exec("ALTER TABLE comptages ADD COLUMN {$col}");
-            }
+            $_SESSION['admin_message'] = $result['success'] ? "Caisse '{$new_name}' ajoutée." : $result['message'];
 
         } catch (\Exception $e) {
             $_SESSION['admin_error'] = "Erreur BDD lors de l'ajout de la caisse : " . $e->getMessage();
-            return;
         }
-
-        $noms_caisses[$new_id] = $new_name;
-        $result = $this->configService->updateConfigFile(['noms_caisses' => $noms_caisses]);
-        $_SESSION['admin_message'] = $result['success'] ? "Caisse '{$new_name}' ajoutée." : $result['message'];
     }
 
     /**
-     * Renomme une caisse existante dans le fichier de configuration.
+     * Renomme une caisse existante dans la base de données et le fichier de configuration.
      */
     public function renameCaisse($id, $new_name) {
-        global $noms_caisses;
-        if ($id > 0 && !empty($new_name) && isset($noms_caisses[$id])) {
-            $noms_caisses[$id] = $new_name;
-            $result = $this->configService->updateConfigFile(['noms_caisses' => $noms_caisses]);
-            $_SESSION['admin_message'] = $result['success'] ? "Caisse renommée." : $result['message'];
+        if ($id > 0 && !empty($new_name)) {
+            try {
+                // Étape 1 : Mettre à jour la table 'caisses'
+                $stmt = $this->pdo->prepare("UPDATE caisses SET nom_caisse = ? WHERE id = ?");
+                $stmt->execute([$new_name, intval($id)]);
+
+                // Étape 2 : Mettre à jour la configuration
+                global $noms_caisses;
+                $noms_caisses[intval($id)] = $new_name;
+                $result = $this->configService->updateConfigFile(['noms_caisses' => $noms_caisses]);
+
+                $_SESSION['admin_message'] = $result['success'] ? "Caisse renommée." : $result['message'];
+
+            } catch (\Exception $e) {
+                $_SESSION['admin_error'] = "Erreur BDD lors du renommage de la caisse : " . $e->getMessage();
+            }
         } else {
             $_SESSION['admin_error'] = "Données invalides pour le renommage.";
         }
@@ -83,33 +69,24 @@ class CaisseManagementService {
      * Supprime une caisse de la base de données et du fichier de configuration.
      */
     public function deleteCaisse($id) {
-        global $noms_caisses, $denominations;
-        if ($id > 0 && isset($noms_caisses[$id])) {
+        if ($id > 0) {
             try {
-                $cols_to_drop = [];
-                $cols_to_drop[] = "c{$id}_fond_de_caisse";
-                $cols_to_drop[] = "c{$id}_ventes";
-                $cols_to_drop[] = "c{$id}_retrocession";
-                
-                foreach ($denominations as $list) {
-                    foreach (array_keys($list) as $name) {
-                        $cols_to_drop[] = "c{$id}_{$name}";
-                    }
-                }
+                // Étape 1 : Supprimer la caisse de la table 'caisses'
+                // La suppression en cascade gérera les entrées correspondantes dans comptage_details
+                $stmt = $this->pdo->prepare("DELETE FROM caisses WHERE id = ?");
+                $stmt->execute([intval($id)]);
 
-                $sql = "ALTER TABLE comptages DROP COLUMN " . implode(', DROP COLUMN ', $cols_to_drop);
-                $this->pdo->exec($sql);
+                // Étape 2 : Supprimer la caisse du fichier de configuration
+                global $noms_caisses;
+                $deleted_name = $noms_caisses[intval($id)] ?? 'Inconnu';
+                unset($noms_caisses[intval($id)]);
+                $result = $this->configService->updateConfigFile(['noms_caisses' => $noms_caisses]);
+
+                $_SESSION['admin_message'] = $result['success'] ? "Caisse '{$deleted_name}' et toutes ses données ont été supprimées." : $result['message'];
 
             } catch (\Exception $e) {
-                $_SESSION['admin_error'] = "Erreur BDD lors de la suppression des colonnes de la caisse : " . $e->getMessage();
-                return;
+                $_SESSION['admin_error'] = "Erreur BDD lors de la suppression de la caisse : " . $e->getMessage();
             }
-            
-            $deleted_name = $noms_caisses[$id];
-            unset($noms_caisses[$id]);
-
-            $result = $this->configService->updateConfigFile(['noms_caisses' => $noms_caisses]);
-            $_SESSION['admin_message'] = $result['success'] ? "Caisse '{$deleted_name}' et toutes ses données ont été supprimées." : $result['message'];
         } else {
             $_SESSION['admin_error'] = "ID de caisse invalide.";
         }

@@ -1,4 +1,5 @@
 // Fichier JavaScript pour la page d'historique.
+// Mise à jour pour fonctionner avec le nouveau schéma normalisé de la base de données.
 
 document.addEventListener('DOMContentLoaded', function() {
     const historyPage = document.getElementById('history-page');
@@ -40,25 +41,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 const comptageData = JSON.parse(card.dataset.comptage);
                 const caisseId = detailsButton.dataset.caisseId;
                 const caisseNom = detailsButton.dataset.caisseNom;
+                const caisseDetails = comptageData.caisses_data[caisseId];
                 
                 let html = `<div class="modal-header"><h3>Détails pour : ${caisseNom}</h3><div class="modal-actions"><button class="action-btn modal-export-pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button><button class="action-btn modal-export-excel"><i class="fa-solid fa-file-csv"></i> Excel</button></div></div>`;
                 html += `<p><strong>Nom du comptage :</strong> ${comptageData.nom_comptage}</p>`;
                 html += '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead><tbody>';
 
                 let totalCaisse = 0;
-                if (globalConfig.denominations) {
-                    for (const [name, value] of Object.entries(globalConfig.denominations.billets)) {
-                        const quantite = comptageData[`c${caisseId}_${name}`] || 0;
-                        const totalLigne = quantite * value;
-                        totalCaisse += totalLigne;
-                        html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
-                    }
-                    for (const [name, value] of Object.entries(globalConfig.denominations.pieces)) {
-                        const quantite = comptageData[`c${caisseId}_${name}`] || 0;
-                        const totalLigne = quantite * value;
-                        totalCaisse += totalLigne;
-                        const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
-                        html += `<tr><td>Pièce de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                if (globalConfig.denominations && caisseDetails) {
+                    for (const type in globalConfig.denominations) {
+                        for (const [name, value] of Object.entries(globalConfig.denominations[type])) {
+                            const quantite = caisseDetails.denominations[name] || 0;
+                            const totalLigne = quantite * value;
+                            totalCaisse += totalLigne;
+                            const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+                            html += `<tr><td>${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                        }
                     }
                 }
                 html += '</tbody></table>';
@@ -81,27 +79,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 let summaryTotal = 0;
 
                 if (globalConfig.nomsCaisses) {
-                    for (const caisseId in globalConfig.nomsCaisses) {
+                    for (const caisseId in comptageData.caisses_data) {
                         const caisseNom = globalConfig.nomsCaisses[caisseId];
+                        const caisseDetails = comptageData.caisses_data[caisseId];
                         html += `<h4 class="modal-table-title">${caisseNom}</h4>`;
                         html += '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead><tbody>';
 
                         let totalCaisse = 0;
                         if (globalConfig.denominations) {
-                            for (const [name, value] of Object.entries(globalConfig.denominations.billets)) {
-                                const quantite = comptageData[`c${caisseId}_${name}`] || 0;
-                                summaryQuantities[name] = (summaryQuantities[name] || 0) + quantite;
-                                const totalLigne = quantite * value;
-                                totalCaisse += totalLigne;
-                                html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
-                            }
-                            for (const [name, value] of Object.entries(globalConfig.denominations.pieces)) {
-                                const quantite = comptageData[`c${caisseId}_${name}`] || 0;
-                                summaryQuantities[name] = (summaryQuantities[name] || 0) + quantite;
-                                const totalLigne = quantite * value;
-                                totalCaisse += totalLigne;
-                                const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
-                                html += `<tr><td>Pièce de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                             for (const type in globalConfig.denominations) {
+                                for (const [name, value] of Object.entries(globalConfig.denominations[type])) {
+                                    const quantite = caisseDetails.denominations[name] || 0;
+                                    summaryQuantities[name] = (summaryQuantities[name] || 0) + quantite;
+                                    const totalLigne = quantite * value;
+                                    totalCaisse += totalLigne;
+                                    const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+                                    html += `<tr><td>${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                                }
                             }
                         }
                         html += '</tbody></table>';
@@ -112,18 +106,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     html += '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité Totale</th><th>Total</th></tr></thead><tbody>';
 
                     if (globalConfig.denominations) {
-                        for (const [name, value] of Object.entries(globalConfig.denominations.billets)) {
-                            const quantite = summaryQuantities[name] || 0;
-                            const totalLigne = quantite * value;
-                            summaryTotal += totalLigne;
-                            html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
-                        }
-                        for (const [name, value] of Object.entries(globalConfig.denominations.pieces)) {
-                            const quantite = summaryQuantities[name] || 0;
-                            const totalLigne = quantite * value;
-                            summaryTotal += totalLigne;
-                            const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
-                            html += `<tr><td>Pièce de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                        for (const type in globalConfig.denominations) {
+                            for (const [name, value] of Object.entries(globalConfig.denominations[type])) {
+                                const quantite = summaryQuantities[name] || 0;
+                                const totalLigne = quantite * value;
+                                summaryTotal += totalLigne;
+                                const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+                                html += `<tr><td>${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                            }
                         }
                     }
                     html += '</tbody></table>';
@@ -247,6 +237,41 @@ document.addEventListener('DOMContentLoaded', function() {
         chart.render();
     }
     
+    // Fonction de calcul mise à jour pour le nouveau schéma
+    function calculateResults(comptageData) {
+        const results = { caisses: {}, combines: { total_compté: 0, recette_reelle: 0, ecart: 0, recette_theorique: 0 }};
+        const noms_caisses = globalConfig.nomsCaisses;
+        const denominations = globalConfig.denominations;
+        
+        for (const caisseId in comptageData.caisses_data) {
+            const caisseData = comptageData.caisses_data[caisseId];
+            let total_compte = 0;
+            
+            if (denominations) {
+                for (const type in denominations) {
+                    for (const name in denominations[type]) {
+                        total_compte += (parseFloat(caisseData.denominations[name]) || 0) * denominations[type][name];
+                    }
+                }
+            }
+            
+            const fond_de_caisse = parseFloat(caisseData.fond_de_caisse) || 0;
+            const ventes = parseFloat(caisseData.ventes) || 0;
+            const retrocession = parseFloat(caisseData.retrocession) || 0;
+            const recette_theorique = ventes + retrocession;
+            const recette_reelle = total_compte - fond_de_caisse;
+            const ecart = recette_reelle - recette_theorique;
+
+            results.caisses[caisseId] = { total_compte, fond_de_caisse, ventes, retrocession, recette_theorique, recette_reelle, ecart };
+            results.combines.total_compté += total_compte;
+            results.combines.recette_reelle += recette_reelle;
+            results.combines.recette_theorique += recette_theorique;
+            results.combines.ecart += ecart;
+        }
+
+        return results;
+    }
+    
     function renderGlobalChart(historique) {
         if (!globalChartContainer) return;
         
@@ -262,6 +287,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const sortedHistorique = historique.sort((a, b) => new Date(a.date_comptage) - new Date(b.date_comptage));
         const dates = sortedHistorique.map(c => new Date(c.date_comptage).toLocaleDateString('fr-FR'));
+        
+        // Calcule les totaux globaux et les écarts
         const ventesTotales = sortedHistorique.map(c => calculateResults(c).combines.recette_reelle);
         const ecartsGlobaux = sortedHistorique.map(c => calculateResults(c).combines.ecart);
 
@@ -312,8 +339,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         historique.forEach(comptage => {
             const calculated = calculateResults(comptage);
-            const caisseVentesData = Object.entries(globalConfig.nomsCaisses).map(([num, nom]) => {
-                return calculated.caisses[num]?.ventes || 0;
+            const caisseVentesData = Object.entries(comptage.caisses_data).map(([caisseId, data]) => {
+                return data.ventes;
             });
 
             const cardDiv = document.createElement('div');
@@ -342,8 +369,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="history-card-footer no-export">
                     <button class="action-btn-small details-all-btn"><i class="fa-solid fa-layer-group"></i> Ensemble</button>
-                    ${Object.entries(globalConfig.nomsCaisses).map(([num, nom]) => `
-                        <button class="action-btn-small details-btn" data-caisse-id="${num}" data-caisse-nom="${nom}">
+                    ${Object.entries(globalConfig.nomsCaisses).map(([caisseId, nom]) => `
+                        <button class="action-btn-small details-btn" data-caisse-id="${caisseId}" data-caisse-nom="${nom}">
                             <i class="fa-solid fa-list-ul"></i> ${nom}
                         </button>
                     `).join('')}
@@ -396,38 +423,6 @@ document.addEventListener('DOMContentLoaded', function() {
         paginationNav.innerHTML = paginationHtml;
     }
 
-    function calculateResults(data_row) {
-        const results = { caisses: {}, combines: { total_compté: 0, recette_reelle: 0, ecart: 0, recette_theorique: 0 }};
-        const noms_caisses = globalConfig.nomsCaisses;
-        const denominations = globalConfig.denominations;
-        
-        for (const i in noms_caisses) {
-            let total_compte = 0;
-            if (denominations) {
-                for (const list in denominations) {
-                    for (const name in denominations[list]) {
-                        total_compte += (parseFloat(data_row[`c${i}_${name}`]) || 0) * denominations[list][name];
-                    }
-                }
-            }
-            
-            const fond_de_caisse = parseFloat(data_row[`c${i}_fond_de_caisse`]) || 0;
-            const ventes = parseFloat(data_row[`c${i}_ventes`]) || 0;
-            const retrocession = parseFloat(data_row[`c${i}_retrocession`]) || 0;
-            const recette_theorique = ventes + retrocession;
-            const recette_reelle = total_compte - fond_de_caisse;
-            const ecart = recette_reelle - recette_theorique;
-
-            results.caisses[i] = { total_compte, fond_de_caisse, ventes, retrocession, recette_theorique, recette_reelle, ecart };
-            results.combines.total_compté += total_compte;
-            results.combines.recette_reelle += recette_reelle;
-            results.combines.recette_theorique += recette_theorique;
-            results.combines.ecart += ecart;
-        }
-
-        return results;
-    }
-
     function loadHistoriqueData(params) {
         const query = new URLSearchParams(params).toString();
         fetch(`index.php?action=get_historique_data&${query}`)
@@ -437,7 +432,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderPagination(data.page_courante, data.pages_totales);
                 renderGlobalChart(data.historique_complet);
                 
-                // NOUVEAU : Met à jour les boutons de filtre rapide
+                // Met à jour les boutons de filtre rapide
                 updateQuickFilterButtons(params);
             })
             .catch(error => {
@@ -586,5 +581,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const initialParams = Object.fromEntries(new URLSearchParams(window.location.search).entries());
     loadHistoriqueData(initialParams);
-
 });

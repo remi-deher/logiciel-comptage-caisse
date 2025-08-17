@@ -4,11 +4,13 @@
 
 $page_css = 'stats.css';
 $page_js = 'stats.js';
+// NOUVEAU : Récupération du symbole de la devise pour l'affichage
+$currency_symbol = defined('APP_CURRENCY_SYMBOL') ? APP_CURRENCY_SYMBOL : '€';
 require_once __DIR__ . '/partials/header.php';
 require_once __DIR__ . '/partials/navbar.php';
 ?>
 
-<div class="container">
+<div class="container" id="stats-page">
     <header class="page-header">
         <h1>Tableau de bord des statistiques</h1>
         <p class="subtitle">Analyse des données de comptage de caisse</p>
@@ -108,6 +110,7 @@ require_once __DIR__ . '/partials/navbar.php';
         <div id="modal-details-content"></div>
     </div>
 </div>
+<div id="stats-data" data-config='{"currencySymbol": "<?= htmlspecialchars($currency_symbol) ?>"}' style="display:none"></div>
 
 <?php
 require_once __DIR__ . '/partials/footer.php';

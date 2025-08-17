@@ -1,37 +1,63 @@
 <?php
-// src/Utils.php
+// src/Utils.php - Version mise à jour pour le schéma normalisé.
 
 /**
  * Calcule tous les totaux pour les caisses et les totaux combinés à partir d'un tableau de données.
+ * Cette fonction est maintenant capable de gérer une structure de données normalisée.
  *
- * @param array $data_row        Les données d'un comptage provenant de la BDD.
- * @param int   $nombre_caisses  Le nombre total de caisses.
- * @param array $denominations   Le tableau des billets et pièces.
- * @return array                 Un tableau structuré avec les résultats.
+ * @param array $data_rows Les données des comptages provenant de la BDD.
+ * @return array Un tableau structuré avec les résultats.
  */
-function calculate_results_from_data($data_row, $nombre_caisses, $denominations) {
-    $results = ['caisses' => [], 'combines' => ['total_compté' => 0, 'recette_reelle' => 0, 'ecart' => 0, 'recette_theorique' => 0]];
-    for ($i = 1; $i <= $nombre_caisses; $i++) {
-        $total_compté = 0;
-        foreach ($denominations as $list) {
-            foreach ($list as $name => $value) {
-                $total_compté += floatval($data_row["c{$i}_{$name}"] ?? 0) * $value;
+function calculate_results_from_data($data_rows) {
+    $results = [
+        'caisses' => [], 
+        'combines' => [
+            'total_compté' => 0, 
+            'recette_reelle' => 0, 
+            'ecart' => 0, 
+            'recette_theorique' => 0
+        ]
+    ];
+    
+    // On s'assure que la variable globale existe
+    global $denominations;
+    if (!isset($denominations)) {
+        $denominations = [];
+    }
+
+    foreach ($data_rows as $caisse_id => $caisse_data) {
+        $total_compte = 0;
+        
+        // On recalcule le total compté en utilisant les dénominations
+        foreach ($caisse_data['denominations'] as $denom) {
+            $valeur = 0;
+            // Recherche de la valeur de la dénomination
+            foreach ($denominations as $list) {
+                if (isset($list[$denom['denomination_nom']])) {
+                    $valeur = floatval($list[$denom['denomination_nom']]);
+                    break;
+                }
             }
+            $total_compte += floatval($denom['quantite']) * $valeur;
         }
-        $fond_de_caisse = floatval($data_row["c{$i}_fond_de_caisse"] ?? 0);
-        $ventes = floatval($data_row["c{$i}_ventes"] ?? 0);
-        $retrocession = floatval($data_row["c{$i}_retrocession"] ?? 0);
+
+        $fond_de_caisse = floatval($caisse_data['fond_de_caisse'] ?? 0);
+        $ventes = floatval($caisse_data['ventes'] ?? 0);
+        $retrocession = floatval($caisse_data['retrocession'] ?? 0);
         $recette_theorique = $ventes + $retrocession;
-        $recette_reelle = $total_compté - $fond_de_caisse;
+        $recette_reelle = $total_compte - $fond_de_caisse;
         $ecart = $recette_theorique > 0 ? $recette_reelle - $recette_theorique : 0;
-        $results['caisses'][$i] = compact('total_compté', 'fond_de_caisse', 'ventes', 'retrocession', 'recette_theorique', 'recette_reelle', 'ecart');
-        $results['combines']['total_compté'] += $total_compté;
+        
+        $results['caisses'][$caisse_id] = compact('total_compte', 'fond_de_caisse', 'ventes', 'retrocession', 'recette_theorique', 'recette_reelle', 'ecart');
+        $results['combines']['total_compté'] += $total_compte;
         $results['combines']['recette_reelle'] += $recette_reelle;
         $results['combines']['recette_theorique'] += $recette_theorique;
         $results['combines']['ecart'] += $ecart;
     }
+    
     return $results;
 }
+
 
 /**
  * Récupère une valeur numérique depuis un tableau, en gérant les chaînes vides et les virgules.
@@ -77,8 +103,7 @@ function format_date_fr($date_string) {
         if ($timestamp === false) return $date_string;
         $dayOfWeek = $days[date('w', $timestamp)];
         $dayOfMonth = date('j', $timestamp);
-        // Ligne corrigée ci-dessous
-        $month = $months[date('n', $timestamp) - 1]; // Correction: $timestamp au lieu de 'timestamp'
+        $month = $months[date('n', $timestamp) - 1];
         $year = date('Y', $timestamp);
         $time = date('H:i', $timestamp);
         return ucfirst($dayOfWeek) . ' ' . $dayOfMonth . ' ' . $month . ' ' . $year . ' à ' . $time;

@@ -4,9 +4,14 @@
 
 $page_js = 'history.js';
 $page_css = 'historique.css'; // Ajout de la feuille de style pour le rendu des graphiques
+
+// On récupère le symbole de la devise
+$currency_symbol = defined('APP_CURRENCY_SYMBOL') ? APP_CURRENCY_SYMBOL : '€';
+
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
-    'denominations' => $denominations ?? []
+    'denominations' => $denominations ?? [],
+    'currencySymbol' => $currency_symbol // NOUVEAU : On passe le symbole au JavaScript
 ]);
 
 require 'partials/header.php';

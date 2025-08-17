@@ -1,6 +1,7 @@
 /**
  * Module JavaScript pour la logique du calculateur de caisse.
  * Ce module gère les calculs, l'interface utilisateur et les sauvegardes.
+ * Version mise à jour pour le nouveau schéma de la base de données.
  */
 document.addEventListener('DOMContentLoaded', function() {
     const caisseForm = document.getElementById('caisse-form');
@@ -61,6 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function generateWithdrawalSuggestion(amountToWithdraw, currentCounts, denominations) {
         let remainingAmount = amountToWithdraw;
         const suggestions = {};
+        
         const allDenominations = [
             ...Object.entries(denominations.billets),
             ...Object.entries(denominations.pieces)
@@ -96,34 +98,39 @@ document.addEventListener('DOMContentLoaded', function() {
             const el = document.getElementById(id);
             if (el) el.textContent = value;
         };
-
+        
         for (const i of Object.keys(config.nomsCaisses)) {
             const getVal = (id) => parseFloat(document.getElementById(`${id}_${i}`)?.value.replace(',', '.') || 0) || 0;
+            const getInt = (id) => parseInt(document.getElementById(`${id}_${i}`)?.value || 0) || 0;
+            
             let totalCompte = 0;
             const currentCounts = {};
+
+            // Calcul des billets et pièces
             for (const type in config.denominations) {
                 for (const name in config.denominations[type]) {
-                    const count = getVal(name);
+                    const count = getInt(name);
                     const totalLigne = count * config.denominations[type][name];
                     updateElementText(`total_${name}_${i}`, formatEuros(totalLigne));
                     totalCompte += totalLigne;
                     currentCounts[name] = count;
                 }
             }
-
+            
             const fondDeCaisse = getVal('fond_de_caisse');
             const ventes = getVal('ventes');
             const retrocession = getVal('retrocession');
-            const recetteTheorique = ventes;
-            const recetteReelle = totalCompte - fondDeCaisse - retrocession;
+            const recetteTheorique = ventes + retrocession;
+            const recetteReelle = totalCompte - fondDeCaisse;
             const ecart = recetteReelle - recetteTheorique;
 
             caissesData[i] = { ecart, recetteReelle, currentCounts };
             totauxCombines.fdc += fondDeCaisse;
             totauxCombines.total += totalCompte;
             totauxCombines.recette += recetteReelle;
-            totauxCombines.theorique += recetteReelle;
+            totauxCombines.theorique += recetteTheorique;
             totauxCombines.ecart += ecart;
+            
             if (Math.abs(ecart) < 0.01) {
                 combinedRecetteForZeroEcart += recetteReelle;
             } else {
@@ -134,12 +141,16 @@ document.addEventListener('DOMContentLoaded', function() {
             updateElementText(`res-c${i}-total`, formatEuros(totalCompte));
             updateElementText(`res-c${i}-theorique`, formatEuros(recetteTheorique));
             updateElementText(`res-c${i}-recette`, formatEuros(recetteReelle));
+            
             const ecartEl = document.getElementById(`res-c${i}-ecart`);
             if (ecartEl) {
                 ecartEl.textContent = formatEuros(ecart);
                 ecartEl.parentElement.className = 'result-line total';
-                if (ecart > 0.001) ecartEl.parentElement.classList.add('ecart-positif');
-                if (ecart < -0.001) ecartEl.parentElement.classList.add('ecart-negatif');
+                if (ecart > 0.01) { // L'écart est-il positif ?
+                    ecartEl.parentElement.classList.add('ecart-positif');
+                } else if (ecart < -0.01) { // L'écart est-il négatif ?
+                    ecartEl.parentElement.classList.add('ecart-negatif');
+                }
             }
         }
 
@@ -151,8 +162,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (ecartTotalEl) {
             ecartTotalEl.textContent = formatEuros(totauxCombines.ecart);
             ecartTotalEl.parentElement.className = 'result-line total';
-            if (totauxCombines.ecart > 0.001) ecartTotalEl.parentElement.classList.add('ecart-positif');
-            if (totauxCombines.ecart < -0.001) ecartTotalEl.parentElement.classList.add('ecart-negatif');
+            if (totauxCombines.ecart > 0.01) {
+                ecartTotalEl.parentElement.classList.add('ecart-positif');
+            } else if (totauxCombines.ecart < -0.01) {
+                ecartTotalEl.parentElement.classList.add('ecart-negatif');
+            }
         }
 
         for (const i of Object.keys(config.nomsCaisses)) {
@@ -168,6 +182,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (wasActive) topEcartDisplay.classList.add('active');
                 topEcartExplanation.innerHTML = '';
                 suggestionAccordionContainer.innerHTML = '';
+                
+                // Débogage : Afficher la valeur de l'écart dans la console
+                console.log(`Caisse ${i} : Écart calculé = ${ecart}`);
+
                 if (Math.abs(ecart) < 0.01) {
                     topEcartDisplay.classList.add('ecart-ok');
                     let explanation = `<strong>Montant à retirer pour cette caisse :</strong> <strong>${formatEuros(recetteReelle)}</strong>.<br>`;
@@ -218,23 +236,17 @@ document.addEventListener('DOMContentLoaded', function() {
     function getFormStateAsString() {
         const state = {};
         
-        // Cible explicitement tous les champs de comptage
-        // en se basant sur la structure de la configuration des caisses.
         if (config.nomsCaisses && config.denominations) {
             for (const caisseId of Object.keys(config.nomsCaisses)) {
-                // Champs d'informations de caisse
                 const infoFields = ['fond_de_caisse', 'ventes', 'retrocession'];
                 for (const field of infoFields) {
                     const input = document.getElementById(`${field}_${caisseId}`);
-                    // NORMALISATION : Convertit la valeur en un nombre pour éviter les problèmes de formatage de chaîne
                     if (input) state[input.id] = parseFloat(input.value.replace(',', '.')) || 0;
                 }
 
-                // Champs de dénominations
                 for (const type in config.denominations) {
                     for (const denominationName in config.denominations[type]) {
                         const input = document.getElementById(`${denominationName}_${caisseId}`);
-                        // NORMALISATION : Convertit la valeur en un nombre pour éviter les problèmes de formatage de chaîne
                         if (input) state[input.id] = parseInt(input.value) || 0;
                     }
                 }
@@ -285,8 +297,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Initialisation ---
     calculateAllFull();
-    // Correction ici : Retarder la capture de l'état initial
-    // pour s'assurer que tous les scripts et le navigateur ont terminé leurs mises à jour.
     setTimeout(() => {
         initialState = getFormStateAsString();
     }, 0);
