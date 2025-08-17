@@ -151,12 +151,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         if (chartTypeSelector.options[chartTypeSelector.selectedIndex].disabled) {
-            if (lineOption && !lineOption.disabled) {
-                chartTypeSelector.value = 'line';
-            } else if (barOption && !barOption.disabled) {
-                chartTypeSelector.value = 'bar';
-            } else if (doughnutOption && !doughnutOption.disabled) {
-                chartTypeSelector.value = 'doughnut';
+            const firstAvailable = chartTypeSelector.querySelector('option:not([disabled])');
+            if (firstAvailable) {
+                chartTypeSelector.value = firstAvailable.value;
             }
         }
         updateChart();
