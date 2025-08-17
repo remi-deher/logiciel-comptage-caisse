@@ -29,10 +29,12 @@ require_once __DIR__ . '/../src/services/ConfigService.php';
 require_once __DIR__ . '/../src/services/UserService.php';
 require_once __DIR__ . '/../src/services/CaisseManagementService.php';
 require_once __DIR__ . '/../src/services/DatabaseMigrationService.php';
+require_once __DIR__ . '/../src/services/FilterService.php';
 // On charge les contrôleurs
 require_once __DIR__ . '/../src/CaisseController.php';
 require_once __DIR__ . '/../src/AdminController.php';
 require_once __DIR__ . '/../src/AuthController.php';
+require_once __DIR__ . '/../src/StatistiquesController.php';
 
 
 // Pour la compatibilité ascendante, on s'assure que la variable TPE existe
@@ -45,6 +47,7 @@ $pdo = Bdd::getPdo();
 $caisseController = new CaisseController($pdo, $noms_caisses, $denominations, $tpe_par_caisse);
 $adminController = new AdminController($pdo);
 $authController = new AuthController($pdo);
+$statistiquesController = new StatistiquesController($pdo, $noms_caisses, $denominations);
 
 $page = $_GET['page'] ?? 'calculateur';
 $action = $_REQUEST['action'] ?? null;
@@ -70,7 +73,7 @@ if ($ajax_action) {
             exit;
         case 'get_stats_data':
             // Nouvelle route pour récupérer les données de statistiques
-            $caisseController->getStatsData();
+            $statistiquesController->getStatsData();
             exit;
     }
 }
@@ -95,7 +98,7 @@ switch ($page) {
 
     case 'statistiques':
         // Nouvelle route pour la page de statistiques
-        $caisseController->statistiques();
+        $statistiquesController->statistiques();
         break;
 
     case 'login':

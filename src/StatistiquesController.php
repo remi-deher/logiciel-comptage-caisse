@@ -1,108 +1,154 @@
 <?php
 // src/StatistiquesController.php
-
 require_once 'Bdd.php';
-require_once 'services/CaisseManagementService.php';
+require_once 'Utils.php';
+require_once 'services/FilterService.php';
 
 class StatistiquesController {
-    
-    /**
-     * Affiche la page de statistiques avec les données des comptages.
-     * Cette méthode récupère les données de la base de données.
-     */
-    public function showStatsPage() {
-        // Connexion à la base de données en utilisant la méthode getPdo()
-        $db = Bdd::getPdo();
+    private $pdo;
+    private $noms_caisses;
+    private $denominations;
+    private $filterService;
 
-        // Récupère les données des statistiques depuis la base de données
-        $statsData = $this->getDataFromDatabase($db);
-
-        // On prépare les données pour les passer au JavaScript de manière sécurisée
-        // Note: Assurez-vous que les variables passées au template correspondent
-        //       à celles utilisées dans le code JavaScript de la vue.
-        $statsDataJson = json_encode($statsData);
-
-        // Démarre la capture de la sortie tampon pour inclure la page dans le contrôleur
-        ob_start();
-        
-        // Inclut la vue (votre fichier HTML/PHP)
-        // Les variables locales du contrôleur deviennent disponibles dans le template
-        require __DIR__ . '/../templates/statistiques.php';
-        
-        // Nettoie et affiche le contenu du tampon
-        ob_end_flush();
+    public function __construct($pdo, $noms_caisses, $denominations) {
+        $this->pdo = $pdo;
+        $this->noms_caisses = $noms_caisses;
+        $this->denominations = $denominations;
+        $this->filterService = new FilterService();
     }
 
     /**
-     * Récupère les données des statistiques depuis la base de données.
-     * Les requêtes sont écrites en se basant sur une structure de base de données standard
-     * pour une application de comptage de caisse.
-     *
-     * @param PDO $db L'instance de la classe de connexion à la base de données.
-     * @return array Un tableau associatif contenant les données pour les graphiques et les KPIs.
+     * Affiche la page de statistiques.
      */
-    private function getDataFromDatabase($db) {
-        // Initialisation des données par défaut
-        $statsData = [
-            'dates' => [],
-            'totals' => [],
-            'ecarts' => [],
-            'totalGlobal' => 0,
-            'ecartTotal' => 0,
-            'numDays' => 0,
-            'kpiEcartMoyen' => 0,
-            'denominations' => []
-        ];
-        
-        // --- Requête pour les totaux et écarts des 30 derniers jours ---
-        // Correction de la syntaxe SQL pour MariaDB et du nom de la table.
-        $query = "SELECT date_comptage, SUM(total_compté) AS total, SUM(ecart) AS ecart 
-                  FROM comptage_caisse 
-                  WHERE date_comptage >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-                  GROUP BY date_comptage 
-                  ORDER BY date_comptage ASC";
-        
-        try {
-            $stmt = $db->query($query);
-            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    public function statistiques() {
+        $page_css = 'stats.css';
+        $page_js = 'stats.js';
+        $noms_caisses = $this->noms_caisses;
+        require __DIR__ . '/../templates/statistiques.php';
+    }
 
-            foreach ($results as $row) {
-                $statsData['dates'][] = (new DateTime($row['date_comptage']))->format('d/m/Y');
-                $statsData['totals'][] = $row['total'];
-                $statsData['ecarts'][] = $row['ecart'];
-            }
-            
-            $statsData['numDays'] = count($statsData['dates']);
-            
-        } catch (PDOException $e) {
-            // Gérer l'erreur (par exemple, logger ou afficher un message)
-            error_log("Erreur de requête SQL pour les totaux et écarts : " . $e->getMessage());
+    /**
+     * Récupère les données des statistiques et les renvoie en JSON.
+     */
+    public function getStatsData() {
+        header('Content-Type: application/json');
+        
+        $date_debut = $_GET['date_debut'] ?? null;
+        $date_fin = $_GET['date_fin'] ?? null;
+        
+        $filter_params = $this->filterService->getWhereClauseAndBindings($date_debut, $date_fin, null, null, 'tout');
+        $sql_where = $filter_params['sql_where'];
+        $bind_values = $filter_params['bind_values'];
+        
+        $sum_cols_ventes = [];
+        $sum_cols_retrocession = [];
+        $repartition_labels = [];
+        $repartition_data = [];
+        $caisses_data = [];
+        $sum_cols_all_caisse_ventes = [];
+        
+        foreach ($this->noms_caisses as $i => $nom_caisse) {
+            $sum_cols_ventes[] = "SUM(c{$i}_ventes)";
+            $sum_cols_retrocession[] = "SUM(c{$i}_retrocession)";
+            $repartition_labels[] = $nom_caisse;
+            $sum_cols_all_caisse_ventes[] = "c{$i}_ventes";
+
+            $stmt = $this->pdo->prepare("SELECT SUM(c{$i}_ventes) AS total_ventes, AVG(c{$i}_ventes) AS moyenne_ventes, SUM(c{$i}_retrocession) AS total_retrocession FROM comptages" . $sql_where);
+            $stmt->execute($bind_values);
+            $caisse_stats = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            $caisses_data[] = [
+                'id' => $i,
+                'nom' => $nom_caisse,
+                'total_ventes' => round(floatval($caisse_stats['total_ventes'] ?? 0), 2),
+                'moyenne_ventes' => round(floatval($caisse_stats['moyenne_ventes'] ?? 0), 2),
+                'total_retrocession' => round(floatval($caisse_stats['total_retrocession'] ?? 0), 2)
+            ];
         }
 
-        // --- Requête pour les KPIs globaux ---
-        // Correction du nom de la table.
-        $kpiQuery = "SELECT COUNT(*) AS nb_comptages, SUM(total_compté) AS total_global, AVG(ecart) AS ecart_moyen FROM comptage_caisse";
-        try {
-            $kpiResult = $db->query($kpiQuery)->fetch(PDO::FETCH_ASSOC);
-            if ($kpiResult) {
-                $statsData['totalGlobal'] = $kpiResult['total_global'] ?? 0;
-                $statsData['numDays'] = $kpiResult['nb_comptages'] ?? 0;
-                $statsData['kpiEcartMoyen'] = $kpiResult['ecart_moyen'] ?? 0;
-            }
-        } catch (PDOException $e) {
-            error_log("Erreur de requête SQL pour les KPIs : " . $e->getMessage());
+        $sum_cols_ventes_str = implode(' + ', $sum_cols_ventes);
+        $sum_cols_retrocession_str = implode(' + ', $sum_cols_retrocession);
+        $sum_cols_all_caisse_ventes_str = implode(' + ', $sum_cols_all_caisse_ventes);
+        
+        $stmt_total_comptages = $this->pdo->prepare("SELECT COUNT(*) FROM comptages" . $sql_where);
+        $stmt_total_comptages->execute($bind_values);
+        $total_comptages = $stmt_total_comptages->fetchColumn();
+
+        $stmt_total_ventes = $this->pdo->prepare("SELECT {$sum_cols_ventes_str} FROM comptages" . $sql_where);
+        $stmt_total_ventes->execute($bind_values);
+        $total_ventes = $stmt_total_ventes->fetchColumn() ?? 0;
+        
+        $ventes_moyennes = $total_comptages > 0 ? $total_ventes / $total_comptages : 0;
+        
+        $stmt_total_retrocession = $this->pdo->prepare("SELECT {$sum_cols_retrocession_str} FROM comptages" . $sql_where);
+        $stmt_total_retrocession->execute($bind_values);
+        $total_retrocession = $stmt_total_retrocession->fetchColumn() ?? 0;
+
+        $repartition_sql = "SELECT " . implode(', ', array_map(fn($i) => "SUM(c{$i}_ventes) AS ventes_c{$i}", array_keys($this->noms_caisses))) . " FROM comptages" . $sql_where;
+        $repartition_stmt = $this->pdo->prepare($repartition_sql);
+        $repartition_stmt->execute($bind_values);
+        $repartition_result = $repartition_stmt->fetch(PDO::FETCH_ASSOC);
+
+        foreach ($this->noms_caisses as $i => $nom_caisse) {
+            $repartition_data[] = floatval($repartition_result["ventes_c{$i}"] ?? 0);
         }
         
-        // --- Requête pour les dénominations du dernier comptage ---
-        // Cette requête est plus complexe et dépend fortement du schéma.
-        // Ici, on va simuler la récupération pour la rendre plus simple.
-        // REMPLACEZ CE CODE PAR VOS REQUÊTES pour le détail des billets/pièces.
-        // Exemple avec des données simulées pour la démo:
-        $statsData['denominations'] = [
-            'b50' => 15, 'b20' => 30, 'b10' => 50, 'b5' => 100,
-            'p2e' => 250, 'p1e' => 400, 'p50c' => 600, 'p20c' => 800
+        // Récupération des données pour le graphique linéaire
+        $evolution_sql = "SELECT DATE(date_comptage) as date, " . implode(' + ', $sum_cols_ventes) . " as total_ventes FROM comptages" . $sql_where . " GROUP BY DATE(date_comptage) ORDER BY date ASC";
+        $evolution_stmt = $this->pdo->prepare($evolution_sql);
+        $evolution_stmt->execute($bind_values);
+        $evolution_results = $evolution_stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $evolution_dates = [];
+        $evolution_ventes = [];
+        foreach ($evolution_results as $row) {
+            $evolution_dates[] = (new DateTime($row['date']))->format('d/m/Y');
+            $evolution_ventes[] = floatval($row['total_ventes']);
+        }
+        
+        // NOUVEAU: Données pour le graphique en entonnoir
+        $funnel_data = [
+            'labels' => ['Ventes', 'Rétrocessions', 'Total réel'],
+            'data' => [
+                $total_ventes,
+                $total_retrocession,
+                $total_ventes - $total_retrocession
+            ]
         ];
+        
+        // NOUVEAU: Données pour le graphique radar
+        $radar_labels = array_keys($this->noms_caisses);
+        $radar_data = [];
+        $radar_data_ventes = array_column($caisses_data, 'total_ventes');
+        $radar_data_ventes_moyennes = array_column($caisses_data, 'moyenne_ventes');
+        $radar_data_retrocession = array_column($caisses_data, 'total_retrocession');
 
-        return $statsData;
+        $radar_data[] = ['name' => 'Ventes totales', 'data' => $radar_data_ventes];
+        $radar_data[] = ['name' => 'Ventes moyennes', 'data' => $radar_data_ventes_moyennes];
+        $radar_data[] = ['name' => 'Rétrocessions', 'data' => $radar_data_retrocession];
+
+
+        echo json_encode([
+            'repartition' => [
+                'labels' => $repartition_labels,
+                'data' => $repartition_data
+            ],
+            'kpis' => [
+                'total_comptages' => $total_comptages,
+                'total_ventes' => round($total_ventes, 2),
+                'ventes_moyennes' => round($ventes_moyennes, 2),
+                'total_retrocession' => round($total_retrocession, 2)
+            ],
+            'caisses' => $caisses_data,
+            'evolution' => [
+                'labels' => $evolution_dates,
+                'data' => $evolution_ventes
+            ],
+            'funnel' => $funnel_data,
+            'radar' => [
+                'labels' => $radar_labels,
+                'series' => $radar_data
+            ]
+        ]);
     }
 }
