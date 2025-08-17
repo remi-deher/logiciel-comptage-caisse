@@ -22,21 +22,21 @@
             <div class="admin-card-content">
                 <p>Gérez la devise de votre caisse et définissez les dénominations et les quantités minimales à conserver.</p>
 
-                <div class="form-group">
-                    <label for="currency-selector">Sélectionner une devise prédéfinie</label>
-                    <select id="currency-selector" class="inline-input">
-                        <option value="EUR" selected>Euro (€)</option>
-                        <option value="USD">Dollar Américain ($)</option>
-                        <option value="JPY">Yen Japonais (¥)</option>
-                        <option value="GBP">Livre Sterling (£)</option>
-                        <option value="CHF">Franc Suisse (CHF)</option>
-                        <option value="CAD">Dollar Canadien (CA$)</option>
-                        <option value="AUD">Dollar Australien (AU$)</option>
-                    </select>
-                </div>
-
                 <form id="denominations-form" action="index.php?page=admin" method="POST">
                     <input type="hidden" name="action" value="update_denominations_config">
+                    <div class="form-group">
+                        <label for="currency-selector">Sélectionner une devise prédéfinie</label>
+                        <select id="currency-selector" class="inline-input" name="currency_code">
+                            <option value="EUR" <?= ($current_currency_code === 'EUR') ? 'selected' : '' ?>>Euro (€)</option>
+                            <option value="USD" <?= ($current_currency_code === 'USD') ? 'selected' : '' ?>>Dollar Américain ($)</option>
+                            <option value="JPY" <?= ($current_currency_code === 'JPY') ? 'selected' : '' ?>>Yen Japonais (¥)</option>
+                            <option value="GBP" <?= ($current_currency_code === 'GBP') ? 'selected' : '' ?>>Livre Sterling (£)</option>
+                            <option value="CHF" <?= ($current_currency_code === 'CHF') ? 'selected' : '' ?>>Franc Suisse (CHF)</option>
+                            <option value="CAD" <?= ($current_currency_code === 'CAD') ? 'selected' : '' ?>>Dollar Canadien (CA$)</option>
+                            <option value="AUD" <?= ($current_currency_code === 'AUD') ? 'selected' : '' ?>>Dollar Australien (AU$)</option>
+                        </select>
+                    </div>
+
                     <div class="withdrawal-grid">
                         <div class="grid-column">
                             <h4>Billets</h4>
@@ -142,7 +142,7 @@
                     <tbody>
                         <?php foreach($caisses as $id => $nom): ?>
                             <tr>
-                                <td>
+                                <td data-label="Nom">
                                     <form action="index.php?page=admin" method="POST" class="inline-form">
                                         <input type="hidden" name="action" value="rename_caisse">
                                         <input type="hidden" name="caisse_id" value="<?= $id ?>">
@@ -150,7 +150,7 @@
                                         <button type="submit" class="action-btn-small new-btn"><i class="fa-solid fa-pencil"></i>Renommer</button>
                                     </form>
                                 </td>
-                                <td>
+                                <td data-label="Actions">
                                     <form action="index.php?page=admin" method="POST" onsubmit="return confirm('ATTENTION : La suppression d\'une caisse est irréversible et effacera toutes les données de comptage associées. Êtes-vous sûr ?');">
                                         <input type="hidden" name="action" value="delete_caisse">
                                         <input type="hidden" name="caisse_id" value="<?= $id ?>">
@@ -186,8 +186,8 @@
                     <tbody>
                         <?php foreach($admins as $username => $data): ?>
                             <tr>
-                                <td><strong><?= htmlspecialchars($username) ?></strong></td>
-                                <td>
+                                <td data-label="Utilisateur"><strong><?= htmlspecialchars($username) ?></strong></td>
+                                <td data-label="Statut">
                                     <?php if($data['sync_status'] === 'ok'): ?>
                                         <span class="status-tag status-ok">Synchronisé</span>
                                     <?php elseif($data['sync_status'] === 'mismatch'): ?>
@@ -196,7 +196,7 @@
                                         <span class="status-tag status-partial">Partiel</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="action-cell">
+                                <td data-label="Actions" class="action-cell">
                                     <?php if($data['sync_status'] === 'mismatch' || $data['sync_status'] === 'db_only'): ?>
                                         <form action="index.php?page=admin" method="POST" style="margin:0; display: inline-block;">
                                             <input type="hidden" name="action" value="sync_single_admin">

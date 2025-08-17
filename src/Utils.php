@@ -46,13 +46,14 @@ function get_numeric_value($source_array, $key) {
 }
 
 /**
- * Formate un montant en chaîne de caractères monétaire en euros.
+ * Formate un montant en chaîne de caractères monétaire avec le bon symbole.
  *
  * @param float $montant Le montant à formater.
  * @return string        Le montant formaté (ex: "1 234,56 €").
  */
-function format_euros($montant) {
-    return number_format($montant, 2, ',', ' ') . ' €';
+function format_currency($montant) {
+    $symbol = defined('APP_CURRENCY_SYMBOL') ? APP_CURRENCY_SYMBOL : '€';
+    return number_format($montant, 2, ',', ' ') . ' ' . $symbol;
 }
 
 /**

@@ -26,7 +26,9 @@ class ConfigService {
             'DB_USER' => defined('DB_USER') ? DB_USER : '',
             'DB_PASS' => defined('DB_PASS') ? DB_PASS : '',
             'GIT_REPO_URL' => defined('GIT_REPO_URL') ? GIT_REPO_URL : '',
-            'APP_TIMEZONE' => defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Europe/Paris'
+            'APP_TIMEZONE' => defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Europe/Paris',
+            // NOUVEAU : Ajout de la constante APP_CURRENCY
+            'APP_CURRENCY' => defined('APP_CURRENCY') ? APP_CURRENCY : 'EUR',
         ];
 
         // On applique les mises à jour
@@ -57,6 +59,9 @@ class ConfigService {
         $new_content .= "define('GIT_REPO_URL', '" . addslashes($current_defines['GIT_REPO_URL']) . "');\n\n";
         $new_content .= "// Fuseau horaire de l'application\n";
         $new_content .= "define('APP_TIMEZONE', '" . addslashes($current_defines['APP_TIMEZONE']) . "');\n\n";
+        // NOUVEAU : Écriture de la constante APP_CURRENCY
+        $new_content .= "// Devise de l'application\n";
+        $new_content .= "define('APP_CURRENCY', '" . addslashes($current_defines['APP_CURRENCY']) . "');\n\n";
         $new_content .= "// Configuration de l'application\n";
         $new_content .= '$noms_caisses = ' . var_export($noms_caisses, true) . ";\n";
         $new_content .= '$tpe_par_caisse = ' . var_export($tpe_par_caisse, true) . ";\n";

@@ -2,6 +2,7 @@
 // src/AdminController.php
 
 require_once __DIR__ . '/Utils.php';
+require_once 'services/CurrencyService.php';
 
 class AdminController {
     private $pdo;
@@ -10,6 +11,7 @@ class AdminController {
     private $configService;
     private $userService;
     private $caisseManagementService;
+    private $currencyService;
 
     public function __construct($pdo) {
         $this->pdo = $pdo;
@@ -18,6 +20,7 @@ class AdminController {
         $this->configService = new ConfigService();
         $this->userService = new UserService($pdo);
         $this->caisseManagementService = new CaisseManagementService($pdo, $this->configService);
+        $this->currencyService = new CurrencyService();
     }
 
     public function index() {
@@ -73,6 +76,11 @@ class AdminController {
         $admins = $this->userService->getAdminsList();
         $caisses = $noms_caisses;
         $timezones = DateTimeZone::listIdentifiers(DateTimeZone::EUROPE);
+
+        // NOUVEAU: Récupère les données des devises
+        $currenciesData = $this->currencyService->getCurrenciesData();
+        // Lit la devise actuelle depuis la configuration
+        $current_currency_code = defined('APP_CURRENCY') ? APP_CURRENCY : 'EUR';
         
         $page_css = 'admin.css';
         require __DIR__ . '/../templates/admin.php';
@@ -80,9 +88,24 @@ class AdminController {
 
     // NOUVELLE MÉTHODE POUR METTRE À JOUR LES DÉNOMINATIONS
     private function updateDenominationsConfig() {
-        $updates = ['denominations' => $_POST['denominations'] ?? []];
-        $result = $this->configService->updateConfigFile($updates);
-        $_SESSION['admin_message'] = $result['success'] ? "Configuration des dénominations mise à jour." : $result['message'];
+        $denominations = $_POST['denominations'] ?? [];
+        $min_to_keep = $_POST['min_to_keep'] ?? [];
+        $currency_code = $_POST['currency_code'] ?? 'EUR';
+        
+        // Sauvegarde les dénominations dans le fichier JSON
+        $result = $this->currencyService->updateCurrency($currency_code, $denominations, $min_to_keep);
+
+        // Met à jour le fichier de configuration PHP
+        if ($result) {
+            $updates = [
+                'denominations' => $denominations,
+                'min_to_keep' => $min_to_keep,
+                'defines' => ['APP_CURRENCY' => $currency_code]
+            ];
+            $result = $this->configService->updateConfigFile($updates);
+        }
+        
+        $_SESSION['admin_message'] = $result ? "Configuration des dénominations mise à jour." : "Erreur lors de la mise à jour des dénominations.";
     }
 
     private function updateWithdrawalConfig() {

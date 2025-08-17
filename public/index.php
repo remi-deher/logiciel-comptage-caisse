@@ -9,6 +9,21 @@ if (file_exists(__DIR__ . '/../config/config.php')) {
 // Définit le fuseau horaire pour toute l'application
 date_default_timezone_set(defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Europe/Paris');
 
+// NOUVEAU : Définit la devise pour toute l'application
+$currenciesData = [];
+if (file_exists(__DIR__ . '/../config/currencies.json')) {
+    $currenciesData = json_decode(file_get_contents(__DIR__ . '/../config/currencies.json'), true);
+}
+
+// Lit la devise actuelle depuis la configuration ou utilise EUR par défaut
+$current_currency_code = defined('APP_CURRENCY') ? APP_CURRENCY : 'EUR';
+// Lit le symbole de la devise depuis les données chargées, avec un fallback si non trouvé
+$current_currency_symbol = $currenciesData[$current_currency_code]['symbol'] ?? '€';
+
+define('APP_CURRENCY', $current_currency_code);
+define('APP_CURRENCY_SYMBOL', $current_currency_symbol);
+
+
 // REDIRECTION VERS L'INSTALLATEUR SI L'APPLICATION N'EST PAS CONFIGURÉE
 if (!file_exists(__DIR__ . '/../config/config.php')) {
     if (is_dir(__DIR__ . '/install')) {
@@ -30,6 +45,7 @@ require_once __DIR__ . '/../src/services/UserService.php';
 require_once __DIR__ . '/../src/services/CaisseManagementService.php';
 require_once __DIR__ . '/../src/services/DatabaseMigrationService.php';
 require_once __DIR__ . '/../src/services/FilterService.php';
+require_once __DIR__ . '/../src/services/CurrencyService.php';
 // On charge les contrôleurs
 require_once __DIR__ . '/../src/AdminController.php';
 require_once __DIR__ . '/../src/AuthController.php';

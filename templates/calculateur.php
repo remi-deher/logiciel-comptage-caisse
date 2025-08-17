@@ -17,7 +17,8 @@ $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
     'denominations' => $denominations ?? [],
     'minToKeep' => $min_to_keep, // NOUVEAU : Ajout de la variable
-    'isLoadedFromHistory' => $isLoadedFromHistory ?? false
+    'isLoadedFromHistory' => $isLoadedFromHistory ?? false,
+    'currencySymbol' => APP_CURRENCY_SYMBOL // NOUVEAU : Ajout du symbole de devise
 ]);
 
 // On définit une variable pour ajouter l'attribut 'disabled' plus facilement
@@ -54,7 +55,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
         <div class="ecart-display-container">
     <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
         <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
-            Écart Caisse Actuelle : <span class="ecart-value">0,00 €</span>
+            Écart Caisse Actuelle : <span class="ecart-value">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
             <p class="ecart-explanation"></p>
         </div>
         <div id="suggestion-accordion-caisse<?= $id ?>" class="suggestion-accordion-container"></div>
@@ -74,15 +75,15 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                             <div class="accordion-content-inner">
                                 <div class="grid grid-3">
                                     <div class="form-group">
-                                        <label>Fond de Caisse (€)</label>
+                                        <label>Fond de Caisse (<?= APP_CURRENCY_SYMBOL ?>)</label>
                                         <input type="text" id="fond_de_caisse_<?= $id ?>" name="caisse[<?= $id ?>][fond_de_caisse]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_fond_de_caisse"] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                     <div class="form-group">
-                                        <label>Total Ventes du Jour (€)</label>
+                                        <label>Total Ventes du Jour (<?= APP_CURRENCY_SYMBOL ?>)</label>
                                         <input type="text" id="ventes_<?= $id ?>" name="caisse[<?= $id ?>][ventes]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_ventes"] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                     <div class="form-group">
-                                        <label>Rétrocessions / Prélèvements (€)</label>
+                                        <label>Rétrocessions / Prélèvements (<?= APP_CURRENCY_SYMBOL ?>)</label>
                                         <input type="text" id="retrocession_<?= $id ?>" name="caisse[<?= $id ?>][retrocession]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_retrocession"] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                 </div>
@@ -102,9 +103,9 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                 <div class="grid">
                                     <?php foreach($denominations['billets'] as $name => $valeur): ?>
                                     <div class="form-group">
-                                        <label><?= $valeur ?> €</label>
+                                        <label><?= $valeur ?> <?= APP_CURRENCY_SYMBOL ?></label>
                                         <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data["c{$id}_{$name}"] ?? '') ?>" <?= $disabled_attr ?>>
-                                        <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 €</span>
+                                        <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -112,9 +113,9 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                 <div class="grid">
                                     <?php foreach($denominations['pieces'] as $name => $valeur): ?>
                                     <div class="form-group">
-                                        <label><?= $valeur >= 1 ? $valeur.' €' : ($valeur*100).' cts' ?></label>
+                                        <label><?= $valeur >= 1 ? $valeur.' '.APP_CURRENCY_SYMBOL : ($valeur*100).' cts' ?></label>
                                         <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data["c{$id}_{$name}"] ?? '') ?>" <?= $disabled_attr ?>>
-                                        <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 €</span>
+                                        <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -158,23 +159,23 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                             <?php foreach ($noms_caisses as $id => $nom): ?>
                             <div class="result-box">
                                 <h3><?= htmlspecialchars($nom) ?></h3>
-                                <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id ?>-fdc">0,00 €</span></div>
-                                <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id ?>-total">0,00 €</span></div>
+                                <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id ?>-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id ?>-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
                                 <hr>
-                                <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id ?>-theorique">0,00 €</span></div>
-                                <div class="result-line total"><span>Recette réelle (à retirer) :</span> <span id="res-c<?= $id ?>-recette">0,00 €</span></div>
-                                <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id ?>-ecart">0,00 €</span></div>
+                                <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id ?>-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line total"><span>Recette réelle (à retirer) :</span> <span id="res-c<?= $id ?>-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id ?>-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
                             </div>
                             <?php endforeach; ?>
                         </div>
                         <div class="result-box combined-results">
                             <h3>Totaux Combinés</h3>
-                            <div class="result-line"><span>Total Fonds de caisse :</span> <span id="res-total-fdc">0,00 €</span></div>
-                            <div class="result-line"><span>Total compté (global) :</span> <span id="res-total-total">0,00 €</span></div>
+                            <div class="result-line"><span>Total Fonds de caisse :</span> <span id="res-total-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                            <div class="result-line"><span>Total compté (global) :</span> <span id="res-total-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
                             <hr>
-                            <div class="result-line"><span>Recette théorique totale :</span> <span id="res-total-theorique">0,00 €</span></div>
-                            <div class="result-line total"><span>Recette réelle totale (à retirer) :</span> <span id="res-total-recette">0,00 €</span></div>
-                            <div class="result-line total"><span>ÉCART TOTAL :</span> <span id="res-total-ecart">0,00 €</span></div>
+                            <div class="result-line"><span>Recette théorique totale :</span> <span id="res-total-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                            <div class="result-line total"><span>Recette réelle totale (à retirer) :</span> <span id="res-total-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                            <div class="result-line total"><span>ÉCART TOTAL :</span> <span id="res-total-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
                         </div>
                     </div>
                 </div>
