@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Configuration et Éléments du DOM ---
     const configElement = document.getElementById('calculator-data');
     const config = configElement ? JSON.parse(configElement.dataset.config) : {};
-    const minToKeep = config.minToKeep || {}; 
+    const minToKeep = config.minToKeep || {};
 
     const tabLinks = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function calculateAllFull() {
         if (!config.nomsCaisses) return;
-        
+
         const activeTab = document.querySelector('.tab-link.active')?.dataset.tab;
         let totauxCombines = { fdc: 0, total: 0, recette: 0, theorique: 0, ecart: 0 };
         const caissesData = {};
@@ -110,14 +110,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentCounts[name] = count;
                 }
             }
-            
+
             const fondDeCaisse = getVal('fond_de_caisse');
             const ventes = getVal('ventes');
             const retrocession = getVal('retrocession');
             const recetteTheorique = ventes;
             const recetteReelle = totalCompte - fondDeCaisse - retrocession;
             const ecart = recetteReelle - recetteTheorique;
-            
+
             caissesData[i] = { ecart, recetteReelle, currentCounts };
             totauxCombines.fdc += fondDeCaisse;
             totauxCombines.total += totalCompte;
@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (ecart < -0.001) ecartEl.parentElement.classList.add('ecart-negatif');
             }
         }
-        
+
         updateElementText('res-total-fdc', formatEuros(totauxCombines.fdc));
         updateElementText('res-total-total', formatEuros(totauxCombines.total));
         updateElementText('res-total-theorique', formatEuros(totauxCombines.theorique));
@@ -217,16 +217,37 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Logique de Sauvegarde ---
     function getFormStateAsString() {
         const state = {};
-        caisseForm.querySelectorAll('input[type="number"], input[type="text"], textarea').forEach(input => {
-            if (input.id) state[input.id] = input.value;
-        });
+        
+        // Cible explicitement tous les champs de comptage
+        // en se basant sur la structure de la configuration des caisses.
+        if (config.nomsCaisses && config.denominations) {
+            for (const caisseId of Object.keys(config.nomsCaisses)) {
+                // Champs d'informations de caisse
+                const infoFields = ['fond_de_caisse', 'ventes', 'retrocession'];
+                for (const field of infoFields) {
+                    const input = document.getElementById(`${field}_${caisseId}`);
+                    // NORMALISATION : Convertit la valeur en un nombre pour éviter les problèmes de formatage de chaîne
+                    if (input) state[input.id] = parseFloat(input.value.replace(',', '.')) || 0;
+                }
+
+                // Champs de dénominations
+                for (const type in config.denominations) {
+                    for (const denominationName in config.denominations[type]) {
+                        const input = document.getElementById(`${denominationName}_${caisseId}`);
+                        // NORMALISATION : Convertit la valeur en un nombre pour éviter les problèmes de formatage de chaîne
+                        if (input) state[input.id] = parseInt(input.value) || 0;
+                    }
+                }
+            }
+        }
+
         return JSON.stringify(state);
     }
-    
+
     function hasUnsavedChanges() {
         return initialState !== getFormStateAsString();
     }
-    
+
     function performAutosaveOnExit() {
         const formData = new FormData(caisseForm);
         let nom = formData.get('nom_comptage');
@@ -234,7 +255,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
             formData.set('nom_comptage', nom);
         }
-        
+
         if (navigator.sendBeacon) {
             navigator.sendBeacon('index.php?action=autosave', new URLSearchParams(formData));
         }
@@ -264,6 +285,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Initialisation ---
     calculateAllFull();
-    initialState = getFormStateAsString();
+    // Correction ici : Retarder la capture de l'état initial
+    // pour s'assurer que tous les scripts et le navigateur ont terminé leurs mises à jour.
+    setTimeout(() => {
+        initialState = getFormStateAsString();
+    }, 0);
     initAccordion();
 });

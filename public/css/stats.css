@@ -138,6 +138,16 @@ body[data-theme="dark"] .filter-form input[type="date"] {
     transform: translateY(-2px);
 }
 
+/* NOUVEAU : Style pour le bouton actif */
+.quick-filter-btn.active {
+    background-color: var(--color-success);
+    color: white;
+    border-color: var(--color-success);
+    font-weight: bold;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
 /* NOUVEAU: Styles pour les boutons d'exportation */
 .export-buttons-container {
     text-align: center;

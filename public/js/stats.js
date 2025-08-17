@@ -266,6 +266,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     quickFilterBtns.forEach(btn => {
         btn.addEventListener('click', function() {
+            // Retirer la classe 'active' de tous les boutons
+            quickFilterBtns.forEach(b => b.classList.remove('active'));
+            // Ajouter la classe 'active' au bouton cliqué
+            this.classList.add('active');
+            
             const days = parseInt(this.dataset.days);
             const today = new Date();
             const startDate = new Date();
@@ -279,6 +284,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (resetBtn) {
         resetBtn.addEventListener('click', function() {
+            // Retirer la classe active de tous les boutons
+            quickFilterBtns.forEach(b => b.classList.remove('active'));
             document.getElementById('date_debut').value = '';
             document.getElementById('date_fin').value = '';
             loadStats();
