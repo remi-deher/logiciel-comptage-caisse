@@ -81,17 +81,20 @@ if ($ajax_action) {
             // Nouvelle route pour récupérer les données de statistiques
             $statistiquesController->getStatsData();
             exit;
+        case 'get_historique_data': // NOUVEAU
+            $historiqueController->getHistoriqueDataJson();
+            exit;
+        case 'delete_historique_data': // NOUVEAU
+            $historiqueController->delete();
+            exit;
     }
 }
 
 // --- Routage principal pour l'affichage des pages ---
 switch ($page) {
     case 'historique':
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
-            $historiqueController->delete();
-        } else {
-            $historiqueController->historique();
-        }
+        // La logique de suppression est maintenant gérée par l'action AJAX ci-dessus
+        $historiqueController->historique();
         break;
     
     case 'aide':
@@ -127,5 +130,3 @@ switch ($page) {
         }
         break;
 }
-
-?>

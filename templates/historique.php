@@ -57,9 +57,6 @@ function renderPagination($page_courante, $pages_totales) {
 <div class="container" id="history-page"> 
     <h2><i class="fa-solid fa-clock-rotate-left" style="color: #3498db;"></i> Historique des Comptages</h2>
 
-    <!-- Anciens onglets de vue retirés pour laisser la place aux filtres avancés -->
-
-    <!-- NOUVELLE SECTION DE FILTRES -->
     <div class="filter-section">
         <h3>Filtres</h3>
         <div class="filter-buttons">
@@ -73,24 +70,20 @@ function renderPagination($page_courante, $pages_totales) {
             <input type="hidden" name="vue" value="tout">
             <div class="form-group">
                 <label for="date_debut">Date de début :</label>
-                <input type="date" id="date_debut" name="date_debut" value="<?= htmlspecialchars($date_debut) ?>">
+                <input type="date" id="date_debut" name="date_debut" value="<?= htmlspecialchars($date_debut ?? '') ?>">
             </div>
             <div class="form-group">
                 <label for="date_fin">Date de fin :</label>
-                <input type="date" id="date_fin" name="date_fin" value="<?= htmlspecialchars($date_fin) ?>">
+                <input type="date" id="date_fin" name="date_fin" value="<?= htmlspecialchars($date_fin ?? '') ?>">
             </div>
             <div class="form-group">
                 <label for="recherche">Recherche :</label>
-                <input type="text" id="recherche" name="recherche" placeholder="Nom du comptage..." value="<?= htmlspecialchars($recherche) ?>">
+                <input type="text" id="recherche" name="recherche" placeholder="Nom du comptage..." value="<?= htmlspecialchars($recherche ?? '') ?>">
             </div>
             <button type="submit" class="new-btn">Filtrer</button>
             <a href="index.php?page=historique&vue=tout" class="action-btn" style="background-color: #7f8c8d;">Réinitialiser</a>
         </form>
     </div>
-
-    <?php if (isset($message)): ?>
-        <p class="session-message"><?= htmlspecialchars($message) ?></p>
-    <?php endif; ?>
 
     <div class="history-controls">
         <div class="history-actions">
@@ -99,76 +92,12 @@ function renderPagination($page_courante, $pages_totales) {
             <button id="excel-btn" class="action-btn no-export"><i class="fa-solid fa-file-csv"></i> Excel</button>
         </div>
     </div>
+    
+    <div class="history-grid"></div>
+    <nav class="pagination-nav" style="margin-top: 20px;"></nav>
 
-    <?php if (empty($historique)): ?>
-        <p>Aucun enregistrement trouvé pour ces critères.</p>
-    <?php else: ?>
-        <?php if ($pages_totales > 1): ?>
-            <nav class="pagination-nav"><?php renderPagination($page_courante, $pages_totales); ?></nav>
-        <?php endif; ?>
-
-        <div class="history-grid">
-            <?php foreach ($historique as $comptage):
-                $nombre_caisses_actuel = isset($nombre_caisses) ? $nombre_caisses : count($noms_caisses);
-                $denominations_actuel = isset($denominations) ? $denominations : [];
-                $calculated = calculate_results_from_data($comptage, $nombre_caisses_actuel, $denominations_actuel);
-            ?>
-                <div class="history-card" data-comptage='<?= htmlspecialchars(json_encode($comptage), ENT_QUOTES, 'UTF-8') ?>'>
-                    <div class="history-card-header">
-                        <h4><?= htmlspecialchars($comptage['nom_comptage']) ?></h4>
-                        <div class="date"><i class="fa-regular fa-calendar"></i> <?= format_date_fr($comptage['date_comptage']) ?></div>
-                        <?php if(!empty($comptage['explication'])): ?>
-                            <p class="explication"><i class="fa-solid fa-lightbulb"></i> <?= htmlspecialchars($comptage['explication']) ?></p>
-                        <?php endif; ?>
-                    </div>
-                    <div class="history-card-body">
-                        <div class="summary-line">
-                            <div><i class="fa-solid fa-coins icon-total"></i> Total Compté Global</div>
-                            <span><?= format_euros($calculated['combines']['total_compté']) ?></span>
-                        </div>
-                        <div class="summary-line">
-                             <div><i class="fa-solid fa-right-left icon-ecart"></i> Écart Global</div>
-                            <span class="<?= $calculated['combines']['ecart'] > 0.001 ? 'ecart-positif' : ($calculated['combines']['ecart'] < -0.001 ? 'ecart-negatif' : '') ?>">
-                                <?= format_euros($calculated['combines']['ecart']) ?>
-                            </span>
-                        </div>
-                        <hr class="card-divider">
-                        <?php foreach($noms_caisses as $num => $nom): 
-                            $ecart = $calculated['caisses'][$num]['ecart']; ?>
-                            <div class="summary-line">
-                                <div class="caisse-name">Écart <?= htmlspecialchars($nom) ?></div>
-                                <span class="<?= $ecart > 0.001 ? 'ecart-positif' : ($ecart < -0.001 ? 'ecart-negatif' : '') ?>">
-                                    <?= format_euros($ecart) ?>
-                                </span>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <div class="history-card-footer no-export">
-                        <button class="action-btn-small details-all-btn"><i class="fa-solid fa-layer-group"></i> Ensemble</button>
-                        <?php foreach($noms_caisses as $num => $nom): ?>
-                            <button class="action-btn-small details-btn" data-caisse-id="<?= $num ?>" data-caisse-nom="<?= htmlspecialchars($nom) ?>">
-                                <i class="fa-solid fa-list-ul"></i> <?= htmlspecialchars($nom) ?>
-                            </button>
-                        <?php endforeach; ?>
-                        <div style="flex-grow: 1;"></div> <!-- Espace flexible -->
-                        <a href="index.php?page=calculateur&load=<?= $comptage['id'] ?>" class="action-btn-small save-btn"><i class="fa-solid fa-pen-to-square"></i></a>
-                        <form method="POST" action="index.php?page=historique" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer DÉFINITIVEMENT ce comptage ?');" style="margin:0;">
-                            <input type="hidden" name="action" value="delete">
-                            <input type="hidden" name="id_a_supprimer" value="<?= $comptage['id'] ?>">
-                            <button type="submit" class="action-btn-small delete-btn"><i class="fa-solid fa-trash-can"></i></button>
-                        </form>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-
-        <?php if ($pages_totales > 1): ?>
-            <nav class="pagination-nav" style="margin-top: 20px;"><?php renderPagination($page_courante, $pages_totales); ?></nav>
-        <?php endif; ?>
-    <?php endif; ?>
 </div>
 
-<!-- Fenêtre Modale pour les détails -->
 <div id="details-modal" class="modal">
     <div class="modal-content">
         <span class="modal-close">&times;</span>

@@ -6,10 +6,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fonction d'aide pour formater les montants en euros
     const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(montant);
+    const formatDateFr = (dateString) => {
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        return new Intl.DateTimeFormat('fr-FR', options).format(new Date(dateString));
+    };
     
     // Récupère la configuration (noms de caisses, dénominations) depuis l'élément data
     const configElement = document.getElementById('history-data');
-    const config = configElement ? JSON.parse(configElement.dataset.config) : {};
+    const globalConfig = configElement ? JSON.parse(configElement.dataset.config) : {};
+    
+    const historyGrid = document.querySelector('.history-grid');
+    const paginationNav = document.querySelector('.pagination-nav');
+    const form = document.getElementById('history-filter-form');
+    const quickFilterBtns = document.querySelectorAll('.quick-filter-btn');
+    const resetBtn = document.querySelector('.filter-section .action-btn');
 
     const modal = document.getElementById('details-modal');
     if (modal) {
@@ -34,14 +44,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 html += '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead><tbody>';
 
                 let totalCaisse = 0;
-                if (config.denominations) {
-                    for (const [name, value] of Object.entries(config.denominations.billets)) {
+                if (globalConfig.denominations) {
+                    for (const [name, value] of Object.entries(globalConfig.denominations.billets)) {
                         const quantite = comptageData[`c${caisseId}_${name}`] || 0;
                         const totalLigne = quantite * value;
                         totalCaisse += totalLigne;
                         html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
                     }
-                    for (const [name, value] of Object.entries(config.denominations.pieces)) {
+                    for (const [name, value] of Object.entries(globalConfig.denominations.pieces)) {
                         const quantite = comptageData[`c${caisseId}_${name}`] || 0;
                         const totalLigne = quantite * value;
                         totalCaisse += totalLigne;
@@ -68,22 +78,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 const summaryQuantities = {};
                 let summaryTotal = 0;
 
-                if (config.nomsCaisses) {
-                    for (const caisseId in config.nomsCaisses) {
-                        const caisseNom = config.nomsCaisses[caisseId];
+                if (globalConfig.nomsCaisses) {
+                    for (const caisseId in globalConfig.nomsCaisses) {
+                        const caisseNom = globalConfig.nomsCaisses[caisseId];
                         html += `<h4 class="modal-table-title">${caisseNom}</h4>`;
                         html += '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead><tbody>';
 
                         let totalCaisse = 0;
-                        if (config.denominations) {
-                            for (const [name, value] of Object.entries(config.denominations.billets)) {
+                        if (globalConfig.denominations) {
+                            for (const [name, value] of Object.entries(globalConfig.denominations.billets)) {
                                 const quantite = comptageData[`c${caisseId}_${name}`] || 0;
                                 summaryQuantities[name] = (summaryQuantities[name] || 0) + quantite;
                                 const totalLigne = quantite * value;
                                 totalCaisse += totalLigne;
                                 html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
                             }
-                            for (const [name, value] of Object.entries(config.denominations.pieces)) {
+                            for (const [name, value] of Object.entries(globalConfig.denominations.pieces)) {
                                 const quantite = comptageData[`c${caisseId}_${name}`] || 0;
                                 summaryQuantities[name] = (summaryQuantities[name] || 0) + quantite;
                                 const totalLigne = quantite * value;
@@ -99,14 +109,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     html += `<h4 class="modal-table-title">Synthèse Globale</h4>`;
                     html += '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité Totale</th><th>Total</th></tr></thead><tbody>';
 
-                    if (config.denominations) {
-                        for (const [name, value] of Object.entries(config.denominations.billets)) {
+                    if (globalConfig.denominations) {
+                        for (const [name, value] of Object.entries(globalConfig.denominations.billets)) {
                             const quantite = summaryQuantities[name] || 0;
                             const totalLigne = quantite * value;
                             summaryTotal += totalLigne;
                             html += `<tr><td>Billet de ${value} €</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
                         }
-                        for (const [name, value] of Object.entries(config.denominations.pieces)) {
+                        for (const [name, value] of Object.entries(globalConfig.denominations.pieces)) {
                             const quantite = summaryQuantities[name] || 0;
                             const totalLigne = quantite * value;
                             summaryTotal += totalLigne;
@@ -197,9 +207,215 @@ document.addEventListener('DOMContentLoaded', function() {
     if(printBtn) {
         printBtn.addEventListener('click', () => window.print());
     }
+    
+    // NOUVELLE LOGIQUE : Fonction de rendu des cartes
+    function renderHistoriqueCards(historique) {
+        historyGrid.innerHTML = '';
+        if (historique.length === 0) {
+            historyGrid.innerHTML = '<p>Aucun enregistrement trouvé pour ces critères.</p>';
+            return;
+        }
 
-    // NOUVEAUTÉ : Logique pour les boutons de filtre rapide
-    const quickFilterBtns = document.querySelectorAll('.quick-filter-btn');
+        historique.forEach(comptage => {
+            const calculated = calculateResults(comptage);
+            const cardHtml = `
+                <div class="history-card" data-comptage='${JSON.stringify(comptage)}'>
+                    <div class="history-card-header">
+                        <h4>${comptage.nom_comptage}</h4>
+                        <div class="date"><i class="fa-regular fa-calendar"></i> ${formatDateFr(comptage.date_comptage)}</div>
+                        ${comptage.explication ? `<p class="explication"><i class="fa-solid fa-lightbulb"></i> ${comptage.explication}</p>` : ''}
+                    </div>
+                    <div class="history-card-body">
+                        <div class="summary-line">
+                            <div><i class="fa-solid fa-coins icon-total"></i> Total Compté Global</div>
+                            <span>${formatEuros(calculated.combines.total_compté)}</span>
+                        </div>
+                        <div class="summary-line">
+                             <div><i class="fa-solid fa-right-left icon-ecart"></i> Écart Global</div>
+                            <span class="${calculated.combines.ecart > 0.001 ? 'ecart-positif' : (calculated.combines.ecart < -0.001 ? 'ecart-negatif' : '')}">
+                                ${formatEuros(calculated.combines.ecart)}
+                            </span>
+                        </div>
+                        <hr class="card-divider">
+                        ${Object.entries(globalConfig.nomsCaisses).map(([num, nom]) => {
+                            const ecart = calculated.caisses[num]?.ecart || 0;
+                            return `
+                            <div class="summary-line">
+                                <div class="caisse-name">Écart ${nom}</div>
+                                <span class="${ecart > 0.001 ? 'ecart-positif' : (ecart < -0.001 ? 'ecart-negatif' : '')}">
+                                    ${formatEuros(ecart)}
+                                </span>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                    <div class="history-card-footer no-export">
+                        <button class="action-btn-small details-all-btn"><i class="fa-solid fa-layer-group"></i> Ensemble</button>
+                        ${Object.entries(globalConfig.nomsCaisses).map(([num, nom]) => `
+                            <button class="action-btn-small details-btn" data-caisse-id="${num}" data-caisse-nom="${nom}">
+                                <i class="fa-solid fa-list-ul"></i> ${nom}
+                            </button>
+                        `).join('')}
+                        <div style="flex-grow: 1;"></div>
+                        <a href="index.php?page=calculateur&load=${comptage.id}" class="action-btn-small save-btn"><i class="fa-solid fa-pen-to-square"></i></a>
+                        <button type="button" class="action-btn-small delete-btn delete-comptage-btn" data-id-to-delete="${comptage.id}"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                </div>`;
+            historyGrid.innerHTML += cardHtml;
+        });
+    }
+
+    // NOUVELLE LOGIQUE : Fonction pour rendre la pagination
+    function renderPagination(currentPage, totalPages) {
+        if (!paginationNav) return;
+        paginationNav.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const params = urlParams.toString().replace(/&?p=\d+/, '');
+        const maxVisible = 5;
+        const start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+        const end = Math.min(totalPages, start + maxVisible - 1);
+
+        let paginationHtml = '<ul class="pagination">';
+
+        // Bouton Précédent
+        if (currentPage > 1) {
+            paginationHtml += `<li><a href="#" data-page="${currentPage - 1}">« Préc.</a></li>`;
+        } else {
+            paginationHtml += `<li class="disabled"><span>« Préc.</span></li>`;
+        }
+
+        // Liens des pages
+        for (let i = start; i <= end; i++) {
+            if (i === currentPage) {
+                paginationHtml += `<li class="active"><span>${i}</span></li>`;
+            } else {
+                paginationHtml += `<li><a href="#" data-page="${i}">${i}</a></li>`;
+            }
+        }
+
+        // Bouton Suivant
+        if (currentPage < totalPages) {
+            paginationHtml += `<li><a href="#" data-page="${currentPage + 1}">Suiv. »</a></li>`;
+        } else {
+            paginationHtml += `<li class="disabled"><span>Suiv. »</span></li>`;
+        }
+        
+        paginationHtml += '</ul>';
+        paginationNav.innerHTML = paginationHtml;
+    }
+
+    // NOUVELLE LOGIQUE : Fonction pour calculer les totaux côté client
+    function calculateResults(data_row) {
+        const results = { caisses: {}, combines: { total_compté: 0, recette_reelle: 0, ecart: 0, recette_theorique: 0 }};
+        const noms_caisses = globalConfig.nomsCaisses;
+        const denominations = globalConfig.denominations;
+        
+        for (const i in noms_caisses) {
+            let total_compte = 0;
+            if (denominations) {
+                for (const list in denominations) {
+                    for (const name in denominations[list]) {
+                        total_compte += (parseFloat(data_row[`c${i}_${name}`]) || 0) * denominations[list][name];
+                    }
+                }
+            }
+            
+            const fond_de_caisse = parseFloat(data_row[`c${i}_fond_de_caisse`]) || 0;
+            const ventes = parseFloat(data_row[`c${i}_ventes`]) || 0;
+            const retrocession = parseFloat(data_row[`c${i}_retrocession`]) || 0;
+            const recette_theorique = ventes + retrocession;
+            const recette_reelle = total_compte - fond_de_caisse;
+            const ecart = recette_reelle - recette_theorique;
+
+            results.caisses[i] = { total_compte, fond_de_caisse, ventes, retrocession, recette_theorique, recette_reelle, ecart };
+            results.combines.total_compté += total_compte;
+            results.combines.recette_reelle += recette_reelle;
+            results.combines.recette_theorique += recette_theorique;
+            results.combines.ecart += ecart;
+        }
+
+        return results;
+    }
+
+    // NOUVELLE LOGIQUE : Fonction principale pour charger les données via AJAX
+    function loadHistoriqueData(params) {
+        const query = new URLSearchParams(params).toString();
+        fetch(`index.php?action=get_historique_data&${query}`)
+            .then(response => response.json())
+            .then(data => {
+                renderHistoriqueCards(data.historique);
+                renderPagination(data.page_courante, data.pages_totales);
+            })
+            .catch(error => {
+                console.error("Erreur de chargement de l'historique:", error);
+                historyGrid.innerHTML = '<p>Erreur lors du chargement des données. Veuillez réessayer.</p>';
+            });
+    }
+
+    // NOUVELLE LOGIQUE : Gestion de la soumission du formulaire et de la pagination
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const params = {};
+        for (const [key, value] of formData.entries()) {
+            params[key] = value;
+        }
+        params.page = 'historique'; // Garde la page 'historique'
+        history.pushState(null, '', `?${new URLSearchParams(params).toString()}`);
+        loadHistoriqueData(params);
+    });
+    
+    // NOUVELLE LOGIQUE : Gestion des clics sur les boutons de pagination
+    if (paginationNav) {
+        paginationNav.addEventListener('click', function(e) {
+            const link = e.target.closest('a');
+            if (link) {
+                e.preventDefault();
+                const page = link.dataset.page;
+                const urlParams = new URLSearchParams(window.location.search);
+                urlParams.set('p', page);
+                history.pushState(null, '', `?${urlParams.toString()}`);
+                loadHistoriqueData(Object.fromEntries(urlParams.entries()));
+            }
+        });
+    }
+
+    // NOUVELLE LOGIQUE : Gestion de la suppression via AJAX
+    historyGrid.addEventListener('click', function(e) {
+        const deleteButton = e.target.closest('.delete-comptage-btn');
+        if (deleteButton) {
+            e.preventDefault();
+            if (confirm('Êtes-vous sûr de vouloir supprimer DÉFINITIVEMENT ce comptage ?')) {
+                const idToDelete = deleteButton.dataset.idToDelete;
+                
+                const formData = new FormData();
+                formData.append('id_a_supprimer', idToDelete);
+                
+                fetch('index.php?action=delete_historique_data', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const cardToRemove = deleteButton.closest('.history-card');
+                        cardToRemove.remove();
+                        // Recharge les données pour mettre à jour la pagination si nécessaire
+                        loadHistoriqueData(Object.fromEntries(new URLSearchParams(window.location.search).entries()));
+                    } else {
+                        alert(data.message || 'Erreur lors de la suppression.');
+                    }
+                })
+                .catch(error => {
+                    console.error("Erreur de suppression:", error);
+                    alert("Erreur lors de la suppression. Veuillez réessayer.");
+                });
+            }
+        }
+    });
+
+    // Événements pour les filtres rapides
     if (quickFilterBtns) {
         quickFilterBtns.forEach(btn => {
             btn.addEventListener('click', function() {
@@ -213,20 +429,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 const form = document.getElementById('history-filter-form');
                 form.querySelector('#date_debut').value = formatDate(startDate);
                 form.querySelector('#date_fin').value = formatDate(today);
-                form.submit();
+                
+                // Mettre à jour l'URL et charger les données
+                const params = {
+                    page: 'historique',
+                    date_debut: formatDate(startDate),
+                    date_fin: formatDate(today)
+                };
+                history.pushState(null, '', `?${new URLSearchParams(params).toString()}`);
+                loadHistoriqueData(params);
             });
         });
     }
 
-    // NOUVEAUTÉ : Gère le bouton de réinitialisation des filtres
-    const resetBtn = document.querySelector('.filter-section .action-btn');
+    // Gère le bouton de réinitialisation des filtres
     if (resetBtn) {
-        resetBtn.addEventListener('click', function() {
+        resetBtn.addEventListener('click', function(e) {
+            e.preventDefault();
             document.getElementById('date_debut').value = '';
             document.getElementById('date_fin').value = '';
-            document.getElementById('caisse_filter').value = '';
             document.getElementById('recherche').value = '';
-            document.getElementById('history-filter-form').submit();
+            history.pushState(null, '', `?page=historique`);
+            loadHistoriqueData({ page: 'historique' });
         });
     }
+    
+    // Lancement initial au chargement de la page
+    const initialParams = Object.fromEntries(new URLSearchParams(window.location.search).entries());
+    loadHistoriqueData(initialParams);
+
 });
