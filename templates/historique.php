@@ -3,6 +3,7 @@
 // Mise à jour pour retirer le filtre par caisse.
 
 $page_js = 'history.js';
+$page_css = 'historique.css'; // Ajout de la feuille de style pour le rendu des graphiques
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
     'denominations' => $denominations ?? []
@@ -93,6 +94,11 @@ function renderPagination($page_courante, $pages_totales) {
         </div>
     </div>
     
+    <div class="global-chart-container">
+        <h3>Synthèse de la période filtrée</h3>
+        <div id="global-chart-container"></div>
+    </div>
+
     <div class="history-grid"></div>
     <nav class="pagination-nav" style="margin-top: 20px;"></nav>
 

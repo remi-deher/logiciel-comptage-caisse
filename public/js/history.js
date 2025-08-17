@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return new Intl.DateTimeFormat('fr-FR', options).format(new Date(dateString));
     };
     
-    // Récupère la configuration (noms de caisses, dénominations) depuis l'élément data
     const configElement = document.getElementById('history-data');
     const globalConfig = configElement ? JSON.parse(configElement.dataset.config) : {};
     
@@ -20,6 +19,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('history-filter-form');
     const quickFilterBtns = document.querySelectorAll('.quick-filter-btn');
     const resetBtn = document.querySelector('.filter-section .action-btn');
+
+    const globalChartContainer = document.getElementById('global-chart-container');
+    let globalChart = null;
 
     const modal = document.getElementById('details-modal');
     if (modal) {
@@ -208,7 +210,96 @@ document.addEventListener('DOMContentLoaded', function() {
         printBtn.addEventListener('click', () => window.print());
     }
     
-    // NOUVELLE LOGIQUE : Fonction de rendu des cartes
+    const chartColors = ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6'];
+    
+    function renderMiniChart(element, data) {
+        if (!data || data.every(val => val === 0)) {
+            element.innerHTML = '<p class="no-chart-data">Pas de données de vente.</p>';
+            return;
+        }
+
+        const labels = Object.values(globalConfig.nomsCaisses);
+        const options = {
+            chart: {
+                type: 'pie',
+                height: 150,
+                toolbar: { show: false },
+                sparkline: { enabled: true }
+            },
+            series: data,
+            labels: labels,
+            colors: chartColors,
+            legend: { show: false },
+            tooltip: {
+                y: {
+                    formatter: function (value, { seriesIndex, dataPointIndex, w }) {
+                        return formatEuros(value);
+                    }
+                }
+            }
+        };
+
+        const chart = new ApexCharts(element, options);
+        chart.render();
+    }
+    
+    function renderGlobalChart(historique) {
+        if (!globalChartContainer) return;
+        
+        if (globalChart) {
+            globalChart.destroy();
+            globalChart = null;
+        }
+
+        if (!historique || historique.length === 0) {
+             globalChartContainer.innerHTML = '<p class="no-chart-data">Aucune donnée disponible pour le graphique.</p>';
+             return;
+        }
+        
+        const sortedHistorique = historique.sort((a, b) => new Date(a.date_comptage) - new Date(b.date_comptage));
+        const dates = sortedHistorique.map(c => new Date(c.date_comptage).toLocaleDateString('fr-FR'));
+        const ventesTotales = sortedHistorique.map(c => calculateResults(c).combines.recette_reelle);
+        const ecartsGlobaux = sortedHistorique.map(c => calculateResults(c).combines.ecart);
+
+        const options = {
+            chart: {
+                type: 'line',
+                height: 350
+            },
+            series: [
+                {
+                    name: 'Ventes totales',
+                    data: ventesTotales
+                },
+                {
+                    name: 'Écart global',
+                    data: ecartsGlobaux
+                }
+            ],
+            xaxis: {
+                categories: dates
+            },
+            yaxis: {
+                labels: {
+                    formatter: function (value) {
+                        return formatEuros(value);
+                    }
+                }
+            },
+            colors: ['#3498db', '#e74c3c'],
+            tooltip: {
+                y: {
+                    formatter: function (value) {
+                        return formatEuros(value);
+                    }
+                }
+            }
+        };
+
+        globalChart = new ApexCharts(globalChartContainer, options);
+        globalChart.render();
+    }
+
     function renderHistoriqueCards(historique) {
         historyGrid.innerHTML = '';
         if (historique.length === 0) {
@@ -218,6 +309,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         historique.forEach(comptage => {
             const calculated = calculateResults(comptage);
+            const caisseVentesData = Object.entries(globalConfig.nomsCaisses).map(([num, nom]) => {
+                return calculated.caisses[num]?.ventes || 0;
+            });
             const cardHtml = `
                 <div class="history-card" data-comptage='${JSON.stringify(comptage)}'>
                     <div class="history-card-header">
@@ -237,16 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </span>
                         </div>
                         <hr class="card-divider">
-                        ${Object.entries(globalConfig.nomsCaisses).map(([num, nom]) => {
-                            const ecart = calculated.caisses[num]?.ecart || 0;
-                            return `
-                            <div class="summary-line">
-                                <div class="caisse-name">Écart ${nom}</div>
-                                <span class="${ecart > 0.001 ? 'ecart-positif' : (ecart < -0.001 ? 'ecart-negatif' : '')}">
-                                    ${formatEuros(ecart)}
-                                </span>
-                            </div>`;
-                        }).join('')}
+                        <div class="mini-chart-container"></div>
                     </div>
                     <div class="history-card-footer no-export">
                         <button class="action-btn-small details-all-btn"><i class="fa-solid fa-layer-group"></i> Ensemble</button>
@@ -260,11 +345,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button type="button" class="action-btn-small delete-btn delete-comptage-btn" data-id-to-delete="${comptage.id}"><i class="fa-solid fa-trash-can"></i></button>
                     </div>
                 </div>`;
+            
             historyGrid.innerHTML += cardHtml;
+            const lastCard = historyGrid.lastElementChild;
+            const miniChartElement = lastCard.querySelector('.mini-chart-container');
+            renderMiniChart(miniChartElement, caisseVentesData);
         });
     }
 
-    // NOUVELLE LOGIQUE : Fonction pour rendre la pagination
     function renderPagination(currentPage, totalPages) {
         if (!paginationNav) return;
         paginationNav.innerHTML = '';
@@ -278,14 +366,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let paginationHtml = '<ul class="pagination">';
 
-        // Bouton Précédent
         if (currentPage > 1) {
             paginationHtml += `<li><a href="#" data-page="${currentPage - 1}">« Préc.</a></li>`;
         } else {
             paginationHtml += `<li class="disabled"><span>« Préc.</span></li>`;
         }
 
-        // Liens des pages
         for (let i = start; i <= end; i++) {
             if (i === currentPage) {
                 paginationHtml += `<li class="active"><span>${i}</span></li>`;
@@ -294,7 +380,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Bouton Suivant
         if (currentPage < totalPages) {
             paginationHtml += `<li><a href="#" data-page="${currentPage + 1}">Suiv. »</a></li>`;
         } else {
@@ -305,7 +390,6 @@ document.addEventListener('DOMContentLoaded', function() {
         paginationNav.innerHTML = paginationHtml;
     }
 
-    // NOUVELLE LOGIQUE : Fonction pour calculer les totaux côté client
     function calculateResults(data_row) {
         const results = { caisses: {}, combines: { total_compté: 0, recette_reelle: 0, ecart: 0, recette_theorique: 0 }};
         const noms_caisses = globalConfig.nomsCaisses;
@@ -338,7 +422,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return results;
     }
 
-    // NOUVELLE LOGIQUE : Fonction principale pour charger les données via AJAX
     function loadHistoriqueData(params) {
         const query = new URLSearchParams(params).toString();
         fetch(`index.php?action=get_historique_data&${query}`)
@@ -346,6 +429,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 renderHistoriqueCards(data.historique);
                 renderPagination(data.page_courante, data.pages_totales);
+                renderGlobalChart(data.historique_complet);
             })
             .catch(error => {
                 console.error("Erreur de chargement de l'historique:", error);
@@ -353,7 +437,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    // NOUVELLE LOGIQUE : Gestion de la soumission du formulaire et de la pagination
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         const formData = new FormData(form);
@@ -361,12 +444,11 @@ document.addEventListener('DOMContentLoaded', function() {
         for (const [key, value] of formData.entries()) {
             params[key] = value;
         }
-        params.page = 'historique'; // Garde la page 'historique'
+        params.page = 'historique';
         history.pushState(null, '', `?${new URLSearchParams(params).toString()}`);
         loadHistoriqueData(params);
     });
     
-    // NOUVELLE LOGIQUE : Gestion des clics sur les boutons de pagination
     if (paginationNav) {
         paginationNav.addEventListener('click', function(e) {
             const link = e.target.closest('a');
@@ -381,7 +463,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // NOUVELLE LOGIQUE : Gestion de la suppression via AJAX
     historyGrid.addEventListener('click', function(e) {
         const deleteButton = e.target.closest('.delete-comptage-btn');
         if (deleteButton) {
@@ -401,7 +482,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.success) {
                         const cardToRemove = deleteButton.closest('.history-card');
                         cardToRemove.remove();
-                        // Recharge les données pour mettre à jour la pagination si nécessaire
                         loadHistoriqueData(Object.fromEntries(new URLSearchParams(window.location.search).entries()));
                     } else {
                         alert(data.message || 'Erreur lors de la suppression.');
@@ -415,7 +495,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Événements pour les filtres rapides
     if (quickFilterBtns) {
         quickFilterBtns.forEach(btn => {
             btn.addEventListener('click', function() {
@@ -430,7 +509,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 form.querySelector('#date_debut').value = formatDate(startDate);
                 form.querySelector('#date_fin').value = formatDate(today);
                 
-                // Mettre à jour l'URL et charger les données
                 const params = {
                     page: 'historique',
                     date_debut: formatDate(startDate),
@@ -442,7 +520,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Gère le bouton de réinitialisation des filtres
     if (resetBtn) {
         resetBtn.addEventListener('click', function(e) {
             e.preventDefault();
@@ -454,7 +531,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Lancement initial au chargement de la page
     const initialParams = Object.fromEntries(new URLSearchParams(window.location.search).entries());
     loadHistoriqueData(initialParams);
 

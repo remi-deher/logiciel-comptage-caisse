@@ -109,7 +109,6 @@ require_once __DIR__ . '/partials/navbar.php';
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <?php
 require_once __DIR__ . '/partials/footer.php';
 ?>

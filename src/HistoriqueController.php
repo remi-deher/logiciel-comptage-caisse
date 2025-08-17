@@ -10,7 +10,7 @@ class HistoriqueController {
     private $denominations;
     private $tpe_par_caisse;
     private $versionService;
-    private $filterService; // Ajout du service de filtre
+    private $filterService;
 
     public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse) {
         $this->pdo = $pdo;
@@ -18,7 +18,7 @@ class HistoriqueController {
         $this->denominations = $denominations;
         $this->tpe_par_caisse = $tpe_par_caisse;
         $this->versionService = new VersionService();
-        $this->filterService = new FilterService(); // Initialisation
+        $this->filterService = new FilterService();
     }
 
     public function historique() {
@@ -56,14 +56,22 @@ class HistoriqueController {
         $stmt_count->execute($bind_values);
         $total_comptages = $stmt_count->fetchColumn();
         $pages_totales = ceil($total_comptages / $comptages_par_page);
-
-        $sql_data = "SELECT * FROM comptages" . $sql_where . " ORDER BY date_comptage DESC LIMIT {$comptages_par_page} OFFSET {$offset}";
-        $stmt_data = $this->pdo->prepare($sql_data);
-        $stmt_data->execute($bind_values);
-        $historique = $stmt_data->fetchAll();
+        
+        // Requête pour les données paginées
+        $sql_paged_data = "SELECT * FROM comptages" . $sql_where . " ORDER BY date_comptage DESC LIMIT {$comptages_par_page} OFFSET {$offset}";
+        $stmt_paged_data = $this->pdo->prepare($sql_paged_data);
+        $stmt_paged_data->execute($bind_values);
+        $historique = $stmt_paged_data->fetchAll();
+        
+        // Requête pour TOUTES les données filtrées (pour le graphique global)
+        $sql_all_data = "SELECT * FROM comptages" . $sql_where . " ORDER BY date_comptage ASC";
+        $stmt_all_data = $this->pdo->prepare($sql_all_data);
+        $stmt_all_data->execute($bind_values);
+        $historique_complet = $stmt_all_data->fetchAll();
         
         $response_data = [
             'historique' => $historique,
+            'historique_complet' => $historique_complet,
             'page_courante' => $page_courante,
             'pages_totales' => $pages_totales,
             'nombre_caisses' => count($this->noms_caisses),
