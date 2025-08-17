@@ -212,7 +212,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const chartColors = ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6'];
     
-    // CORRIGÉ: Fonction de rendu des mini-graphiques avec ApexCharts
     function renderMiniChart(element, data) {
         if (!data || data.every(val => val === 0)) {
             element.innerHTML = '<p class="no-chart-data">Pas de données de vente.</p>';
@@ -305,7 +304,6 @@ document.addEventListener('DOMContentLoaded', function() {
         globalChart.render();
     }
 
-    // CORRIGÉ: Fonction de rendu des cartes pour éviter le problème d'innerHTML
     function renderHistoriqueCards(historique) {
         historyGrid.innerHTML = '';
         if (historique.length === 0) {
@@ -318,12 +316,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return calculated.caisses[num]?.ventes || 0;
             });
 
-            // Crée un conteneur pour la carte
             const cardDiv = document.createElement('div');
             cardDiv.classList.add('history-card');
             cardDiv.dataset.comptage = JSON.stringify(comptage);
 
-            // Génère le HTML pour le contenu de la carte
             cardDiv.innerHTML = `
                 <div class="history-card-header">
                     <h4>${comptage.nom_comptage}</h4>
@@ -356,15 +352,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button type="button" class="action-btn-small delete-btn delete-comptage-btn" data-id-to-delete="${comptage.id}"><i class="fa-solid fa-trash-can"></i></button>
                 </div>`;
             
-            // Ajoute la nouvelle carte à la grille
             historyGrid.appendChild(cardDiv);
             
-            // Trouve le conteneur du graphique dans la carte nouvellement ajoutée et rend le graphique
             const miniChartElement = cardDiv.querySelector('.mini-chart-container');
             renderMiniChart(miniChartElement, caisseVentesData);
         });
     }
-
 
     function renderPagination(currentPage, totalPages) {
         if (!paginationNav) return;
@@ -443,12 +436,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderHistoriqueCards(data.historique);
                 renderPagination(data.page_courante, data.pages_totales);
                 renderGlobalChart(data.historique_complet);
+                
+                // NOUVEAU : Met à jour les boutons de filtre rapide
+                updateQuickFilterButtons(params);
             })
             .catch(error => {
                 console.error("Erreur de chargement de l'historique:", error);
                 historyGrid.innerHTML = '<p>Erreur lors du chargement des données. Veuillez réessayer.</p>';
             });
     }
+
+    // NOUVELLE FONCTION : Met à jour la classe "active" sur les boutons de filtre rapide
+    function updateQuickFilterButtons(params) {
+        // Retire la classe 'active' de tous les boutons
+        quickFilterBtns.forEach(btn => btn.classList.remove('active'));
+
+        if (params.date_debut && params.date_fin) {
+            // Vérifie si les dates correspondent à un filtre rapide
+            const today = new Date();
+            const formatDate = (date) => date.toISOString().split('T')[0];
+            
+            const start = params.date_debut;
+            const end = params.date_fin;
+
+            quickFilterBtns.forEach(btn => {
+                const days = parseInt(btn.dataset.days);
+                const startDate = new Date();
+                startDate.setDate(today.getDate() - days);
+                
+                const filterStart = formatDate(startDate);
+                const filterEnd = formatDate(today);
+
+                if (start === filterStart && end === filterEnd) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+    }
+
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -511,22 +536,26 @@ document.addEventListener('DOMContentLoaded', function() {
     if (quickFilterBtns) {
         quickFilterBtns.forEach(btn => {
             btn.addEventListener('click', function() {
+                // NOUVEAU : Réinitialise d'abord les autres filtres
+                document.getElementById('date_debut').value = '';
+                document.getElementById('date_fin').value = '';
+
                 const days = parseInt(this.dataset.days);
                 const today = new Date();
                 const startDate = new Date();
-                startDate.setDate(today.getDate() - days);
-
+                if (days > 0) { startDate.setDate(today.getDate() - days); }
                 const formatDate = (date) => date.toISOString().split('T')[0];
-
-                const form = document.getElementById('history-filter-form');
-                form.querySelector('#date_debut').value = formatDate(startDate);
-                form.querySelector('#date_fin').value = formatDate(today);
                 
                 const params = {
                     page: 'historique',
                     date_debut: formatDate(startDate),
                     date_fin: formatDate(today)
                 };
+                
+                // Mettre à jour les champs de formulaire pour un affichage visuel
+                document.getElementById('date_debut').value = params.date_debut;
+                document.getElementById('date_fin').value = params.date_fin;
+
                 history.pushState(null, '', `?${new URLSearchParams(params).toString()}`);
                 loadHistoriqueData(params);
             });

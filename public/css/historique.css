@@ -349,3 +349,13 @@ body[data-theme="dark"] .modal-details-table th { background-color: #495057; }
     .history-grid { grid-template-columns: 1fr; }
     .pagination li a, .pagination li span { padding: 6px 12px; font-size: 0.9em; }
 }
+
+/* NOUVEAU : Style pour le bouton actif */
+.quick-filter-btn.active {
+    background-color: var(--color-success);
+    color: white;
+    border-color: var(--color-success);
+    font-weight: bold;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
