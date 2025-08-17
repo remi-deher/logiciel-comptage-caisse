@@ -1,7 +1,7 @@
 <?php
 // templates/calculateur.php
 
-$page_js = 'calculator.js'; // Définit le script JS spécifique à cette page
+$page_js = 'calculator-core.js'; // Définit le script JS spécifique à cette page
 
 require 'partials/header.php';
 require 'partials/navbar.php';
@@ -182,7 +182,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
         </div>
     </div>
 </div>
-
+<script src="js/realtime.js"></script>
 <?php
 require 'partials/footer.php';
 ?>
