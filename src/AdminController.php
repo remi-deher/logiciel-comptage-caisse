@@ -30,6 +30,8 @@ class AdminController {
                 case 'update_db_config': $this->updateDbConfig(); break;
                 case 'update_app_config': $this->updateAppConfig(); break;
                 case 'update_withdrawal_config': $this->updateWithdrawalConfig(); break;
+                // NOUVEAU: Gère l'action de mise à jour des dénominations
+                case 'update_denominations_config': $this->updateDenominationsConfig(); break;
                 
                 // Actions de sauvegarde
                 case 'create_backup': $this->createBackup(); break;
@@ -74,6 +76,13 @@ class AdminController {
         
         $page_css = 'admin.css';
         require __DIR__ . '/../templates/admin.php';
+    }
+
+    // NOUVELLE MÉTHODE POUR METTRE À JOUR LES DÉNOMINATIONS
+    private function updateDenominationsConfig() {
+        $updates = ['denominations' => $_POST['denominations'] ?? []];
+        $result = $this->configService->updateConfigFile($updates);
+        $_SESSION['admin_message'] = $result['success'] ? "Configuration des dénominations mise à jour." : $result['message'];
     }
 
     private function updateWithdrawalConfig() {

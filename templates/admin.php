@@ -16,32 +16,90 @@
     <?php endif; ?>
 
     <div class="admin-grid">
-        <!-- NOUVELLE CARTE: Configuration des Retraits -->
+        <!-- NOUVELLE CARTE: Configuration des Dénominations -->
+        <div class="admin-card full-width-card">
+            <h3><i class="fa-solid fa-money-bill-wave"></i> Configuration des Dénominations et des Retraits</h3>
+            <div class="admin-card-content">
+                <p>Gérez la devise de votre caisse et définissez les dénominations et les quantités minimales à conserver.</p>
+
+                <div class="form-group">
+                    <label for="currency-selector">Sélectionner une devise prédéfinie</label>
+                    <select id="currency-selector" class="inline-input">
+                        <option value="EUR" selected>Euro (€)</option>
+                        <option value="USD">Dollar Américain ($)</option>
+                        <option value="JPY">Yen Japonais (¥)</option>
+                        <option value="GBP">Livre Sterling (£)</option>
+                        <option value="CHF">Franc Suisse (CHF)</option>
+                        <option value="CAD">Dollar Canadien (CA$)</option>
+                        <option value="AUD">Dollar Australien (AU$)</option>
+                    </select>
+                </div>
+
+                <form id="denominations-form" action="index.php?page=admin" method="POST">
+                    <input type="hidden" name="action" value="update_denominations_config">
+                    <div class="withdrawal-grid">
+                        <div class="grid-column">
+                            <h4>Billets</h4>
+                            <div id="billets-container">
+                                <?php foreach($denominations['billets'] as $name => $value): ?>
+                                <div class="form-group denomination-item">
+                                    <label for="billet_<?= htmlspecialchars($name) ?>">Valeur</label>
+                                    <input type="number" id="billet_<?= htmlspecialchars($name) ?>" name="denominations[billets][<?= htmlspecialchars($name) ?>]" value="<?= htmlspecialchars($value) ?>" min="1" step="1">
+                                    <button type="button" class="action-btn-small delete-btn remove-denomination">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <button type="button" class="new-btn add-denomination" data-type="billets"><i class="fa-solid fa-plus"></i> Ajouter un billet</button>
+                        </div>
+                        <div class="grid-column">
+                            <h4>Pièces</h4>
+                            <div id="pieces-container">
+                                <?php foreach($denominations['pieces'] as $name => $value): ?>
+                                <div class="form-group denomination-item">
+                                    <label for="piece_<?= htmlspecialchars($name) ?>">Valeur</label>
+                                    <input type="number" id="piece_<?= htmlspecialchars($name) ?>" name="denominations[pieces][<?= htmlspecialchars($name) ?>]" value="<?= htmlspecialchars($value) ?>" min="0.01" step="0.01">
+                                    <button type="button" class="action-btn-small delete-btn remove-denomination">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <button type="button" class="new-btn add-denomination" data-type="pieces"><i class="fa-solid fa-plus"></i> Ajouter une pièce</button>
+                        </div>
+                    </div>
+                    <button type="submit" class="save-btn mt-4"><i class="fa-solid fa-floppy-disk"></i> Enregistrer les dénominations</button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- CARTE : Configuration des Retraits -->
         <div class="admin-card full-width-card">
             <h3><i class="fa-solid fa-sack-dollar"></i> Configuration des Retraits</h3>
             <div class="admin-card-content">
                 <p>Définissez la quantité minimale de chaque dénomination à conserver dans la caisse lors d'une suggestion de retrait.</p>
-                <form action="index.php?page=admin" method="POST">
+                <form id="withdrawal-form" action="index.php?page=admin" method="POST">
                     <input type="hidden" name="action" value="update_withdrawal_config">
                     <div class="withdrawal-grid">
                         <div class="grid-column">
                             <h4>Billets</h4>
-                            <div class="grid">
+                            <div class="grid" id="min-billets-container">
                                 <?php foreach($denominations['billets'] as $name => $value): ?>
                                 <div class="form-group">
-                                    <label for="min_<?= $name ?>">Min. <?= $value ?> €</label>
-                                    <input type="number" id="min_<?= $name ?>" name="min_to_keep[<?= $name ?>]" value="<?= htmlspecialchars($min_to_keep[$name] ?? 0) ?>" min="0" step="1">
+                                    <label for="min_<?= htmlspecialchars($name) ?>">Min. <?= htmlspecialchars($value) ?> €</label>
+                                    <input type="number" id="min_<?= htmlspecialchars($name) ?>" name="min_to_keep[<?= htmlspecialchars($name) ?>]" value="<?= htmlspecialchars($min_to_keep[$name] ?? 0) ?>" min="0" step="1">
                                 </div>
                                 <?php endforeach; ?>
                             </div>
                         </div>
                         <div class="grid-column">
                             <h4>Pièces</h4>
-                            <div class="grid">
+                            <div class="grid" id="min-pieces-container">
                                 <?php foreach($denominations['pieces'] as $name => $value): ?>
                                 <div class="form-group">
-                                    <label for="min_<?= $name ?>">Min. <?= $value >= 1 ? $value.' €' : ($value*100).' cts' ?></label>
-                                    <input type="number" id="min_<?= $name ?>" name="min_to_keep[<?= $name ?>]" value="<?= htmlspecialchars($min_to_keep[$name] ?? 0) ?>" min="0" step="1">
+                                    <label for="min_<?= htmlspecialchars($name) ?>">Min. <?= htmlspecialchars($value >= 1 ? $value.' €' : ($value*100).' cts') ?></label>
+                                    <input type="number" id="min_<?= htmlspecialchars($name) ?>" name="min_to_keep[<?= htmlspecialchars($name) ?>]" value="<?= htmlspecialchars($min_to_keep[$name] ?? 0) ?>" min="0" step="1">
                                 </div>
                                 <?php endforeach; ?>
                             </div>
@@ -221,4 +279,223 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const currencySelector = document.getElementById('currency-selector');
+    const denominationsForm = document.getElementById('denominations-form');
+    const withdrawalForm = document.getElementById('withdrawal-form');
+    const billetsContainer = document.getElementById('billets-container');
+    const piecesContainer = document.getElementById('pieces-container');
+    const minBilletsContainer = document.getElementById('min-billets-container');
+    const minPiecesContainer = document.getElementById('min-pieces-container');
+
+    const currenciesData = {
+        'EUR': {
+            symbol: '€',
+            billets: { 'b500': 500, 'b200': 200, 'b100': 100, 'b50': 50, 'b20': 20, 'b10': 10, 'b5': 5 },
+            pieces: { 'p200': 2, 'p100': 1, 'p050': 0.50, 'p020': 0.20, 'p010': 0.10, 'p005': 0.05, 'p002': 0.02, 'p001': 0.01 },
+            min_to_keep: { 'b5': 2, 'p200': 5, 'p100': 10 }
+        },
+        'USD': {
+            symbol: '$',
+            billets: { 'b100': 100, 'b50': 50, 'b20': 20, 'b10': 10, 'b5': 5, 'b2': 2, 'b1': 1 },
+            pieces: { 'p100': 1, 'p050': 0.50, 'p025': 0.25, 'p010': 0.10, 'p005': 0.05, 'p001': 0.01 },
+            min_to_keep: { 'b1': 5, 'b5': 5, 'p100': 20 }
+        },
+        'JPY': {
+            symbol: '¥',
+            billets: { 'b10000': 10000, 'b5000': 5000, 'b2000': 2000, 'b1000': 1000 },
+            pieces: { 'p500': 500, 'p100': 100, 'p50': 50, 'p10': 10, 'p5': 5, 'p1': 1 },
+            min_to_keep: { 'b1000': 10, 'p500': 10, 'p100': 20 }
+        },
+        'GBP': {
+            symbol: '£',
+            billets: { 'b50': 50, 'b20': 20, 'b10': 10, 'b5': 5 },
+            pieces: { 'p200': 2, 'p100': 1, 'p050': 0.50, 'p020': 0.20, 'p010': 0.10, 'p005': 0.05, 'p002': 0.02, 'p001': 0.01 },
+            min_to_keep: { 'b5': 5, 'p200': 5, 'p100': 10 }
+        },
+        'CHF': {
+            symbol: 'CHF',
+            billets: { 'b1000': 1000, 'b200': 200, 'b100': 100, 'b50': 50, 'b20': 20, 'b10': 10 },
+            pieces: { 'p500': 5, 'p200': 2, 'p100': 1, 'p050': 0.50, 'p020': 0.20, 'p010': 0.10, 'p005': 0.05 },
+            min_to_keep: { 'b10': 10, 'p500': 5 }
+        },
+        'CAD': {
+            symbol: 'CA$',
+            billets: { 'b100': 100, 'b50': 50, 'b20': 20, 'b10': 10, 'b5': 5 },
+            pieces: { 'p200': 2, 'p100': 1, 'p025': 0.25, 'p010': 0.10, 'p005': 0.05, 'p001': 0.01 },
+            min_to_keep: { 'b5': 5, 'p200': 5 }
+        },
+        'AUD': {
+            symbol: 'AU$',
+            billets: { 'b100': 100, 'b50': 50, 'b20': 20, 'b10': 10, 'b5': 5 },
+            pieces: { 'p200': 2, 'p100': 1, 'p050': 0.50, 'p020': 0.20, 'p010': 0.10, 'p005': 0.05 },
+            min_to_keep: { 'b5': 5, 'p200': 5, 'p100': 10 }
+        }
+    };
+    
+    // Fonction pour générer les champs de formulaire de dénominations
+    function renderDenominations(currencyCode) {
+        const currency = currenciesData[currencyCode];
+        if (!currency) return;
+
+        billetsContainer.innerHTML = '';
+        minBilletsContainer.innerHTML = '';
+        piecesContainer.innerHTML = '';
+        minPiecesContainer.innerHTML = '';
+
+        Object.entries(currency.billets).forEach(([name, value]) => {
+            const billetItem = document.createElement('div');
+            billetItem.className = 'form-group denomination-item';
+            billetItem.innerHTML = `
+                <label for="billet_${name}">Valeur</label>
+                <input type="number" id="billet_${name}" name="denominations[billets][${name}]" value="${value}" min="1" step="1">
+                <button type="button" class="action-btn-small delete-btn remove-denomination">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            `;
+            billetsContainer.appendChild(billetItem);
+
+            const minBilletItem = document.createElement('div');
+            minBilletItem.className = 'form-group';
+            const minBilletValue = currency.min_to_keep[name] || 0;
+            minBilletItem.innerHTML = `
+                <label for="min_${name}">Min. ${value} ${currency.symbol}</label>
+                <input type="number" id="min_${name}" name="min_to_keep[${name}]" value="${minBilletValue}" min="0" step="1">
+            `;
+            minBilletsContainer.appendChild(minBilletItem);
+        });
+
+        Object.entries(currency.pieces).forEach(([name, value]) => {
+            const pieceItem = document.createElement('div');
+            pieceItem.className = 'form-group denomination-item';
+            const label = value >= 1 ? `${value}` : `${value * 100} cts`;
+            pieceItem.innerHTML = `
+                <label for="piece_${name}">Valeur</label>
+                <input type="number" id="piece_${name}" name="denominations[pieces][${name}]" value="${value}" min="0.01" step="0.01">
+                <button type="button" class="action-btn-small delete-btn remove-denomination">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            `;
+            piecesContainer.appendChild(pieceItem);
+            
+            const minPieceItem = document.createElement('div');
+            minPieceItem.className = 'form-group';
+            const minPieceValue = currency.min_to_keep[name] || 0;
+            minPieceItem.innerHTML = `
+                <label for="min_${name}">Min. ${label} ${currency.symbol}</label>
+                <input type="number" id="min_${name}" name="min_to_keep[${name}]" value="${minPieceValue}" min="0" step="1">
+            `;
+            minPiecesContainer.appendChild(minPieceItem);
+        });
+    }
+
+    // Événement pour ajouter dynamiquement un nouveau champ de dénomination
+    document.querySelectorAll('.add-denomination').forEach(button => {
+        button.addEventListener('click', function() {
+            const type = this.dataset.type; // 'billets' ou 'pieces'
+            const container = document.getElementById(type + '-container');
+            const uniqueId = 'new_' + Date.now();
+            const labelText = (type === 'billets') ? 'Valeur' : 'Valeur';
+            const stepValue = (type === 'billets') ? '1' : '0.01';
+            const currentSymbol = currenciesData[currencySelector.value]?.symbol || '€';
+
+            const newFieldHtml = `
+                <div class="form-group denomination-item">
+                    <label for="${type}_${uniqueId}">${labelText}</label>
+                    <input type="number" id="${type}_${uniqueId}" name="denominations[${type}][${uniqueId}]" min="${stepValue}" step="${stepValue}">
+                    <button type="button" class="action-btn-small delete-btn remove-denomination">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', newFieldHtml);
+            
+            const minContainer = (type === 'billets') ? minBilletsContainer : minPiecesContainer;
+            const newMinFieldHtml = `
+                <div class="form-group">
+                    <label for="min_${uniqueId}">Min. <span class="denomination-value"></span> ${currentSymbol}</label>
+                    <input type="number" id="min_${uniqueId}" name="min_to_keep[${uniqueId}]" value="0" min="0" step="1">
+                </div>
+            `;
+            minContainer.insertAdjacentHTML('beforeend', newMinFieldHtml);
+            
+            const newDenominationInput = document.getElementById(`${type}_${uniqueId}`);
+            const newMinLabel = document.querySelector(`label[for="min_${uniqueId}"]`);
+            newDenominationInput.addEventListener('input', function() {
+                const value = this.value;
+                const labelText = (type === 'billets') ? `${value} ${currentSymbol}` : `${value >= 1 ? `${value} ${currentSymbol}` : `${value * 100} cts`}`;
+                if(newMinLabel) newMinLabel.innerHTML = `Min. ${labelText}`;
+            });
+        });
+    });
+
+    // Événement pour supprimer dynamiquement un champ de dénomination
+    document.addEventListener('click', function(event) {
+        if (event.target.closest('.remove-denomination')) {
+            const denominationItem = event.target.closest('.denomination-item');
+            const inputId = denominationItem.querySelector('input').id;
+            const uniqueId = inputId.split('_')[1];
+            
+            // Remove the main denomination item
+            denominationItem.remove();
+
+            // Find and remove the corresponding min_to_keep item
+            const minItem = document.getElementById(`min_${uniqueId}`)?.closest('.form-group');
+            if (minItem) {
+                minItem.remove();
+            }
+        }
+    });
+
+    // Événement pour le sélecteur de devise
+    if (currencySelector) {
+        currencySelector.addEventListener('change', (event) => {
+            renderDenominations(event.target.value);
+        });
+    }
+    
+    // Initialisation avec la devise par défaut
+    // J'ai enlevé l'appel ici pour que l'initialisation se fasse via PHP pour les valeurs par défaut
+    // et que le JS ne prenne le relais qu'au changement.
+
+    // Correction: On initialise le formulaire min_to_keep en se basant sur les dénominations de la page
+    const denominationsFromPage = {
+        billets: {},
+        pieces: {}
+    };
+    document.querySelectorAll('#billets-container .denomination-item input').forEach(input => {
+        const name = input.id.split('_')[1];
+        denominationsFromPage.billets[name] = parseFloat(input.value);
+    });
+    document.querySelectorAll('#pieces-container .denomination-item input').forEach(input => {
+        const name = input.id.split('_')[1];
+        denominationsFromPage.pieces[name] = parseFloat(input.value);
+    });
+
+    // On s'assure que les labels de min_to_keep sont corrects au chargement
+    function updateMinToKeepLabels() {
+        const currentDenominations = denominationsFromPage;
+        const currentSymbol = '€'; // On suppose que la page est chargée avec l'euro par défaut
+
+        Object.entries(currentDenominations.billets).forEach(([name, value]) => {
+            const labelEl = document.querySelector(`label[for="min_${name}"]`);
+            if (labelEl) {
+                labelEl.innerHTML = `Min. ${value} ${currentSymbol}`;
+            }
+        });
+
+        Object.entries(currentDenominations.pieces).forEach(([name, value]) => {
+            const labelEl = document.querySelector(`label[for="min_${name}"]`);
+            if (labelEl) {
+                const labelText = value >= 1 ? `${value} ${currentSymbol}` : `${value * 100} cts`;
+                labelEl.innerHTML = `Min. ${labelText}`;
+            }
+        });
+    }
+    updateMinToKeepLabels();
+});
+</script>
+
 <?php require __DIR__ . '/partials/footer.php'; ?>
