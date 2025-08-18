@@ -104,7 +104,7 @@ class HistoriqueController {
                 cd.id as comptage_detail_id,
                 GROUP_CONCAT(CONCAT(d.denomination_nom, ':', d.quantite) SEPARATOR ';') as denominations
             FROM comptages c
-            JOIN comptage_details cd ON c.id = cd.comptage_id
+            LEFT JOIN comptage_details cd ON c.id = cd.comptage_id
             LEFT JOIN comptage_denominations d ON cd.id = d.comptage_detail_id
             WHERE c.id IN ({$placeholders})
             GROUP BY c.id, cd.caisse_id
