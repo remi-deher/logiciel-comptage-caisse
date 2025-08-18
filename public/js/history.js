@@ -425,9 +425,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function loadHistoriqueData(params) {
         const query = new URLSearchParams(params).toString();
-        fetch(`index.php?action=get_historique_data&${query}`)
+        // Ajout d'un paramètre anti-cache pour forcer le rechargement
+        const cacheBuster = `&_=${new Date().getTime()}`;
+        
+        fetch(`index.php?action=get_historique_data&${query}${cacheBuster}`)
             .then(response => response.json())
             .then(data => {
+                // Débogage : Affiche les données brutes reçues du serveur
+                console.log("Données de l'historique reçues:", data);
                 renderHistoriqueCards(data.historique);
                 renderPagination(data.page_courante, data.pages_totales);
                 renderGlobalChart(data.historique_complet);

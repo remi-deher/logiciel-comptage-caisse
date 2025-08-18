@@ -20,9 +20,13 @@ $current_currency_code = defined('APP_CURRENCY') ? APP_CURRENCY : 'EUR';
 // Lit le symbole de la devise depuis les données chargées, avec un fallback si non trouvé
 $current_currency_symbol = $currenciesData[$current_currency_code]['symbol'] ?? '€';
 
-define('APP_CURRENCY', $current_currency_code);
-define('APP_CURRENCY_SYMBOL', $current_currency_symbol);
-
+// CORRECTION : S'assure que les constantes ne sont définies qu'une seule fois
+if (!defined('APP_CURRENCY')) {
+    define('APP_CURRENCY', $current_currency_code);
+}
+if (!defined('APP_CURRENCY_SYMBOL')) {
+    define('APP_CURRENCY_SYMBOL', $current_currency_symbol);
+}
 
 // REDIRECTION VERS L'INSTALLATEUR SI L'APPLICATION N'EST PAS CONFIGURÉE
 if (!file_exists(__DIR__ . '/../config/config.php')) {

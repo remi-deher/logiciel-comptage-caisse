@@ -1,5 +1,5 @@
 <?php
-// src/HistoriqueController.php - Version mise à jour pour le schéma normalisé.
+// src/HistoriqueController.php - Version corrigée pour le chargement des données.
 
 require_once 'services/VersionService.php';
 require_once 'Utils.php';
@@ -29,9 +29,6 @@ class HistoriqueController {
         $message = $_SESSION['message'] ?? null;
         unset($_SESSION['message']);
         
-        // Les variables pour la vue sont définies dans getHistoriqueDataJson()
-        // La vue se chargera d'appeler le JS qui fera la requête AJAX.
-        
         $noms_caisses = $this->noms_caisses;
         $denominations = $this->denominations;
         $nombre_caisses = count($this->noms_caisses);
@@ -51,7 +48,6 @@ class HistoriqueController {
         $date_fin = $_GET['date_fin'] ?? '';
         $recherche = $_GET['recherche'] ?? '';
         
-        // Nouvelle requête pour compter le total des comptages
         $filter_params = $this->filterService->getWhereClauseAndBindings($date_debut, $date_fin, $recherche, null, 'tout');
         $sql_where = $filter_params['sql_where'];
         $bind_values = $filter_params['bind_values'];
@@ -61,7 +57,6 @@ class HistoriqueController {
         $total_comptages = $stmt_count->fetchColumn();
         $pages_totales = ceil($total_comptages / $comptages_par_page);
         
-        // Requête pour les ID des comptages paginés
         $sql_paged_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage DESC LIMIT {$comptages_par_page} OFFSET {$offset}";
         $stmt_paged_ids = $this->pdo->prepare($sql_paged_ids);
         $stmt_paged_ids->execute($bind_values);
@@ -72,7 +67,6 @@ class HistoriqueController {
             $historique = $this->fetchComptagesDetails($comptage_ids);
         }
 
-        // Requête pour TOUTES les données filtrées (pour le graphique global)
         $sql_all_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage ASC";
         $stmt_all_ids = $this->pdo->prepare($sql_all_ids);
         $stmt_all_ids->execute($bind_values);
@@ -97,8 +91,9 @@ class HistoriqueController {
         exit;
     }
 
-    // Nouvelle fonction pour charger les données complètes de plusieurs comptages
     private function fetchComptagesDetails(array $comptage_ids) {
+        if (empty($comptage_ids)) return [];
+
         $historique = [];
         $placeholders = implode(',', array_fill(0, count($comptage_ids), '?'));
 
@@ -154,7 +149,6 @@ class HistoriqueController {
         header('Content-Type: application/json');
         $id_a_supprimer = intval($_POST['id_a_supprimer'] ?? 0);
         if ($id_a_supprimer > 0) {
-            // La suppression en cascade gère la suppression des détails et dénominations
             $stmt = $this->pdo->prepare("DELETE FROM comptages WHERE id = ?");
             if ($stmt->execute([$id_a_supprimer])) {
                 echo json_encode(['success' => true]);
@@ -167,7 +161,6 @@ class HistoriqueController {
         exit;
     }
 
-    // NOUVEAU: Méthode pour exporter au format CSV
     public function exportCsv() {
         $date_debut = $_GET['date_debut'] ?? '';
         $date_fin = $_GET['date_fin'] ?? '';
@@ -190,7 +183,6 @@ class HistoriqueController {
 
         $output = fopen('php://output', 'w');
         
-        // En-têtes CSV
         $header = ['ID', 'Nom', 'Date', 'Explication'];
         foreach ($this->noms_caisses as $id => $nom) {
             $header[] = "Caisse {$id} - Nom";
@@ -206,7 +198,6 @@ class HistoriqueController {
         }
         fputcsv($output, $header, ';');
 
-        // Données
         foreach ($historique as $comptage) {
             $rowData = [$comptage['id'], $comptage['nom_comptage'], $comptage['date_comptage'], $comptage['explication']];
             foreach ($this->noms_caisses as $caisse_id => $nom_caisse) {

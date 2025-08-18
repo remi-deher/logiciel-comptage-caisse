@@ -1,185 +1,220 @@
 <?php
-// src/CalculateurController.php - Version corrigée pour la sauvegarde.
-// Ce contrôleur gère la page du calculateur et les actions de sauvegarde.
+// src/HistoriqueController.php - Version corrigée pour le chargement des données.
+
 require_once 'services/VersionService.php';
 require_once 'Utils.php';
-class CalculateurController {
+require_once 'services/FilterService.php';
+
+class HistoriqueController {
     private $pdo;
     private $noms_caisses;
     private $denominations;
     private $tpe_par_caisse;
     private $versionService;
+    private $filterService;
+
     public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse) {
         $this->pdo = $pdo;
         $this->noms_caisses = $noms_caisses;
         $this->denominations = $denominations;
         $this->tpe_par_caisse = $tpe_par_caisse;
         $this->versionService = new VersionService();
+        $this->filterService = new FilterService();
     }
-    public function calculateur() {
-        $loaded_data = [];
-        $isLoadedFromHistory = false;
-        $isAutosaveLoaded = false;
 
-        // Nouvelle logique de chargement pour le schéma normalisé
-        if (isset($_GET['load'])) {
-            $isLoadedFromHistory = true;
-            $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE id = ?");
-            $stmt->execute([intval($_GET['load'])]);
-            $loaded_comptage = $stmt->fetch() ?: [];
-
-            if ($loaded_comptage) {
-                $loaded_data = $this->loadComptageData($loaded_comptage['id']);
-                $loaded_data['nom_comptage'] = $loaded_comptage['nom_comptage'];
-                $loaded_data['explication'] = $loaded_comptage['explication'];
-            }
-        } else {
-            // Sauvegarde auto
-            $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
-            $stmt->execute();
-            $loaded_comptage = $stmt->fetch() ?: [];
-            if ($loaded_comptage) {
-                $isAutosaveLoaded = true;
-                $loaded_data = $this->loadComptageData($loaded_comptage['id']);
-                $loaded_data['nom_comptage'] = $loaded_comptage['nom_comptage'];
-                $loaded_data['explication'] = $loaded_comptage['explication'];
-            }
-        }
-
+    public function historique() {
+        $historique = [];
+        $pages_totales = 0;
+        $page_courante = 1;
         $message = $_SESSION['message'] ?? null;
         unset($_SESSION['message']);
+        
         $noms_caisses = $this->noms_caisses;
         $denominations = $this->denominations;
-        $page_css = 'calculateur.css';
-        require __DIR__ . '/../templates/calculateur.php';
+        $nombre_caisses = count($this->noms_caisses);
+        $page_css = 'historique.css';
+        
+        require __DIR__ . '/../templates/historique.php';
     }
 
-    // Nouvelle fonction pour charger les données d'un comptage depuis le nouveau schéma
-    private function loadComptageData($comptage_id) {
-        $data = [];
-        $stmt_details = $this->pdo->prepare("SELECT * FROM comptage_details WHERE comptage_id = ?");
-        $stmt_details->execute([$comptage_id]);
-        $details = $stmt_details->fetchAll(PDO::FETCH_ASSOC);
+    public function getHistoriqueDataJson() {
+        header('Content-Type: application/json');
+        
+        $page_courante = isset($_GET['p']) ? (int)$_GET['p'] : 1;
+        $comptages_par_page = 10;
+        $offset = ($page_courante - 1) * $comptages_par_page;
+        
+        $date_debut = $_GET['date_debut'] ?? '';
+        $date_fin = $_GET['date_fin'] ?? '';
+        $recherche = $_GET['recherche'] ?? '';
+        
+        $filter_params = $this->filterService->getWhereClauseAndBindings($date_debut, $date_fin, $recherche, null, 'tout');
+        $sql_where = $filter_params['sql_where'];
+        $bind_values = $filter_params['bind_values'];
 
-        foreach ($details as $detail) {
-            $caisse_id = $detail['caisse_id'];
-            $data[$caisse_id]['fond_de_caisse'] = $detail['fond_de_caisse'];
-            $data[$caisse_id]['ventes'] = $detail['ventes'];
-            $data[$caisse_id]['retrocession'] = $detail['retrocession'];
+        $stmt_count = $this->pdo->prepare("SELECT COUNT(id) FROM comptages" . $sql_where);
+        $stmt_count->execute($bind_values);
+        $total_comptages = $stmt_count->fetchColumn();
+        $pages_totales = ceil($total_comptages / $comptages_par_page);
+        
+        $sql_paged_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage DESC LIMIT {$comptages_par_page} OFFSET {$offset}";
+        $stmt_paged_ids = $this->pdo->prepare($sql_paged_ids);
+        $stmt_paged_ids->execute($bind_values);
+        $comptage_ids = $stmt_paged_ids->fetchAll(PDO::FETCH_COLUMN);
 
-            $stmt_denominations = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
-            $stmt_denominations->execute([$detail['id']]);
-            $denominations = $stmt_denominations->fetchAll(PDO::FETCH_KEY_PAIR);
-
-            $data[$caisse_id]['denominations'] = $denominations;
+        $historique = [];
+        if (!empty($comptage_ids)) {
+            $historique = $this->fetchComptagesDetails($comptage_ids);
         }
-        return $data;
+
+        $sql_all_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage ASC";
+        $stmt_all_ids = $this->pdo->prepare($sql_all_ids);
+        $stmt_all_ids->execute($bind_values);
+        $all_comptage_ids = $stmt_all_ids->fetchAll(PDO::FETCH_COLUMN);
+        
+        $historique_complet = [];
+        if (!empty($all_comptage_ids)) {
+            $historique_complet = $this->fetchComptagesDetails($all_comptage_ids);
+        }
+
+        $response_data = [
+            'historique' => $historique,
+            'historique_complet' => $historique_complet,
+            'page_courante' => $page_courante,
+            'pages_totales' => $pages_totales,
+            'nombre_caisses' => count($this->noms_caisses),
+            'noms_caisses' => $this->noms_caisses,
+            'denominations' => $this->denominations,
+        ];
+        
+        echo json_encode($response_data);
+        exit;
     }
 
-    public function save() { $this->handleSave(false); }
-    public function autosave() { $this->handleSave(true); }
+    private function fetchComptagesDetails(array $comptage_ids) {
+        if (empty($comptage_ids)) return [];
 
-    private function handleSave($is_autosave) {
-        if ($is_autosave) { header('Content-Type: application/json'); ob_start(); }
+        $historique = [];
+        $placeholders = implode(',', array_fill(0, count($comptage_ids), '?'));
 
-        $nom_comptage = trim($_POST['nom_comptage'] ?? '');
-        $explication = trim($_POST['explication'] ?? '');
-        $has_data = false;
-        foreach ($_POST['caisse'] ?? [] as $caisse_data) {
-            foreach ($caisse_data as $value) { if (!empty($value)) { $has_data = true; break 2; } }
-        }
-        if (!$has_data) {
-            if ($is_autosave) { ob_end_clean(); echo json_encode(['success' => false, 'message' => 'Aucune donnée à sauvegarder.']); }
-            else { $_SESSION['message'] = "Aucune donnée n'a été saisie."; header('Location: index.php?page=calculateur'); }
-            exit;
-        }
+        $stmt = $this->pdo->prepare("
+            SELECT 
+                c.id, c.nom_comptage, c.date_comptage, c.explication,
+                cd.caisse_id, cd.fond_de_caisse, cd.ventes, cd.retrocession,
+                cd.id as comptage_detail_id,
+                GROUP_CONCAT(CONCAT(d.denomination_nom, ':', d.quantite) SEPARATOR ';') as denominations
+            FROM comptages c
+            JOIN comptage_details cd ON c.id = cd.comptage_id
+            LEFT JOIN comptage_denominations d ON cd.id = d.comptage_detail_id
+            WHERE c.id IN ({$placeholders})
+            GROUP BY c.id, cd.caisse_id
+            ORDER BY c.date_comptage DESC, cd.caisse_id ASC
+        ");
+        $stmt->execute($comptage_ids);
+        $raw_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        try {
-            $comptage_id = null;
-
-            if ($is_autosave) {
-                // Logique de SAUVEGARDE AUTOMATIQUE
-                $stmt_check = $this->pdo->prepare("SELECT id FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
-                $stmt_check->execute();
-                $existing_autosave_id = $stmt_check->fetchColumn();
-
-                if ($existing_autosave_id) {
-                    // Mise à jour de l'enregistrement principal
-                    $stmt_update_comptage = $this->pdo->prepare("UPDATE comptages SET nom_comptage = ?, explication = ?, date_comptage = ? WHERE id = ?");
-                    $stmt_update_comptage->execute([$nom_comptage, $explication, date('Y-m-d H:i:s'), $existing_autosave_id]);
-                    $comptage_id = $existing_autosave_id;
-                    
-                    // Suppression des détails et dénominations précédents pour pouvoir les réinsérer
-                    $stmt_delete_details = $this->pdo->prepare("DELETE FROM comptage_details WHERE comptage_id = ?");
-                    $stmt_delete_details->execute([$comptage_id]);
-                } else {
-                    // Création d'une nouvelle sauvegarde automatique
-                    $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-                    $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
-                    $comptage_id = $this->pdo->lastInsertId();
-                }
-            } else {
-                // Logique de SAUVEGARDE MANUELLE : On crée toujours un nouvel enregistrement.
-                // 1. On crée un NOUVEL enregistrement de comptage
-                if (empty($nom_comptage)) {
-                    $nom_comptage = "Comptage du " . date('Y-m-d H:i:s');
-                }
-                $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-                $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
-                $comptage_id = $this->pdo->lastInsertId();
-
-                // 2. On supprime l'ancienne sauvegarde automatique pour qu'elle ne soit plus chargée par défaut
-                $stmt_delete_autosave = $this->pdo->prepare("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
-                $stmt_delete_autosave->execute();
+        foreach ($raw_data as $row) {
+            $comptage_id = $row['id'];
+            if (!isset($historique[$comptage_id])) {
+                $historique[$comptage_id] = [
+                    'id' => $comptage_id,
+                    'nom_comptage' => $row['nom_comptage'],
+                    'date_comptage' => $row['date_comptage'],
+                    'explication' => $row['explication'],
+                    'caisses_data' => []
+                ];
             }
-
-            // Étape d'insertion commune pour les détails et les dénominations
-            foreach ($this->noms_caisses as $caisse_id => $nom) {
-                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
-                if (empty($caisse_data)) {
-                    continue;
+            
+            $denominations_array = [];
+            if ($row['denominations']) {
+                $parts = explode(';', $row['denominations']);
+                foreach ($parts as $part) {
+                    list($name, $quantity) = explode(':', $part);
+                    $denominations_array[$name] = $quantity;
                 }
+            }
+            
+            $historique[$comptage_id]['caisses_data'][$row['caisse_id']] = [
+                'fond_de_caisse' => $row['fond_de_caisse'],
+                'ventes' => $row['ventes'],
+                'retrocession' => $row['retrocession'],
+                'denominations' => $denominations_array
+            ];
+        }
 
-                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                $stmt_details->execute([
-                    $comptage_id,
-                    $caisse_id,
-                    get_numeric_value($caisse_data, 'fond_de_caisse'),
-                    get_numeric_value($caisse_data, 'ventes'),
-                    get_numeric_value($caisse_data, 'retrocession')
-                ]);
-                $comptage_detail_id = $this->pdo->lastInsertId();
+        return array_values($historique);
+    }
 
-                foreach ($this->denominations as $type => $denominations_list) {
-                    foreach ($denominations_list as $name => $value) {
-                        $quantite = get_numeric_value($caisse_data, $name);
-                        if ($quantite > 0) {
-                            $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
-                            $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
-                        }
+    public function delete() {
+        header('Content-Type: application/json');
+        $id_a_supprimer = intval($_POST['id_a_supprimer'] ?? 0);
+        if ($id_a_supprimer > 0) {
+            $stmt = $this->pdo->prepare("DELETE FROM comptages WHERE id = ?");
+            if ($stmt->execute([$id_a_supprimer])) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Erreur lors de la suppression.']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'message' => 'ID invalide.']);
+        }
+        exit;
+    }
+
+    public function exportCsv() {
+        $date_debut = $_GET['date_debut'] ?? '';
+        $date_fin = $_GET['date_fin'] ?? '';
+        $recherche = $_GET['recherche'] ?? '';
+        
+        $filter_params = $this->filterService->getWhereClauseAndBindings($date_debut, $date_fin, $recherche);
+        $sql_where = $filter_params['sql_where'];
+        $bind_values = $filter_params['bind_values'];
+
+        $sql_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage DESC";
+        $stmt_ids = $this->pdo->prepare($sql_ids);
+        $stmt_ids->execute($bind_values);
+        $comptage_ids = $stmt_ids->fetchAll(PDO::FETCH_COLUMN);
+
+        $historique = $this->fetchComptagesDetails($comptage_ids);
+
+        $filename = "export-comptages-" . date('Y-m-d') . ".csv";
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        $output = fopen('php://output', 'w');
+        
+        $header = ['ID', 'Nom', 'Date', 'Explication'];
+        foreach ($this->noms_caisses as $id => $nom) {
+            $header[] = "Caisse {$id} - Nom";
+            $header[] = "Caisse {$id} - Fond de caisse";
+            $header[] = "Caisse {$id} - Ventes";
+            $header[] = "Caisse {$id} - Rétrocession";
+            foreach ($this->denominations as $type => $denoms) {
+                foreach ($denoms as $key => $value) {
+                    $label = ($value >= 1) ? "{$value} €" : "{$value} cts";
+                    $header[] = "Caisse {$id} - {$label}";
+                }
+            }
+        }
+        fputcsv($output, $header, ';');
+
+        foreach ($historique as $comptage) {
+            $rowData = [$comptage['id'], $comptage['nom_comptage'], $comptage['date_comptage'], $comptage['explication']];
+            foreach ($this->noms_caisses as $caisse_id => $nom_caisse) {
+                $caisse_data = $comptage['caisses_data'][$caisse_id];
+                $rowData[] = $nom_caisse;
+                $rowData[] = str_replace('.', ',', $caisse_data['fond_de_caisse']);
+                $rowData[] = str_replace('.', ',', $caisse_data['ventes']);
+                $rowData[] = str_replace('.', ',', $caisse_data['retrocession']);
+                foreach ($this->denominations as $type => $denoms) {
+                    foreach (array_keys($denoms) as $key) {
+                        $rowData[] = $caisse_data['denominations'][$key] ?? 0;
                     }
                 }
             }
-
-            if ($is_autosave) {
-                ob_end_clean();
-                echo json_encode(['success' => true, 'message' => 'Sauvegarde auto à ' . date('H:i:s')]);
-            } else {
-                $_SESSION['message'] = "Comptage '" . htmlspecialchars($nom_comptage) . "' créé avec succès !";
-                // Rediriger vers le calculateur pour effacer la session de sauvegarde auto
-                header('Location: index.php?page=calculateur');
-            }
-            exit;
-
-        } catch (PDOException $e) {
-            if ($is_autosave) {
-                ob_end_clean();
-                echo json_encode(['success' => false, 'message' => 'Erreur de BDD: ' . $e->getMessage()]);
-            } else {
-                $_SESSION['message'] = "Erreur de BDD lors de la sauvegarde : " . $e->getMessage();
-                header('Location: index.php?page=calculateur');
-            }
-            exit;
+            fputcsv($output, $rowData, ';');
         }
+        fclose($output);
+        exit;
     }
 }
