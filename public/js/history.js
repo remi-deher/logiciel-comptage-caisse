@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const globalChartContainer = document.getElementById('global-chart-container');
     let globalChart = null;
+    let miniCharts = []; // Nouveau : Tableau pour stocker les instances de mini-graphiques
 
     const modal = document.getElementById('details-modal');
     if (modal) {
@@ -125,66 +126,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Gère les exports PDF et Excel dans la fenêtre modale
-        modalContent.addEventListener('click', function(event) {
-            const mainTitle = modalContent.querySelector('h3').textContent;
-            const tables = modalContent.querySelectorAll('.modal-details-table');
-            
-            if (event.target.closest('.modal-export-pdf')) {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                doc.text(mainTitle, 14, 16);
-                let startY = 25;
-
-                tables.forEach((table) => {
-                    const subTitleEl = table.previousElementSibling;
-                    if (subTitleEl && (subTitleEl.tagName === 'H4' || subTitleEl.tagName === 'H5')) {
-                        doc.text(subTitleEl.textContent, 14, startY);
-                        startY += 8;
-                    }
-                    doc.autoTable({ html: table, startY: startY });
-                    startY = doc.autoTable.previous.finalY + 10;
-                    const totalEl = table.nextElementSibling;
-                     if (totalEl && totalEl.tagName === 'H5') {
-                        doc.text(totalEl.textContent, 14, startY);
-                        startY += 15;
-                    }
-                });
-                doc.save(`details-${mainTitle.replace(/ /g, '_')}.pdf`);
-            }
-
-            if (event.target.closest('.modal-export-excel')) {
-                let csvContent = "data:text/csv;charset=utf-8,";
-                csvContent += mainTitle + '\r\n\r\n';
-
-                tables.forEach(table => {
-                    const subTitleEl = table.previousElementSibling;
-                    if (subTitleEl && (subTitleEl.tagName === 'H4' || subTitleEl.tagName === 'H5')) {
-                        csvContent += subTitleEl.textContent + '\r\n';
-                    }
-                    const rows = table.querySelectorAll('tr');
-                    rows.forEach(row => {
-                        const cols = row.querySelectorAll('th, td');
-                        const rowData = Array.from(cols).map(col => `"${col.innerText}"`).join(';');
-                        csvContent += rowData + '\r\n';
-                    });
-                    const totalEl = table.nextElementSibling;
-                    if (totalEl && totalEl.tagName === 'H5') {
-                        csvContent += `"${totalEl.textContent}"\r\n`;
-                    }
-                    csvContent += '\r\n';
-                });
-                
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `details-${mainTitle.replace(/ /g, '_')}.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-        });
-
         if(closeModalBtn) {
             closeModalBtn.onclick = function() { modal.style.display = 'none'; }
         }
@@ -192,49 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (event.target == modal) {
                 modal.style.display = 'none';
             }
-        }
-    }
-
-    const printBtn = document.getElementById('print-btn');
-    if(printBtn) {
-        printBtn.addEventListener('click', () => window.print());
-    }
-    
-    const chartColors = ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6'];
-    
-    function renderMiniChart(element, data) {
-        if (!data || data.every(val => val === 0)) {
-            element.innerHTML = '<p class="no-chart-data">Pas de données de vente.</p>';
-            return;
-        }
-
-        element.innerHTML = '';
-        
-        const labels = Object.values(globalConfig.nomsCaisses);
-        const options = {
-            chart: {
-                type: 'donut',
-                height: 150,
-                toolbar: { show: false }
-            },
-            series: data,
-            labels: labels,
-            colors: chartColors,
-            legend: { show: false },
-            dataLabels: {
-                enabled: false,
-            },
-            tooltip: {
-                y: {
-                    formatter: function (value, { seriesIndex, dataPointIndex, w }) {
-                        return formatEuros(value);
-                    }
-                }
-            }
         };
-
-        const chart = new ApexCharts(element, options);
-        chart.render();
     }
     
     // Fonction de calcul mise à jour pour le nouveau schéma
@@ -326,10 +225,61 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         };
-
-        globalChart = new ApexCharts(globalChartContainer, options);
-        globalChart.render();
+        // NOUVEAU : On initialise le graphique avec un petit délai
+        setTimeout(() => {
+            globalChart = new ApexCharts(globalChartContainer, options);
+            globalChart.render();
+        }, 100);
     }
+
+    function renderMiniChart(element, data) {
+        if (!data || data.every(val => val === 0)) {
+            element.innerHTML = '<p class="no-chart-data">Pas de données de vente.</p>';
+            return;
+        }
+
+        element.innerHTML = '';
+        
+        const labels = Object.values(globalConfig.nomsCaisses);
+        const options = {
+            chart: {
+                type: 'bar',
+                height: 150,
+                toolbar: { show: false }
+            },
+            series: [{
+                data: data
+            }],
+            labels: labels,
+            colors: ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6'],
+            legend: { show: false },
+            dataLabels: {
+                enabled: false,
+            },
+            tooltip: {
+                y: {
+                    formatter: function (value) {
+                        return formatEuros(value);
+                    }
+                }
+            },
+            xaxis: {
+                categories: labels,
+                labels: {
+                    style: {
+                        colors: getComputedStyle(document.body).getPropertyValue('--color-text-secondary')
+                    }
+                }
+            }
+        };
+        // NOUVEAU : On initialise le graphique avec un petit délai
+        setTimeout(() => {
+            const chart = new ApexCharts(element, options);
+            chart.render();
+            element.chart = chart;
+        }, 100);
+    }
+
 
     function renderHistoriqueCards(historique) {
         historyGrid.innerHTML = '';
@@ -536,7 +486,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (quickFilterBtns) {
         quickFilterBtns.forEach(btn => {
             btn.addEventListener('click', function() {
-                // NOUVEAU : Réinitialise d'abord les autres filtres
+                // NOUVELLE LOGIQUE : Réinitialise les autres filtres
                 document.getElementById('date_debut').value = '';
                 document.getElementById('date_fin').value = '';
 
@@ -552,7 +502,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     date_fin: formatDate(today)
                 };
                 
-                // Mettre à jour les champs de formulaire pour un affichage visuel
                 document.getElementById('date_debut').value = params.date_debut;
                 document.getElementById('date_fin').value = params.date_fin;
 
@@ -586,4 +535,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const initialParams = Object.fromEntries(new URLSearchParams(window.location.search).entries());
     loadHistoriqueData(initialParams);
+    
+    // NOUVEL ÉCOUTEUR D'ÉVÉNEMENT : Redimensionne les graphiques au redimensionnement de la fenêtre
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            if (globalChart && globalChart.resize) {
+                globalChart.resize();
+            }
+            document.querySelectorAll('.mini-chart-container').forEach(element => {
+                // Correction : Vérifier que l'élément a bien une instance de graphique
+                if (element.chart && element.chart.resize) {
+                    element.chart.resize();
+                }
+            });
+        }, 200); // Délai de 200ms pour éviter de surcharger
+    });
+
 });

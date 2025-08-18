@@ -153,6 +153,22 @@
 .ecart-negatif { color: var(--color-danger); }
 .card-divider { border-top: 1px solid var(--color-border-light); margin: 15px 0; }
 
+/* NOUVEAU: Styles pour le conteneur du graphique */
+.mini-chart-container {
+    height: 150px;
+    min-height: 150px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0;
+}
+.mini-chart-container .no-chart-data {
+    color: var(--color-text-muted);
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+
 /* --- NOUVEAUX STYLES POUR LE FOOTER DE LA CARTE --- */
 .history-card-footer { 
     background-color: var(--color-surface-alt); 
@@ -394,4 +410,3 @@ body[data-theme="dark"] .modal-details-table th { background-color: #495057; }
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
-
