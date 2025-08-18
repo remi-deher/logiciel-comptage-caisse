@@ -23,26 +23,36 @@ class CalculateurController {
 
         // Nouvelle logique de chargement pour le schéma normalisé
         if (isset($_GET['load'])) {
+            $comptageIdToLoad = intval($_GET['load']);
+            error_log("Tentative de chargement du comptage ID: " . $comptageIdToLoad);
             $isLoadedFromHistory = true;
             $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE id = ?");
-            $stmt->execute([intval($_GET['load'])]);
+            $stmt->execute([$comptageIdToLoad]);
             $loaded_comptage = $stmt->fetch() ?: [];
 
             if ($loaded_comptage) {
+                error_log("Comptage trouvé avec l'ID: " . $comptageIdToLoad);
+                // La méthode loadComptageData a été mise à jour pour renvoyer le bon format
                 $loaded_data = $this->loadComptageData($loaded_comptage['id']);
                 $loaded_data['nom_comptage'] = $loaded_comptage['nom_comptage'];
                 $loaded_data['explication'] = $loaded_comptage['explication'];
+            } else {
+                error_log("Comptage avec l'ID " . $comptageIdToLoad . " non trouvé.");
             }
         } else {
             // Sauvegarde auto
             $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
+            error_log("Recherche de la dernière sauvegarde automatique...");
             $stmt->execute();
             $loaded_comptage = $stmt->fetch() ?: [];
             if ($loaded_comptage) {
+                error_log("Sauvegarde automatique trouvée avec l'ID: " . $loaded_comptage['id']);
                 $isAutosaveLoaded = true;
                 $loaded_data = $this->loadComptageData($loaded_comptage['id']);
                 $loaded_data['nom_comptage'] = $loaded_comptage['nom_comptage'];
                 $loaded_data['explication'] = $loaded_comptage['explication'];
+            } else {
+                error_log("Aucune sauvegarde automatique trouvée.");
             }
         }
 
@@ -55,24 +65,60 @@ class CalculateurController {
     }
 
     // Nouvelle fonction pour charger les données d'un comptage depuis le nouveau schéma
+    // Cette fonction re-structure les données dans le format attendu par le template
     private function loadComptageData($comptage_id) {
         $data = [];
-        $stmt_details = $this->pdo->prepare("SELECT * FROM comptage_details WHERE comptage_id = ?");
-        $stmt_details->execute([$comptage_id]);
-        $details = $stmt_details->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Requête pour récupérer tous les détails et les dénominations en une seule fois
+        $sql_query = "
+            SELECT
+                cd.caisse_id,
+                cd.fond_de_caisse,
+                cd.ventes,
+                cd.retrocession,
+                d.denomination_nom,
+                d.quantite
+            FROM comptage_details cd
+            LEFT JOIN comptage_denominations d ON cd.id = d.comptage_detail_id
+            WHERE cd.comptage_id = ?
+        ";
+        error_log("Exécution de la requête : " . $sql_query);
+        error_log("Avec l'ID de comptage : " . $comptage_id);
 
-        foreach ($details as $detail) {
-            $caisse_id = $detail['caisse_id'];
-            $data[$caisse_id]['fond_de_caisse'] = $detail['fond_de_caisse'];
-            $data[$caisse_id]['ventes'] = $detail['ventes'];
-            $data[$caisse_id]['retrocession'] = $detail['retrocession'];
-
-            $stmt_denominations = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
-            $stmt_denominations->execute([$detail['id']]);
-            $denominations = $stmt_denominations->fetchAll(PDO::FETCH_KEY_PAIR);
-
-            $data[$caisse_id]['denominations'] = $denominations;
+        $stmt = $this->pdo->prepare($sql_query);
+        $stmt->execute([$comptage_id]);
+        $raw_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (empty($raw_data)) {
+            error_log("Aucun détail trouvé pour le comptage ID: " . $comptage_id);
+            return $data;
         }
+
+        error_log("Données brutes de la BDD pour le comptage ID " . $comptage_id . ": " . print_r($raw_data, true));
+
+        // Refonte de la boucle pour regrouper les données par caisse
+        foreach ($raw_data as $row) {
+            $caisse_id = $row['caisse_id'];
+            
+            // Initialiser le tableau pour la caisse si elle n'existe pas
+            if (!isset($data[$caisse_id])) {
+                $data[$caisse_id] = [
+                    'fond_de_caisse' => $row['fond_de_caisse'],
+                    'ventes' => $row['ventes'],
+                    'retrocession' => $row['retrocession'],
+                    'denominations' => []
+                ];
+            }
+            
+            // Ajouter les dénominations si elles existent
+            if ($row['denomination_nom']) {
+                $data[$caisse_id]['denominations'][$row['denomination_nom']] = $row['quantite'];
+            }
+        }
+        
+        error_log("Données formatées pour la vue : " . print_r($data, true));
+
+        // Retourner le tableau structuré
         return $data;
     }
 

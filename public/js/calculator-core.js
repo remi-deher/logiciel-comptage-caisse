@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Configuration et Éléments du DOM ---
     const configElement = document.getElementById('calculator-data');
     const config = configElement ? JSON.parse(configElement.dataset.config) : {};
+    const loadedData = configElement ? JSON.parse(configElement.dataset.loadedData) : {};
     const minToKeep = config.minToKeep || {};
 
     const tabLinks = document.querySelectorAll('.tab-link');
@@ -146,9 +147,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (ecartEl) {
                 ecartEl.textContent = formatEuros(ecart);
                 ecartEl.parentElement.className = 'result-line total';
-                if (ecart > 0.01) { // L'écart est-il positif ?
+                if (ecart > 0.01) { 
                     ecartEl.parentElement.classList.add('ecart-positif');
-                } else if (ecart < -0.01) { // L'écart est-il négatif ?
+                } else if (ecart < -0.01) { 
                     ecartEl.parentElement.classList.add('ecart-negatif');
                 }
             }
@@ -183,9 +184,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 topEcartExplanation.innerHTML = '';
                 suggestionAccordionContainer.innerHTML = '';
                 
-                // Débogage : Afficher la valeur de l'écart dans la console
-                console.log(`Caisse ${i} : Écart calculé = ${ecart}`);
-
                 if (Math.abs(ecart) < 0.01) {
                     topEcartDisplay.classList.add('ecart-ok');
                     let explanation = `<strong>Montant à retirer pour cette caisse :</strong> <strong>${formatEuros(recetteReelle)}</strong>.<br>`;
@@ -272,6 +270,40 @@ document.addEventListener('DOMContentLoaded', function() {
             navigator.sendBeacon('index.php?action=autosave', new URLSearchParams(formData));
         }
     }
+    
+    // NOUVELLE FONCTION : Charge les données depuis le backend et initialise le formulaire
+    function loadAndInitFormData(data) {
+        if (!data || Object.keys(data).length === 0) return;
+
+        // Met à jour le nom et l'explication du comptage
+        if (data.nom_comptage) nomComptageInput.value = data.nom_comptage;
+        if (data.explication) document.getElementById('explication').value = data.explication;
+
+        // Boucle sur les données de chaque caisse
+        Object.keys(config.nomsCaisses).forEach(caisseId => {
+            const caisseData = data[caisseId];
+            if (!caisseData) return;
+
+            // Renseigne les champs des informations générales
+            const fondDeCaisseInput = document.getElementById(`fond_de_caisse_${caisseId}`);
+            if (fondDeCaisseInput) fondDeCaisseInput.value = caisseData.fond_de_caisse;
+
+            const ventesInput = document.getElementById(`ventes_${caisseId}`);
+            if (ventesInput) ventesInput.value = caisseData.ventes;
+            
+            const retrocessionInput = document.getElementById(`retrocession_${caisseId}`);
+            if (retrocessionInput) retrocessionInput.value = caisseData.retrocession;
+            
+            // Renseigne les champs des dénominations
+            Object.entries(caisseData.denominations).forEach(([denominationName, quantity]) => {
+                const input = document.getElementById(`${denominationName}_${caisseId}`);
+                if (input) input.value = quantity;
+            });
+        });
+        
+        calculateAllFull();
+    }
+
 
     // Exposez la fonction de calcul pour qu'elle puisse être appelée par le module de temps réel
     window.calculateAllFull = calculateAllFull;
@@ -296,7 +328,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- Initialisation ---
-    calculateAllFull();
+    // Correction: On utilise les données chargées par PHP pour initialiser le formulaire
+    loadAndInitFormData(loadedData);
+    
     setTimeout(() => {
         initialState = getFormStateAsString();
     }, 0);

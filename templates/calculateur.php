@@ -1,31 +1,29 @@
 <?php
-// templates/calculateur.php
+// templates/calculateur.php - Version corrigée pour le chargement des données.
 
-$page_js = 'calculator-core.js'; // Définit le script JS spécifique à cette page
+$page_js = 'calculator-core.js'; 
 
 require 'partials/header.php';
 require 'partials/navbar.php';
 
-// NOUVEAU : On s'assure que la variable existe pour le JSON
 global $min_to_keep;
 if (!isset($min_to_keep)) {
     $min_to_keep = [];
 }
 
-// On prépare les données pour les passer au JavaScript de manière sécurisée
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
     'denominations' => $denominations ?? [],
-    'minToKeep' => $min_to_keep, // NOUVEAU : Ajout de la variable
+    'minToKeep' => $min_to_keep, 
     'isLoadedFromHistory' => $isLoadedFromHistory ?? false,
-    'currencySymbol' => APP_CURRENCY_SYMBOL // NOUVEAU : Ajout du symbole de devise
+    'currencySymbol' => APP_CURRENCY_SYMBOL 
 ]);
 
-// On définit une variable pour ajouter l'attribut 'disabled' plus facilement
 $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 ?>
 
-<div id="calculator-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'></div>
+<div id="calculator-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'
+     data-loaded-data='<?= htmlspecialchars(json_encode($loaded_data), ENT_QUOTES, 'UTF-8') ?>'></div>
 
 <div class="container">
     <?php if ($isLoadedFromHistory ?? false): ?>
@@ -76,15 +74,15 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                 <div class="grid grid-3">
                                     <div class="form-group">
                                         <label>Fond de Caisse (<?= APP_CURRENCY_SYMBOL ?>)</label>
-                                        <input type="text" id="fond_de_caisse_<?= $id ?>" name="caisse[<?= $id ?>][fond_de_caisse]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_fond_de_caisse"] ?? '') ?>" <?= $disabled_attr ?>>
+                                        <input type="text" id="fond_de_caisse_<?= $id ?>" name="caisse[<?= $id ?>][fond_de_caisse]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['fond_de_caisse'] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                     <div class="form-group">
                                         <label>Total Ventes du Jour (<?= APP_CURRENCY_SYMBOL ?>)</label>
-                                        <input type="text" id="ventes_<?= $id ?>" name="caisse[<?= $id ?>][ventes]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_ventes"] ?? '') ?>" <?= $disabled_attr ?>>
+                                        <input type="text" id="ventes_<?= $id ?>" name="caisse[<?= $id ?>][ventes]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['ventes'] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                     <div class="form-group">
                                         <label>Rétrocessions / Prélèvements (<?= APP_CURRENCY_SYMBOL ?>)</label>
-                                        <input type="text" id="retrocession_<?= $id ?>" name="caisse[<?= $id ?>][retrocession]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data["c{$id}_retrocession"] ?? '') ?>" <?= $disabled_attr ?>>
+                                        <input type="text" id="retrocession_<?= $id ?>" name="caisse[<?= $id ?>][retrocession]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['retrocession'] ?? '') ?>" <?= $disabled_attr ?>>
                                     </div>
                                 </div>
                             </div>
@@ -104,7 +102,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                     <?php foreach($denominations['billets'] as $name => $valeur): ?>
                                     <div class="form-group">
                                         <label><?= $valeur ?> <?= APP_CURRENCY_SYMBOL ?></label>
-                                        <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data["c{$id}_{$name}"] ?? '') ?>" <?= $disabled_attr ?>>
+                                        <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data[$id]['denominations'][$name] ?? '') ?>" <?= $disabled_attr ?>>
                                         <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
                                     </div>
                                     <?php endforeach; ?>
@@ -114,7 +112,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                     <?php foreach($denominations['pieces'] as $name => $valeur): ?>
                                     <div class="form-group">
                                         <label><?= $valeur >= 1 ? $valeur.' '.APP_CURRENCY_SYMBOL : ($valeur*100).' cts' ?></label>
-                                        <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data["c{$id}_{$name}"] ?? '') ?>" <?= $disabled_attr ?>>
+                                        <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data[$id]['denominations'][$name] ?? '') ?>" <?= $disabled_attr ?>>
                                         <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
                                     </div>
                                     <?php endforeach; ?>
