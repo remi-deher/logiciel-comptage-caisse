@@ -27,6 +27,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const nomComptageInput = document.getElementById('nom_comptage');
     const isLoadedFromHistory = config.isLoadedFromHistory;
 
+    // Éléments de l'interface
+    const mainEcartDisplayContainer = document.querySelector('.ecart-display-container');
+
     let isSubmitting = false;
     let initialState = '';
 
@@ -147,9 +150,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (ecartEl) {
                 ecartEl.textContent = formatEuros(ecart);
                 ecartEl.parentElement.className = 'result-line total';
-                if (ecart > 0.01) { 
+                if (ecart > 0.01) { // L'écart est-il positif ?
                     ecartEl.parentElement.classList.add('ecart-positif');
-                } else if (ecart < -0.01) { 
+                } else if (ecart < -0.01) { // L'écart est-il négatif ?
                     ecartEl.parentElement.classList.add('ecart-negatif');
                 }
             }
@@ -271,20 +274,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // NOUVELLE FONCTION : Charge les données depuis le backend et initialise le formulaire
     function loadAndInitFormData(data) {
         if (!data || Object.keys(data).length === 0) return;
 
-        // Met à jour le nom et l'explication du comptage
         if (data.nom_comptage) nomComptageInput.value = data.nom_comptage;
         if (data.explication) document.getElementById('explication').value = data.explication;
 
-        // Boucle sur les données de chaque caisse
         Object.keys(config.nomsCaisses).forEach(caisseId => {
             const caisseData = data[caisseId];
             if (!caisseData) return;
 
-            // Renseigne les champs des informations générales
             const fondDeCaisseInput = document.getElementById(`fond_de_caisse_${caisseId}`);
             if (fondDeCaisseInput) fondDeCaisseInput.value = caisseData.fond_de_caisse;
 
@@ -294,7 +293,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const retrocessionInput = document.getElementById(`retrocession_${caisseId}`);
             if (retrocessionInput) retrocessionInput.value = caisseData.retrocession;
             
-            // Renseigne les champs des dénominations
             Object.entries(caisseData.denominations).forEach(([denominationName, quantity]) => {
                 const input = document.getElementById(`${denominationName}_${caisseId}`);
                 if (input) input.value = quantity;
@@ -307,6 +305,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Exposez la fonction de calcul pour qu'elle puisse être appelée par le module de temps réel
     window.calculateAllFull = calculateAllFull;
+    
+    // NOUVEAU : Écouteur d'événement de défilement pour la barre compacte
+    let isCompact = false;
+    function handleScroll() {
+        const scrollPosition = window.scrollY;
+        const offset = mainEcartDisplayContainer.offsetTop + mainEcartDisplayContainer.offsetHeight;
+
+        if (scrollPosition > offset && !isCompact) {
+            mainEcartDisplayContainer.classList.add('compact-sticky');
+            isCompact = true;
+        } else if (scrollPosition <= offset && isCompact) {
+            mainEcartDisplayContainer.classList.remove('compact-sticky');
+            isCompact = false;
+        }
+    }
+    window.addEventListener('scroll', handleScroll);
+
 
     // --- Écouteurs d'événements ---
     if (!isLoadedFromHistory) {
@@ -328,11 +343,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- Initialisation ---
-    // Correction: On utilise les données chargées par PHP pour initialiser le formulaire
     loadAndInitFormData(loadedData);
     
     setTimeout(() => {
         initialState = getFormStateAsString();
     }, 0);
     initAccordion();
+    handleScroll(); // Initialisation de la barre au chargement
 });

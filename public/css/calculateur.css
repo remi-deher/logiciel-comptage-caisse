@@ -46,15 +46,11 @@
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-/* --- Indicateur d'écart en haut --- */
+/* --- Indicateur d'écart en haut (version d'origine) --- */
 .ecart-display-container {
-    position: sticky;
-    top: 70px; /* Ajustez cette valeur si nécessaire pour qu'il ne soit pas masqué par la navbar */
-    z-index: 10;
-    background-color: var(--color-bg);
-    padding: 10px 0;
+    text-align: center;
     margin-bottom: 20px;
-    border-bottom: 2px solid var(--color-border-light);
+    transition: all 0.3s ease;
 }
 
 .ecart-display {
@@ -68,9 +64,46 @@
     opacity: 0;
     background-color: var(--color-surface);
 }
-.ecart-display.active { display: block; opacity: 1; }
-.ecart-display .ecart-value { font-size: 1.5em; display: block; margin-bottom: 5px; }
-.ecart-explanation { font-size: 0.9em; font-style: italic; font-weight: normal; color: var(--color-text-secondary); margin-top: 8px; min-height: 1.2em; }
+.ecart-display.active { 
+    display: block; 
+    opacity: 1; 
+}
+.ecart-display .ecart-value { 
+    font-size: 1.5em;
+    display: block;
+    margin-bottom: 5px;
+}
+.ecart-explanation { 
+    font-size: 0.9em; 
+    font-style: italic; 
+    font-weight: normal; 
+    color: var(--color-text-secondary); 
+    margin-top: 8px; 
+    min-height: 1.2em; 
+}
+
+/* --- Nouvelle classe pour la barre compacte en mode sticky --- */
+.ecart-display-container.compact-sticky {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 400px;
+    padding: 10px 15px;
+    z-index: 100;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    /* Les règles suivantes s'appliquent à tous les écrans */
+}
+
+.ecart-display-container.compact-sticky .ecart-value { 
+    font-size: 1.2em;
+    margin: 0;
+}
+.ecart-display-container.compact-sticky .ecart-explanation { 
+    display: none; 
+}
 .ecart-display.ecart-ok { background-color: rgba(39, 174, 96, 0.1); border-color: var(--color-success); }
 .ecart-display.ecart-ok .ecart-value { color: var(--color-success); }
 .ecart-display.ecart-positif { background-color: rgba(243, 156, 18, 0.1); border-color: var(--color-warning); }
