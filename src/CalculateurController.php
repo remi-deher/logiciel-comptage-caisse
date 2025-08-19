@@ -1,5 +1,5 @@
 <?php
-// src/CalculateurController.php - Version corrigée pour le chargement des données.
+// src/CalculateurController.php - Version corrigée pour un nouvel enregistrement à chaque sauvegarde automatique.
 // Ce contrôleur gère la page du calculateur et les actions de sauvegarde.
 require_once 'services/VersionService.php';
 require_once 'Utils.php';
@@ -144,26 +144,10 @@ class CalculateurController {
             $comptage_id = null;
 
             if ($is_autosave) {
-                // Logique de SAUVEGARDE AUTOMATIQUE
-                $stmt_check = $this->pdo->prepare("SELECT id FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
-                $stmt_check->execute();
-                $existing_autosave_id = $stmt_check->fetchColumn();
-
-                if ($existing_autosave_id) {
-                    // Mise à jour de l'enregistrement principal
-                    $stmt_update_comptage = $this->pdo->prepare("UPDATE comptages SET nom_comptage = ?, explication = ?, date_comptage = ? WHERE id = ?");
-                    $stmt_update_comptage->execute([$nom_comptage, $explication, date('Y-m-d H:i:s'), $existing_autosave_id]);
-                    $comptage_id = $existing_autosave_id;
-                    
-                    // Suppression des détails et dénominations précédents pour pouvoir les réinsérer
-                    $stmt_delete_details = $this->pdo->prepare("DELETE FROM comptage_details WHERE comptage_id = ?");
-                    $stmt_delete_details->execute([$comptage_id]);
-                } else {
-                    // Création d'une nouvelle sauvegarde automatique
-                    $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-                    $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
-                    $comptage_id = $this->pdo->lastInsertId();
-                }
+                // Logique de SAUVEGARDE AUTOMATIQUE : On crée toujours un nouvel enregistrement
+                $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+                $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
+                $comptage_id = $this->pdo->lastInsertId();
             } else {
                 // Logique de SAUVEGARDE MANUELLE : On crée toujours un nouvel enregistrement.
                 // 1. On crée un NOUVEL enregistrement de comptage
