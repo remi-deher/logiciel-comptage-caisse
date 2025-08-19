@@ -36,7 +36,7 @@
 .top-save-section .form-group label { font-size: 0.9em; margin-bottom: 5px; }
 .top-save-section input { padding: 8px; }
 .top-save-section .save-btn { padding: 8px 20px; font-size: 1em; flex-shrink: 0; }
-.top-save-section .autosave-status { flex-basis: 100%; text-align: right; font-size: 0.85em; min-height: 1.2em; transition: color 0.5s; }
+.top-save-section .autosave-status { flex-basis: 100%; text-align: right; font-size: 0.85em; min-height: 0; margin-top: 5px; }
 
 /* --- Styles des onglets --- */
 .tab-selector { border-bottom: 2px solid var(--color-border-light); margin-bottom: 20px; display: flex; flex-wrap: wrap; }
@@ -47,8 +47,27 @@
 .tab-content.active { display: block; }
 
 /* --- Indicateur d'écart en haut --- */
-.ecart-display-container { text-align: center; }
-.ecart-display { display: none; padding: 15px; margin-bottom: 20px; border: 2px solid var(--color-border-light); border-radius: 8px; font-size: 1.1em; font-weight: bold; transition: background-color 0.3s, border-color 0.3s, opacity 0.5s; opacity: 0; }
+.ecart-display-container {
+    position: sticky;
+    top: 70px; /* Ajustez cette valeur si nécessaire pour qu'il ne soit pas masqué par la navbar */
+    z-index: 10;
+    background-color: var(--color-bg);
+    padding: 10px 0;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--color-border-light);
+}
+
+.ecart-display {
+    display: none;
+    padding: 15px;
+    border: 2px solid var(--color-border-light);
+    border-radius: 8px;
+    font-size: 1.1em;
+    font-weight: bold;
+    transition: background-color 0.3s, border-color 0.3s, opacity 0.5s;
+    opacity: 0;
+    background-color: var(--color-surface);
+}
 .ecart-display.active { display: block; opacity: 1; }
 .ecart-display .ecart-value { font-size: 1.5em; display: block; margin-bottom: 5px; }
 .ecart-explanation { font-size: 0.9em; font-style: italic; font-weight: normal; color: var(--color-text-secondary); margin-top: 8px; min-height: 1.2em; }

@@ -1,7 +1,7 @@
 <?php
-// templates/calculateur.php - Version corrigée pour le chargement des données.
+// templates/calculateur.php - Version corrigée pour le chargement des données et l'affichage sur écran 4/3.
 
-$page_js = 'calculator-core.js'; 
+$page_js = 'calculator-core.js'; // Définit le script JS spécifique à cette page
 
 require 'partials/header.php';
 require 'partials/navbar.php';
