@@ -28,6 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('connected');
                 statusText.textContent = 'Connecté en temps réel';
             }
+            // NOUVEAU: Attribue un ID unique à la connexion
+            window.wsConnection.resourceId = Math.random().toString(36).substring(2, 15);
         };
 
         window.wsConnection.onerror = () => {
@@ -49,6 +51,23 @@ document.addEventListener('DOMContentLoaded', function() {
         window.wsConnection.onmessage = (e) => {
             try {
                 const data = JSON.parse(e.data);
+                
+                // NOUVEAU: Gère l'état de verrouillage de la clôture
+                if (data.type === 'lock_status') {
+                    if (window.handleInterfaceLock) {
+                        window.handleInterfaceLock(data.caisse_id, data.locked_by);
+                    }
+                    return; // Ne pas traiter comme une mise à jour de formulaire
+                }
+                
+                // Si on a le statut de verrouillage au premier chargement, on le gère
+                if (data.cloture_lock_status) {
+                    if (window.handleInterfaceLock) {
+                        window.handleInterfaceLock(data.cloture_lock_status.caisse_id, data.cloture_lock_status.locked_by);
+                    }
+                    delete data.cloture_lock_status;
+                }
+
                 if (data.id && typeof data.value !== 'undefined') {
                     const input = document.getElementById(data.id);
                     if (input && input.value !== data.value) {
@@ -80,6 +99,8 @@ document.addEventListener('DOMContentLoaded', function() {
 // Fonctions utilitaires pour envoyer des données depuis d'autres modules
 window.sendWsMessage = function(id, value) {
     if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
-        window.wsConnection.send(JSON.stringify({ id: id, value: value }));
+        // NOUVEAU: On envoie l'id de la connexion pour permettre au serveur de vérifier les permissions
+        const dataToSend = { id: id, value: value, resourceId: window.wsConnection.resourceId };
+        window.wsConnection.send(JSON.stringify(dataToSend));
     }
 };

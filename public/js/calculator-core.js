@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let isSubmitting = false;
     let initialState = '';
-    
+
     // --- Logique de l'interface (Accordéon, Onglets) ---
     function initAccordion() {
         const accordionHeaders = document.querySelectorAll('.accordion-header');
@@ -72,18 +72,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Écouteurs pour les champs du formulaire pour le calcul en temps réel
         if (!isLoadedFromHistory) {
             caisseForm.addEventListener('input', (event) => {
-                // NOUVEAU: Autoriser la modification uniquement pour la caisse active en mode clôture
-                const activeCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
-                const targetCaisseId = event.target.id.split('_').pop();
-                const isClotureActive = sessionStorage.getItem('isClotureMode') === 'true';
-
-                if (isClotureActive && activeCaisseId !== targetCaisseId) {
-                    // Si on est en mode clôture, on désactive les champs de toutes les autres caisses
-                    event.target.setAttribute('disabled', 'disabled');
-                } else if (!isClotureActive) {
-                    // Si on n'est pas en mode clôture, tous les champs sont actifs
-                    event.target.removeAttribute('disabled');
-                }
                 calculateAllFull();
                 if (window.sendWsMessage) {
                     window.sendWsMessage(event.target.id, event.target.value);
@@ -323,7 +311,98 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // NOUVEAU : Fonctions de gestion de la sauvegarde auto
+    let autosaveTimeout;
+    const autosaveStatusEl = document.getElementById('autosave-status');
+
+    function getFormStateAsString() {
+        const formData = new FormData(caisseForm);
+        const params = new URLSearchParams(formData);
+        return params.toString();
+    }
+
+    function hasUnsavedChanges() {
+        const currentState = getFormStateAsString();
+        return currentState !== initialState;
+    }
+
+    function startAutosaveTimer() {
+        if (autosaveTimeout) clearTimeout(autosaveTimeout);
+        autosaveTimeout = setTimeout(performAutosave, 30000); // 30 secondes
+    }
+
+    async function performAutosave() {
+        if (!hasUnsavedChanges() || isSubmitting) {
+            startAutosaveTimer();
+            return;
+        }
+
+        if (autosaveStatusEl) {
+            autosaveStatusEl.textContent = 'Sauvegarde auto en cours...';
+            autosaveStatusEl.classList.add('saving');
+        }
+
+        const formData = new FormData(caisseForm);
+        // Ajout de l'action 'autosave' pour le contrôleur PHP
+        formData.append('action', 'autosave');
+        
+        try {
+            const response = await fetch('index.php?action=autosave', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            if (data.success) {
+                initialState = getFormStateAsString(); // Met à jour l'état initial
+                if (autosaveStatusEl) {
+                    autosaveStatusEl.textContent = data.message;
+                    autosaveStatusEl.classList.remove('saving');
+                    autosaveStatusEl.classList.add('success');
+                    setTimeout(() => autosaveStatusEl.textContent = '', 5000);
+                }
+            } else {
+                if (autosaveStatusEl) {
+                    autosaveStatusEl.textContent = data.message;
+                    autosaveStatusEl.classList.remove('saving');
+                    autosaveStatusEl.classList.add('error');
+                }
+            }
+        } catch (error) {
+            console.error('Erreur de sauvegarde automatique:', error);
+            if (autosaveStatusEl) {
+                autosaveStatusEl.textContent = 'Erreur de sauvegarde automatique.';
+                autosaveStatusEl.classList.remove('saving');
+                autosaveStatusEl.classList.add('error');
+            }
+        }
+        startAutosaveTimer();
+    }
     
+    // Fonction de sauvegarde au moment de quitter la page
+    function performAutosaveOnExit() {
+        const formData = new FormData(caisseForm);
+        formData.append('action', 'autosave');
+        
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'index.php?action=autosave', false); // Requête synchrone
+        xhr.send(formData);
+    }
+    
+    // NOUVEAU: Ajout d'un écouteur pour la saisie des montants pour le déclenchement de la sauvegarde
+    caisseForm.addEventListener('input', (event) => {
+        // Redémarre le compteur à chaque saisie
+        clearTimeout(autosaveTimeout);
+        startAutosaveTimer();
+        
+        // CORRECTION : Envoie également la donnée via WebSocket
+        if (window.sendWsMessage) {
+            window.sendWsMessage(event.target.id, event.target.value);
+        }
+    });
+
     // --- Initialisation du calculateur ---
     initCalculator();
+    if (!isLoadedFromHistory) {
+        startAutosaveTimer();
+    }
 });

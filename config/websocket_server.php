@@ -14,8 +14,9 @@ require dirname(__FILE__, 2) . '/vendor/autoload.php';
 
 class Caisse implements MessageComponentInterface {
     protected $clients;
-    // NOUVELLE PROPRIÉTÉ : Un tableau pour mémoriser l'état du formulaire.
+    // Un tableau pour mémoriser l'état du formulaire et de la caisse verrouillée.
     private $formState = [];
+    private $lockedCaisse = ['caisse_id' => null, 'locked_by' => null];
 
     public function __construct() {
         $this->clients = new \SplObjectStorage;
@@ -26,24 +27,41 @@ class Caisse implements MessageComponentInterface {
         $this->clients->attach($conn);
         echo "Nouvelle connexion! ({$conn->resourceId})\n";
 
-        // NOUVELLE LOGIQUE : Dès qu'un client se connecte, on lui envoie
-        // l'état actuel complet du formulaire.
-        if (!empty($this->formState)) {
-            $conn->send(json_encode($this->formState));
-        }
+        // Envoie l'état actuel complet du formulaire et le statut de verrouillage
+        $fullState = array_merge($this->formState, ['cloture_lock_status' => $this->lockedCaisse]);
+        $conn->send(json_encode($fullState));
     }
 
     public function onMessage(ConnectionInterface $from, $msg) {
-        // NOUVELLE LOGIQUE : On met à jour l'état sur le serveur.
         $data = json_decode($msg, true);
-        if (isset($data['id']) && isset($data['value'])) {
-            $this->formState[$data['id']] = $data['value'];
-        }
 
-        // On continue de diffuser le message à tous les autres clients.
-        foreach ($this->clients as $client) {
-            if ($from !== $client) {
-                $client->send($msg);
+        // NOUVEAU: Gère les messages de verrouillage/déverrouillage
+        if (isset($data['type'])) {
+            if ($data['type'] === 'cloture_lock') {
+                $caisseId = $data['caisse_id'];
+                // Vérifie si la caisse n'est pas déjà verrouillée
+                if ($this->lockedCaisse['caisse_id'] === null) {
+                    $this->lockedCaisse = ['caisse_id' => $caisseId, 'locked_by' => $from->resourceId];
+                    // Diffuse le statut de verrouillage à tous les clients
+                    $this->broadcast(['type' => 'lock_status', 'caisse_id' => $caisseId, 'locked_by' => $from->resourceId]);
+                }
+            } elseif ($data['type'] === 'cloture_unlock') {
+                // Vérifie si l'utilisateur qui déverrouille est bien celui qui a verrouillé
+                if ($this->lockedCaisse['locked_by'] === $from->resourceId) {
+                    $this->lockedCaisse = ['caisse_id' => null, 'locked_by' => null];
+                    // Diffuse le statut de déverrouillage
+                    $this->broadcast(['type' => 'lock_status', 'caisse_id' => null, 'locked_by' => null]);
+                }
+            }
+        }
+        
+        // Gère les messages de saisie normale
+        if (isset($data['id']) && isset($data['value'])) {
+            $caisseId = explode('_', $data['id'])[1] ?? null;
+            // Ne met à jour et ne diffuse que si la caisse n'est pas verrouillée par un autre
+            if ($this->lockedCaisse['caisse_id'] === null || $this->lockedCaisse['locked_by'] === $from->resourceId || $caisseId != $this->lockedCaisse['caisse_id']) {
+                $this->formState[$data['id']] = $data['value'];
+                $this->broadcast($data, $from);
             }
         }
     }
@@ -51,11 +69,27 @@ class Caisse implements MessageComponentInterface {
     public function onClose(ConnectionInterface $conn) {
         $this->clients->detach($conn);
         echo "Connexion {$conn->resourceId} terminée\n";
+        
+        // Si l'utilisateur qui a verrouillé la caisse se déconnecte, on déverrouille
+        if ($this->lockedCaisse['locked_by'] === $conn->resourceId) {
+            $this->lockedCaisse = ['caisse_id' => null, 'locked_by' => null];
+            $this->broadcast(['type' => 'lock_status', 'caisse_id' => null, 'locked_by' => null]);
+        }
     }
 
     public function onError(ConnectionInterface $conn, \Exception $e) {
         echo "Une erreur est survenue: {$e->getMessage()}\n";
         $conn->close();
+    }
+    
+    // Fonction utilitaire pour diffuser un message
+    private function broadcast($message, $exclude = null) {
+        $jsonMessage = json_encode($message);
+        foreach ($this->clients as $client) {
+            if ($client !== $exclude) {
+                $client->send($jsonMessage);
+            }
+        }
     }
 }
 
