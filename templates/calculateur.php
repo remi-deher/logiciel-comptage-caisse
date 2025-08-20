@@ -182,6 +182,10 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
         </div>
     </div>
 </div>
+
+<!-- NOUVEAU: Inclusion des scripts spécifiques à la page. -->
+<script src="/js/realtime.js"></script>
+<script src="/js/cloture.js"></script>
 <?php
 require 'partials/footer.php';
 ?>

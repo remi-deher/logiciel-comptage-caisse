@@ -11,8 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return new Intl.DateTimeFormat('fr-FR', options).format(now).replace(/^\w/, c => c.toUpperCase());
     };
 
-    let isClotureMode = false;
     let clotureModal, cancelClotureBtn, confirmClotureBtn;
+    let isClotureMode = sessionStorage.getItem('isClotureMode') === 'true';
 
     const Global = {
         init: function() {
@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
             this.initThemeSwitcher();
             this.initVersionCheck();
             this.initClotureButton();
+            this.checkClotureModeStatus(); 
         },
 
         initNavbar: function() {
@@ -129,12 +130,41 @@ Voulez-vous mettre à jour l'application maintenant ?`;
             });
         },
         
+        checkClotureModeStatus: function() {
+            const statusIndicator = document.getElementById('websocket-status-indicator');
+            const isCalculatorPage = window.location.search.includes('page=calculateur') || (window.location.pathname.endsWith('index.php') && !window.location.search);
+            const caisseForm = document.getElementById('caisse-form');
+            
+            if (isCalculatorPage && isClotureMode) {
+                document.body.classList.add('cloture-active');
+                if (statusIndicator) {
+                    statusIndicator.classList.remove('connected', 'disconnected');
+                    statusIndicator.classList.add('cloture');
+                    statusIndicator.querySelector('.status-text').textContent = 'Connecté en temps réel : Cloture'; // NOUVEAU: Texte mis à jour
+                }
+                if (caisseForm) {
+                    const inputs = caisseForm.querySelectorAll('input, textarea, button[type="submit"]');
+                    inputs.forEach(input => {
+                        input.setAttribute('disabled', 'disabled');
+                    });
+                }
+            } else {
+                document.body.classList.remove('cloture-active');
+                sessionStorage.removeItem('isClotureMode');
+                if (statusIndicator) {
+                     statusIndicator.classList.remove('cloture');
+                }
+            }
+        },
+
         initClotureButton: function() {
             const clotureBtn = document.getElementById('cloture-btn');
             clotureModal = document.getElementById('cloture-modal');
             cancelClotureBtn = document.getElementById('cancel-cloture-btn');
-            confirmClotureBtn = document.getElementById('confirm-cloture-btn');
+            const startClotureBtn = document.getElementById('start-cloture-btn');
+            const confirmFinalClotureBtn = document.getElementById('confirm-final-cloture-btn');
             const statusIndicator = document.getElementById('websocket-status-indicator');
+            const caisseForm = document.getElementById('caisse-form');
 
             // --- NOUVEAU: Ajout de logs pour le diagnostic ---
             console.log("Initialisation du bouton de clôture...");
@@ -148,27 +178,27 @@ Voulez-vous mettre à jour l'application maintenant ?`;
             }
             console.log("Bouton et modale de clôture trouvés. Attribution des écouteurs d'événements.");
 
+            // Écouteur pour le bouton de la barre de navigation
             clotureBtn.addEventListener('click', () => {
                 console.log("Clic sur le bouton de clôture détecté.");
                 const isCalculatorPage = window.location.search.includes('page=calculateur') || (window.location.pathname.endsWith('index.php') && !window.location.search);
                 const isLoadedFromHistory = document.getElementById('calculator-data')?.dataset.config.includes('isLoadedFromHistory":true');
 
-                console.log("isCalculatorPage:", isCalculatorPage);
-                console.log("isLoadedFromHistory:", isLoadedFromHistory);
-
                 if (isCalculatorPage && !isLoadedFromHistory) {
-                    if (isClotureMode) {
-                        // 2ème clic: Confirmation finale
+                    // Si on est en mode clôture, on affiche la modale de confirmation finale
+                    if (sessionStorage.getItem('isClotureMode') === 'true') {
                         document.querySelector('#cloture-modal h3').textContent = "Confirmer la clôture finale";
                         document.querySelector('#cloture-modal p').textContent = "Souhaitez-vous valider la clôture des caisses et les réinitialiser ?";
-                        confirmClotureBtn.textContent = "Confirmer la clôture";
+                        startClotureBtn.style.display = 'none';
+                        confirmFinalClotureBtn.style.display = 'block';
                         clotureModal.classList.add('visible');
                         console.log("Affichage de la modale de confirmation finale.");
                     } else {
-                        // 1er clic: Lancement du mode clôture
+                        // Sinon, on affiche la modale de lancement du mode clôture
                         document.querySelector('#cloture-modal h3').textContent = "Commencer la clôture";
                         document.querySelector('#cloture-modal p').textContent = "Voulez-vous passer en mode clôture pour vérifier le comptage avant de valider ?";
-                        confirmClotureBtn.textContent = "Passer en mode clôture";
+                        startClotureBtn.style.display = 'block';
+                        confirmFinalClotureBtn.style.display = 'none';
                         clotureModal.classList.add('visible');
                         console.log("Affichage de la modale de lancement de la clôture.");
                     }
@@ -181,75 +211,69 @@ Voulez-vous mettre à jour l'application maintenant ?`;
                 }
             });
 
+            // Écouteur pour le bouton "Annuler"
             cancelClotureBtn.addEventListener('click', () => {
                 clotureModal.classList.remove('visible');
                 console.log("Modale de clôture annulée.");
             });
 
-            confirmClotureBtn.addEventListener('click', () => {
-                clotureModal.classList.remove('visible');
-                console.log("Confirmation reçue, traitement de la clôture.");
+            // Écouteur pour le bouton "Passer en mode clôture" (premier clic)
+            startClotureBtn.addEventListener('click', () => {
+                 clotureModal.classList.remove('visible');
+                console.log("Confirmation de l'entrée en mode clôture.");
+                sessionStorage.setItem('isClotureMode', 'true');
+                window.location.reload();
+            });
 
-                if (!isClotureMode) {
-                    // 1er clic confirmé, on passe en mode clôture
-                    isClotureMode = true;
-                    if (statusIndicator) {
-                        statusIndicator.classList.remove('connected', 'disconnected');
-                        statusIndicator.classList.add('cloture');
-                        statusIndicator.querySelector('.status-text').textContent = 'Mode Clôture';
+            // Écouteur pour le bouton "Confirmer la clôture" (second clic)
+            confirmFinalClotureBtn.addEventListener('click', () => {
+                clotureModal.classList.remove('visible');
+                console.log("Lancement de la procédure de clôture finale.");
+                
+                if (statusIndicator) {
+                    statusIndicator.classList.remove('cloture');
+                    statusIndicator.classList.add('connected');
+                    statusIndicator.querySelector('.status-text').textContent = 'Clôture en cours...';
+                }
+                
+                if (!caisseForm) {
+                    alert("Erreur: Le formulaire du calculateur n'a pas été trouvé.");
+                    console.error("Erreur critique: Le formulaire de caisse est introuvable.");
+                    return;
+                }
+                const formData = new FormData(caisseForm);
+                
+                console.log("Appel à l'API de clôture en cours...");
+                fetch('index.php?action=cloture', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        console.error("Erreur réseau:", response.status, response.statusText);
+                        throw new Error('Erreur réseau lors de la clôture');
                     }
-                    const inputs = document.querySelectorAll('form#caisse-form input, form#caisse-form textarea, form#caisse-form button[type="submit"]');
-                    inputs.forEach(input => {
-                        input.setAttribute('disabled', 'disabled');
-                    });
-                    alert("Vous êtes maintenant en mode clôture. Vérifiez vos totaux et cliquez à nouveau sur 'Clôture' pour valider.");
-                } else {
-                    // 2ème clic confirmé, on lance la procédure finale
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Réponse de l'API:", data);
+                    if (data.success) {
+                        alert(data.message);
+                        sessionStorage.removeItem('isClotureMode');
+                        window.location.reload();
+                    } else {
+                        throw new Error(data.message || 'Erreur inconnue');
+                    }
+                })
+                .catch(error => {
+                    console.error("Erreur lors de la clôture:", error);
+                    alert("Une erreur est survenue lors de la clôture: " + error.message);
                     if (statusIndicator) {
                         statusIndicator.classList.remove('cloture');
                         statusIndicator.classList.add('connected');
-                        statusIndicator.querySelector('.status-text').textContent = 'Clôture en cours...';
+                        statusIndicator.querySelector('.status-text').textContent = 'Connecté en temps réel';
                     }
-                    
-                    const caisseForm = document.getElementById('caisse-form');
-                    if (!caisseForm) {
-                        alert("Erreur: Le formulaire du calculateur n'a pas été trouvé.");
-                        console.error("Erreur critique: Le formulaire de caisse est introuvable.");
-                        return;
-                    }
-                    const formData = new FormData(caisseForm);
-                    
-                    console.log("Appel à l'API de clôture en cours...");
-                    fetch('index.php?action=cloture', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            console.error("Erreur réseau:", response.status, response.statusText);
-                            throw new Error('Erreur réseau lors de la clôture');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log("Réponse de l'API:", data);
-                        if (data.success) {
-                            alert(data.message);
-                            window.location.reload();
-                        } else {
-                            throw new Error(data.message || 'Erreur inconnue');
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Erreur lors de la clôture:", error);
-                        alert("Une erreur est survenue lors de la clôture: " + error.message);
-                        if (statusIndicator) {
-                            statusIndicator.classList.remove('cloture');
-                            statusIndicator.classList.add('connected');
-                            statusIndicator.querySelector('.status-text').textContent = 'Connecté en temps réel';
-                        }
-                    });
-                }
+                });
             });
         }
     };
