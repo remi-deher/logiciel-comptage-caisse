@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     let isClotureMode = false;
+    let clotureModal, cancelClotureBtn, confirmClotureBtn;
 
     const Global = {
         init: function() {
@@ -130,17 +131,30 @@ Voulez-vous mettre à jour l'application maintenant ?`;
         
         initClotureButton: function() {
             const clotureBtn = document.getElementById('cloture-btn');
-            const clotureModal = document.getElementById('cloture-modal');
-            const cancelClotureBtn = document.getElementById('cancel-cloture-btn');
-            const confirmClotureBtn = document.getElementById('confirm-cloture-btn');
+            clotureModal = document.getElementById('cloture-modal');
+            cancelClotureBtn = document.getElementById('cancel-cloture-btn');
+            confirmClotureBtn = document.getElementById('confirm-cloture-btn');
             const statusIndicator = document.getElementById('websocket-status-indicator');
 
-            if (!clotureBtn || !clotureModal) return;
+            // --- NOUVEAU: Ajout de logs pour le diagnostic ---
+            console.log("Initialisation du bouton de clôture...");
+            if (!clotureBtn) {
+                console.error("ERREUR: Le bouton avec l'ID 'cloture-btn' est introuvable.");
+                return;
+            }
+            if (!clotureModal) {
+                 console.error("ERREUR: La modale avec l'ID 'cloture-modal' est introuvable.");
+                 return;
+            }
+            console.log("Bouton et modale de clôture trouvés. Attribution des écouteurs d'événements.");
 
             clotureBtn.addEventListener('click', () => {
                 console.log("Clic sur le bouton de clôture détecté.");
                 const isCalculatorPage = window.location.search.includes('page=calculateur') || (window.location.pathname.endsWith('index.php') && !window.location.search);
                 const isLoadedFromHistory = document.getElementById('calculator-data')?.dataset.config.includes('isLoadedFromHistory":true');
+
+                console.log("isCalculatorPage:", isCalculatorPage);
+                console.log("isLoadedFromHistory:", isLoadedFromHistory);
 
                 if (isCalculatorPage && !isLoadedFromHistory) {
                     if (isClotureMode) {
@@ -149,29 +163,35 @@ Voulez-vous mettre à jour l'application maintenant ?`;
                         document.querySelector('#cloture-modal p').textContent = "Souhaitez-vous valider la clôture des caisses et les réinitialiser ?";
                         confirmClotureBtn.textContent = "Confirmer la clôture";
                         clotureModal.classList.add('visible');
+                        console.log("Affichage de la modale de confirmation finale.");
                     } else {
                         // 1er clic: Lancement du mode clôture
                         document.querySelector('#cloture-modal h3').textContent = "Commencer la clôture";
                         document.querySelector('#cloture-modal p').textContent = "Voulez-vous passer en mode clôture pour vérifier le comptage avant de valider ?";
                         confirmClotureBtn.textContent = "Passer en mode clôture";
                         clotureModal.classList.add('visible');
+                        console.log("Affichage de la modale de lancement de la clôture.");
                     }
                 } else if (isLoadedFromHistory) {
                     alert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.");
+                    console.warn("Échec de l'affichage de la modale: mode consultation.");
                 } else {
                     alert("La clôture est une fonctionnalité de la page 'Calculateur'.");
+                    console.warn("Échec de l'affichage de la modale: page incorrecte.");
                 }
             });
 
             cancelClotureBtn.addEventListener('click', () => {
                 clotureModal.classList.remove('visible');
+                console.log("Modale de clôture annulée.");
             });
 
             confirmClotureBtn.addEventListener('click', () => {
                 clotureModal.classList.remove('visible');
+                console.log("Confirmation reçue, traitement de la clôture.");
 
                 if (!isClotureMode) {
-                    // C'est le 1er clic, on passe en mode clôture
+                    // 1er clic confirmé, on passe en mode clôture
                     isClotureMode = true;
                     if (statusIndicator) {
                         statusIndicator.classList.remove('connected', 'disconnected');
@@ -184,7 +204,7 @@ Voulez-vous mettre à jour l'application maintenant ?`;
                     });
                     alert("Vous êtes maintenant en mode clôture. Vérifiez vos totaux et cliquez à nouveau sur 'Clôture' pour valider.");
                 } else {
-                    // C'est le 2ème clic, on lance la procédure finale
+                    // 2ème clic confirmé, on lance la procédure finale
                     if (statusIndicator) {
                         statusIndicator.classList.remove('cloture');
                         statusIndicator.classList.add('connected');
@@ -194,19 +214,25 @@ Voulez-vous mettre à jour l'application maintenant ?`;
                     const caisseForm = document.getElementById('caisse-form');
                     if (!caisseForm) {
                         alert("Erreur: Le formulaire du calculateur n'a pas été trouvé.");
+                        console.error("Erreur critique: Le formulaire de caisse est introuvable.");
                         return;
                     }
                     const formData = new FormData(caisseForm);
                     
+                    console.log("Appel à l'API de clôture en cours...");
                     fetch('index.php?action=cloture', {
                         method: 'POST',
                         body: formData
                     })
                     .then(response => {
-                        if (!response.ok) throw new Error('Erreur réseau lors de la clôture');
+                        if (!response.ok) {
+                            console.error("Erreur réseau:", response.status, response.statusText);
+                            throw new Error('Erreur réseau lors de la clôture');
+                        }
                         return response.json();
                     })
                     .then(data => {
+                        console.log("Réponse de l'API:", data);
                         if (data.success) {
                             alert(data.message);
                             window.location.reload();

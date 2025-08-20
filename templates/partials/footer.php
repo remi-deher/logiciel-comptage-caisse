@@ -37,5 +37,20 @@ $release_info = 'Information non disponible';
     <?php if (!empty($page_js)): ?>
         <script src="/js/<?= htmlspecialchars($page_js) ?>"></script>
     <?php endif; ?>
+    <!-- NOUVEAU: Inclusion de la modale de clôture -->
+    <div id="cloture-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <div class="modal-header">
+                <h3>Confirmer la clôture des caisses</h3>
+            </div>
+            <p>Êtes-vous sûr de vouloir lancer la procédure de clôture pour toutes les caisses ?</p>
+            <p>Cette action sauvegardera l'état actuel et mettra les caisses à zéro.</p>
+            <div class="modal-actions">
+                <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
+                <button id="confirm-cloture-btn" class="btn new-btn">Confirmer la clôture</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

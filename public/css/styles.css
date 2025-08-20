@@ -199,9 +199,9 @@ body[data-theme="dark"] .error {
     transition: opacity 0.3s ease;
 }
 .modal.visible {
-    opacity: 1;
-    pointer-events: auto;
-    display: flex; /* IMPORTANT: forcer le display pour qu'elle s'affiche */
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    display: flex !important;
 }
 .modal-content {
     background-color: var(--color-surface);
