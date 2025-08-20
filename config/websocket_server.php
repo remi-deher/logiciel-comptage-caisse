@@ -51,6 +51,22 @@ class Caisse implements MessageComponentInterface {
                     $this->lockedCaisse = ['caisse_id' => null, 'locked_by' => null];
                     // Diffuse le statut de déverrouillage
                     $this->broadcast(['type' => 'lock_status', 'caisse_id' => null, 'locked_by' => null]);
+                } else {
+                    // Si l'utilisateur n'est pas l'initiateur, on refuse le déverrouillage
+                    $from->send(json_encode(['type' => 'unlock_refused', 'message' => "Vous ne pouvez pas déverrouiller une caisse initiée par un autre utilisateur."]));
+                }
+            } elseif ($data['type'] === 'force_unlock') {
+                // NOUVEAU: Gère le déverrouillage forcé
+                $caisseId = $data['caisse_id'];
+                if ($this->lockedCaisse['caisse_id'] === $caisseId) {
+                    // Envoie une notification à l'utilisateur qui a verrouillé la caisse
+                    foreach ($this->clients as $client) {
+                        if ($client->resourceId === $this->lockedCaisse['locked_by']) {
+                            $client->send(json_encode(['type' => 'force_unlocked', 'message' => "Votre session a été déverrouillée par un autre utilisateur."]));
+                        }
+                    }
+                    $this->lockedCaisse = ['caisse_id' => null, 'locked_by' => null];
+                    $this->broadcast(['type' => 'lock_status', 'caisse_id' => null, 'locked_by' => null]);
                 }
             }
         }

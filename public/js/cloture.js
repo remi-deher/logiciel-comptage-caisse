@@ -4,8 +4,7 @@
  */
 document.addEventListener('DOMContentLoaded', function() {
     let clotureModal, cancelClotureBtn, startClotureBtn, confirmFinalClotureBtn, clotureBtn;
-    let isClotureMode = sessionStorage.getItem('isClotureMode') === 'true';
-
+    
     // Récupère les éléments du DOM
     clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn) return;
@@ -23,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fonction pour gérer le verrouillage de l'interface
     function handleInterfaceLock(caisseId, lockedBy) {
+        console.log("handleInterfaceLock called with:", { caisseId, lockedBy });
         const activeTab = document.querySelector('.tab-link.active');
         const activeCaisseId = activeTab ? activeTab.dataset.tab.replace('caisse', '') : null;
         const currentWsId = window.wsConnection?.resourceId;
@@ -32,87 +32,101 @@ document.addEventListener('DOMContentLoaded', function() {
         currentLockerId = lockedBy;
         
         const isCaisseLockedByAnother = (caisseId && lockedBy !== currentWsId);
-
-        document.querySelectorAll('input, textarea, button[type="submit"]').forEach(el => {
-            el.disabled = false;
-        });
         
-        if (isCaisseLockedByAnother) {
-             // Désactive tous les champs si une caisse est verrouillée par un autre utilisateur
-             document.querySelectorAll('input, textarea, button[type="submit"]').forEach(el => {
-                 el.disabled = true;
-             });
-        }
+        // Gère les inputs et les boutons
+        document.querySelectorAll('input, textarea, button[type="submit"]').forEach(el => {
+            const elId = el.id.split('_');
+            const elCaisseId = elId[elId.length - 1]; // Récupère le dernier élément de l'ID (e.g., '1' de 'fond_de_caisse_1')
+            const isTabInput = el.closest('.tab-content') && el.closest('.tab-content').id.includes(`caisse${activeCaisseId}`);
+            
+            // Si un verrouillage existe et que l'input n'est pas dans la caisse verrouillée
+            if (caisseId && elCaisseId !== caisseId) {
+                el.disabled = false;
+            } else if (caisseId && elCaisseId === caisseId) {
+                // Si la caisse est verrouillée par un autre
+                if (isCaisseLockedByAnother) {
+                    el.disabled = true;
+                } else if (lockedBy === currentWsId) { // Verrouillé par nous-mêmes
+                    el.disabled = false;
+                }
+            } else { // Pas de verrouillage, tout est actif
+                el.disabled = false;
+            }
+
+             // Cas particulier des onglets
+            if (el.classList.contains('tab-link')) {
+                el.disabled = (caisseId !== null && el.dataset.tab.replace('caisse', '') !== caisseId);
+            }
+        });
     
         // Gère le bouton de clôture
-        if (isCaisseLockedByAnother) {
-            clotureBtn.disabled = true;
-            clotureBtn.textContent = "Caisse verrouillée par un autre utilisateur";
-        } else if (caisseId && lockedBy === currentWsId) {
-             clotureBtn.disabled = false;
-             clotureBtn.textContent = "Finaliser la clôture";
+        const activeTabCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
+
+        // Crée les boutons
+        const defaultBtn = '<i class="fa-solid fa-lock"></i> Clôture';
+        const unlockBtn = '<i class="fa-solid fa-lock-open"></i> Déverrouiller';
+        const forceUnlockBtn = '<i class="fa-solid fa-user-lock"></i> Forcer le déverrouillage';
+
+        // Gère les boutons en bas de la page
+        if (currentLockedCaisseId === activeTabCaisseId) {
+             if (currentLockerId === currentWsId) {
+                 clotureBtn.innerHTML = unlockBtn;
+                 clotureBtn.onclick = () => {
+                      if (window.confirm("Êtes-vous sûr de vouloir déverrouiller cette caisse ?")) {
+                         window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock' }));
+                      }
+                 }
+             } else {
+                clotureBtn.innerHTML = forceUnlockBtn;
+                clotureBtn.onclick = () => {
+                    if (window.confirm("Cette caisse est verrouillée par un autre utilisateur. Voulez-vous forcer le déverrouillage ?")) {
+                         window.wsConnection.send(JSON.stringify({ type: 'force_unlock', caisse_id: activeTabCaisseId }));
+                    }
+                }
+             }
         } else {
-            clotureBtn.disabled = false;
-            clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
+             clotureBtn.innerHTML = defaultBtn;
+             clotureBtn.onclick = () => {
+                const isLoadedFromHistory = document.getElementById('calculator-data')?.dataset.config.includes('isLoadedFromHistory":true');
+                if (isLoadedFromHistory) {
+                    alert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.");
+                    return;
+                }
+                if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
+                    window.wsConnection.send(JSON.stringify({ type: 'cloture_lock', caisse_id: activeTabCaisseId }));
+                }
+                // Affiche la modale de lancement du mode clôture
+                document.querySelector('#cloture-modal h3').textContent = "Commencer la clôture";
+                document.querySelector('#cloture-modal p').textContent = "Voulez-vous passer en mode clôture pour vérifier le comptage avant de valider ?";
+                startClotureBtn.style.display = 'block';
+                confirmFinalClotureBtn.style.display = 'none';
+                clotureModal.classList.add('visible');
+             };
         }
     }
     window.handleInterfaceLock = handleInterfaceLock;
     
-    // --- NOUVEAU: Logique du bouton de clôture ---
-    clotureBtn.addEventListener('click', () => {
-        const activeTab = document.querySelector('.tab-link.active');
-        if (!activeTab) {
-            alert("Veuillez sélectionner une caisse d'abord.");
-            return;
-        }
-        const activeCaisseId = activeTab.dataset.tab.replace('caisse', '');
-        const currentWsId = window.wsConnection?.resourceId;
-
-        // Vérifie si la caisse est déjà verrouillée par un autre
-        if (currentLockedCaisseId && currentLockerId !== currentWsId) {
-            alert("Cette caisse est déjà en mode clôture sur un autre poste.");
-            return;
-        }
-
-        // Si la caisse est verrouillée par nous-mêmes, on passe à l'étape finale
-        if (currentLockedCaisseId === activeCaisseId && currentLockerId === currentWsId) {
-             // 2ème clic: Confirmation finale
-             document.querySelector('#cloture-modal h3').textContent = "Confirmer la clôture finale";
-             document.querySelector('#cloture-modal p').textContent = "Souhaitez-vous valider la clôture des caisses et les réinitialiser ?";
-             startClotureBtn.style.display = 'none';
-             confirmFinalClotureBtn.style.display = 'block';
-             clotureModal.classList.add('visible');
-        } else {
-            // Sinon, on envoie la requête de verrouillage
-            if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
-                window.wsConnection.send(JSON.stringify({ type: 'cloture_lock', caisse_id: activeCaisseId }));
-            }
-            // Affiche la modale de lancement du mode clôture
-            document.querySelector('#cloture-modal h3').textContent = "Commencer la clôture";
-            document.querySelector('#cloture-modal p').textContent = "Voulez-vous passer en mode clôture pour vérifier le comptage avant de valider ?";
-            startClotureBtn.style.display = 'block';
-            confirmFinalClotureBtn.style.display = 'none';
-            clotureModal.classList.add('visible');
-        }
-    });
-
+    // NOUVEAU: Logique du bouton de clôture
+    
+    // Événement pour le bouton "Annuler" de la modale
     cancelClotureBtn.addEventListener('click', () => {
+        console.log("Cancel button clicked. currentLockedCaisseId:", currentLockedCaisseId);
         clotureModal.classList.remove('visible');
-        // Si l'utilisateur annule, on envoie une requête de déverrouillage
-        if (currentLockerId === window.wsConnection?.resourceId) {
-            if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
-                window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock' }));
-            }
+        if (currentLockedCaisseId && currentLockerId === window.wsConnection?.resourceId) {
+            window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock' }));
         }
     });
 
+    // Événement pour le bouton "Commencer la clôture" de la modale
     startClotureBtn.addEventListener('click', () => {
+        console.log("Start Cloture button clicked.");
         clotureModal.classList.remove('visible');
         // Ne fait rien ici, la requête de verrouillage a déjà été envoyée
-        // On attend la réponse du serveur pour mettre l'interface à jour
     });
 
+    // Événement pour le bouton "Confirmer la clôture" de la modale
     confirmFinalClotureBtn.addEventListener('click', () => {
+        console.log("Confirm Final Cloture button clicked.");
         clotureModal.classList.remove('visible');
         
         if (statusIndicator) {
@@ -156,7 +170,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('connected');
                 statusIndicator.querySelector('.status-text').textContent = 'Connecté en temps réel';
             }
-            // Si la clôture échoue, on déverrouille pour permettre à l'utilisateur de corriger
             if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
                 window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock' }));
             }

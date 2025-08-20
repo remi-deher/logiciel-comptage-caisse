@@ -67,6 +67,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     delete data.cloture_lock_status;
                 }
+                
+                // NOUVEAU: Gère les messages de refus de déverrouillage
+                if (data.type === 'unlock_refused') {
+                    alert("Erreur: " + data.message);
+                    return;
+                }
+                
+                // NOUVEAU: Gère les messages de déverrouillage forcé
+                 if (data.type === 'force_unlocked') {
+                    alert(data.message);
+                    window.location.reload();
+                    return;
+                }
 
                 if (data.id && typeof data.value !== 'undefined') {
                     const input = document.getElementById(data.id);

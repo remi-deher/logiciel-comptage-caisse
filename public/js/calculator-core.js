@@ -47,15 +47,41 @@ document.addEventListener('DOMContentLoaded', function() {
         this.nextElementSibling.classList.toggle('open');
     }
     
+    // NOUVEAU : Fonction de chargement et d'initialisation des données
+    function loadAndInitFormData(data) {
+        if (!data) return;
+        
+        for (const caisseId in data) {
+            if (caisseId === 'nom_comptage' || caisseId === 'explication') {
+                const input = document.getElementById(caisseId);
+                if (input) input.value = data[caisseId];
+            } else {
+                const caisseData = data[caisseId];
+                document.getElementById(`fond_de_caisse_${caisseId}`).value = caisseData.fond_de_caisse || '';
+                document.getElementById(`ventes_${caisseId}`).value = caisseData.ventes || '';
+                document.getElementById(`retrocession_${caisseId}`).value = caisseData.retrocession || '';
+                
+                for (const denom in caisseData.denominations) {
+                    const input = document.getElementById(`${denom}_${caisseId}`);
+                    if (input) input.value = caisseData.denominations[denom];
+                }
+            }
+        }
+        calculateAllFull();
+    }
+    
     // Initialisation des écouteurs d'événements pour la page du calculateur
     function initCalculator() {
         tabLinks.forEach(link => {
             link.addEventListener('click', (event) => {
-                // NOUVEAU: Bloquer le changement de caisse si le mode clôture est actif
-                if (sessionStorage.getItem('isClotureMode') === 'true') {
-                    alert("Impossible de changer de caisse en mode clôture.");
+                const activeCaisseId = event.currentTarget.dataset.tab.replace('caisse', '');
+                
+                // NOUVEAU: Gère le changement d'onglet en mode clôture
+                if (window.currentLockedCaisseId && window.currentLockedCaisseId !== activeCaisseId) {
+                    alert("Impossible de changer de caisse en mode clôture si la caisse active n'est pas celle verrouillée.");
                     return;
                 }
+
                 tabLinks.forEach(l => l.classList.remove('active'));
                 tabContents.forEach(c => c.classList.remove('active'));
                 event.currentTarget.classList.add('active');
@@ -66,6 +92,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 ecartDisplays.forEach(display => display.classList.remove('active'));
                 document.getElementById(`ecart-display-${event.currentTarget.dataset.tab}`)?.classList.add('active');
                 calculateAllFull();
+                // NOUVEAU: Réapplique les règles de verrouillage de l'interface
+                if (window.handleInterfaceLock) {
+                    window.handleInterfaceLock(window.currentLockedCaisseId, window.currentLockerId);
+                }
             });
         });
 
