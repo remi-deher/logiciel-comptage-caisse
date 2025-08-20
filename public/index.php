@@ -110,6 +110,9 @@ if ($ajax_action) {
         case 'export_csv': // NOUVEAU
             $historiqueController->exportCsv();
             exit;
+        case 'cloture': // NOUVEAU: Ajout de l'action de clôture
+            $calculateurController->cloture();
+            exit;
     }
 }
 

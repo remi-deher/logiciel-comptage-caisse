@@ -161,3 +161,29 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
     .navbar-nav { position: static; left: auto; top: auto; transform: none; width: auto; display: flex; align-items: center; }
     .navbar-controls { margin-left: 15px; } /* Ajustement de la marge pour les contrôles */
 }
+
+/* NOUVEAU: Styles pour le bouton de clôture */
+.cloture-btn {
+    background-color: #8a2be2; /* Couleur violette */
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cloture-btn:hover {
+    background-color: #6a0dad;
+    transform: translateY(-2px);
+}
+
+/* NOUVEAU: Nouvelle couleur pour le statut "Clôture" */
+.status-indicator.cloture {
+    background-color: #8a2be2;
+    color: white;
+}

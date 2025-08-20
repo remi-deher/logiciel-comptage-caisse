@@ -42,3 +42,12 @@ CREATE TABLE IF NOT EXISTS `admins` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- NOUVEAU: Table pour stocker les clôtures
+CREATE TABLE IF NOT EXISTS `clotures` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `comptage_id` int(11) NOT NULL,
+  `date_cloture` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`comptage_id`) REFERENCES `comptages`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

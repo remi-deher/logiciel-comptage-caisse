@@ -212,4 +212,76 @@ class CalculateurController {
             exit;
         }
     }
+
+    // NOUVEAU: Méthode pour gérer la clôture des caisses
+    public function cloture() {
+        header('Content-Type: application/json');
+
+        try {
+            // Étape 1: Sauvegarder l'état actuel des caisses (avant les retraits)
+            $nom_cloture = "Clôture du " . date('Y-m-d H:i:s');
+            $explication = "Clôture quotidienne automatique";
+            
+            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt->execute([$nom_cloture, $explication, date('Y-m-d H:i:s')]);
+            $comptage_id_cloture = $this->pdo->lastInsertId();
+            
+            // Insertion des détails pour chaque caisse
+            foreach ($this->noms_caisses as $caisse_id => $nom) {
+                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
+                if (empty($caisse_data)) {
+                    continue;
+                }
+            
+                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+                $stmt_details->execute([
+                    $comptage_id_cloture,
+                    $caisse_id,
+                    get_numeric_value($caisse_data, 'fond_de_caisse'),
+                    get_numeric_value($caisse_data, 'ventes'),
+                    get_numeric_value($caisse_data, 'retrocession')
+                ]);
+                $comptage_detail_id = $this->pdo->lastInsertId();
+
+                foreach ($this->denominations as $type => $denominations_list) {
+                    foreach ($denominations_list as $name => $value) {
+                        $quantite = get_numeric_value($caisse_data, $name);
+                        if ($quantite > 0) {
+                            $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                            $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
+                        }
+                    }
+                }
+            }
+            
+            // Étape 2: Créer un NOUVEAU comptage pour le fond de caisse du jour suivant
+            $nom_nouveau_comptage = "Fond de caisse du " . date('Y-m-d H:i:s');
+            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt->execute([$nom_nouveau_comptage, "Nouvel état après clôture", date('Y-m-d H:i:s')]);
+            $comptage_id_nouveau = $this->pdo->lastInsertId();
+
+            // Insertion des détails avec uniquement le fond de caisse
+            foreach ($this->noms_caisses as $caisse_id => $nom) {
+                $fond_de_caisse = get_numeric_value($_POST['caisse'][$caisse_id] ?? [], 'fond_de_caisse');
+                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+                $stmt_details->execute([
+                    $comptage_id_nouveau,
+                    $caisse_id,
+                    $fond_de_caisse,
+                    0, // Ventes à zéro
+                    0  // Rétrocessions à zéro
+                ]);
+            }
+
+            // Étape 3: Supprimer toutes les anciennes sauvegardes automatiques
+            $stmt_delete_autosave = $this->pdo->prepare("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
+            $stmt_delete_autosave->execute();
+
+            echo json_encode(['success' => true, 'message' => "La clôture a été effectuée avec succès. Un nouveau comptage avec le fond de caisse a été créé."]);
+        
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'message' => 'Erreur de BDD lors de la clôture : ' . $e->getMessage()]);
+        }
+        exit;
+    }
 }

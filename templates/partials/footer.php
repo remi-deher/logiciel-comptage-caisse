@@ -32,9 +32,10 @@ $release_info = 'Information non disponible';
         </div>
     </footer>
 
-    <script src="js/main.js"></script>
+    <!-- CORRIGÉ: Chemins des scripts en absolu pour une meilleure fiabilité -->
+    <script src="/js/main.js"></script>
     <?php if (!empty($page_js)): ?>
-        <script src="js/<?= htmlspecialchars($page_js) ?>"></script>
+        <script src="/js/<?= htmlspecialchars($page_js) ?>"></script>
     <?php endif; ?>
 </body>
 </html>

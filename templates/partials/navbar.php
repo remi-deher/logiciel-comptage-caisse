@@ -1,6 +1,6 @@
 <?php
 // Fichier : templates/partials/navbar.php
-// Mise à jour pour ajouter le lien vers la page de statistiques.
+// Mise à jour pour ajouter le lien vers la page de statistiques et le bouton de clôture.
 $page_active = $_GET['page'] ?? 'calculateur';
 ?>
 <nav class="navbar">
@@ -28,6 +28,8 @@ $page_active = $_GET['page'] ?? 'calculateur';
                 <span class="status-dot"></span>
                 <span class="status-text">Connexion...</span>
             </div>
+            <!-- NOUVEAU: Bouton de Clôture -->
+            <button id="cloture-btn" class="cloture-btn"><i class="fa-solid fa-lock"></i> Clôture</button>
             <!-- NOUVEAU BOUTON DE THÈME -->
             <button id="theme-switcher" class="theme-switch-btn" title="Changer de thème">
                 <i class="fa-solid fa-sun"></i>

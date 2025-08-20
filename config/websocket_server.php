@@ -1,7 +1,7 @@
 <?php
 
 // Port utilisé pour le Websocket
-$port = '8080';
+$port = '8081';
 
 // websocket_server.php
 use Ratchet\MessageComponentInterface;
@@ -10,7 +10,7 @@ use Ratchet\Server\IoServer;
 use Ratchet\Http\HttpServer;
 use Ratchet\WebSocket\WsServer;
 
-require dirname(__FILE__) . '/vendor/autoload.php';
+require dirname(__FILE__, 2) . '/vendor/autoload.php';
 
 class Caisse implements MessageComponentInterface {
     protected $clients;

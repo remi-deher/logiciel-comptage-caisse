@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let isSubmitting = false;
     let initialState = '';
-
+    
     // --- Logique de l'interface (Accordéon, Onglets) ---
     function initAccordion() {
         const accordionHeaders = document.querySelectorAll('.accordion-header');
@@ -46,22 +46,52 @@ document.addEventListener('DOMContentLoaded', function() {
         this.classList.toggle('active');
         this.nextElementSibling.classList.toggle('open');
     }
-
-    tabLinks.forEach(link => {
-        link.addEventListener('click', (event) => {
-            tabLinks.forEach(l => l.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-            const targetTab = document.getElementById(event.currentTarget.dataset.tab);
-            if (targetTab) {
-                targetTab.classList.add('active');
-            }
-            ecartDisplays.forEach(display => display.classList.remove('active'));
-            document.getElementById(`ecart-display-${event.currentTarget.dataset.tab}`)?.classList.add('active');
-            calculateAllFull();
+    
+    // Initialisation des écouteurs d'événements pour la page du calculateur
+    function initCalculator() {
+        tabLinks.forEach(link => {
+            link.addEventListener('click', (event) => {
+                tabLinks.forEach(l => l.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                event.currentTarget.classList.add('active');
+                const targetTab = document.getElementById(event.currentTarget.dataset.tab);
+                if (targetTab) {
+                    targetTab.classList.add('active');
+                }
+                ecartDisplays.forEach(display => display.classList.remove('active'));
+                document.getElementById(`ecart-display-${event.currentTarget.dataset.tab}`)?.classList.add('active');
+                calculateAllFull();
+            });
         });
-    });
 
+        // Écouteurs pour les champs du formulaire pour le calcul en temps réel
+        if (!isLoadedFromHistory) {
+            caisseForm.addEventListener('input', (event) => {
+                calculateAllFull();
+                if (window.sendWsMessage) {
+                    window.sendWsMessage(event.target.id, event.target.value);
+                }
+            });
+            window.addEventListener('beforeunload', () => {
+                if (isSubmitting || !hasUnsavedChanges()) return;
+                performAutosaveOnExit();
+            });
+        }
+    
+        caisseForm.addEventListener('submit', () => {
+            isSubmitting = true;
+            if (nomComptageInput && nomComptageInput.value.trim() === '') {
+                nomComptageInput.value = `Comptage du ${formatDateTimeFr().replace(', ', ' à ')}`;
+            }
+        });
+
+        // Initialisation de l'état du formulaire
+        loadAndInitFormData(loadedData);
+        setTimeout(() => { initialState = getFormStateAsString(); }, 0);
+        initAccordion();
+        handleScroll();
+    }
+    
     // --- Fonctions de Calcul ---
     function generateWithdrawalSuggestion(amountToWithdraw, currentCounts, denominations) {
         let remainingAmount = amountToWithdraw;
@@ -323,31 +353,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('scroll', handleScroll);
 
 
-    // --- Écouteurs d'événements ---
-    if (!isLoadedFromHistory) {
-        caisseForm.addEventListener('input', (event) => {
-            calculateAllFull();
-            window.sendWsMessage(event.target.id, event.target.value);
-        });
-        window.addEventListener('beforeunload', () => {
-            if (isSubmitting || !hasUnsavedChanges()) return;
-            performAutosaveOnExit();
-        });
-    }
-
-    caisseForm.addEventListener('submit', () => {
-        isSubmitting = true;
-        if (nomComptageInput && nomComptageInput.value.trim() === '') {
-            nomComptageInput.value = `Comptage du ${formatDateTimeFr().replace(', ', ' à ')}`;
-        }
-    });
-
-    // --- Initialisation ---
-    loadAndInitFormData(loadedData);
-    
-    setTimeout(() => {
-        initialState = getFormStateAsString();
-    }, 0);
-    initAccordion();
-    handleScroll(); // Initialisation de la barre au chargement
+    // --- Initialisation du calculateur ---
+    initCalculator();
 });

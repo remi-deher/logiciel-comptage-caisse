@@ -1,7 +1,8 @@
 <?php
 // templates/calculateur.php - Version corrigée pour le chargement des données et l'affichage sur écran 4/3.
 
-$page_js = 'calculator-core.js'; // Définit le script JS spécifique à cette page
+// NOUVEAU: La variable $page_js inclut maintenant le script de clôture
+$page_js = 'calculator-core.js'; 
 
 require 'partials/header.php';
 require 'partials/navbar.php';
@@ -181,7 +182,25 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
         </div>
     </div>
 </div>
-<script src="js/realtime.js"></script>
+
+<!-- NOUVEAU: Fenêtre Modale de Confirmation de Clôture -->
+<div id="cloture-modal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <div class="modal-header">
+            <h3>Confirmer la clôture des caisses</h3>
+        </div>
+        <p>Êtes-vous sûr de vouloir lancer la procédure de clôture pour toutes les caisses ?</p>
+        <p>Cette action sauvegardera l'état actuel et mettra les caisses à zéro.</p>
+        <div class="modal-actions">
+            <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
+            <button id="confirm-cloture-btn" class="btn new-btn">Confirmer la clôture</button>
+        </div>
+    </div>
+</div>
+
+<script src="/js/realtime.js"></script>
+<script src="/js/cloture.js"></script>
 <?php
 require 'partials/footer.php';
 ?>
