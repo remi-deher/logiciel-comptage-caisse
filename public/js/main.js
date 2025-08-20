@@ -135,7 +135,7 @@ Voulez-vous mettre à jour l'application maintenant ?`;
             const isCalculatorPage = window.location.search.includes('page=calculateur') || (window.location.pathname.endsWith('index.php') && !window.location.search);
             const caisseForm = document.getElementById('caisse-form');
             
-            if (isCalculatorPage && isClotureMode) {
+            if (isCalculatorPage && sessionStorage.getItem('isClotureMode') === 'true') {
                 document.body.classList.add('cloture-active');
                 if (statusIndicator) {
                     statusIndicator.classList.remove('connected', 'disconnected');
@@ -178,15 +178,14 @@ Voulez-vous mettre à jour l'application maintenant ?`;
             }
             console.log("Bouton et modale de clôture trouvés. Attribution des écouteurs d'événements.");
 
-            // Écouteur pour le bouton de la barre de navigation
             clotureBtn.addEventListener('click', () => {
                 console.log("Clic sur le bouton de clôture détecté.");
                 const isCalculatorPage = window.location.search.includes('page=calculateur') || (window.location.pathname.endsWith('index.php') && !window.location.search);
                 const isLoadedFromHistory = document.getElementById('calculator-data')?.dataset.config.includes('isLoadedFromHistory":true');
 
                 if (isCalculatorPage && !isLoadedFromHistory) {
-                    // Si on est en mode clôture, on affiche la modale de confirmation finale
                     if (sessionStorage.getItem('isClotureMode') === 'true') {
+                        // 2ème clic: Confirmation finale
                         document.querySelector('#cloture-modal h3').textContent = "Confirmer la clôture finale";
                         document.querySelector('#cloture-modal p').textContent = "Souhaitez-vous valider la clôture des caisses et les réinitialiser ?";
                         startClotureBtn.style.display = 'none';
@@ -211,13 +210,11 @@ Voulez-vous mettre à jour l'application maintenant ?`;
                 }
             });
 
-            // Écouteur pour le bouton "Annuler"
             cancelClotureBtn.addEventListener('click', () => {
                 clotureModal.classList.remove('visible');
                 console.log("Modale de clôture annulée.");
             });
 
-            // Écouteur pour le bouton "Passer en mode clôture" (premier clic)
             startClotureBtn.addEventListener('click', () => {
                  clotureModal.classList.remove('visible');
                 console.log("Confirmation de l'entrée en mode clôture.");
@@ -225,7 +222,6 @@ Voulez-vous mettre à jour l'application maintenant ?`;
                 window.location.reload();
             });
 
-            // Écouteur pour le bouton "Confirmer la clôture" (second clic)
             confirmFinalClotureBtn.addEventListener('click', () => {
                 clotureModal.classList.remove('visible');
                 console.log("Lancement de la procédure de clôture finale.");

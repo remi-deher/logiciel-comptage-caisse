@@ -51,6 +51,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function initCalculator() {
         tabLinks.forEach(link => {
             link.addEventListener('click', (event) => {
+                // NOUVEAU: Bloquer le changement de caisse si le mode clôture est actif
+                if (sessionStorage.getItem('isClotureMode') === 'true') {
+                    alert("Impossible de changer de caisse en mode clôture.");
+                    return;
+                }
                 tabLinks.forEach(l => l.classList.remove('active'));
                 tabContents.forEach(c => c.classList.remove('active'));
                 event.currentTarget.classList.add('active');
@@ -67,6 +72,18 @@ document.addEventListener('DOMContentLoaded', function() {
         // Écouteurs pour les champs du formulaire pour le calcul en temps réel
         if (!isLoadedFromHistory) {
             caisseForm.addEventListener('input', (event) => {
+                // NOUVEAU: Autoriser la modification uniquement pour la caisse active en mode clôture
+                const activeCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
+                const targetCaisseId = event.target.id.split('_').pop();
+                const isClotureActive = sessionStorage.getItem('isClotureMode') === 'true';
+
+                if (isClotureActive && activeCaisseId !== targetCaisseId) {
+                    // Si on est en mode clôture, on désactive les champs de toutes les autres caisses
+                    event.target.setAttribute('disabled', 'disabled');
+                } else if (!isClotureActive) {
+                    // Si on n'est pas en mode clôture, tous les champs sont actifs
+                    event.target.removeAttribute('disabled');
+                }
                 calculateAllFull();
                 if (window.sendWsMessage) {
                     window.sendWsMessage(event.target.id, event.target.value);
@@ -162,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function() {
             totauxCombines.fdc += fondDeCaisse;
             totauxCombines.total += totalCompte;
             totauxCombines.recette += recetteReelle;
-            totauxCombines.theorique += recetteTheorique;
+            totauxCombines.theorique += recetteReelle; // CORRIGÉ: Utilisez la recette réelle pour le calcul de la clôture
             totauxCombines.ecart += ecart;
             
             if (Math.abs(ecart) < 0.01) {
@@ -263,75 +280,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- Logique de Sauvegarde ---
-    function getFormStateAsString() {
-        const state = {};
-        
-        if (config.nomsCaisses && config.denominations) {
-            for (const caisseId of Object.keys(config.nomsCaisses)) {
-                const infoFields = ['fond_de_caisse', 'ventes', 'retrocession'];
-                for (const field of infoFields) {
-                    const input = document.getElementById(`${field}_${caisseId}`);
-                    if (input) state[input.id] = parseFloat(input.value.replace(',', '.')) || 0;
-                }
-
-                for (const type in config.denominations) {
-                    for (const denominationName in config.denominations[type]) {
-                        const input = document.getElementById(`${denominationName}_${caisseId}`);
-                        if (input) state[input.id] = parseInt(input.value) || 0;
-                    }
-                }
-            }
-        }
-
-        return JSON.stringify(state);
-    }
-
-    function hasUnsavedChanges() {
-        return initialState !== getFormStateAsString();
-    }
-
-    function performAutosaveOnExit() {
-        const formData = new FormData(caisseForm);
-        let nom = formData.get('nom_comptage');
-        if (!nom || nom.startsWith('Sauvegarde auto')) {
-            nom = `Sauvegarde auto du ${formatDateTimeFr().replace(', ', ' à ')}`;
-            formData.set('nom_comptage', nom);
-        }
-
-        if (navigator.sendBeacon) {
-            navigator.sendBeacon('index.php?action=autosave', new URLSearchParams(formData));
-        }
-    }
-    
-    function loadAndInitFormData(data) {
-        if (!data || Object.keys(data).length === 0) return;
-
-        if (data.nom_comptage) nomComptageInput.value = data.nom_comptage;
-        if (data.explication) document.getElementById('explication').value = data.explication;
-
-        Object.keys(config.nomsCaisses).forEach(caisseId => {
-            const caisseData = data[caisseId];
-            if (!caisseData) return;
-
-            const fondDeCaisseInput = document.getElementById(`fond_de_caisse_${caisseId}`);
-            if (fondDeCaisseInput) fondDeCaisseInput.value = caisseData.fond_de_caisse;
-
-            const ventesInput = document.getElementById(`ventes_${caisseId}`);
-            if (ventesInput) ventesInput.value = caisseData.ventes;
-            
-            const retrocessionInput = document.getElementById(`retrocession_${caisseId}`);
-            if (retrocessionInput) retrocessionInput.value = caisseData.retrocession;
-            
-            Object.entries(caisseData.denominations).forEach(([denominationName, quantity]) => {
-                const input = document.getElementById(`${denominationName}_${caisseId}`);
-                if (input) input.value = quantity;
-            });
-        });
-        
-        calculateAllFull();
-    }
-
 
     // Exposez la fonction de calcul pour qu'elle puisse être appelée par le module de temps réel
     window.calculateAllFull = calculateAllFull;
@@ -353,6 +301,29 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('scroll', handleScroll);
 
 
+    // --- Écouteurs d'événements ---
+    // Les écouteurs d'événements de base sont réintégrés ici pour garantir leur exécution.
+    if (!isLoadedFromHistory) {
+        caisseForm.addEventListener('input', (event) => {
+            calculateAllFull();
+            if (window.sendWsMessage) {
+                window.sendWsMessage(event.target.id, event.target.value);
+            }
+        });
+        window.addEventListener('beforeunload', () => {
+            if (isSubmitting || !hasUnsavedChanges()) return;
+            performAutosaveOnExit();
+        });
+    }
+
+    caisseForm.addEventListener('submit', () => {
+        isSubmitting = true;
+        if (nomComptageInput && nomComptageInput.value.trim() === '') {
+            nomComptageInput.value = `Comptage du ${formatDateTimeFr().replace(', ', ' à ')}`;
+        }
+    });
+
+    
     // --- Initialisation du calculateur ---
     initCalculator();
 });
