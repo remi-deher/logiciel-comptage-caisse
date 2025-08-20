@@ -28,16 +28,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('connected');
                 statusText.textContent = 'Connecté en temps réel';
             }
-            // NOUVEAU: Attribue un ID unique à la connexion
-            window.wsConnection.resourceId = Math.random().toString(36).substring(2, 15);
+            console.log("WebSocket connected. Waiting for server ID...");
         };
 
-        window.wsConnection.onerror = () => {
+        window.wsConnection.onerror = (error) => {
             if (statusIndicator) {
                 statusIndicator.classList.remove('connected');
                 statusIndicator.classList.add('disconnected');
                 statusText.textContent = 'Déconnecté';
             }
+            console.error("WebSocket Error: Connexion interrompue.", error);
         };
 
         window.wsConnection.onclose = () => {
@@ -46,11 +46,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('disconnected');
                 statusText.textContent = 'Déconnecté';
             }
+            console.log("WebSocket closed.");
         };
 
         window.wsConnection.onmessage = (e) => {
             try {
                 const data = JSON.parse(e.data);
+                console.log("Message from WebSocket:", data);
+                
+                // NOUVEAU : Le serveur envoie un message de bienvenue avec notre ID.
+                if (data.type === 'welcome') {
+                    window.wsConnection.resourceId = data.resourceId;
+                    console.log("Received server ID:", window.wsConnection.resourceId);
+                    // On ne fait rien d'autre, le reste du flux gérera l'affichage.
+                    return;
+                }
                 
                 // NOUVEAU: Gère l'état de verrouillage de la clôture
                 if (data.type === 'lock_status') {
@@ -112,8 +122,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // Fonctions utilitaires pour envoyer des données depuis d'autres modules
 window.sendWsMessage = function(id, value) {
     if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
-        // NOUVEAU: On envoie l'id de la connexion pour permettre au serveur de vérifier les permissions
-        const dataToSend = { id: id, value: value, resourceId: window.wsConnection.resourceId };
+        const dataToSend = { id: id, value: value };
         window.wsConnection.send(JSON.stringify(dataToSend));
     }
 };

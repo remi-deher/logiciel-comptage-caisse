@@ -27,6 +27,9 @@ class Caisse implements MessageComponentInterface {
         $this->clients->attach($conn);
         echo "Nouvelle connexion! ({$conn->resourceId})\n";
 
+        // NOUVEAU: Envoyer un message de bienvenue avec l'ID de la connexion
+        $conn->send(json_encode(['type' => 'welcome', 'resourceId' => $conn->resourceId]));
+
         // Envoie l'état actuel complet du formulaire et le statut de verrouillage
         $fullState = array_merge($this->formState, ['cloture_lock_status' => $this->lockedCaisse]);
         $conn->send(json_encode($fullState));

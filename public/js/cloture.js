@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fonction pour gérer le verrouillage de l'interface
     function handleInterfaceLock(caisseId, lockedBy) {
         console.log("handleInterfaceLock called with:", { caisseId, lockedBy });
+        console.log("Mon WebSocket ID:", window.wsConnection?.resourceId);
+        
         const activeTab = document.querySelector('.tab-link.active');
         const activeCaisseId = activeTab ? activeTab.dataset.tab.replace('caisse', '') : null;
         const currentWsId = window.wsConnection?.resourceId;
@@ -37,26 +39,42 @@ document.addEventListener('DOMContentLoaded', function() {
         // Gère les inputs et les boutons
         document.querySelectorAll('input, textarea, button[type="submit"]').forEach(el => {
             const elId = el.id.split('_');
-            const elCaisseId = elId[elId.length - 1]; // Récupère le dernier élément de l'ID (e.g., '1' de 'fond_de_caisse_1')
-            const isTabInput = el.closest('.tab-content') && el.closest('.tab-content').id.includes(`caisse${activeCaisseId}`);
+            const elCaisseId = elId[elId.length - 1];
             
-            // Si un verrouillage existe et que l'input n'est pas dans la caisse verrouillée
-            if (caisseId && elCaisseId !== caisseId) {
-                el.disabled = false;
-            } else if (caisseId && elCaisseId === caisseId) {
-                // Si la caisse est verrouillée par un autre
-                if (isCaisseLockedByAnother) {
-                    el.disabled = true;
-                } else if (lockedBy === currentWsId) { // Verrouillé par nous-mêmes
-                    el.disabled = false;
+            // Si une caisse est verrouillée
+            if (caisseId) {
+                // Si l'utilisateur est l'initiateur du verrouillage
+                if (lockedBy === currentWsId) {
+                    // Les champs de la caisse verrouillée sont actifs
+                    if (elCaisseId === caisseId) {
+                        el.disabled = false;
+                    } else {
+                        // Les autres caisses ne sont pas modifiables
+                        el.disabled = true;
+                    }
+                } else {
+                    // C'est un autre utilisateur qui a verrouillé
+                    if (elCaisseId === caisseId) {
+                        // La caisse verrouillée est en lecture seule
+                        el.disabled = true;
+                    } else {
+                        // Les autres caisses restent modifiables
+                        el.disabled = false;
+                    }
                 }
-            } else { // Pas de verrouillage, tout est actif
+            } else {
+                // Aucune caisse n'est verrouillée, tout est actif
                 el.disabled = false;
             }
 
-             // Cas particulier des onglets
+            // Cas particulier des onglets
             if (el.classList.contains('tab-link')) {
-                el.disabled = (caisseId !== null && el.dataset.tab.replace('caisse', '') !== caisseId);
+                // Le PC qui a verrouillé la caisse ne peut pas changer d'onglet
+                if (caisseId && lockedBy === currentWsId && el.dataset.tab.replace('caisse', '') !== caisseId) {
+                    el.disabled = true;
+                } else {
+                    el.disabled = false;
+                }
             }
         });
     
