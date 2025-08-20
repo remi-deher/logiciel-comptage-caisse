@@ -75,9 +75,10 @@ document.addEventListener('DOMContentLoaded', function() {
         tabLinks.forEach(link => {
             link.addEventListener('click', (event) => {
                 const activeCaisseId = event.currentTarget.dataset.tab.replace('caisse', '');
-                
-                // NOUVEAU: Gère le changement d'onglet en mode clôture
-                if (window.currentLockedCaisseId && window.currentLockedCaisseId !== activeCaisseId) {
+                const currentWsId = window.wsConnection?.resourceId;
+
+                // NOUVEAU: Permet le changement d'onglet si la caisse n'est pas verrouillée par l'utilisateur actuel
+                if (window.currentLockedCaisseId && window.currentLockerId === currentWsId) {
                     alert("Impossible de changer de caisse en mode clôture si la caisse active n'est pas celle verrouillée.");
                     return;
                 }
