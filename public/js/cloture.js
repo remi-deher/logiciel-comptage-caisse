@@ -17,8 +17,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusIndicator = document.getElementById('websocket-status-indicator');
     const caisseForm = document.getElementById('caisse-form');
     
-    let currentLockedCaisseId = null;
-    let currentLockerId = null;
+    // NOUVEAU: Les variables d'état sont maintenant globales
+    window.currentLockedCaisseId = null;
+    window.currentLockerId = null;
 
     // Fonction pour gérer le verrouillage de l'interface
     function handleInterfaceLock(caisseId, lockedBy) {
@@ -28,8 +29,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const currentWsId = window.wsConnection?.resourceId;
         
         // Met à jour l'état de verrouillage global
-        currentLockedCaisseId = caisseId;
-        currentLockerId = lockedBy;
+        window.currentLockedCaisseId = caisseId;
+        window.currentLockerId = lockedBy;
         
         const isCaisseLockedByAnother = (caisseId && lockedBy !== currentWsId);
         
@@ -68,8 +69,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const forceUnlockBtn = '<i class="fa-solid fa-user-lock"></i> Forcer le déverrouillage';
 
         // Gère les boutons en bas de la page
-        if (currentLockedCaisseId === activeTabCaisseId) {
-             if (currentLockerId === currentWsId) {
+        if (window.currentLockedCaisseId === activeTabCaisseId) {
+             if (window.currentLockerId === currentWsId) {
                  clotureBtn.innerHTML = unlockBtn;
                  clotureBtn.onclick = () => {
                       if (window.confirm("Êtes-vous sûr de vouloir déverrouiller cette caisse ?")) {
@@ -110,9 +111,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Événement pour le bouton "Annuler" de la modale
     cancelClotureBtn.addEventListener('click', () => {
-        console.log("Cancel button clicked. currentLockedCaisseId:", currentLockedCaisseId);
+        console.log("Cancel button clicked. currentLockedCaisseId:", window.currentLockedCaisseId);
         clotureModal.classList.remove('visible');
-        if (currentLockedCaisseId && currentLockerId === window.wsConnection?.resourceId) {
+        if (window.currentLockedCaisseId && window.currentLockerId === window.wsConnection?.resourceId) {
             window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock' }));
         }
     });
