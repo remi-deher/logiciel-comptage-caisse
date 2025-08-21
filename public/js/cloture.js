@@ -158,6 +158,9 @@ document.addEventListener('DOMContentLoaded', function() {
             // On s'assure que les boutons sont dans le bon état
             cancelClotureBtn.style.display = 'block';
             confirmFinalClotureBtn.style.display = 'block';
+            // On masque le bouton "Passer en mode cloture"
+            const startClotureBtn = document.getElementById('start-cloture-btn');
+            if (startClotureBtn) startClotureBtn.style.display = 'none';
 
             // Affiche la suggestion de retrait dans la modale
             showWithdrawalSuggestion();
