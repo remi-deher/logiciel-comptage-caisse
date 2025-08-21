@@ -3,7 +3,6 @@
 // Port utilisé pour le Websocket
 $port = '8081';
 
-// websocket_server.php
 use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
 use Ratchet\Server\IoServer;
@@ -11,15 +10,16 @@ use Ratchet\Http\HttpServer;
 use Ratchet\WebSocket\WsServer;
 
 require dirname(__FILE__, 2) . '/vendor/autoload.php';
+require dirname(__FILE__, 2) . '/src/services/ClotureStateService.php';
+@include_once dirname(__FILE__, 2) . '/config/config.php';
 
 class Caisse implements MessageComponentInterface {
     protected $clients;
-    // Un tableau pour mémoriser l'état du formulaire et de la caisse verrouillée.
-    private $formState = [];
-    private $lockedCaisse = ['caisse_id' => null, 'locked_by' => null];
+    private $clotureStateService;
 
     public function __construct() {
         $this->clients = new \SplObjectStorage;
+        $this->clotureStateService = new ClotureStateService();
         echo "Serveur de caisse démarré.\n";
     }
 
@@ -27,60 +27,90 @@ class Caisse implements MessageComponentInterface {
         $this->clients->attach($conn);
         echo "Nouvelle connexion! ({$conn->resourceId})\n";
 
-        // NOUVEAU: Envoyer un message de bienvenue avec l'ID de la connexion
+        // Send a welcome message with the connection ID
         $conn->send(json_encode(['type' => 'welcome', 'resourceId' => $conn->resourceId]));
 
-        // Envoie l'état actuel complet du formulaire et le statut de verrouillage
-        $fullState = array_merge($this->formState, ['cloture_lock_status' => $this->lockedCaisse]);
+        // Send the current form state and lock status
+        $lockedCaisses = $this->clotureStateService->getLockedCaisses();
+        $closedCaisses = $this->clotureStateService->getClosedCaisses();
+        $fullState = array_merge([], ['cloture_locked_caisses' => $lockedCaisses, 'closed_caisses' => $closedCaisses]);
         $conn->send(json_encode($fullState));
     }
 
     public function onMessage(ConnectionInterface $from, $msg) {
         $data = json_decode($msg, true);
 
-        // NOUVEAU: Gère les messages de verrouillage/déverrouillage
         if (isset($data['type'])) {
-            if ($data['type'] === 'cloture_lock') {
-                $caisseId = $data['caisse_id'];
-                // Vérifie si la caisse n'est pas déjà verrouillée
-                if ($this->lockedCaisse['caisse_id'] === null) {
-                    $this->lockedCaisse = ['caisse_id' => $caisseId, 'locked_by' => $from->resourceId];
-                    // Diffuse le statut de verrouillage à tous les clients
-                    $this->broadcast(['type' => 'lock_status', 'caisse_id' => $caisseId, 'locked_by' => $from->resourceId]);
-                }
-            } elseif ($data['type'] === 'cloture_unlock') {
-                // Vérifie si l'utilisateur qui déverrouille est bien celui qui a verrouillé
-                if ($this->lockedCaisse['locked_by'] === $from->resourceId) {
-                    $this->lockedCaisse = ['caisse_id' => null, 'locked_by' => null];
-                    // Diffuse le statut de déverrouillage
-                    $this->broadcast(['type' => 'lock_status', 'caisse_id' => null, 'locked_by' => null]);
-                } else {
-                    // Si l'utilisateur n'est pas l'initiateur, on refuse le déverrouillage
-                    $from->send(json_encode(['type' => 'unlock_refused', 'message' => "Vous ne pouvez pas déverrouiller une caisse initiée par un autre utilisateur."]));
-                }
-            } elseif ($data['type'] === 'force_unlock') {
-                // NOUVEAU: Gère le déverrouillage forcé
-                $caisseId = $data['caisse_id'];
-                if ($this->lockedCaisse['caisse_id'] === $caisseId) {
-                    // Envoie une notification à l'utilisateur qui a verrouillé la caisse
-                    foreach ($this->clients as $client) {
-                        if ($client->resourceId === $this->lockedCaisse['locked_by']) {
-                            $client->send(json_encode(['type' => 'force_unlocked', 'message' => "Votre session a été déverrouillée par un autre utilisateur."]));
+            switch ($data['type']) {
+                case 'cloture_lock':
+                    $caisseId = $data['caisse_id'];
+                    if ($this->clotureStateService->lockCaisse($caisseId, $from->resourceId)) {
+                        $this->broadcast(['type' => 'cloture_locked_caisses', 'caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
+                    }
+                    break;
+                case 'cloture_unlock':
+                    $caisseId = $data['caisse_id'];
+                    $lockedState = $this->clotureStateService->getLockedCaisses();
+                    $isLockedByMe = false;
+                    foreach ($lockedState as $lockedCaisse) {
+                        if ($lockedCaisse['caisse_id'] === $caisseId && $lockedCaisse['locked_by'] === $from->resourceId) {
+                            $isLockedByMe = true;
+                            break;
                         }
                     }
-                    $this->lockedCaisse = ['caisse_id' => null, 'locked_by' => null];
-                    $this->broadcast(['type' => 'lock_status', 'caisse_id' => null, 'locked_by' => null]);
-                }
-            }
-        }
-        
-        // Gère les messages de saisie normale
-        if (isset($data['id']) && isset($data['value'])) {
-            $caisseId = explode('_', $data['id'])[1] ?? null;
-            // Ne met à jour et ne diffuse que si la caisse n'est pas verrouillée par un autre
-            if ($this->lockedCaisse['caisse_id'] === null || $this->lockedCaisse['locked_by'] === $from->resourceId || $caisseId != $this->lockedCaisse['caisse_id']) {
-                $this->formState[$data['id']] = $data['value'];
-                $this->broadcast($data, $from);
+
+                    if ($isLockedByMe) {
+                        $this->clotureStateService->unlockCaisse($caisseId);
+                        $this->broadcast(['type' => 'cloture_locked_caisses', 'caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
+                    } else {
+                        $from->send(json_encode(['type' => 'unlock_refused', 'message' => "Vous ne pouvez pas déverrouiller une caisse qui n'est pas verrouillée par vous."]));
+                    }
+                    break;
+                case 'force_unlock':
+                    $caisseId = $data['caisse_id'];
+                    $lockedState = $this->clotureStateService->getLockedCaisses();
+                    foreach ($lockedState as $lockedCaisse) {
+                        if ($lockedCaisse['caisse_id'] === $caisseId) {
+                            foreach ($this->clients as $client) {
+                                if ($client->resourceId === $lockedCaisse['locked_by']) {
+                                    $client->send(json_encode(['type' => 'force_unlocked', 'message' => "Votre session a été déverrouillée par un autre utilisateur."]));
+                                }
+                            }
+                            $this->clotureStateService->unlockCaisse($caisseId);
+                            $this->broadcast(['type' => 'cloture_locked_caisses', 'caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
+                            break;
+                        }
+                    }
+                    break;
+                case 'cloture_caisse_confirmed':
+                    $caisseId = $data['caisse_id'];
+                    $this->clotureStateService->confirmCaisse($caisseId);
+                    $this->clotureStateService->unlockCaisse($caisseId);
+                    
+                    $this->broadcast(['type' => 'cloture_locked_caisses', 'caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
+                    
+                    global $noms_caisses;
+                    if (count($this->clotureStateService->getClosedCaisses()) === count($noms_caisses)) {
+                         $this->broadcast(['type' => 'all_caisses_closed']);
+                    }
+                    break;
+                default:
+                    // Handle regular input messages
+                    if (isset($data['id']) && isset($data['value'])) {
+                        $caisseId = explode('_', $data['id'])[1] ?? null;
+                        $lockedState = $this->clotureStateService->getLockedCaisses();
+                        $isLockedByAnother = false;
+                        foreach ($lockedState as $lockedCaisse) {
+                            if ($lockedCaisse['caisse_id'] === $caisseId && $lockedCaisse['locked_by'] !== $from->resourceId) {
+                                $isLockedByAnother = true;
+                                break;
+                            }
+                        }
+                        if (!$isLockedByAnother && !$this->clotureStateService->isCaisseConfirmed($caisseId)) {
+                            $this->broadcast($data, $from);
+                        }
+                    }
+                    break;
             }
         }
     }
@@ -89,10 +119,12 @@ class Caisse implements MessageComponentInterface {
         $this->clients->detach($conn);
         echo "Connexion {$conn->resourceId} terminée\n";
         
-        // Si l'utilisateur qui a verrouillé la caisse se déconnecte, on déverrouille
-        if ($this->lockedCaisse['locked_by'] === $conn->resourceId) {
-            $this->lockedCaisse = ['caisse_id' => null, 'locked_by' => null];
-            $this->broadcast(['type' => 'lock_status', 'caisse_id' => null, 'locked_by' => null]);
+        $lockedState = $this->clotureStateService->getLockedCaisses();
+        foreach($lockedState as $lockedCaisse) {
+            if ($lockedCaisse['locked_by'] === $conn->resourceId) {
+                $this->clotureStateService->unlockCaisse($lockedCaisse['caisse_id']);
+                $this->broadcast(['type' => 'cloture_locked_caisses', 'caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
+            }
         }
     }
 
@@ -101,7 +133,7 @@ class Caisse implements MessageComponentInterface {
         $conn->close();
     }
     
-    // Fonction utilitaire pour diffuser un message
+    // Utility function to broadcast a message
     private function broadcast($message, $exclude = null) {
         $jsonMessage = json_encode($message);
         foreach ($this->clients as $client) {

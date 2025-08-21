@@ -95,7 +95,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 calculateAllFull();
                 // NOUVEAU: Réapplique les règles de verrouillage de l'interface
                 if (window.handleInterfaceLock) {
-                    window.handleInterfaceLock(window.currentLockedCaisseId, window.currentLockerId);
+                     const activeCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
+                     const isLocked = window.lockedCaisses.some(c => c.caisse_id === activeCaisseId);
+                     const lockedBy = isLocked ? window.lockedCaisses.find(c => c.caisse_id === activeCaisseId)?.locked_by : null;
+                     window.handleInterfaceLock(window.lockedCaisses, window.closedCaisses);
                 }
             });
         });
@@ -267,14 +270,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         for (const [name, value] of Object.entries(config.denominations.billets).sort((a, b) => b[1] - a[1])) {
                             if (suggestions[name] && suggestions[name] > 0) {
                                 hasSuggestions = true;
-                                suggestionHtml += `<tr><td>${value} €</td><td>${suggestions[name]}</td></tr>`;
+                                suggestionHtml += `<tr><td>${value} ${config.currencySymbol}</td><td>${suggestions[name]}</td></tr>`;
                             }
                         }
                         suggestionHtml += `</tbody></table><h4><i class="fa-solid fa-coins"></i> Pièces</h4><table class="withdrawal-table"><thead><tr><th>Dénomination</th><th>Quantité</th></tr></thead><tbody>`;
                         for (const [name, value] of Object.entries(config.denominations.pieces).sort((a, b) => b[1] - a[1])) {
                             if (suggestions[name] && suggestions[name] > 0) {
                                 hasSuggestions = true;
-                                const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+                                const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
                                 suggestionHtml += `<tr><td>${label}</td><td>${suggestions[name]}</td></tr>`;
                             }
                         }
@@ -292,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     topEcartDisplay.classList.add('ecart-positif');
                     topEcartExplanation.textContent = "Il y a un surplus dans la caisse. Vérifiez vos saisies.";
                 } else {
-                    topEcartDisplay.classList.add('ecart-negatif');
+                    topEartDisplay.classList.add('ecart-negatif');
                     topEcartExplanation.textContent = "Il manque de l'argent. Recomptez la caisse.";
                 }
             }
@@ -414,9 +417,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(caisseForm);
         formData.append('action', 'autosave');
         
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'index.php?action=autosave', false); // Requête synchrone
-        xhr.send(formData);
+        // Utilisation de navigator.sendBeacon pour les requêtes asynchrones en sortie de page
+        navigator.sendBeacon('index.php?action=autosave', formData);
     }
     
     // NOUVEAU: Ajout d'un écouteur pour la saisie des montants pour le déclenchement de la sauvegarde

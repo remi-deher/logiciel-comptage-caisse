@@ -1,20 +1,25 @@
 <?php
 // src/CalculateurController.php - Version corrigée pour un nouvel enregistrement à chaque sauvegarde automatique.
 // Ce contrôleur gère la page du calculateur et les actions de sauvegarde.
-require_once 'services/VersionService.php';
-require_once 'Utils.php';
+require_once __DIR__ . '/services/VersionService.php';
+require_once __DIR__ . '/Utils.php';
+require_once __DIR__ . '/services/ClotureStateService.php';
+
 class CalculateurController {
     private $pdo;
     private $noms_caisses;
     private $denominations;
     private $tpe_par_caisse;
     private $versionService;
+    private $clotureStateService;
+
     public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse) {
         $this->pdo = $pdo;
         $this->noms_caisses = $noms_caisses;
         $this->denominations = $denominations;
         $this->tpe_par_caisse = $tpe_par_caisse;
         $this->versionService = new VersionService();
+        $this->clotureStateService = new ClotureStateService();
     }
     public function calculateur() {
         $loaded_data = [];
@@ -217,26 +222,35 @@ class CalculateurController {
     public function cloture() {
         header('Content-Type: application/json');
 
+        // Débogage: Log les données reçues
+        error_log("Requête de clôture reçue. Données POST brutes : " . file_get_contents('php://input'));
+        error_log("Données POST décodées : " . print_r($_POST, true));
+
         try {
-            // Étape 1: Sauvegarder l'état actuel des caisses (avant les retraits)
-            $nom_cloture = "Clôture du " . date('Y-m-d H:i:s');
-            $explication = "Clôture quotidienne automatique";
+            // Étape 1: Sauvegarder l'état actuel de la caisse confirmée
+            $caisse_id_a_cloturer = intval($_POST['caisse_id_a_cloturer'] ?? 0);
+            if ($caisse_id_a_cloturer === 0) {
+                error_log("Erreur: ID de caisse invalide reçu.");
+                echo json_encode(['success' => false, 'message' => 'ID de caisse invalide.']);
+                exit;
+            }
+            error_log("ID de caisse à clôturer: {$caisse_id_a_cloturer}");
+
+            $nom_cloture = "Clôture de la caisse {$caisse_id_a_cloturer} du " . date('Y-m-d H:i:s');
+            $explication = "Clôture quotidienne de la caisse " . $caisse_id_a_cloturer;
             
+            // On crée un enregistrement pour cette caisse dans l'historique
             $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt->execute([$nom_cloture, $explication, date('Y-m-d H:i:s')]);
             $comptage_id_cloture = $this->pdo->lastInsertId();
             
-            // Insertion des détails pour chaque caisse
-            foreach ($this->noms_caisses as $caisse_id => $nom) {
-                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
-                if (empty($caisse_data)) {
-                    continue;
-                }
-            
+            // Insertion des détails pour la caisse confirmée
+            $caisse_data = $_POST['caisse'][$caisse_id_a_cloturer] ?? [];
+            if (!empty($caisse_data)) {
                 $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
                 $stmt_details->execute([
                     $comptage_id_cloture,
-                    $caisse_id,
+                    $caisse_id_a_cloturer,
                     get_numeric_value($caisse_data, 'fond_de_caisse'),
                     get_numeric_value($caisse_data, 'ventes'),
                     get_numeric_value($caisse_data, 'retrocession')
@@ -253,34 +267,59 @@ class CalculateurController {
                     }
                 }
             }
-            
-            // Étape 2: Créer un NOUVEAU comptage pour le fond de caisse du jour suivant
-            $nom_nouveau_comptage = "Fond de caisse du " . date('Y-m-d H:i:s');
-            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-            $stmt->execute([$nom_nouveau_comptage, "Nouvel état après clôture", date('Y-m-d H:i:s')]);
-            $comptage_id_nouveau = $this->pdo->lastInsertId();
 
-            // Insertion des détails avec uniquement le fond de caisse
-            foreach ($this->noms_caisses as $caisse_id => $nom) {
-                $fond_de_caisse = get_numeric_value($_POST['caisse'][$caisse_id] ?? [], 'fond_de_caisse');
-                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                $stmt_details->execute([
-                    $comptage_id_nouveau,
-                    $caisse_id,
-                    $fond_de_caisse,
-                    0, // Ventes à zéro
-                    0  // Rétrocessions à zéro
-                ]);
+            // Étape 2: On marque la caisse comme confirmée dans le service
+            $this->clotureStateService->confirmCaisse($caisse_id_a_cloturer);
+
+            // Étape 3: On vérifie si toutes les caisses sont confirmées
+            $all_caisses_confirmed = true;
+            $all_caisses = array_keys($this->noms_caisses);
+            foreach ($all_caisses as $caisse_id) {
+                if (!$this->clotureStateService->isCaisseConfirmed($caisse_id)) {
+                    $all_caisses_confirmed = false;
+                    break;
+                }
             }
 
-            // Étape 3: Supprimer toutes les anciennes sauvegardes automatiques
-            $stmt_delete_autosave = $this->pdo->prepare("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
-            $stmt_delete_autosave->execute();
+            // Étape 4: Si toutes les caisses sont confirmées, on procède à la réinitialisation
+            if ($all_caisses_confirmed) {
+                // Créer un NOUVEAU comptage pour le fond de caisse du jour suivant
+                $nom_nouveau_comptage = "Fond de caisse du " . date('Y-m-d H:i:s');
+                $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+                $stmt->execute([$nom_nouveau_comptage, "Nouvel état après clôture", date('Y-m-d H:i:s')]);
+                $comptage_id_nouveau = $this->pdo->lastInsertId();
 
-            echo json_encode(['success' => true, 'message' => "La clôture a été effectuée avec succès. Un nouveau comptage avec le fond de caisse a été créé."]);
+                // Insertion des détails avec uniquement le fond de caisse
+                foreach ($this->noms_caisses as $caisse_id => $nom) {
+                    $fond_de_caisse = get_numeric_value($_POST['caisse'][$caisse_id] ?? [], 'fond_de_caisse');
+                    $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+                    $stmt_details->execute([
+                        $comptage_id_nouveau,
+                        $caisse_id,
+                        $fond_de_caisse,
+                        0, // Ventes à zéro
+                        0  // Rétrocessions à zéro
+                    ]);
+                }
+
+                // Supprimer toutes les anciennes sauvegardes automatiques
+                $stmt_delete_autosave = $this->pdo->prepare("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
+                $stmt_delete_autosave->execute();
+
+                // Réinitialiser l'état de la clôture
+                $this->clotureStateService->resetState();
+
+                echo json_encode(['success' => true, 'message' => "La clôture a été effectuée avec succès. Un nouveau comptage avec le fond de caisse a été créé.", 'all_caisses_confirmed' => true]);
+            } else {
+                echo json_encode(['success' => true, 'message' => "La caisse a été clôturée avec succès. En attente des autres caisses.", 'all_caisses_confirmed' => false]);
+            }
         
         } catch (PDOException $e) {
+            error_log("Erreur PDO lors de la clôture : " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => 'Erreur de BDD lors de la clôture : ' . $e->getMessage()]);
+        } catch (Exception $e) {
+            error_log("Erreur générale lors de la clôture : " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erreur inattendue lors de la clôture.']);
         }
         exit;
     }

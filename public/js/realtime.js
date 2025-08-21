@@ -1,6 +1,8 @@
 /**
  * Module JavaScript pour la gestion de la communication WebSocket en temps réel.
  * Ce module est responsable de la connexion et de la diffusion des données.
+ *
+ * Logique mise à jour pour gérer le statut de clôture persistant.
  */
 document.addEventListener('DOMContentLoaded', function() {
     const statusIndicator = document.getElementById('websocket-status-indicator');
@@ -58,35 +60,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.type === 'welcome') {
                     window.wsConnection.resourceId = data.resourceId;
                     console.log("Received server ID:", window.wsConnection.resourceId);
-                    // On ne fait rien d'autre, le reste du flux gérera l'affichage.
                     return;
                 }
                 
-                // NOUVEAU: Gère l'état de verrouillage de la clôture
-                if (data.type === 'lock_status') {
+                // Gère le statut de verrouillage et des caisses clôturées
+                if (data.type === 'cloture_locked_caisses') {
                     if (window.handleInterfaceLock) {
-                        window.handleInterfaceLock(data.caisse_id, data.locked_by);
+                        window.handleInterfaceLock(data.caisses, data.closed_caisses);
                     }
-                    return; // Ne pas traiter comme une mise à jour de formulaire
-                }
-                
-                // Si on a le statut de verrouillage au premier chargement, on le gère
-                if (data.cloture_lock_status) {
-                    if (window.handleInterfaceLock) {
-                        window.handleInterfaceLock(data.cloture_lock_status.caisse_id, data.cloture_lock_status.locked_by);
-                    }
-                    delete data.cloture_lock_status;
-                }
-                
-                // NOUVEAU: Gère les messages de refus de déverrouillage
-                if (data.type === 'unlock_refused') {
-                    alert("Erreur: " + data.message);
                     return;
                 }
                 
-                // NOUVEAU: Gère les messages de déverrouillage forcé
+                // Gère le statut de verrouillage au premier chargement
+                if (data.cloture_locked_caisses) {
+                    if (window.handleInterfaceLock) {
+                        window.handleInterfaceLock(data.cloture_locked_caisses, data.closed_caisses);
+                    }
+                    delete data.cloture_locked_caisses;
+                }
+                
+                 // Gère les messages de déverrouillage forcé
                  if (data.type === 'force_unlocked') {
                     alert(data.message);
+                    window.location.reload();
+                    return;
+                }
+                
+                // Si toutes les caisses sont clôturées, on recharge la page
+                if (data.type === 'all_caisses_closed') {
+                    alert('Toutes les caisses ont été clôturées. L\'application va être réinitialisée.');
                     window.location.reload();
                     return;
                 }
