@@ -68,6 +68,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (window.handleInterfaceLock) {
                         window.handleInterfaceLock(data.caisses, data.closed_caisses);
                     }
+                    if (Array.isArray(data.caisses) && data.caisses.length > 0) {
+                        statusIndicator.classList.remove('connected');
+                        statusIndicator.classList.add('cloture');
+                        statusText.textContent = 'Clôture en cours...';
+                    } else if (Array.isArray(data.closed_caisses) && data.closed_caisses.length > 0) {
+                         statusIndicator.classList.remove('connected');
+                         statusIndicator.classList.add('cloture');
+                         statusText.textContent = `Caisse(s) clôturée(s): ${data.closed_caisses.length}`;
+                    } else {
+                         statusIndicator.classList.remove('cloture');
+                         statusIndicator.classList.add('connected');
+                         statusText.textContent = 'Connecté en temps réel';
+                    }
                     return;
                 }
                 

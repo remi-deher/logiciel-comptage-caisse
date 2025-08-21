@@ -1,6 +1,6 @@
 <?php
 
-// Port utilisé pour le Websocket
+// Port used for WebSocket
 $port = '8081';
 
 use Ratchet\MessageComponentInterface;
@@ -16,9 +16,17 @@ require dirname(__FILE__, 2) . '/src/services/ClotureStateService.php';
 class Caisse implements MessageComponentInterface {
     protected $clients;
     private $clotureStateService;
+    private $nomsCaisses;
 
     public function __construct() {
         $this->clients = new \SplObjectStorage;
+        
+        global $noms_caisses;
+        if (!isset($noms_caisses)) {
+             $noms_caisses = [];
+        }
+        $this->nomsCaisses = $noms_caisses;
+
         $this->clotureStateService = new ClotureStateService();
         echo "Serveur de caisse démarré.\n";
     }
@@ -30,22 +38,23 @@ class Caisse implements MessageComponentInterface {
         // Send a welcome message with the connection ID
         $conn->send(json_encode(['type' => 'welcome', 'resourceId' => $conn->resourceId]));
 
-        // Send the current form state and lock status
-        $lockedCaisses = $this->clotureStateService->getLockedCaisses();
-        $closedCaisses = $this->clotureStateService->getClosedCaisses();
-        $fullState = array_merge([], ['cloture_locked_caisses' => $lockedCaisses, 'closed_caisses' => $closedCaisses]);
-        $conn->send(json_encode($fullState));
+        // Send the initial state of locked and closed cash registers
+        $this->broadcastClotureState();
     }
 
     public function onMessage(ConnectionInterface $from, $msg) {
-        $data = json_decode($msg, true);
+        try {
+            $data = json_decode($msg, true);
+            if (!is_array($data) || !isset($data['type'])) {
+                 error_log("Invalid WebSocket message format received: " . $msg);
+                 return;
+            }
 
-        if (isset($data['type'])) {
             switch ($data['type']) {
                 case 'cloture_lock':
                     $caisseId = $data['caisse_id'];
                     if ($this->clotureStateService->lockCaisse($caisseId, $from->resourceId)) {
-                        $this->broadcast(['type' => 'cloture_locked_caisses', 'caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
+                        $this->broadcastClotureState();
                     }
                     break;
                 case 'cloture_unlock':
@@ -61,9 +70,9 @@ class Caisse implements MessageComponentInterface {
 
                     if ($isLockedByMe) {
                         $this->clotureStateService->unlockCaisse($caisseId);
-                        $this->broadcast(['type' => 'cloture_locked_caisses', 'caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
+                        $this->broadcastClotureState();
                     } else {
-                        $from->send(json_encode(['type' => 'unlock_refused', 'message' => "Vous ne pouvez pas déverrouiller une caisse qui n'est pas verrouillée par vous."]));
+                        $from->send(json_encode(['type' => 'unlock_refused', 'message' => "You cannot unlock a cash register that is not locked by you."]));
                     }
                     break;
                 case 'force_unlock':
@@ -73,11 +82,11 @@ class Caisse implements MessageComponentInterface {
                         if ($lockedCaisse['caisse_id'] === $caisseId) {
                             foreach ($this->clients as $client) {
                                 if ($client->resourceId === $lockedCaisse['locked_by']) {
-                                    $client->send(json_encode(['type' => 'force_unlocked', 'message' => "Votre session a été déverrouillée par un autre utilisateur."]));
+                                    $client->send(json_encode(['type' => 'force_unlocked', 'message' => "Your session has been unlocked by another user."]));
                                 }
                             }
                             $this->clotureStateService->unlockCaisse($caisseId);
-                            $this->broadcast(['type' => 'cloture_locked_caisses', 'caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
+                            $this->broadcastClotureState();
                             break;
                         }
                     }
@@ -87,11 +96,11 @@ class Caisse implements MessageComponentInterface {
                     $this->clotureStateService->confirmCaisse($caisseId);
                     $this->clotureStateService->unlockCaisse($caisseId);
                     
-                    $this->broadcast(['type' => 'cloture_locked_caisses', 'caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
+                    $this->broadcastClotureState();
                     
-                    global $noms_caisses;
-                    if (count($this->clotureStateService->getClosedCaisses()) === count($noms_caisses)) {
-                         $this->broadcast(['type' => 'all_caisses_closed']);
+                    if (count($this->clotureStateService->getClosedCaisses()) === count($this->nomsCaisses)) {
+                        $this->broadcast(['type' => 'all_caisses_closed']);
+                        $this->clotureStateService->resetState(); // Reset after broadcasting
                     }
                     break;
                 default:
@@ -112,6 +121,8 @@ class Caisse implements MessageComponentInterface {
                     }
                     break;
             }
+        } catch (\Exception $e) {
+            error_log("Error in onMessage: {$e->getMessage()}");
         }
     }
 
@@ -123,7 +134,8 @@ class Caisse implements MessageComponentInterface {
         foreach($lockedState as $lockedCaisse) {
             if ($lockedCaisse['locked_by'] === $conn->resourceId) {
                 $this->clotureStateService->unlockCaisse($lockedCaisse['caisse_id']);
-                $this->broadcast(['type' => 'cloture_locked_caisses', 'caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
+                $this->broadcastClotureState();
+                break; // Only one cash register can be locked by a user at a time
             }
         }
     }
@@ -133,6 +145,14 @@ class Caisse implements MessageComponentInterface {
         $conn->close();
     }
     
+    // Broadcast the full state of cash registers
+    private function broadcastClotureState() {
+        $lockedCaisses = $this->clotureStateService->getLockedCaisses();
+        $closedCaisses = $this->clotureStateService->getClosedCaisses();
+        $message = ['type' => 'cloture_locked_caisses', 'caisses' => $lockedCaisses, 'closed_caisses' => $closedCaisses];
+        $this->broadcast($message);
+    }
+
     // Utility function to broadcast a message
     private function broadcast($message, $exclude = null) {
         $jsonMessage = json_encode($message);

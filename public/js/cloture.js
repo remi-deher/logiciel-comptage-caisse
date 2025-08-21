@@ -109,12 +109,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Gère les boutons de clôture
         const activeTabCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
         const isCaisseActiveLockedByMe = isCaisseLockedBy(activeTabCaisseId, currentWsId);
-        const isCaisseActiveLocked = isCaisseLocked(activeCaisseId);
+        const isCaisseActiveLocked = isCaisseLocked(activeTabCaisseId);
         const isCaisseActiveClosed = window.closedCaisses.includes(activeCaisseId);
     
         if (isCaisseActiveLockedByMe) {
             clotureBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i> Déverrouiller';
             clotureBtn.onclick = () => {
+                console.log("Tentative de déverrouillage de la caisse:", activeCaisseId);
                 if (window.confirm("Êtes-vous sûr de vouloir déverrouiller cette caisse ?")) {
                     window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock', caisse_id: activeCaisseId }));
                 }
@@ -123,6 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (isCaisseActiveLocked) {
             clotureBtn.innerHTML = '<i class="fa-solid fa-user-lock"></i> Forcer le déverrouillage';
             clotureBtn.onclick = () => {
+                console.log("Tentative de déverrouillage forcé de la caisse:", activeCaisseId);
                 if (window.confirm("Cette caisse est verrouillée par un autre utilisateur. Voulez-vous forcer le déverrouillage ?")) {
                     window.wsConnection.send(JSON.stringify({ type: 'force_unlock', caisse_id: activeCaisseId }));
                 }
@@ -131,6 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
             clotureBtn.onclick = () => {
+                console.log("Bouton Clôture cliqué. Affichage de la modale de sélection.");
                 const isLoadedFromHistory = document.getElementById('calculator-data')?.dataset.config.includes('isLoadedFromHistory":true');
                 if (isLoadedFromHistory) {
                     alert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.");
@@ -141,7 +144,8 @@ document.addEventListener('DOMContentLoaded', function() {
             confirmClotureBtnContainer.style.display = 'none';
         }
     
-        clotureBtn.disabled = isCaisseActiveClosed;
+        // Le bouton de clôture reste actif même si la caisse est clôturée
+        clotureBtn.disabled = false;
     }
     window.handleInterfaceLock = handleInterfaceLock;
     
@@ -180,12 +184,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Confirm Final Cloture button clicked.");
         clotureModal.classList.remove('visible');
         
-        if (statusIndicator) {
-            statusIndicator.classList.remove('cloture');
-            statusIndicator.classList.add('connected');
-            statusIndicator.querySelector('.status-text').textContent = 'Clôture en cours...';
-        }
-        
         if (!caisseForm) {
             alert("Erreur: Le formulaire du calculateur n'a pas été trouvé.");
             return;
@@ -196,11 +194,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // CORRECTION: Vérifier si l'ID de la caisse est valide avant de continuer
         if (!activeTabCaisseId || window.closedCaisses.includes(activeTabCaisseId)) {
             alert("Erreur : ID de caisse invalide ou caisse déjà clôturée.");
-            if (statusIndicator) {
-                statusIndicator.classList.remove('cloture');
-                statusIndicator.classList.add('connected');
-                statusIndicator.querySelector('.status-text').textContent = 'Connecté en temps réel';
-            }
             if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
                  window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock', caisse_id: activeTabCaisseId }));
             }
@@ -238,11 +231,6 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             alert("Une erreur est survenue lors de la clôture: " + error.message);
-            if (statusIndicator) {
-                statusIndicator.classList.remove('cloture');
-                statusIndicator.classList.add('connected');
-                statusIndicator.querySelector('.status-text').textContent = 'Connecté en temps réel';
-            }
             if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
                 window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock', caisse_id: activeTabCaisseId }));
             }
