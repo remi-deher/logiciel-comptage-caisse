@@ -1,10 +1,15 @@
 /**
  * Module JavaScript pour la logique de clôture de caisse.
  * Ce script est chargé uniquement sur la page du calculateur.
+ *
+ * CORRECTION : La logique a été réorganisée pour que le verrouillage
+ * soit initié depuis le bouton "Passer en mode clôture" de la modale,
+ * et non plus par le bouton principal, ce qui évitait un conflit avec
+ * la réponse du serveur WebSocket.
  */
 document.addEventListener('DOMContentLoaded', function() {
     let clotureModal, cancelClotureBtn, startClotureBtn, confirmFinalClotureBtn, clotureBtn;
-    
+
     // Récupère les éléments du DOM
     clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn) return;
@@ -105,15 +110,14 @@ document.addEventListener('DOMContentLoaded', function() {
              }
         } else {
              clotureBtn.innerHTML = defaultBtn;
+             // CORRECTION : Le bouton de clôture ouvre la modale
              clotureBtn.onclick = () => {
                 const isLoadedFromHistory = document.getElementById('calculator-data')?.dataset.config.includes('isLoadedFromHistory":true');
                 if (isLoadedFromHistory) {
                     alert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.");
                     return;
                 }
-                if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
-                    window.wsConnection.send(JSON.stringify({ type: 'cloture_lock', caisse_id: activeTabCaisseId }));
-                }
+                
                 // Affiche la modale de lancement du mode clôture
                 document.querySelector('#cloture-modal h3').textContent = "Commencer la clôture";
                 document.querySelector('#cloture-modal p').textContent = "Voulez-vous passer en mode clôture pour vérifier le comptage avant de valider ?";
@@ -140,7 +144,12 @@ document.addEventListener('DOMContentLoaded', function() {
     startClotureBtn.addEventListener('click', () => {
         console.log("Start Cloture button clicked.");
         clotureModal.classList.remove('visible');
-        // Ne fait rien ici, la requête de verrouillage a déjà été envoyée
+        
+        // CORRECTION : C'est ici que l'on envoie le message de verrouillage
+        if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
+            const activeTabCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
+            window.wsConnection.send(JSON.stringify({ type: 'cloture_lock', caisse_id: activeTabCaisseId }));
+        }
     });
 
     // Événement pour le bouton "Confirmer la clôture" de la modale
