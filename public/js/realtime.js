@@ -18,6 +18,10 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    // NOUVEAU: Variable pour suivre si des données initiales ont été reçues
+    let hasReceivedInitialData = false;
+    let initialDataTimeout;
+
     try {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsHost = window.location.host;
@@ -31,6 +35,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusText.textContent = 'Connecté en temps réel';
             }
             console.log("WebSocket connected. Waiting for server ID...");
+
+            // NOUVEAU: Lance un minuteur pour vérifier si des données initiales sont reçues
+            initialDataTimeout = setTimeout(() => {
+                if (!hasReceivedInitialData) {
+                    console.log("Timeout expiré. Aucun autre client n'est connecté. Rechargement de la page pour charger la dernière sauvegarde automatique.");
+                    window.location.reload();
+                }
+            }, 3000); // Délai de 3 secondes
         };
 
         window.wsConnection.onerror = (error) => {
@@ -39,6 +51,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('disconnected');
                 statusText.textContent = 'Déconnecté';
             }
+            // NOUVEAU: Annule le minuteur en cas d'erreur de connexion
+            if (initialDataTimeout) clearTimeout(initialDataTimeout);
             console.error("WebSocket Error: Connexion interrompue.", error);
         };
 
@@ -48,17 +62,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('disconnected');
                 statusText.textContent = 'Déconnecté';
             }
+            // NOUVEAU: Annule le minuteur en cas de fermeture de la connexion
+            if (initialDataTimeout) clearTimeout(initialDataTimeout);
             console.log("WebSocket closed.");
         };
 
         window.wsConnection.onmessage = (e) => {
+            // NOUVEAU: Un message est reçu, donc d'autres clients sont connectés
+            hasReceivedInitialData = true;
+            if (initialDataTimeout) clearTimeout(initialDataTimeout);
+
             try {
                 const data = JSON.parse(e.data);
                 
-                // NOUVEAU: Afficher tous les messages reçus dans la console
-                console.log("[REÇU] Message du serveur:", data);
-                
-                // NOUVEAU : Le serveur envoie un message de bienvenue avec notre ID.
+                // NOUVEAU: Le serveur envoie un message de bienvenue avec notre ID.
                 if (data.type === 'welcome') {
                     window.wsConnection.resourceId = data.resourceId;
                     console.log("Received server ID:", window.wsConnection.resourceId);
@@ -141,9 +158,6 @@ window.sendWsMessage = function(id, value) {
     if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
         const dataToSend = { id: id, value: value };
         const jsonString = JSON.stringify(dataToSend);
-        
-        // NOUVEAU: Afficher le message envoyé dans la console
-        console.log("[ENVOYÉ] Message au serveur:", jsonString);
         
         window.wsConnection.send(jsonString);
     }

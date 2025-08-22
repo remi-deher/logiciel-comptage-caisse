@@ -366,7 +366,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function performAutosave() {
-        if (!hasUnsavedChanges() || isSubmitting) {
+        // NOUVEAU: Ne lance la sauvegarde que si des modifications ont été apportées.
+        if (!hasUnsavedChanges()) {
+            if (autosaveStatusEl) {
+                autosaveStatusEl.textContent = 'Aucune modification à sauvegarder.';
+                autosaveStatusEl.classList.remove('saving', 'success', 'error');
+                setTimeout(() => autosaveStatusEl.textContent = '', 5000);
+            }
+            startAutosaveTimer();
+            return;
+        }
+
+        if (isSubmitting) {
             startAutosaveTimer();
             return;
         }

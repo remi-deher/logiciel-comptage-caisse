@@ -149,14 +149,17 @@ class CalculateurController {
         try {
             $comptage_id = null;
 
+            // NOUVEAU: Logique de nommage correct pour la sauvegarde automatique
             if ($is_autosave) {
-                // Logique de SAUVEGARDE AUTOMATIQUE : On crée toujours un nouvel enregistrement
+                // S'assure que le nom du comptage est reconnu comme une sauvegarde automatique
+                $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
+                // On crée un NOUVEL enregistrement de comptage à chaque autosave pour avoir un historique des états
                 $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
                 $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
                 $comptage_id = $this->pdo->lastInsertId();
+
             } else {
-                // Logique de SAUVEGARDE MANUELLE : On crée toujours un nouvel enregistrement.
-                // 1. On crée un NOUVEL enregistrement de comptage
+                // Logique de SAUVEGARDE MANUELLE
                 if (empty($nom_comptage)) {
                     $nom_comptage = "Comptage du " . date('Y-m-d H:i:s');
                 }
@@ -164,7 +167,7 @@ class CalculateurController {
                 $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
                 $comptage_id = $this->pdo->lastInsertId();
 
-                // 2. On supprime l'ancienne sauvegarde automatique pour qu'elle ne soit plus chargée par défaut
+                // On supprime l'ancienne sauvegarde automatique pour qu'elle ne soit plus chargée par défaut
                 $stmt_delete_autosave = $this->pdo->prepare("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
                 $stmt_delete_autosave->execute();
             }
