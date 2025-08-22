@@ -32,6 +32,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let isSubmitting = false;
     let initialState = '';
+    
+    // NOUVELLE VARIABLE : État de la sauvegarde automatique
+    let isAutosaveActive = !isLoadedFromHistory;
 
     // --- Logique de l'interface (Accordéon, Onglets) ---
     function initAccordion() {
@@ -350,12 +353,31 @@ document.addEventListener('DOMContentLoaded', function() {
         return currentState !== initialState;
     };
 
+    // Nouvelle fonction pour désactiver le minuteur
+    window.toggleAutosave = function(state) {
+        isAutosaveActive = state;
+        if (!state) {
+            if (autosaveTimeout) {
+                clearTimeout(autosaveTimeout);
+                autosaveTimeout = null;
+            }
+            if (autosaveStatusEl) {
+                autosaveStatusEl.textContent = 'Sauvegarde automatique désactivée.';
+                autosaveStatusEl.classList.remove('saving', 'success', 'error');
+            }
+        } else {
+             startAutosaveTimer();
+        }
+    };
+
     function startAutosaveTimer() {
+        if (!isAutosaveActive) return;
         if (autosaveTimeout) clearTimeout(autosaveTimeout);
         autosaveTimeout = setTimeout(performAutosave, 30000);
     }
 
     async function performAutosave() {
+        if (!isAutosaveActive) return;
         if (!window.hasUnsavedChanges()) {
             if (autosaveStatusEl) {
                 autosaveStatusEl.textContent = 'Aucune modification à sauvegarder.';
@@ -419,6 +441,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     caisseForm.addEventListener('input', (event) => {
+        if (!isAutosaveActive) return;
         clearTimeout(autosaveTimeout);
         startAutosaveTimer();
         
@@ -479,6 +502,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         initialState = window.getFormStateAsString();
         calculateAllFull();
+        window.toggleAutosave(false);
     };
 
     initCalculator();
