@@ -1,7 +1,3 @@
-<?php
-// Fichier : templates/partials/footer.php
-// CORRIGÉ : Ce fichier est maintenant un partial complet et inclut les scripts JS.
-
 $current_version = 'N/A';
 $version_file = __DIR__ . '/../../VERSION';
 if (file_exists($version_file)) {
@@ -32,12 +28,10 @@ $release_info = 'Information non disponible';
         </div>
     </footer>
 
-    <!-- CORRIGÉ: Chemins des scripts en absolu pour une meilleure fiabilité -->
     <script src="/js/main.js"></script>
     <?php if (!empty($page_js)): ?>
         <script src="/js/<?= htmlspecialchars($page_js) ?>"></script>
     <?php endif; ?>
-    <!-- NOUVEAU: Inclusion de la modale de clôture -->
     <div id="cloture-modal" class="modal">
         <div class="modal-content">
             <span class="modal-close">&times;</span>
@@ -48,8 +42,6 @@ $release_info = 'Information non disponible';
             <p>Cette action sauvegardera l'état actuel et mettra les caisses à zéro.</p>
             <div class="modal-actions">
                 <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
-                <!-- NOUVEAU: Ajout de deux boutons distincts pour chaque étape de la clôture -->
-                <button id="start-cloture-btn" class="btn new-btn">Passer en mode clôture</button>
                 <button id="confirm-final-cloture-btn" class="btn new-btn" style="display: none;">Confirmer la clôture</button>
             </div>
         </div>
