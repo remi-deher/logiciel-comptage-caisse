@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const activeTabCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
         const isCaisseActiveLockedByMe = isCaisseLockedBy(activeTabCaisseId, currentWsId);
         const isCaisseActiveLocked = isCaisseLocked(activeTabCaisseId);
-        const isCaisseActiveClosed = window.closedCaisses.includes(parseInt(activeCaisseId));
+        const isCaisseActiveClosed = window.closedCaisses.includes(activeCaisseId);
     
         if (isCaisseActiveLockedByMe) {
             console.log("[handleInterfaceLock] Caisse active locked by me. Showing 'Déverrouiller' button.");
@@ -189,9 +189,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const activeTabCaisseId = window.lockedCaisses.find(c => c.locked_by === window.wsConnection?.resourceId)?.caisse_id;
+        const activeTabCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
         
-        if (!activeTabCaisseId || window.closedCaisses.includes(parseInt(activeTabCaisseId))) {
+        // VERBOSITÉ : Log les IDs pour la vérification
+        console.log(`[ConfirmFinalClotureBtn] ID de caisse à clôturer : ${activeTabCaisseId}`);
+        console.log(`[ConfirmFinalClotureBtn] IDs de caisses déjà clôturées : ${window.closedCaisses}`);
+        
+        if (!activeTabCaisseId || window.closedCaisses.includes(activeTabCaisseId)) {
             alert("Erreur : ID de caisse invalide ou caisse déjà clôturée.");
             if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
                  window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock', caisse_id: activeTabCaisseId }));
@@ -250,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const isLockedByMe = isCaisseLockedBy(id, currentWsId);
             const isLockedByAnother = isCaisseLocked(id) && !isLockedByMe;
-            const isClosed = window.closedCaisses.includes(parseInt(id));
+            const isClosed = window.closedCaisses.includes(id);
 
             if (isClosed) {
                 status = 'Clôturée';
@@ -308,7 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
             item.addEventListener('click', (event) => {
                 const caisseId = item.dataset.caisseId;
                 if (caisseId) {
-                    if (window.closedCaisses.includes(parseInt(caisseId))) {
+                    if (window.closedCaisses.includes(caisseId)) {
                         alert("Cette caisse a déjà été clôturée.");
                         return;
                     }
@@ -439,11 +443,11 @@ document.addEventListener('DOMContentLoaded', function() {
     function showOpenCaisses() {
         const configElement = document.getElementById('calculator-data');
         const config = configElement ? JSON.parse(configElement.dataset.config) : {};
-        const caissesOuvertes = Object.keys(config.nomsCaisses).filter(id => !window.closedCaisses.includes(parseInt(id)));
+        const caissesOuvertes = Object.keys(config.nomsCaisses).filter(id => !window.closedCaisses.includes(id));
         const activeTabCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
         
         const openCaissesHtml = caissesOuvertes
-            .filter(id => parseInt(id) !== parseInt(activeTabCaisseId))
+            .filter(id => id.toString() !== activeTabCaisseId.toString())
             .map(id => `<li>${config.nomsCaisses[id]}</li>`)
             .join('');
 
