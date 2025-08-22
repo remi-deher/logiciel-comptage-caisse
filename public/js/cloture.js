@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
             if (confirmClotureBtnContainer) confirmClotureBtnContainer.style.display = 'block';
-        } else if (isCaisseActiveLocked && !isCaisseActiveLockedByMe) {
+        } else if (isCaisseActiveLocked && !isCaisseLockedByMe) {
             clotureBtn.innerHTML = '<i class="fa-solid fa-user-lock"></i> Forcer le déverrouillage';
             clotureBtn.onclick = () => {
                 if (window.confirm("Cette caisse est verrouillée par un autre utilisateur. Voulez-vous forcer le déverrouillage ?")) {
@@ -163,11 +163,26 @@ document.addEventListener('DOMContentLoaded', function() {
         updateClotureButton(activeCaisseId, currentWsId);
     };
 
-    function showCaisseSelectionModal() {
+    async function showCaisseSelectionModal() {
         const configElement = document.getElementById('calculator-data');
         const config = configElement ? JSON.parse(configElement.dataset.config) : {};
         const nomsCaisses = config.nomsCaisses || {};
         const currentWsId = window.wsConnection?.resourceId;
+
+        // NOUVEAU: Récupère l'état de clôture depuis le serveur
+        let state = { locked_caisses: [], closed_caisses: [] };
+        try {
+            const response = await fetch('index.php?action=get_cloture_state');
+            state = await response.json();
+            window.lockedCaisses = state.locked_caisses.map(c => ({
+                caisse_id: c.caisse_id.toString(),
+                locked_by: c.locked_by.toString()
+            }));
+            window.closedCaisses = state.closed_caisses.map(String);
+        } catch (e) {
+            console.error('Erreur lors de la récupération de l\'état de clôture:', e);
+            // Utilise l'état local en cas d'échec
+        }
 
         let caisseListHtml = '';
         for (const id in nomsCaisses) {
@@ -179,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const isClosed = window.closedCaisses.includes(id);
             const isLocked = isCaisseLocked(id);
             const isLockedByMe = isCaisseLockedBy(id, currentWsId);
-            const isLockedByAnother = isLocked && !isLockedByMe;
+            const isLockedByAnother = isLocked && !isCaisseLockedByMe;
 
             if (isClosed) {
                 status = 'Clôturée';

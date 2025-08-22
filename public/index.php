@@ -117,6 +117,10 @@ if ($ajax_action) {
         case 'get_last_autosave_data':
             $calculateurController->getLastAutosaveData();
             exit;
+        // NOUVEAU: Route pour récupérer l'état de clôture des caisses
+        case 'get_cloture_state':
+            $calculateurController->getClotureState();
+            exit;
     }
 }
 
@@ -159,4 +163,3 @@ switch ($page) {
         }
         break;
 }
-

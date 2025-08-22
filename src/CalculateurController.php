@@ -223,6 +223,20 @@ class CalculateurController {
             exit;
         }
     }
+    
+    // NOUVEAU: Méthode pour récupérer l'état de clôture depuis la base de données
+    public function getClotureState() {
+        header('Content-Type: application/json');
+        try {
+            $lockedCaisses = $this->clotureStateService->getLockedCaisses();
+            $closedCaisses = $this->clotureStateService->getClosedCaisses();
+            echo json_encode(['success' => true, 'locked_caisses' => $lockedCaisses, 'closed_caisses' => $closedCaisses]);
+        } catch (Exception $e) {
+            error_log("Erreur lors de la récupération de l'état de clôture : " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erreur lors de la récupération de l\'état de clôture.']);
+        }
+        exit;
+    }
 
     // NOUVEAU: Méthode pour gérer la clôture des caisses
     public function cloture() {
