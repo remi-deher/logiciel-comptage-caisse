@@ -110,6 +110,14 @@
 .ecart-display.ecart-positif .ecart-value { color: var(--color-warning); }
 .ecart-display.ecart-negatif { background-color: rgba(192, 57, 43, 0.1); border-color: var(--color-danger); }
 .ecart-display.ecart-negatif .ecart-value { color: var(--color-danger); }
+/* NOUVEAU: Style pour le cadre de clôture */
+.ecart-display.ecart-cloturee {
+    background-color: rgba(138, 43, 226, 0.1);
+    border-color: #8a2be2;
+}
+.ecart-display.ecart-cloturee .ecart-value {
+    color: #8a2be2;
+}
 
 /* --- STRUCTURE EN ACCORDÉON --- */
 .accordion-container { display: flex; flex-direction: column; gap: 15px; }

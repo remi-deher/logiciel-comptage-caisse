@@ -153,6 +153,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     
         clotureBtn.disabled = false;
+
+        const ecartDisplay = document.querySelector(`#ecart-display-caisse${activeCaisseId}`);
+        if(ecartDisplay) {
+            ecartDisplay.classList.remove('ecart-cloturee');
+            if (isCaisseActiveClosed) {
+                ecartDisplay.classList.add('ecart-cloturee');
+                ecartDisplay.querySelector('.ecart-value').textContent = "Caisse clôturée";
+                ecartDisplay.querySelector('.ecart-explanation').textContent = "Cette caisse est déjà clôturée pour aujourd'hui.";
+            }
+        }
     }
     window.handleInterfaceLock = handleInterfaceLock;
     
@@ -190,8 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const activeTabCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
-        
-        // VERBOSITÉ : Log les IDs pour la vérification
+
         console.log(`[ConfirmFinalClotureBtn] ID de caisse à clôturer : ${activeTabCaisseId}`);
         console.log(`[ConfirmFinalClotureBtn] IDs de caisses déjà clôturées : ${window.closedCaisses}`);
         

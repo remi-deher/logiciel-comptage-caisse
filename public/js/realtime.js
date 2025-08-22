@@ -54,7 +54,9 @@ document.addEventListener('DOMContentLoaded', function() {
         window.wsConnection.onmessage = (e) => {
             try {
                 const data = JSON.parse(e.data);
-                console.log("Message from WebSocket:", data);
+                
+                // NOUVEAU: Afficher tous les messages reçus dans la console
+                console.log("[REÇU] Message du serveur:", data);
                 
                 // NOUVEAU : Le serveur envoie un message de bienvenue avec notre ID.
                 if (data.type === 'welcome') {
@@ -138,6 +140,11 @@ document.addEventListener('DOMContentLoaded', function() {
 window.sendWsMessage = function(id, value) {
     if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
         const dataToSend = { id: id, value: value };
-        window.wsConnection.send(JSON.stringify(dataToSend));
+        const jsonString = JSON.stringify(dataToSend);
+        
+        // NOUVEAU: Afficher le message envoyé dans la console
+        console.log("[ENVOYÉ] Message au serveur:", jsonString);
+        
+        window.wsConnection.send(jsonString);
     }
 };

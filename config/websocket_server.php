@@ -56,15 +56,39 @@ class Caisse implements MessageComponentInterface {
     public function onMessage(ConnectionInterface $from, $msg) {
         try {
             $data = json_decode($msg, true);
-            if (!is_array($data) || !isset($data['type'])) {
-                 error_log("Invalid WebSocket message format received: " . $msg);
+            if (!is_array($data)) {
+                return;
+            }
+
+            // Correction: La logique de traitement est inversée.
+            // On gère d'abord les messages de saisie, qui n'ont pas de 'type'.
+            if (isset($data['id']) && isset($data['value'])) {
+                $caisseId = explode('_', $data['id'])[1] ?? null;
+
+                $isLockedByAnother = false;
+                $lockedState = $this->clotureStateService->getLockedCaisses();
+                foreach ($lockedState as $lockedCaisse) {
+                    if (intval($lockedCaisse['caisse_id']) === intval($caisseId) && $lockedCaisse['locked_by'] !== (string)$from->resourceId) {
+                        $isLockedByAnother = true;
+                        break;
+                    }
+                }
+                $isConfirmed = $this->clotureStateService->isCaisseConfirmed(intval($caisseId));
+
+                if (!$isLockedByAnother && !$isConfirmed) {
+                    $this->broadcast($data, $from);
+                }
+                return;
+            }
+
+            // Ensuite, on gère les messages de contrôle qui ont un 'type'.
+            if (!isset($data['type'])) {
                  return;
             }
 
             switch ($data['type']) {
                 case 'cloture_lock':
                     $caisseId = intval($data['caisse_id']);
-                    // Correction : L'ID de session doit être une chaîne de caractères pour correspondre
                     if ($this->clotureStateService->lockCaisse($caisseId, (string)$from->resourceId)) {
                         $this->broadcastClotureState();
                     }
@@ -115,26 +139,10 @@ class Caisse implements MessageComponentInterface {
                         $this->clotureStateService->resetState(); // Reset after broadcasting
                     }
                     break;
-                default:
-                    // Handle regular input messages
-                    if (isset($data['id']) && isset($data['value'])) {
-                        $caisseId = explode('_', $data['id'])[1] ?? null;
-                        $lockedState = $this->clotureStateService->getLockedCaisses();
-                        $isLockedByAnother = false;
-                        foreach ($lockedState as $lockedCaisse) {
-                            if (intval($lockedCaisse['caisse_id']) === intval($caisseId) && $lockedCaisse['locked_by'] !== (string)$from->resourceId) {
-                                $isLockedByAnother = true;
-                                break;
-                            }
-                        }
-                        if (!$isLockedByAnother && !$this->clotureStateService->isCaisseConfirmed(intval($caisseId))) {
-                            $this->broadcast($data, $from);
-                        }
-                    }
-                    break;
             }
         } catch (\Exception $e) {
-            error_log("Error in onMessage: {$e->getMessage()}");
+            // Laissez un log d'erreur général pour les problèmes inattendus
+            error_log("Erreur dans onMessage: {$e->getMessage()}");
         }
     }
 
