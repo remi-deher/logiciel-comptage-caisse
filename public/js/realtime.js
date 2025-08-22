@@ -9,7 +9,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const statusText = statusIndicator ? statusIndicator.querySelector('.status-text') : null;
     const isLoadedFromHistory = JSON.parse(document.getElementById('calculator-data')?.dataset.config)?.isLoadedFromHistory;
 
-    // Si on est en mode consultation, on ne se connecte pas au temps réel
     if (isLoadedFromHistory) {
         if(statusIndicator) {
             statusIndicator.classList.add('disconnected');
@@ -18,7 +17,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    // NOUVEAU: Variable pour suivre si des données initiales ont été reçues
     let hasReceivedInitialData = false;
     let initialDataTimeout;
 
@@ -34,18 +32,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('connected');
                 statusText.textContent = 'Connecté en temps réel';
             }
-            // Envoie une demande d'état au serveur.
             window.wsConnection.send(JSON.stringify({ type: 'request_state' }));
 
-            // Lance un minuteur pour vérifier si des données initiales sont reçues
             initialDataTimeout = setTimeout(() => {
                 if (!hasReceivedInitialData) {
-                    // Correction: on ne recharge plus la page, on charge directement la sauvegarde auto
                     if(typeof window.loadLastAutosave === 'function') {
                          window.loadLastAutosave();
                     }
                 }
-            }, 3000); // Délai de 3 secondes
+            }, 3000);
         };
 
         window.wsConnection.onerror = (error) => {
@@ -54,9 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('disconnected');
                 statusText.textContent = 'Déconnecté';
             }
-            // Annule le minuteur en cas d'erreur de connexion
             if (initialDataTimeout) clearTimeout(initialDataTimeout);
-            console.error("WebSocket Error: Connexion interrompue.", error);
         };
 
         window.wsConnection.onclose = () => {
@@ -65,7 +58,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('disconnected');
                 statusText.textContent = 'Déconnecté';
             }
-            // Annule le minuteur en cas de fermeture de la connexion
             if (initialDataTimeout) clearTimeout(initialDataTimeout);
         };
 
@@ -73,32 +65,26 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const data = JSON.parse(e.data);
                 
-                // Un message est reçu, donc d'autres clients sont connectés
-                // Correction: ne pas mettre hasReceivedInitialData à true pour les messages send_full_state
                 if (data.type !== 'send_full_state') {
                     hasReceivedInitialData = true;
                     if (initialDataTimeout) clearTimeout(initialDataTimeout);
                 }
                 
-                // NOUVEAU: Le serveur nous demande d'envoyer notre état complet
                 if (data.type === 'send_full_state' && typeof window.sendFullFormState === 'function') {
                     window.sendFullFormState();
                     return;
                 }
                 
-                // NOUVEAU: Le serveur nous envoie l'état complet du formulaire
                 if (data.type === 'broadcast_state' && typeof window.loadFormDataFromWebSocket === 'function') {
                     window.loadFormDataFromWebSocket(data.form_state);
                     return;
                 }
                 
-                // NOUVEAU: Le serveur envoie un message de bienvenue avec notre ID.
                 if (data.type === 'welcome') {
                     window.wsConnection.resourceId = data.resourceId;
                     return;
                 }
                 
-                // Gère le statut de verrouillage et des caisses clôturées
                 if (data.type === 'cloture_locked_caisses') {
                     if (window.handleInterfaceLock) {
                         window.handleInterfaceLock(data.caisses, data.closed_caisses);
@@ -119,7 +105,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                // Gère le statut de verrouillage au premier chargement
                 if (data.cloture_locked_caisses) {
                     if (window.handleInterfaceLock) {
                         window.handleInterfaceLock(data.cloture_locked_caisses, data.closed_caisses);
@@ -127,17 +112,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     delete data.cloture_locked_caisses;
                 }
                 
-                 // Gère les messages de déverrouillage forcé
                  if (data.type === 'force_unlocked') {
                     alert(data.message);
                     window.location.reload();
                     return;
                 }
                 
-                // Si toutes les caisses sont clôturées, on recharge la page
                 if (data.type === 'all_caisses_closed') {
-                    alert('Toutes les caisses ont été clôturées. L\'application va être réinitialisée.');
-                    window.location.reload();
+                    alert('Toutes les caisses ont été clôturées. Le comptage est réinitialisé.');
+                    if (typeof window.resetAllCaisseFields === 'function') {
+                        window.resetAllCaisseFields();
+                    }
                     return;
                 }
 
@@ -152,16 +137,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (input) input.value = data[fieldId];
                     }
                 }
-                // Déclenche un recalcul dans l'autre module
                 if (typeof window.calculateAllFull === 'function') {
                     window.calculateAllFull();
                 }
             } catch (error) {
-                console.error("[WS] Erreur de parsing JSON WebSocket:", error);
+                console.error("Erreur de parsing JSON WebSocket:", error);
             }
         };
     } catch (e) {
-        console.error("[WS] Impossible d'initialiser la connexion WebSocket:", e);
+        console.error("Impossible d'initialiser la connexion WebSocket:", e);
         if (statusIndicator) {
             statusIndicator.classList.add('disconnected');
             statusText.textContent = 'Erreur de connexion';
@@ -169,7 +153,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Fonctions utilitaires pour envoyer des données depuis d'autres modules
 window.sendWsMessage = function(id, value) {
     if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
         const dataToSend = { id: id, value: value };
@@ -179,7 +162,6 @@ window.sendWsMessage = function(id, value) {
     }
 };
 
-// NOUVEAU: Fonction pour charger la dernière sauvegarde automatique
 window.loadLastAutosave = function() {
     fetch('index.php?action=get_last_autosave_data')
         .then(response => response.json())
@@ -190,6 +172,6 @@ window.loadLastAutosave = function() {
             }
         })
         .catch(error => {
-            console.error("[WS] Erreur lors du chargement de la sauvegarde automatique:", error);
+            console.error("Erreur lors du chargement de la sauvegarde automatique:", error);
         });
 };

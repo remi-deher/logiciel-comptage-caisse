@@ -2,7 +2,7 @@
 // templates/calculateur.php - Version corrigée pour le chargement des données et l'affichage sur écran 4/3.
 
 // Définir les scripts spécifiques à la page pour qu'ils soient chargés dans le footer
-$page_js = 'calculator-core.js'; 
+$page_js = 'calculator.js'; 
 
 require 'partials/header.php';
 require 'partials/navbar.php';

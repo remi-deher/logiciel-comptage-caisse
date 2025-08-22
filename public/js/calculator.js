@@ -4,7 +4,6 @@
  * Version mise à jour pour le nouveau schéma de la base de données.
  */
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("[C-CORE] Le DOM est chargé.");
     const caisseForm = document.getElementById('caisse-form');
     if (!caisseForm) return;
 
@@ -48,13 +47,9 @@ document.addEventListener('DOMContentLoaded', function() {
         this.nextElementSibling.classList.toggle('open');
     }
     
-    // NOUVEAU : Fonction de chargement et d'initialisation des données
     window.loadAndInitFormData = function(data) {
         if (!data) return;
         
-        console.log("[C-CORE] Chargement des données dans le formulaire...");
-        
-        // On réinitialise le formulaire pour éviter les doublons
         caisseForm.reset();
         
         for (const caisseId in data) {
@@ -78,14 +73,12 @@ document.addEventListener('DOMContentLoaded', function() {
         initialState = window.getFormStateAsString();
     };
     
-    // Initialisation des écouteurs d'événements pour la page du calculateur
     function initCalculator() {
         tabLinks.forEach(link => {
             link.addEventListener('click', (event) => {
                 const activeCaisseId = event.currentTarget.dataset.tab.replace('caisse', '');
                 const currentWsId = window.wsConnection?.resourceId;
 
-                // NOUVEAU: Permet le changement d'onglet si la caisse n'est pas verrouillée par l'utilisateur actuel
                 if (window.currentLockedCaisseId && window.currentLockerId === currentWsId) {
                     alert("Impossible de changer de caisse en mode clôture si la caisse active n'est pas celle verrouillée.");
                     return;
@@ -101,7 +94,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 ecartDisplays.forEach(display => display.classList.remove('active'));
                 document.getElementById(`ecart-display-${event.currentTarget.dataset.tab}`)?.classList.add('active');
                 calculateAllFull();
-                // NOUVEAU: Réapplique les règles de verrouillage de l'interface
                 if (window.handleInterfaceLock) {
                      const activeCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
                      const isLocked = window.lockedCaisses.some(c => c.caisse_id === activeCaisseId);
@@ -111,7 +103,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-        // Écouteurs pour les champs du formulaire pour le calcul en temps réel
         if (!isLoadedFromHistory) {
             caisseForm.addEventListener('input', (event) => {
                 calculateAllFull();
@@ -132,14 +123,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // NOUVEAU: on ne charge plus la sauvegarde auto au démarrage
-        // loadAndInitFormData(loadedData); 
         setTimeout(() => { initialState = getFormStateAsString(); }, 0);
         initAccordion();
         handleScroll();
     }
     
-    // --- Fonctions de Calcul ---
     function generateWithdrawalSuggestion(amountToWithdraw, currentCounts, denominations) {
         let remainingAmount = amountToWithdraw;
         const suggestions = {};
@@ -187,7 +175,6 @@ document.addEventListener('DOMContentLoaded', function() {
             let totalCompte = 0;
             const currentCounts = {};
 
-            // Calcul des billets et pièces
             for (const type in config.denominations) {
                 for (const name in config.denominations[type]) {
                     const count = getInt(name);
@@ -209,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function() {
             totauxCombines.fdc += fondDeCaisse;
             totauxCombines.total += totalCompte;
             totauxCombines.recette += recetteReelle;
-            totauxCombines.theorique += recetteReelle; // CORRIGÉ: Utilisez la recette réelle pour le calcul de la clôture
+            totauxCombines.theorique += recetteReelle;
             totauxCombines.ecart += ecart;
             
             if (Math.abs(ecart) < 0.01) {
@@ -227,9 +214,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (ecartEl) {
                 ecartEl.textContent = formatEuros(ecart);
                 ecartEl.parentElement.className = 'result-line total';
-                if (ecart > 0.01) { // L'écart est-il positif ?
+                if (ecart > 0.01) {
                     ecartEl.parentElement.classList.add('ecart-positif');
-                } else if (ecart < -0.01) { // L'écart est-il négatif ?
+                } else if (ecart < -0.01) {
                     ecartEl.parentElement.classList.add('ecart-negatif');
                 }
             }
@@ -286,7 +273,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (suggestions[name] && suggestions[name] > 0) {
                                 hasSuggestions = true;
                                 const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                                suggestionHtml += `<tr><td>${label}</td><td>${suggestions[name]}</li>`;
+                                suggestionHtml += `<tr><td>${label}:</td><td>${suggestions[name]}</td></tr>`;
                             }
                         }
                         suggestionHtml += `</tbody></table></div></div></div>`;
@@ -311,10 +298,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-    // Exposez la fonction de calcul pour qu'elle puisse être appelée par le module de temps réel
     window.calculateAllFull = calculateAllFull;
     
-    // NOUVEAU : Écouteur d'événement de défilement pour la barre compacte
     let isCompact = false;
     function handleScroll() {
         const scrollPosition = window.scrollY;
@@ -331,8 +316,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('scroll', handleScroll);
 
 
-    // --- Écouteurs d'événements ---
-    // Les écouteurs d'événements de base sont réintégrés ici pour garantir leur exécution.
     if (!isLoadedFromHistory) {
         caisseForm.addEventListener('input', (event) => {
             calculateAllFull();
@@ -353,11 +336,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // NOUVEAU : Fonctions de gestion de la sauvegarde auto
     let autosaveTimeout;
     const autosaveStatusEl = document.getElementById('autosave-status');
 
-    // NOUVEAU: Expose les fonctions de gestion de l'état du formulaire
     window.getFormStateAsString = function() {
         const formData = new FormData(caisseForm);
         const params = new URLSearchParams(formData);
@@ -371,11 +352,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function startAutosaveTimer() {
         if (autosaveTimeout) clearTimeout(autosaveTimeout);
-        autosaveTimeout = setTimeout(performAutosave, 30000); // 30 secondes
+        autosaveTimeout = setTimeout(performAutosave, 30000);
     }
 
     async function performAutosave() {
-        // NOUVEAU: Ne lance la sauvegarde que si des modifications ont été apportées.
         if (!window.hasUnsavedChanges()) {
             if (autosaveStatusEl) {
                 autosaveStatusEl.textContent = 'Aucune modification à sauvegarder.';
@@ -397,7 +377,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const formData = new FormData(caisseForm);
-        // Ajout de l'action 'autosave' pour le contrôleur PHP
         formData.append('action', 'autosave');
         
         try {
@@ -407,7 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             const data = await response.json();
             if (data.success) {
-                initialState = window.getFormStateAsString(); // Met à jour l'état initial
+                initialState = window.getFormStateAsString();
                 if (autosaveStatusEl) {
                     autosaveStatusEl.textContent = data.message;
                     autosaveStatusEl.classList.remove('saving');
@@ -432,46 +411,34 @@ document.addEventListener('DOMContentLoaded', function() {
         startAutosaveTimer();
     }
     
-    // Fonction de sauvegarde au moment de quitter la page
     function performAutosaveOnExit() {
         const formData = new FormData(caisseForm);
         formData.append('action', 'autosave');
         
-        // Utilisation de navigator.sendBeacon pour les requêtes asynchrones en sortie de page
         navigator.sendBeacon('index.php?action=autosave', formData);
     }
     
-    // NOUVEAU: Ajout d'un écouteur pour la saisie des montants pour le déclenchement de la sauvegarde
     caisseForm.addEventListener('input', (event) => {
-        // Redémarre le compteur à chaque saisie
         clearTimeout(autosaveTimeout);
         startAutosaveTimer();
         
-        // CORRECTION : Envoie également la donnée via WebSocket
         if (window.sendWsMessage) {
             window.sendWsMessage(event.target.id, event.target.value);
         }
     });
-    
-    // NOUVEAU: Expose la fonction pour charger les données par WebSocket
+
     window.loadFormDataFromWebSocket = function(data) {
         if (!data || Object.keys(data).length === 0) return;
         
-        console.log("[C-CORE] Chargement des données du formulaire depuis le WebSocket:", data);
-        
-        // On réinitialise le formulaire pour éviter les doublons
         caisseForm.reset();
 
-        // On met à jour les champs "nom_comptage" et "explication"
         const nomComptageInput = document.getElementById('nom_comptage');
         if (nomComptageInput) nomComptageInput.value = data['nom_comptage'] || '';
         const explicationInput = document.getElementById('explication');
         if (explicationInput) explicationInput.value = data['explication'] || '';
 
-        // On met à jour les champs par caisse
         for (const key in data) {
             if (key.startsWith('caisse[')) {
-                // Extrait l'ID de la caisse, la dénomination et le type de champ
                 const parts = key.match(/caisse\[(\d+)\]\[(.+)\]/);
                 if (parts) {
                     const caisseId = parts[1];
@@ -485,10 +452,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         calculateAllFull();
-        initialState = window.getFormStateAsString(); // Met à jour l'état initial pour éviter la double sauvegarde
+        initialState = window.getFormStateAsString();
     };
     
-    // NOUVEAU: Expose la fonction pour envoyer l'état complet du formulaire
     window.sendFullFormState = function() {
         const formState = {};
         const form = document.getElementById('caisse-form');
@@ -497,9 +463,24 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         window.wsConnection.send(JSON.stringify({ type: 'broadcast_state', form_state: formState }));
     };
+    
+    window.resetAllCaisseFields = function() {
+        const nomComptageInput = document.getElementById('nom_comptage');
+        const explicationInput = document.getElementById('explication');
+        if (nomComptageInput) nomComptageInput.value = '';
+        if (explicationInput) explicationInput.value = '';
+        
+        document.querySelectorAll('#caisse-form input[type="number"], #caisse-form input[type="text"], #caisse-form textarea').forEach(el => {
+             // Ne réinitialise pas le fond de caisse s'il y a une valeur
+             if (!el.id.includes('fond_de_caisse_')) {
+                 el.value = '';
+             }
+        });
+        
+        initialState = window.getFormStateAsString();
+        calculateAllFull();
+    };
 
-
-    // --- Initialisation du calculateur ---
     initCalculator();
     if (!isLoadedFromHistory) {
         startAutosaveTimer();
