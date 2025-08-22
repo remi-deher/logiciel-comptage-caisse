@@ -286,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (suggestions[name] && suggestions[name] > 0) {
                                 hasSuggestions = true;
                                 const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                                suggestionHtml += `<tr><td>${label}</td><td>${suggestions[name]}</td></tr>`;
+                                suggestionHtml += `<tr><td>${label}</td><td>${suggestions[name]}</li>`;
                             }
                         }
                         suggestionHtml += `</tbody></table></div></div></div>`;
@@ -303,7 +303,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     topEcartDisplay.classList.add('ecart-positif');
                     topEcartExplanation.textContent = "Il y a un surplus dans la caisse. Vérifiez vos saisies.";
                 } else {
-                    topEartDisplay.classList.add('ecart-negatif');
+                    topEcartDisplay.classList.add('ecart-negatif');
                     topEcartExplanation.textContent = "Il manque de l'argent. Recomptez la caisse.";
                 }
             }

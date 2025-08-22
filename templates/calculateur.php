@@ -47,7 +47,10 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 
         <div class="tab-selector">
             <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
-                <button type="button" class="tab-link <?= $is_first ? 'active' : '' ?>" data-tab="caisse<?= $id ?>"><?= htmlspecialchars($nom) ?></button>
+                <button type="button" class="tab-link <?= $is_first ? 'active' : '' ?>" data-tab="caisse<?= $id ?>">
+                    <?= htmlspecialchars($nom) ?>
+                    <span id="caisse-status-<?= $id ?>" class="caisse-status-badge"></span>
+                </button>
                 <?php $is_first = false; endforeach; ?>
         </div>
         
