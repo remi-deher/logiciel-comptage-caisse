@@ -17,6 +17,7 @@ class Caisse implements MessageComponentInterface {
     protected $clients;
     private $clotureStateService;
     private $nomsCaisses;
+    private $pdo; // Ajout de la propriété PDO
 
     public function __construct() {
         $this->clients = new \SplObjectStorage;
@@ -27,7 +28,17 @@ class Caisse implements MessageComponentInterface {
         }
         $this->nomsCaisses = $noms_caisses;
 
-        $this->clotureStateService = new ClotureStateService();
+        // Connexion à la BDD dans le constructeur du serveur WebSocket
+        try {
+            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+            $this->pdo = new PDO($dsn, DB_USER, DB_PASS);
+            $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        } catch (PDOException $e) {
+            die("Erreur de connexion à la base de données : " . $e->getMessage());
+        }
+
+        // Initialisation du service de clôture avec l'objet PDO
+        $this->clotureStateService = new ClotureStateService($this->pdo);
         echo "Serveur de caisse démarré.\n";
     }
 
@@ -52,17 +63,18 @@ class Caisse implements MessageComponentInterface {
 
             switch ($data['type']) {
                 case 'cloture_lock':
-                    $caisseId = $data['caisse_id'];
+                    $caisseId = intval($data['caisse_id']);
                     if ($this->clotureStateService->lockCaisse($caisseId, $from->resourceId)) {
                         $this->broadcastClotureState();
                     }
                     break;
                 case 'cloture_unlock':
-                    $caisseId = $data['caisse_id'];
+                    $caisseId = intval($data['caisse_id']);
                     $lockedState = $this->clotureStateService->getLockedCaisses();
                     $isLockedByMe = false;
                     foreach ($lockedState as $lockedCaisse) {
-                        if ($lockedCaisse['caisse_id'] === $caisseId && $lockedCaisse['locked_by'] === $from->resourceId) {
+                        // Correction : La comparaison doit être stricte sur l'ID de la caisse
+                        if (intval($lockedCaisse['caisse_id']) === $caisseId && $lockedCaisse['locked_by'] === $from->resourceId) {
                             $isLockedByMe = true;
                             break;
                         }
@@ -76,23 +88,23 @@ class Caisse implements MessageComponentInterface {
                     }
                     break;
                 case 'force_unlock':
-                    $caisseId = $data['caisse_id'];
+                    $caisseId = intval($data['caisse_id']);
                     $lockedState = $this->clotureStateService->getLockedCaisses();
                     foreach ($lockedState as $lockedCaisse) {
-                        if ($lockedCaisse['caisse_id'] === $caisseId) {
+                        if (intval($lockedCaisse['caisse_id']) === $caisseId) {
                             foreach ($this->clients as $client) {
                                 if ($client->resourceId === $lockedCaisse['locked_by']) {
                                     $client->send(json_encode(['type' => 'force_unlocked', 'message' => "Your session has been unlocked by another user."]));
                                 }
                             }
-                            $this->clotureStateService->unlockCaisse($caisseId);
+                            $this->clotureStateService->forceUnlockCaisse($caisseId);
                             $this->broadcastClotureState();
                             break;
                         }
                     }
                     break;
                 case 'cloture_caisse_confirmed':
-                    $caisseId = $data['caisse_id'];
+                    $caisseId = intval($data['caisse_id']);
                     $this->clotureStateService->confirmCaisse($caisseId);
                     $this->clotureStateService->unlockCaisse($caisseId);
                     
@@ -110,12 +122,12 @@ class Caisse implements MessageComponentInterface {
                         $lockedState = $this->clotureStateService->getLockedCaisses();
                         $isLockedByAnother = false;
                         foreach ($lockedState as $lockedCaisse) {
-                            if ($lockedCaisse['caisse_id'] === $caisseId && $lockedCaisse['locked_by'] !== $from->resourceId) {
+                            if (intval($lockedCaisse['caisse_id']) === intval($caisseId) && $lockedCaisse['locked_by'] !== $from->resourceId) {
                                 $isLockedByAnother = true;
                                 break;
                             }
                         }
-                        if (!$isLockedByAnother && !$this->clotureStateService->isCaisseConfirmed($caisseId)) {
+                        if (!$isLockedByAnother && !$this->clotureStateService->isCaisseConfirmed(intval($caisseId))) {
                             $this->broadcast($data, $from);
                         }
                     }
@@ -133,7 +145,8 @@ class Caisse implements MessageComponentInterface {
         $lockedState = $this->clotureStateService->getLockedCaisses();
         foreach($lockedState as $lockedCaisse) {
             if ($lockedCaisse['locked_by'] === $conn->resourceId) {
-                $this->clotureStateService->unlockCaisse($lockedCaisse['caisse_id']);
+                // Utilise la nouvelle méthode forceUnlockCaisse en cas de déconnexion
+                $this->clotureStateService->forceUnlockCaisse(intval($lockedCaisse['caisse_id']));
                 $this->broadcastClotureState();
                 break; // Only one cash register can be locked by a user at a time
             }

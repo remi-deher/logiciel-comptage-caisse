@@ -49,7 +49,10 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function isCaisseLockedBy(caisseId, lockedBy) {
         if (!Array.isArray(window.lockedCaisses)) return false;
-        return window.lockedCaisses.some(c => c.caisse_id === caisseId && c.locked_by === lockedBy);
+        // Correction : S'assure que la comparaison se fait entre des chaînes de caractères
+        const result = window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString() && c.locked_by === lockedBy.toString());
+        console.log(`[isCaisseLockedBy] Caisse ID: ${caisseId}, Locked by: ${lockedBy}, Result: ${result}`);
+        return result;
     }
 
     /**
@@ -59,7 +62,9 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function isCaisseLocked(caisseId) {
         if (!Array.isArray(window.lockedCaisses)) return false;
-        return window.lockedCaisses.some(c => c.caisse_id === caisseId);
+        const result = window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString());
+        console.log(`[isCaisseLocked] Caisse ID: ${caisseId}, Result: ${result}`);
+        return result;
     }
     
     // Fonction pour gérer le verrouillage de l'interface
@@ -110,9 +115,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const activeTabCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
         const isCaisseActiveLockedByMe = isCaisseLockedBy(activeTabCaisseId, currentWsId);
         const isCaisseActiveLocked = isCaisseLocked(activeTabCaisseId);
-        const isCaisseActiveClosed = window.closedCaisses.includes(activeCaisseId);
+        const isCaisseActiveClosed = window.closedCaisses.includes(parseInt(activeCaisseId));
     
         if (isCaisseActiveLockedByMe) {
+            console.log("[handleInterfaceLock] Caisse active locked by me. Showing 'Déverrouiller' button.");
             clotureBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i> Déverrouiller';
             clotureBtn.onclick = () => {
                 console.log("Tentative de déverrouillage de la caisse:", activeCaisseId);
@@ -121,7 +127,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             confirmClotureBtnContainer.style.display = 'block';
-        } else if (isCaisseActiveLocked) {
+        } else if (isCaisseActiveLocked && !isCaisseActiveLockedByMe) {
+            console.log("[handleInterfaceLock] Caisse active locked by another user. Showing 'Forcer le déverrouillage' button.");
             clotureBtn.innerHTML = '<i class="fa-solid fa-user-lock"></i> Forcer le déverrouillage';
             clotureBtn.onclick = () => {
                 console.log("Tentative de déverrouillage forcé de la caisse:", activeCaisseId);
@@ -131,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             confirmClotureBtnContainer.style.display = 'none';
         } else {
+            console.log("[handleInterfaceLock] Caisse active is free. Showing 'Clôture' button.");
             clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
             clotureBtn.onclick = () => {
                 console.log("Bouton Clôture cliqué. Affichage de la modale de sélection.");
@@ -144,42 +152,34 @@ document.addEventListener('DOMContentLoaded', function() {
             confirmClotureBtnContainer.style.display = 'none';
         }
     
-        // Le bouton de clôture reste actif même si la caisse est clôturée
         clotureBtn.disabled = false;
     }
     window.handleInterfaceLock = handleInterfaceLock;
     
-    // Événement pour le bouton "Annuler" de la modale
     cancelClotureBtn.addEventListener('click', () => {
         console.log("Cancel button clicked.");
         clotureModal.classList.remove('visible');
     });
 
-    // ÉVÉNEMENT pour le bouton "Confirmer la clôture" de l'interface
     if (confirmClotureBtn) {
         confirmClotureBtn.addEventListener('click', () => {
             console.log("Confirm Cloture button clicked.");
             
             const activeTabCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
             
-            // Affiche la modale de confirmation
             document.querySelector('#cloture-modal h3').textContent = "Confirmation de la clôture";
             document.querySelector('#cloture-modal p').textContent = "Voulez-vous finaliser la clôture de la caisse ? Cette action est irréversible.";
-            // On s'assure que les boutons sont dans le bon état
             cancelClotureBtn.style.display = 'block';
             confirmFinalClotureBtn.style.display = 'block';
             
-            // Affiche la suggestion de retrait dans la modale
             showWithdrawalSuggestion();
 
-            // Affiche les caisses en attente de clôture
             showOpenCaisses();
 
             clotureModal.classList.add('visible');
         });
     }
 
-    // Événement pour le bouton "Confirmer la clôture" de la modale
     confirmFinalClotureBtn.addEventListener('click', () => {
         console.log("Confirm Final Cloture button clicked.");
         clotureModal.classList.remove('visible');
@@ -191,8 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const activeTabCaisseId = window.lockedCaisses.find(c => c.locked_by === window.wsConnection?.resourceId)?.caisse_id;
         
-        // CORRECTION: Vérifier si l'ID de la caisse est valide avant de continuer
-        if (!activeTabCaisseId || window.closedCaisses.includes(activeTabCaisseId)) {
+        if (!activeTabCaisseId || window.closedCaisses.includes(parseInt(activeTabCaisseId))) {
             alert("Erreur : ID de caisse invalide ou caisse déjà clôturée.");
             if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
                  window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock', caisse_id: activeTabCaisseId }));
@@ -203,7 +202,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(caisseForm);
         formData.append('caisse_id_a_cloturer', activeTabCaisseId);
         
-        // Débogage : Affiche le contenu de FormData dans la console
         for (let pair of formData.entries()) {
             console.log(pair[0]+ ': ' + pair[1]); 
         }
@@ -237,9 +235,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    /**
-     * Affiche la modale de sélection de caisse.
-     */
     function showCaisseSelectionModal() {
         const configElement = document.getElementById('calculator-data');
         const config = configElement ? JSON.parse(configElement.dataset.config) : {};
@@ -255,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const isLockedByMe = isCaisseLockedBy(id, currentWsId);
             const isLockedByAnother = isCaisseLocked(id) && !isLockedByMe;
-            const isClosed = window.closedCaisses.includes(id);
+            const isClosed = window.closedCaisses.includes(parseInt(id));
 
             if (isClosed) {
                 status = 'Clôturée';
@@ -303,19 +298,17 @@ document.addEventListener('DOMContentLoaded', function() {
         caisseSelectionModal.innerHTML = modalContentHtml;
         caisseSelectionModal.classList.add('visible');
 
-        // Gère la fermeture de la modale en cliquant en dehors
         window.onclick = function(event) {
             if (event.target == caisseSelectionModal) {
                 caisseSelectionModal.classList.remove('visible');
             }
         };
 
-        // Gère la sélection d'une caisse
         caisseSelectionModal.querySelectorAll('.caisse-status-item').forEach(item => {
             item.addEventListener('click', (event) => {
-                const caisseId = event.currentTarget.dataset.caisseId;
+                const caisseId = item.dataset.caisseId;
                 if (caisseId) {
-                    if (window.closedCaisses.includes(caisseId)) {
+                    if (window.closedCaisses.includes(parseInt(caisseId))) {
                         alert("Cette caisse a déjà été clôturée.");
                         return;
                     }
@@ -326,7 +319,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     window.wsConnection.send(JSON.stringify({ type: 'cloture_lock', caisse_id: caisseId }));
                     
-                    // Bascule vers l'onglet de la caisse sélectionnée
                     const targetTabLink = document.querySelector(`.tab-link[data-tab="caisse${caisseId}"]`);
                     if (targetTabLink) {
                          targetTabLink.click();
@@ -337,10 +329,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
         
-        // Gère le bouton de déverrouillage forcé dans la modale
         caisseSelectionModal.querySelectorAll('.force-unlock-btn').forEach(btn => {
              btn.addEventListener('click', (event) => {
-                 event.stopPropagation(); // Empêche l'événement de se propager au parent
+                 event.stopPropagation();
                  const caisseId = btn.dataset.caisse-id;
                  if (window.confirm("Voulez-vous forcer le déverrouillage de cette caisse ?")) {
                      window.wsConnection.send(JSON.stringify({ type: 'force_unlock', caisse_id: caisseId }));
@@ -350,14 +341,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    /**
-     * Affiche la suggestion de retrait calculée dans la modale de clôture.
-     */
     function showWithdrawalSuggestion() {
-        // La logique de calcul est déjà dans calculator-core.js, on la réutilise.
         if (typeof window.calculateAllFull !== 'function') return;
 
-        // On déclenche un calcul pour s'assurer que les données sont à jour
         window.calculateAllFull();
 
         const activeTab = document.querySelector('.tab-link.active')?.dataset.tab;
@@ -442,7 +428,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Insère le contenu dans la modale
         const modalBody = document.querySelector('#cloture-modal .modal-content');
         let existingContent = modalBody.querySelector('.modal-body-content');
         if (existingContent) {
@@ -451,17 +436,14 @@ document.addEventListener('DOMContentLoaded', function() {
         modalBody.insertAdjacentHTML('beforeend', `<div class="modal-body-content">${suggestionContainer.innerHTML}</div>`);
     }
     
-    /**
-     * Affiche la liste des caisses qui n'ont pas encore confirmé leur clôture.
-     */
     function showOpenCaisses() {
         const configElement = document.getElementById('calculator-data');
         const config = configElement ? JSON.parse(configElement.dataset.config) : {};
-        const caissesOuvertes = Object.keys(config.nomsCaisses).filter(id => !window.closedCaisses.includes(id));
+        const caissesOuvertes = Object.keys(config.nomsCaisses).filter(id => !window.closedCaisses.includes(parseInt(id)));
         const activeTabCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
         
         const openCaissesHtml = caissesOuvertes
-            .filter(id => id !== activeTabCaisseId)
+            .filter(id => parseInt(id) !== parseInt(activeTabCaisseId))
             .map(id => `<li>${config.nomsCaisses[id]}</li>`)
             .join('');
 
@@ -484,10 +466,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    /**
-     * Génère la suggestion de retrait. La fonction a été déplacée ici pour être utilisée
-     * par la modale, et non plus par le calculateur-core.js
-     */
     function generateWithdrawalSuggestion(amountToWithdraw, currentCounts, denominations, minToKeep) {
         let remainingAmount = amountToWithdraw;
         const suggestions = {};

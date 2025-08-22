@@ -19,7 +19,8 @@ class CalculateurController {
         $this->denominations = $denominations;
         $this->tpe_par_caisse = $tpe_par_caisse;
         $this->versionService = new VersionService();
-        $this->clotureStateService = new ClotureStateService();
+        // Le service de clôture est maintenant initialisé avec l'objet PDO
+        $this->clotureStateService = new ClotureStateService($pdo);
     }
     public function calculateur() {
         $loaded_data = [];
