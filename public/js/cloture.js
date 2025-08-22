@@ -105,47 +105,30 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     const updateClotureButton = (activeCaisseId, currentWsId) => {
-        const isCaisseActiveClosed = window.closedCaisses.includes(activeCaisseId);
-        const isCaisseActiveLockedByMe = isCaisseLockedBy(activeCaisseId, currentWsId);
-        const isCaisseActiveLocked = isCaisseLockedOrClosed(activeCaisseId);
+        const isAnyCaisseLocked = window.lockedCaisses.length > 0;
         const formSaveButton = document.querySelector('.save-section .save-btn');
 
         if (formSaveButton) {
-            formSaveButton.disabled = isCaisseActiveClosed || (isCaisseActiveLocked && !isCaisseActiveLockedByMe);
+            const isCaisseActiveLockedByMe = isCaisseLockedBy(activeCaisseId, currentWsId);
+            const isCaisseActiveClosed = window.closedCaisses.includes(activeCaisseId);
+            formSaveButton.disabled = isCaisseActiveClosed || (isCaisseLocked(activeCaisseId) && !isCaisseActiveLockedByMe);
         }
+        
+        clotureBtn.disabled = false;
+        clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
 
-        if (isCaisseActiveClosed) {
-            clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
-            clotureBtn.disabled = true;
-            if (confirmClotureBtnContainer) confirmClotureBtnContainer.style.display = 'none';
-        } else if (isCaisseActiveLockedByMe) {
-            clotureBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i> Déverrouiller';
-            clotureBtn.onclick = () => {
-                if (window.confirm("Êtes-vous sûr de vouloir déverrouiller cette caisse ?")) {
-                    window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock', caisse_id: activeCaisseId }));
-                }
-            };
-            if (confirmClotureBtnContainer) confirmClotureBtnContainer.style.display = 'block';
-        } else if (isCaisseActiveLocked && !isCaisseLockedByMe) {
-            clotureBtn.innerHTML = '<i class="fa-solid fa-user-lock"></i> Forcer le déverrouillage';
-            clotureBtn.onclick = () => {
-                if (window.confirm("Cette caisse est verrouillée par un autre utilisateur. Voulez-vous forcer le déverrouillage ?")) {
-                    window.wsConnection.send(JSON.stringify({ type: 'force_unlock', caisse_id: activeCaisseId }));
-                }
-            };
-            if (confirmClotureBtnContainer) confirmClotureBtnContainer.style.display = 'none';
-        } else {
-            clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
-            clotureBtn.disabled = false;
-            clotureBtn.onclick = () => {
-                const isLoadedFromHistory = document.getElementById('calculator-data')?.dataset.config.includes('isLoadedFromHistory":true');
-                if (isLoadedFromHistory) {
-                    alert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.");
-                    return;
-                }
-                showCaisseSelectionModal();
-            };
-            if (confirmClotureBtnContainer) confirmClotureBtnContainer.style.display = 'none';
+        clotureBtn.onclick = () => {
+            const isLoadedFromHistory = document.getElementById('calculator-data')?.dataset.config.includes('isLoadedFromHistory":true');
+            if (isLoadedFromHistory) {
+                alert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.");
+                return;
+            }
+            showCaisseSelectionModal();
+        };
+
+        const isCaisseActiveLockedByMe = isCaisseLockedBy(activeCaisseId, currentWsId);
+        if (confirmClotureBtnContainer) {
+             confirmClotureBtnContainer.style.display = isCaisseActiveLockedByMe ? 'block' : 'none';
         }
     };
     
@@ -169,7 +152,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const nomsCaisses = config.nomsCaisses || {};
         const currentWsId = window.wsConnection?.resourceId;
 
-        // NOUVEAU: Récupère l'état de clôture depuis le serveur
         let state = { locked_caisses: [], closed_caisses: [] };
         try {
             const response = await fetch('index.php?action=get_cloture_state');
@@ -181,7 +163,6 @@ document.addEventListener('DOMContentLoaded', function() {
             window.closedCaisses = state.closed_caisses.map(String);
         } catch (e) {
             console.error('Erreur lors de la récupération de l\'état de clôture:', e);
-            // Utilise l'état local en cas d'échec
         }
 
         let caisseListHtml = '';
@@ -191,10 +172,11 @@ document.addEventListener('DOMContentLoaded', function() {
             let statusClass = 'caisse-status-libre';
             let actionHtml = '';
 
+            // CORRECTION: Définition de isCaisseLockedByMe ici pour éviter l'erreur
+            const isLockedByMe = isCaisseLockedBy(id, currentWsId);
             const isClosed = window.closedCaisses.includes(id);
             const isLocked = isCaisseLocked(id);
-            const isLockedByMe = isCaisseLockedBy(id, currentWsId);
-            const isLockedByAnother = isLocked && !isCaisseLockedByMe;
+            const isLockedByAnother = isLocked && !isLockedByMe;
 
             if (isClosed) {
                 status = 'Clôturée';
