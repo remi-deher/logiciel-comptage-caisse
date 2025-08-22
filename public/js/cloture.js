@@ -50,23 +50,35 @@ document.addEventListener('DOMContentLoaded', function() {
      * @param {string} lockedBy
      * @returns {boolean}
      */
-    function isCaisseLockedBy(caisseId, lockedBy) {
+    const isCaisseLockedBy = (caisseId, lockedBy) => {
         if (!Array.isArray(window.lockedCaisses)) return false;
-        // Correction : S'assure que la comparaison se fait entre des chaînes de caractères
         const result = window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString() && c.locked_by === lockedBy.toString());
         console.log(`[CLOTURE] isCaisseLockedBy(${caisseId}, ${lockedBy}) -> ${result}`);
         return result;
     }
-
+    
     /**
-     * Vérifie si une caisse est verrouillée par n'importe quel utilisateur.
+     * Vérifie si une caisse est verrouillée par un utilisateur.
      * @param {string} caisseId
      * @returns {boolean}
      */
-    function isCaisseLocked(caisseId) {
+    const isCaisseLocked = (caisseId) => {
         if (!Array.isArray(window.lockedCaisses)) return false;
         const result = window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString());
         console.log(`[CLOTURE] isCaisseLocked(${caisseId}) -> ${result}`);
+        return result;
+    }
+    
+    /**
+     * Vérifie si une caisse est verrouillée ou fermée.
+     * @param {string} caisseId
+     * @returns {boolean}
+     */
+    const isCaisseLockedOrClosed = (caisseId) => {
+        const isLocked = isCaisseLocked(caisseId);
+        const isClosed = window.closedCaisses.includes(caisseId);
+        const result = isLocked || isClosed;
+        console.log(`[CLOTURE] isCaisseLockedOrClosed(${caisseId}) -> ${result}`);
         return result;
     }
     
@@ -105,10 +117,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // Mise à jour de l'état "disabled" pour les onglets
+            // CORRECTION : Les onglets ne sont plus désactivés, sauf si la caisse est clôturée ou verrouillée par un autre utilisateur
             if (tabLink) {
-                if (isClosed || (isLocked && !isLockedByMe)) {
-                    tabLink.disabled = true;
+                const isLockedByAnother = isLocked && !isLockedByMe;
+                if (isClosed || isLockedByAnother) {
+                    tabLink.disabled = false; // La caisse est accessible pour la consultation
+                    // Les inputs eux seront désactivés plus loin
                 } else {
                     tabLink.disabled = false;
                 }
@@ -122,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const isClosed = window.closedCaisses.includes(elCaisseId);
             const isLockedByMe = isCaisseLockedBy(elCaisseId, currentWsId);
-            const isLockedByAnother = isCaisseLocked(elCaisseId) && !isLockedByMe;
+            const isLockedByAnother = isCaisseLocked(elCaisseId) && !isCaisseLockedBy(elCaisseId, currentWsId);
 
             if (isClosed || isLockedByAnother) {
                 el.disabled = true;
@@ -140,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (clotureBtn) {
             const isCaisseActiveClosed = window.closedCaisses.includes(activeCaisseId);
             const isCaisseActiveLockedByMe = isCaisseLockedBy(activeCaisseId, currentWsId);
-            const isCaisseActiveLocked = isCaisseLocked(activeCaisseId);
+            const isCaisseActiveLocked = isCaisseLockedOrClosed(activeCaisseId);
             const formSaveButton = document.querySelector('.save-section .save-btn');
             
             if(formSaveButton) {
@@ -290,7 +304,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let actionHtml = '';
 
             const isClosed = window.closedCaisses.includes(id);
-            const isLocked = isCaisseLocked(id);
+            const isLocked = isCaisseLockedOrClosed(id);
             const isLockedByMe = isCaisseLockedBy(id, currentWsId);
             const isLockedByAnother = isLocked && !isLockedByMe;
 
@@ -361,7 +375,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         alert("Cette caisse a déjà été clôturée.");
                         return;
                     }
-                    if (isCaisseLocked(caisseId) && !isCaisseLockedBy(caisseId, currentWsId)) {
+                    if (isCaisseLockedOrClosed(caisseId) && !isCaisseLockedBy(caisseId, currentWsId)) {
                          alert("Cette caisse est déjà verrouillée par un autre utilisateur.");
                          return;
                     }
