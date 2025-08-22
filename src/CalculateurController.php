@@ -30,7 +30,7 @@ class CalculateurController {
         // Nouvelle logique de chargement pour le schéma normalisé
         if (isset($_GET['load'])) {
             $comptageIdToLoad = intval($_GET['load']);
-            error_log("Tentative de chargement du comptage ID: " . $comptageToLoad);
+            error_log("Tentative de chargement du comptage ID: " . $comptageIdToLoad);
             $isLoadedFromHistory = true;
             $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE id = ?");
             $stmt->execute([$comptageIdToLoad]);
@@ -301,8 +301,12 @@ class CalculateurController {
                 }
             }
 
-            // Étape 4: Si toutes les caisses sont confirmées, on procède à la réinitialisation
+            // Étape 4: Si toutes les caisses sont confirmées, on procède à la sauvegarde finale et à la réinitialisation
             if ($all_caisses_confirmed) {
+                 // Supprimer toutes les anciennes sauvegardes intermédiaires de clôture
+                 $stmt_delete_intermediate = $this->pdo->prepare("DELETE FROM comptages WHERE nom_comptage LIKE 'Clôture de la caisse%'");
+                 $stmt_delete_intermediate->execute();
+
                 // Créer un enregistrement pour la clôture finale
                 $nom_cloture_finale = "Clôture générale du " . date('Y-m-d H:i:s');
                 $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
