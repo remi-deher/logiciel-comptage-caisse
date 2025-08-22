@@ -60,8 +60,7 @@ class Caisse implements MessageComponentInterface {
                 return;
             }
 
-            // Correction: La logique de traitement est inversée.
-            // On gère d'abord les messages de saisie, qui n'ont pas de 'type'.
+            // Gère les messages de saisie
             if (isset($data['id']) && isset($data['value'])) {
                 $caisseId = explode('_', $data['id'])[1] ?? null;
 
@@ -81,12 +80,23 @@ class Caisse implements MessageComponentInterface {
                 return;
             }
 
-            // Ensuite, on gère les messages de contrôle qui ont un 'type'.
+            // Gère les messages de contrôle qui ont un 'type'.
             if (!isset($data['type'])) {
                  return;
             }
 
             switch ($data['type']) {
+                // NOUVEAU: Un client demande l'état du formulaire
+                case 'request_state':
+                    // On diffuse à tous les autres clients la demande de leur état
+                    $this->broadcast(['type' => 'send_full_state'], $from);
+                    break;
+
+                // NOUVEAU: Un client envoie l'état complet de son formulaire
+                case 'broadcast_state':
+                    $this->broadcast(['type' => 'broadcast_state', 'form_state' => $data['form_state']], $from);
+                    break;
+
                 case 'cloture_lock':
                     $caisseId = intval($data['caisse_id']);
                     if ($this->clotureStateService->lockCaisse($caisseId, (string)$from->resourceId)) {
@@ -141,7 +151,6 @@ class Caisse implements MessageComponentInterface {
                     break;
             }
         } catch (\Exception $e) {
-            // Laissez un log d'erreur général pour les problèmes inattendus
             error_log("Erreur dans onMessage: {$e->getMessage()}");
         }
     }

@@ -4,6 +4,7 @@
  * Version mise à jour pour le nouveau schéma de la base de données.
  */
 document.addEventListener('DOMContentLoaded', function() {
+    console.log("[C-CORE] Le DOM est chargé.");
     const caisseForm = document.getElementById('caisse-form');
     if (!caisseForm) return;
 
@@ -48,8 +49,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // NOUVEAU : Fonction de chargement et d'initialisation des données
-    function loadAndInitFormData(data) {
+    window.loadAndInitFormData = function(data) {
         if (!data) return;
+        
+        console.log("[C-CORE] Chargement des données dans le formulaire...");
+        
+        // On réinitialise le formulaire pour éviter les doublons
+        caisseForm.reset();
         
         for (const caisseId in data) {
             if (caisseId === 'nom_comptage' || caisseId === 'explication') {
@@ -67,8 +73,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
+        
         calculateAllFull();
-    }
+        initialState = window.getFormStateAsString();
+    };
     
     // Initialisation des écouteurs d'événements pour la page du calculateur
     function initCalculator() {
@@ -124,8 +132,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Initialisation de l'état du formulaire
-        loadAndInitFormData(loadedData);
+        // NOUVEAU: on ne charge plus la sauvegarde auto au démarrage
+        // loadAndInitFormData(loadedData); 
         setTimeout(() => { initialState = getFormStateAsString(); }, 0);
         initAccordion();
         handleScroll();
@@ -349,16 +357,17 @@ document.addEventListener('DOMContentLoaded', function() {
     let autosaveTimeout;
     const autosaveStatusEl = document.getElementById('autosave-status');
 
-    function getFormStateAsString() {
+    // NOUVEAU: Expose les fonctions de gestion de l'état du formulaire
+    window.getFormStateAsString = function() {
         const formData = new FormData(caisseForm);
         const params = new URLSearchParams(formData);
         return params.toString();
-    }
+    };
 
-    function hasUnsavedChanges() {
-        const currentState = getFormStateAsString();
+    window.hasUnsavedChanges = function() {
+        const currentState = window.getFormStateAsString();
         return currentState !== initialState;
-    }
+    };
 
     function startAutosaveTimer() {
         if (autosaveTimeout) clearTimeout(autosaveTimeout);
@@ -367,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function performAutosave() {
         // NOUVEAU: Ne lance la sauvegarde que si des modifications ont été apportées.
-        if (!hasUnsavedChanges()) {
+        if (!window.hasUnsavedChanges()) {
             if (autosaveStatusEl) {
                 autosaveStatusEl.textContent = 'Aucune modification à sauvegarder.';
                 autosaveStatusEl.classList.remove('saving', 'success', 'error');
@@ -398,7 +407,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             const data = await response.json();
             if (data.success) {
-                initialState = getFormStateAsString(); // Met à jour l'état initial
+                initialState = window.getFormStateAsString(); // Met à jour l'état initial
                 if (autosaveStatusEl) {
                     autosaveStatusEl.textContent = data.message;
                     autosaveStatusEl.classList.remove('saving');
@@ -443,6 +452,52 @@ document.addEventListener('DOMContentLoaded', function() {
             window.sendWsMessage(event.target.id, event.target.value);
         }
     });
+    
+    // NOUVEAU: Expose la fonction pour charger les données par WebSocket
+    window.loadFormDataFromWebSocket = function(data) {
+        if (!data || Object.keys(data).length === 0) return;
+        
+        console.log("[C-CORE] Chargement des données du formulaire depuis le WebSocket:", data);
+        
+        // On réinitialise le formulaire pour éviter les doublons
+        caisseForm.reset();
+
+        // On met à jour les champs "nom_comptage" et "explication"
+        const nomComptageInput = document.getElementById('nom_comptage');
+        if (nomComptageInput) nomComptageInput.value = data['nom_comptage'] || '';
+        const explicationInput = document.getElementById('explication');
+        if (explicationInput) explicationInput.value = data['explication'] || '';
+
+        // On met à jour les champs par caisse
+        for (const key in data) {
+            if (key.startsWith('caisse[')) {
+                // Extrait l'ID de la caisse, la dénomination et le type de champ
+                const parts = key.match(/caisse\[(\d+)\]\[(.+)\]/);
+                if (parts) {
+                    const caisseId = parts[1];
+                    const fieldName = parts[2];
+                    const input = document.querySelector(`input[name="caisse[${caisseId}][${fieldName}]"]`);
+                    if (input) {
+                        input.value = data[key];
+                    }
+                }
+            }
+        }
+        
+        calculateAllFull();
+        initialState = window.getFormStateAsString(); // Met à jour l'état initial pour éviter la double sauvegarde
+    };
+    
+    // NOUVEAU: Expose la fonction pour envoyer l'état complet du formulaire
+    window.sendFullFormState = function() {
+        const formState = {};
+        const form = document.getElementById('caisse-form');
+        new FormData(form).forEach((value, key) => {
+            formState[key] = value;
+        });
+        window.wsConnection.send(JSON.stringify({ type: 'broadcast_state', form_state: formState }));
+    };
+
 
     // --- Initialisation du calculateur ---
     initCalculator();

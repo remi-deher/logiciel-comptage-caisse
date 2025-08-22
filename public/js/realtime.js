@@ -34,13 +34,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('connected');
                 statusText.textContent = 'Connecté en temps réel';
             }
-            console.log("WebSocket connected. Waiting for server ID...");
+            console.log("[WS] Connexion établie. En attente de l'ID serveur...");
+
+            // NOUVEAU: Envoie une demande d'état au serveur.
+            // Le serveur demandera à un client actif de renvoyer son état.
+            window.wsConnection.send(JSON.stringify({ type: 'request_state' }));
 
             // NOUVEAU: Lance un minuteur pour vérifier si des données initiales sont reçues
             initialDataTimeout = setTimeout(() => {
                 if (!hasReceivedInitialData) {
-                    console.log("Timeout expiré. Aucun autre client n'est connecté. Rechargement de la page pour charger la dernière sauvegarde automatique.");
-                    window.location.reload();
+                    console.log("[WS] Timeout expiré. Aucun autre client n'est connecté. Chargement de la dernière sauvegarde automatique.");
+                    // Correction: on ne recharge plus la page, on charge directement la sauvegarde auto
+                    if(typeof window.loadLastAutosave === 'function') {
+                         window.loadLastAutosave();
+                    }
                 }
             }, 3000); // Délai de 3 secondes
         };
@@ -53,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             // NOUVEAU: Annule le minuteur en cas d'erreur de connexion
             if (initialDataTimeout) clearTimeout(initialDataTimeout);
-            console.error("WebSocket Error: Connexion interrompue.", error);
+            console.error("[WS] Erreur WebSocket: Connexion interrompue.", error);
         };
 
         window.wsConnection.onclose = () => {
@@ -64,21 +71,39 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             // NOUVEAU: Annule le minuteur en cas de fermeture de la connexion
             if (initialDataTimeout) clearTimeout(initialDataTimeout);
-            console.log("WebSocket closed.");
+            console.log("[WS] Connexion WebSocket fermée.");
         };
 
         window.wsConnection.onmessage = (e) => {
-            // NOUVEAU: Un message est reçu, donc d'autres clients sont connectés
-            hasReceivedInitialData = true;
-            if (initialDataTimeout) clearTimeout(initialDataTimeout);
-
             try {
                 const data = JSON.parse(e.data);
+                console.log("[WS] Message reçu du serveur:", data);
+                
+                // Un message est reçu, donc d'autres clients sont connectés
+                // Correction: ne pas mettre hasReceivedInitialData à true pour les messages send_full_state
+                if (data.type !== 'send_full_state') {
+                    hasReceivedInitialData = true;
+                    if (initialDataTimeout) clearTimeout(initialDataTimeout);
+                }
+                
+                // NOUVEAU: Le serveur nous demande d'envoyer notre état complet
+                if (data.type === 'send_full_state' && typeof window.sendFullFormState === 'function') {
+                    console.log("[WS] Réception d'une demande de 'send_full_state'. Envoi de l'état du formulaire.");
+                    window.sendFullFormState();
+                    return;
+                }
+                
+                // NOUVEAU: Le serveur nous envoie l'état complet du formulaire
+                if (data.type === 'broadcast_state' && typeof window.loadFormDataFromWebSocket === 'function') {
+                    console.log("[WS] Réception de l'état du formulaire. Mise à jour de l'interface.");
+                    window.loadFormDataFromWebSocket(data.form_state);
+                    return;
+                }
                 
                 // NOUVEAU: Le serveur envoie un message de bienvenue avec notre ID.
                 if (data.type === 'welcome') {
                     window.wsConnection.resourceId = data.resourceId;
-                    console.log("Received server ID:", window.wsConnection.resourceId);
+                    console.log("[WS] Réception de l'ID serveur:", window.wsConnection.resourceId);
                     return;
                 }
                 
@@ -128,6 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.id && typeof data.value !== 'undefined') {
                     const input = document.getElementById(data.id);
                     if (input && input.value !== data.value) {
+                        console.log(`[WS] Mise à jour du champ ${data.id} avec la valeur ${data.value}`);
                         input.value = data.value;
                     }
                 } else {
@@ -141,11 +167,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.calculateAllFull();
                 }
             } catch (error) {
-                console.error("Erreur de parsing JSON WebSocket:", error);
+                console.error("[WS] Erreur de parsing JSON WebSocket:", error);
             }
         };
     } catch (e) {
-        console.error("Impossible d'initialiser la connexion WebSocket:", e);
+        console.error("[WS] Impossible d'initialiser la connexion WebSocket:", e);
         if (statusIndicator) {
             statusIndicator.classList.add('disconnected');
             statusText.textContent = 'Erreur de connexion';
@@ -159,6 +185,24 @@ window.sendWsMessage = function(id, value) {
         const dataToSend = { id: id, value: value };
         const jsonString = JSON.stringify(dataToSend);
         
+        console.log("[WS] Envoi d'un message de saisie:", dataToSend);
         window.wsConnection.send(jsonString);
     }
+};
+
+// NOUVEAU: Fonction pour charger la dernière sauvegarde automatique
+window.loadLastAutosave = function() {
+    fetch('index.php?action=get_last_autosave_data')
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.success) {
+                console.log("[WS] Chargement de la dernière sauvegarde automatique:", data.data);
+                window.loadAndInitFormData(data.data);
+            } else {
+                console.log("[WS] Aucune sauvegarde automatique trouvée.");
+            }
+        })
+        .catch(error => {
+            console.error("[WS] Erreur lors du chargement de la sauvegarde automatique:", error);
+        });
 };

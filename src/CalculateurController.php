@@ -45,21 +45,6 @@ class CalculateurController {
             } else {
                 error_log("Comptage avec l'ID " . $comptageIdToLoad . " non trouvé.");
             }
-        } else {
-            // Sauvegarde auto
-            $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
-            error_log("Recherche de la dernière sauvegarde automatique...");
-            $stmt->execute();
-            $loaded_comptage = $stmt->fetch() ?: [];
-            if ($loaded_comptage) {
-                error_log("Sauvegarde automatique trouvée avec l'ID: " . $loaded_comptage['id']);
-                $isAutosaveLoaded = true;
-                $loaded_data = $this->loadComptageData($loaded_comptage['id']);
-                $loaded_data['nom_comptage'] = $loaded_comptage['nom_comptage'];
-                $loaded_data['explication'] = $loaded_comptage['explication'];
-            } else {
-                error_log("Aucune sauvegarde automatique trouvée.");
-            }
         }
 
         $message = $_SESSION['message'] ?? null;
@@ -68,6 +53,23 @@ class CalculateurController {
         $denominations = $this->denominations;
         $page_css = 'calculateur.css';
         require __DIR__ . '/../templates/calculateur.php';
+    }
+    
+    // NOUVELLE METHODE: pour récupérer la dernière sauvegarde automatique
+    public function getLastAutosaveData() {
+        $stmt = $this->pdo->prepare("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY date_comptage DESC LIMIT 1");
+        $stmt->execute();
+        $loaded_comptage = $stmt->fetch() ?: [];
+        
+        $data = null;
+        if ($loaded_comptage) {
+            $data = $this->loadComptageData($loaded_comptage['id']);
+            $data['nom_comptage'] = $loaded_comptage['nom_comptage'];
+            $data['explication'] = $loaded_comptage['explication'];
+        }
+        
+        header('Content-Type: application/json');
+        echo json_encode(['success' => !is_null($data), 'data' => $data]);
     }
 
     // Nouvelle fonction pour charger les données d'un comptage depuis le nouveau schéma
