@@ -1,8 +1,7 @@
 /**
  * Module JavaScript pour la logique de la page du calculateur.
  * Ce script gère les calculs en temps réel, les onglets, les accordéons,
- * la sauvegarde automatique et l'interaction avec le formulaire principal.
- * La logique de clôture est gérée par cloture.js pour éviter les conflits.
+ * la sauvegarde intelligente en quittant la page et l'interaction avec le formulaire principal.
  */
 document.addEventListener('DOMContentLoaded', function() {
     const calculatorDataElement = document.getElementById('calculator-data');
@@ -12,7 +11,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const config = JSON.parse(calculatorDataElement.dataset.config || '{}');
     const loadedData = JSON.parse(calculatorDataElement.dataset.loadedData || '{}');
     const { nomsCaisses, denominations, minToKeep, isLoadedFromHistory, currencySymbol } = config;
-    let autosaveInterval;
+    
+    // NOUVEAU : Variable pour suivre les modifications non enregistrées
+    let hasUnsavedChanges = false;
 
     // --- Fonctions utilitaires ---
     const formatCurrency = (amount) => {
@@ -146,14 +147,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // CORRECTION: L'écouteur est maintenant sur 'document.body' pour fonctionner
-        // dans les modales créées dynamiquement.
+        // Accordéons
         document.body.addEventListener('click', (e) => {
             const header = e.target.closest('.accordion-header');
             if (header) {
-                // On s'assure de ne pas interférer avec les boutons dans l'en-tête
                 if (e.target.closest('button')) return;
-
                 header.classList.toggle('active');
                 const content = header.nextElementSibling;
                 content.classList.toggle('open');
@@ -162,12 +160,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Champs de saisie
         form.addEventListener('input', (e) => {
-            if (e.target.matches('input[type="number"], input[type="text"]')) {
+            if (e.target.matches('input[type="number"], input[type="text"], textarea')) {
+                hasUnsavedChanges = true; // NOUVEAU : Marque qu'il y a des modifications
                 calculateAllFull();
                 if (!isLoadedFromHistory && window.sendWsMessage) {
                     window.sendWsMessage(e.target.id, e.target.value);
                 }
             }
+        });
+
+        // NOUVEAU : Réinitialise le suivi des modifications lors d'une sauvegarde manuelle
+        form.addEventListener('submit', () => {
+            hasUnsavedChanges = false;
         });
     }
 
@@ -229,33 +233,18 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     /**
-     * Initialise la sauvegarde automatique.
+     * NOUVEAU : Gère la sauvegarde de sécurité lorsque l'utilisateur quitte la page.
      */
-    function initAutosave() {
+    function initUnloadAutosave() {
         if (isLoadedFromHistory) return;
 
-        const autosaveStatus = document.getElementById('autosave-status');
-        autosaveInterval = setInterval(() => {
-            const formData = new FormData(document.getElementById('caisse-form'));
-            autosaveStatus.textContent = 'Sauvegarde en cours...';
-            autosaveStatus.className = 'autosave-status saving';
-
-            fetch('index.php?action=autosave', { method: 'POST', body: formData })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        autosaveStatus.textContent = data.message;
-                        autosaveStatus.className = 'autosave-status success';
-                    } else {
-                        autosaveStatus.textContent = data.message || 'Erreur de sauvegarde';
-                        autosaveStatus.className = 'autosave-status error';
-                    }
-                })
-                .catch(() => {
-                    autosaveStatus.textContent = 'Erreur réseau';
-                    autosaveStatus.className = 'autosave-status error';
-                });
-        }, 30000); // Toutes les 30 secondes
+        window.addEventListener('beforeunload', (event) => {
+            if (hasUnsavedChanges) {
+                // Utilise navigator.sendBeacon pour une sauvegarde fiable en arrière-plan
+                const formData = new FormData(document.getElementById('caisse-form'));
+                navigator.sendBeacon('index.php?action=autosave', formData);
+            }
+        });
     }
 
     // --- Initialisation de la page ---
@@ -265,5 +254,6 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         calculateAllFull();
     }
-    initAutosave();
+    // NOUVEAU : Appelle la nouvelle fonction de sauvegarde à la fermeture
+    initUnloadAutosave();
 });

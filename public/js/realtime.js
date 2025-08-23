@@ -2,7 +2,7 @@
  * Module JavaScript pour la gestion de la communication WebSocket en temps réel.
  * Ce module est responsable de la connexion et de la diffusion des données.
  *
- * Logique mise à jour pour gérer le statut de clôture persistant.
+ * Logique MISE A JOUR : Charge d'abord la sauvegarde, puis synchronise avec les autres clients.
  */
 document.addEventListener('DOMContentLoaded', function() {
     const statusIndicator = document.getElementById('websocket-status-indicator');
@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    // NOUVEAU: Fonction globale pour mettre à jour l'indicateur de statut
+    // Fonction globale pour mettre à jour l'indicateur de statut
     window.updateWebsocketStatusIndicator = function(lockedCaisses, closedCaisses) {
         if (!statusIndicator || !statusText) return;
 
@@ -39,9 +39,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    let hasReceivedInitialData = false;
-    let initialDataTimeout;
-
     try {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsHost = window.location.host;
@@ -54,15 +51,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('connected');
                 statusText.textContent = 'Connecté en temps réel';
             }
+            
+            // NOUVELLE LOGIQUE :
+            // 1. On charge immédiatement la dernière sauvegarde pour un affichage rapide.
+            if (typeof window.loadLastAutosave === 'function') {
+                window.loadLastAutosave();
+            }
+            
+            // 2. Ensuite, on demande l'état aux autres clients pour se synchroniser.
             window.wsConnection.send(JSON.stringify({ type: 'request_state' }));
-
-            initialDataTimeout = setTimeout(() => {
-                if (!hasReceivedInitialData) {
-                    if(typeof window.loadLastAutosave === 'function') {
-                         window.loadLastAutosave();
-                    }
-                }
-            }, 3000);
         };
 
         window.wsConnection.onerror = (error) => {
@@ -71,7 +68,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('disconnected');
                 statusText.textContent = 'Déconnecté';
             }
-            if (initialDataTimeout) clearTimeout(initialDataTimeout);
         };
 
         window.wsConnection.onclose = () => {
@@ -80,25 +76,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusIndicator.classList.add('disconnected');
                 statusText.textContent = 'Déconnecté';
             }
-            if (initialDataTimeout) clearTimeout(initialDataTimeout);
         };
 
         window.wsConnection.onmessage = (e) => {
             try {
                 const data = JSON.parse(e.data);
-                
-                if (data.type !== 'send_full_state') {
-                    hasReceivedInitialData = true;
-                    if (initialDataTimeout) clearTimeout(initialDataTimeout);
-                }
-                
-                if (data.type === 'send_full_state' && typeof window.sendFullFormState === 'function') {
-                    window.sendFullFormState();
+
+                // Si on reçoit l'état d'un autre client, on met à jour notre formulaire.
+                // Cela écrasera la sauvegarde si les données en direct sont plus récentes.
+                if (data.type === 'broadcast_state' && typeof window.loadFormDataFromWebSocket === 'function') {
+                    window.loadFormDataFromWebSocket(data.form_state);
                     return;
                 }
                 
-                if (data.type === 'broadcast_state' && typeof window.loadFormDataFromWebSocket === 'function') {
-                    window.loadFormDataFromWebSocket(data.form_state);
+                // Un autre client demande notre état, on lui envoie.
+                if (data.type === 'send_full_state' && typeof window.sendFullFormState === 'function') {
+                    window.sendFullFormState();
                     return;
                 }
                 
@@ -111,7 +104,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (window.handleInterfaceLock) {
                         window.handleInterfaceLock(data.caisses, data.closed_caisses);
                     }
-                    // Appel de la fonction globale pour mettre à jour l'indicateur
                     if (window.updateWebsocketStatusIndicator) {
                         window.updateWebsocketStatusIndicator(data.caisses, data.closed_caisses);
                     }
@@ -128,7 +120,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (typeof window.showCustomAlert === 'function') {
                         window.showCustomAlert("Toutes les caisses ont été clôturées. Le comptage est réinitialisé.", 'success');
                     } else {
-                        // Fallback au cas où la fonction ne serait pas prête
                         alert('Toutes les caisses ont été clôturées. Le comptage est réinitialisé.');
                     }
                     if (typeof window.resetAllCaisseFields === 'function') {
