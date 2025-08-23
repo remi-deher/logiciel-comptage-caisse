@@ -17,6 +17,28 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    // NOUVEAU: Fonction globale pour mettre à jour l'indicateur de statut
+    window.updateWebsocketStatusIndicator = function(lockedCaisses, closedCaisses) {
+        if (!statusIndicator || !statusText) return;
+
+        lockedCaisses = lockedCaisses || [];
+        closedCaisses = closedCaisses || [];
+
+        if (lockedCaisses.length > 0) {
+            statusIndicator.classList.remove('connected');
+            statusIndicator.classList.add('cloture');
+            statusText.textContent = 'Clôture en cours...';
+        } else if (closedCaisses.length > 0) {
+            statusIndicator.classList.remove('connected');
+            statusIndicator.classList.add('cloture');
+            statusText.textContent = `Caisse(s) clôturée(s): ${closedCaisses.length}`;
+        } else {
+            statusIndicator.classList.remove('cloture');
+            statusIndicator.classList.add('connected');
+            statusText.textContent = 'Connecté en temps réel';
+        }
+    };
+
     let hasReceivedInitialData = false;
     let initialDataTimeout;
 
@@ -89,27 +111,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (window.handleInterfaceLock) {
                         window.handleInterfaceLock(data.caisses, data.closed_caisses);
                     }
-                    if (Array.isArray(data.caisses) && data.caisses.length > 0) {
-                        statusIndicator.classList.remove('connected');
-                        statusIndicator.classList.add('cloture');
-                        statusText.textContent = 'Clôture en cours...';
-                    } else if (Array.isArray(data.closed_caisses) && data.closed_caisses.length > 0) {
-                         statusIndicator.classList.remove('connected');
-                         statusIndicator.classList.add('cloture');
-                         statusText.textContent = `Caisse(s) clôturée(s): ${data.closed_caisses.length}`;
-                    } else {
-                         statusIndicator.classList.remove('cloture');
-                         statusIndicator.classList.add('connected');
-                         statusText.textContent = 'Connecté en temps réel';
+                    // Appel de la fonction globale pour mettre à jour l'indicateur
+                    if (window.updateWebsocketStatusIndicator) {
+                        window.updateWebsocketStatusIndicator(data.caisses, data.closed_caisses);
                     }
                     return;
-                }
-                
-                if (data.cloture_locked_caisses) {
-                    if (window.handleInterfaceLock) {
-                        window.handleInterfaceLock(data.cloture_locked_caisses, data.closed_caisses);
-                    }
-                    delete data.cloture_locked_caisses;
                 }
                 
                  if (data.type === 'force_unlocked') {
@@ -118,16 +124,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                // MODIFICATION: Remplace l'alerte par la modale personnalisée
                 if (data.type === 'all_caisses_closed') {
                     if (typeof window.showCustomAlert === 'function') {
                         window.showCustomAlert("Toutes les caisses ont été clôturées. Le comptage est réinitialisé.", 'success');
                     } else {
-                        // Fallback au cas où la fonction ne serait pas prête
                         alert('Toutes les caisses ont été clôturées. Le comptage est réinitialisé.');
                     }
-                    // Vous pouvez ajouter ici la logique pour réinitialiser les champs du formulaire si nécessaire
-                    // Par exemple: window.location.reload();
+                    if (typeof window.resetAllCaisseFields === 'function') {
+                        window.resetAllCaisseFields();
+                    }
                     return;
                 }
 
@@ -173,7 +178,6 @@ window.loadLastAutosave = function() {
         .then(data => {
             if (data && data.success) {
                 window.loadAndInitFormData(data.data);
-            } else {
             }
         })
         .catch(error => {

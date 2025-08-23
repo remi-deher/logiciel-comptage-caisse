@@ -1,10 +1,6 @@
 /**
  * Module JavaScript pour la logique de clôture de caisse.
  * Ce script est chargé uniquement sur la page du calculateur.
- *
- * Ce module gère l'interface utilisateur pour le processus de clôture,
- * la communication avec le serveur WebSocket pour verrouiller les caisses
- * et la mise à jour dynamique de l'interface.
  */
 document.addEventListener('DOMContentLoaded', function() {
     // --- Sélecteurs des éléments du DOM ---
@@ -65,12 +61,6 @@ document.addEventListener('DOMContentLoaded', function() {
             alertModal.classList.remove('visible');
             setTimeout(() => {
                 alertModal.remove();
-                if (type === 'success' && message.includes('réinitialisé')) {
-                    // Au lieu de recharger, on appelle la fonction de réinitialisation
-                    if (typeof window.resetAllCaisseFields === 'function') {
-                        window.resetAllCaisseFields();
-                    }
-                }
             }, 300);
         };
         closeBtn.addEventListener('click', closeModal);
@@ -79,12 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // NOUVEAU: Fonction pour réinitialiser l'interface sans recharger la page
     window.resetAllCaisseFields = function() {
-        const config = JSON.parse(calculatorDataElement.dataset.config);
-        const { nomsCaisses } = config;
-
-        // Réinitialiser les champs du formulaire
         document.querySelectorAll('#caisse-form input[type="text"], #caisse-form input[type="number"], #caisse-form textarea').forEach(input => {
             if (!input.id.includes('fond_de_caisse')) {
                 input.value = '';
@@ -93,17 +78,19 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('nom_comptage').value = '';
         document.getElementById('explication').value = '';
 
-        // Réinitialiser les états internes
         window.lockedCaisses = [];
         window.closedCaisses = [];
 
-        // Mettre à jour l'ensemble de l'interface
-        if(typeof window.calculateAllFull === 'function') {
+        if (typeof window.calculateAllFull === 'function') {
             window.calculateAllFull();
         }
         handleInterfaceLock([], []);
+        
+        // NOUVEAU: Appel pour réinitialiser l'indicateur de statut
+        if (typeof window.updateWebsocketStatusIndicator === 'function') {
+            window.updateWebsocketStatusIndicator([], []);
+        }
     };
-
 
     const isCaisseLockedBy = (caisseId, lockedBy) => Array.isArray(window.lockedCaisses) && lockedBy && window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString() && c.locked_by.toString() === lockedBy.toString());
     const isCaisseLocked = (caisseId) => Array.isArray(window.lockedCaisses) && window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString());
@@ -143,7 +130,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (isClosed && explanationP) {
                     explanationP.textContent = "Cette caisse est clôturée.";
                 } else if(explanationP && explanationP.textContent === "Cette caisse est clôturée."){
-                    // Réinitialise le message si la caisse n'est plus clôturée
                     explanationP.textContent = "";
                 }
             }
@@ -322,10 +308,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (target.classList.contains('modal-close') || target === modal) {
             modal?.classList.remove('visible');
         }
-        
-        // CORRECTION: Logique pour l'accordéon dans la modale de clôture générale
+
         const accordionHeader = target.closest('#cloture-generale-modal .accordion-header');
-        if (accordionHeader) {
+        if (accordionHeader && !target.closest('button')) {
             accordionHeader.classList.toggle('active');
             const content = accordionHeader.nextElementSibling;
             content.classList.toggle('open');
