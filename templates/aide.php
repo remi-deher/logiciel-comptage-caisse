@@ -60,6 +60,17 @@ require 'partials/navbar.php';
         </div>
 
         <div class="help-card"
+             data-title="Processus de Clôture"
+             data-icon="fa-solid fa-lock"
+             data-content="<h4>Pourquoi la clôture ?</h4><p>Le bouton 'Clôture' dans la barre de navigation est un outil de collaboration qui permet de sauvegarder l'état des caisses de manière sécurisée et coordonnée. Il est particulièrement utile en fin de journée pour figer les comptages avant un retrait d'argent et une réinitialisation.</p><h4>Étapes du processus</h4><ol><li><strong>Verrouillage :</strong> La première étape consiste à verrouiller une caisse via la fenêtre modale. L'application enregistre alors le verrouillage dans la base de données (`cloture_status`) et empêche les autres utilisateurs de modifier cette caisse.</li><li><strong>Confirmation de la caisse :</strong> Une fois le comptage d'une caisse terminé, l'utilisateur la 'confirme' via une fenêtre de dialogue. Cette action génère un enregistrement dans l'historique et la caisse est marquée comme 'clôturée' dans la base de données.</li><li><strong>Clôture Générale :</strong> Lorsque toutes les caisses ont été confirmées, une fenêtre 'Clôture Générale' apparaît. Elle affiche une synthèse des montants à retirer. Une fois cette étape validée, toutes les caisses sont réinitialisées pour le lendemain (le fond de caisse est conservé, les autres champs sont remis à zéro).</li></ol><h4>Sécurité et Temps Réel</h4><p>Le service de clôture repose sur le système de WebSockets pour informer tous les clients en temps réel de l'état des caisses (Libre, Verrouillée, Clôturée), garantissant ainsi que tous les utilisateurs voient la même chose au même moment.</p>">
+            <div class="help-card-header">
+                <div class="help-card-icon"><i class="fa-solid fa-lock"></i></div>
+                <h3>Processus de Clôture</h3>
+            </div>
+            <p>Découvrez le processus sécurisé et collaboratif pour finaliser les comptages de la journée.</p>
+        </div>
+
+        <div class="help-card"
              data-title="Fonctionnalités Avancées"
              data-icon="fa-solid fa-star"
              data-content="<h4>Ne perdez jamais votre travail</h4><ul><li><strong>Sauvegarde de Sécurité :</strong> Si vous avez des modifications non enregistrées et que vous fermez accidentellement la page, l'application effectue une dernière sauvegarde. Lorsque vous reviendrez sur le calculateur, cette sauvegarde sera chargée automatiquement.</li><li><strong>Nommage Automatique :</strong> Si vous laissez le champ 'Nom du comptage' vide et que vous cliquez sur 'Enregistrer', l'application lui donnera automatiquement un nom basé sur la date et l'heure actuelles.</li><li><strong>Mises à jour intelligentes :</strong> Le pied de page vous informe si une nouvelle version est disponible. En cliquant sur 'Mettre à jour', vous accédez à une page dédiée qui vous montre les notes de version et les modifications de base de données avant de lancer le processus.</li></ul>">
@@ -90,6 +101,50 @@ require 'partials/navbar.php';
                 <h3>Panneau d'Administration</h3>
             </div>
             <p>Gérez les paramètres techniques et la sécurité de l'application.</p>
+        </div>
+
+        <div class="help-card"
+             data-title="Architecture & Base de Données"
+             data-icon="fa-solid fa-sitemap"
+             data-content="<h4>Architecture Front Controller</h4><p>L'application suit un modèle MVC simple avec un unique point d'entrée, `index.php`. Toutes les requêtes sont gérées par ce fichier qui, selon les paramètres de l'URL, délègue le traitement à un contrôleur spécifique (ex: `CalculateurController`, `HistoriqueController`).</p><h4>Schéma de la base de données</h4><p>Cette version a été refactorisée avec un schéma de base de données normalisé. Au lieu d'avoir des colonnes pour chaque caisse et chaque dénomination, les données sont désormais stockées dans des tables séparées pour une meilleure flexibilité et évolutivité :</p><ul><li><strong>`comptages` :</strong> Informations de base (nom, date, explication)</li><li><strong>`caisses` :</strong> Liste des caisses configurées.</li><li><strong>`comptage_details` :</strong> Détails spécifiques à chaque caisse pour un comptage donné (ventes, fond de caisse).</li><li><strong>`comptage_denominations` :</strong> Détail des quantités pour chaque dénomination.</li></ul>">
+            <div class="help-card-header">
+                <div class="help-card-icon"><i class="fa-solid fa-sitemap"></i></div>
+                <h3>Architecture & Base de Données</h3>
+            </div>
+            <p>Comprenez le fonctionnement interne de l'application et la nouvelle structure de la base de données.</p>
+        </div>
+
+        <div class="help-card"
+             data-title="Installation & Maintenance"
+             data-icon="fa-solid fa-wrench"
+             data-content="<h4>Installation sur le serveur</h4><p>Un script `install.sh` est fourni pour simplifier le déploiement sur un serveur Debian 12. Il automatise l'installation des dépendances (Nginx ou Apache, PHP-FPM, MariaDB), le clonage du dépôt Git, la configuration du serveur web et l'initialisation de la base de données.</p><h4>Migration du schéma</h4><p>En cas de mise à jour majeure du schéma de la base de données, l'application détecte automatiquement les différences. La page de mise à jour accessible via le pied de page génère un script SQL pour migrer vos données existantes vers la nouvelle structure, après avoir créé une sauvegarde de sécurité.</p>">
+            <div class="help-card-header">
+                <div class="help-card-icon"><i class="fa-solid fa-wrench"></i></div>
+                <h3>Installation & Maintenance</h3>
+            </div>
+            <p>Découvrez les outils d'installation et de mise à jour du logiciel sur votre serveur.</p>
+        </div>
+
+        <div class="help-card"
+             data-title="Commandes Console"
+             data-icon="fa-solid fa-terminal"
+             data-content="<h4>Script `config/console.php`</h4><p>Un outil en ligne de commande est disponible pour effectuer des tâches de maintenance sans passer par l'interface web. Il est utile pour les installations headless ou la gestion automatisée.</p><h5>Exemples de commandes :</h5><ul><li>`php config/console.php admin:list` : Liste les administrateurs.</li><li>`php config/console.php admin:create` : Crée un nouvel administrateur.</li><li>`php config/console.php backup:create` : Crée une sauvegarde de la base de données.</li><li>`php config/console.php config-db` : Met à jour la configuration de la base de données.</li></ul>">
+            <div class="help-card-header">
+                <div class="help-card-icon"><i class="fa-solid fa-terminal"></i></div>
+                <h3>Commandes Console</h3>
+            </div>
+            <p>Accédez à des outils de maintenance et d'administration via la ligne de commande.</p>
+        </div>
+
+        <div class="help-card"
+             data-title="Services & WebSockets"
+             data-icon="fa-solid fa-cubes"
+             data-content="<h4>Logique métier</h4><p>L'application utilise des 'Services' (classes PHP) pour séparer la logique métier du contrôleur. Par exemple, `ClotureStateService` gère la logique de verrouillage des caisses, `VersionService` gère les vérifications de mise à jour, et `BackupService` s'occupe des sauvegardes.</p><h4>Communication WebSocket</h4><p>Le serveur WebSocket (`config/websocket_server.php`) utilise désormais la base de données (via `ClotureStateService`) pour gérer l'état de clôture des caisses. Cette approche, plus robuste, remplace l'ancien système basé sur des fichiers pour éviter les problèmes de concurrence et les incohérences d'état.">
+            <div class="help-card-header">
+                <div class="help-card-icon"><i class="fa-solid fa-cubes"></i></div>
+                <h3>Services & WebSockets</h3>
+            </div>
+            <p>Apprenez-en plus sur l'architecture orientée services et le fonctionnement du temps réel.</p>
         </div>
     </div>
 </div>

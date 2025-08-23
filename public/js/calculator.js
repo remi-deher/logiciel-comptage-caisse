@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const config = JSON.parse(calculatorDataElement.dataset.config || '{}');
     const loadedData = JSON.parse(calculatorDataElement.dataset.loadedData || '{}');
     const { nomsCaisses, denominations, minToKeep, isLoadedFromHistory, currencySymbol } = config;
-    
+
     // Variable pour suivre les modifications non enregistrées
     let hasUnsavedChanges = false;
 
@@ -168,6 +168,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+        
+        // NOUVEAU: Gère la touche 'Entrée' pour passer au champ suivant.
+        form.addEventListener('keydown', (e) => {
+            // Vérifie si la touche est 'Enter' et si l'élément actif est un champ de saisie
+            if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+                e.preventDefault();
+                const formElements = Array.from(form.querySelectorAll('input, textarea, button, a[href]'));
+                const index = formElements.indexOf(e.target);
+                if (index > -1) {
+                    let nextElement = formElements[index + 1];
+                    // Boucle pour trouver le prochain élément focusable
+                    while (nextElement && (nextElement.disabled || nextElement.readOnly || nextElement.offsetParent === null)) {
+                        index++;
+                        nextElement = formElements[index + 1];
+                    }
+                    // Si le prochain élément existe, on y déplace le focus
+                    if (nextElement) {
+                        nextElement.focus();
+                    } else {
+                        // Si on est sur le dernier élément, on revient au premier
+                        formElements[0].focus();
+                    }
+                }
+            }
+        });
 
         // Réinitialise le suivi des modifications lors d'une sauvegarde manuelle
         form.addEventListener('submit', () => {
@@ -186,12 +211,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         for (const caisseId in data) {
             if (!nomsCaisses.hasOwnProperty(caisseId)) continue;
-            
+
             const caisseData = data[caisseId];
             document.getElementById(`fond_de_caisse_${caisseId}`).value = caisseData.fond_de_caisse || '';
             document.getElementById(`ventes_${caisseId}`).value = caisseData.ventes || '';
             document.getElementById(`retrocession_${caisseId}`).value = caisseData.retrocession || '';
-            
+
             if (caisseData.denominations) {
                 for (const name in caisseData.denominations) {
                     const input = document.getElementById(`${name}_${caisseId}`);
@@ -216,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         calculateAllFull();
     };
-    
+
     /**
      * Envoie l'état complet du formulaire via WebSocket.
      */
