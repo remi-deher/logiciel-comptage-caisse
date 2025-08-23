@@ -40,7 +40,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Fonctions utilitaires ---
 
-    // MODIFICATION: On attache la fonction à 'window' pour la rendre globale
     window.showCustomAlert = function(message, type = 'success') {
         const existingAlert = document.getElementById('custom-alert-modal');
         if (existingAlert) existingAlert.remove();
@@ -64,7 +63,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const closeBtn = alertModal.querySelector('.close-alert-btn');
         const closeModal = () => {
             alertModal.classList.remove('visible');
-            setTimeout(() => alertModal.remove(), 300);
+            setTimeout(() => {
+                alertModal.remove();
+                if (type === 'success' && message.includes('réinitialisé')) {
+                    // Au lieu de recharger, on appelle la fonction de réinitialisation
+                    if (typeof window.resetAllCaisseFields === 'function') {
+                        window.resetAllCaisseFields();
+                    }
+                }
+            }, 300);
         };
         closeBtn.addEventListener('click', closeModal);
         alertModal.addEventListener('click', (event) => {
@@ -72,10 +79,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // NOUVEAU: Fonction pour réinitialiser l'interface sans recharger la page
+    window.resetAllCaisseFields = function() {
+        const config = JSON.parse(calculatorDataElement.dataset.config);
+        const { nomsCaisses } = config;
+
+        // Réinitialiser les champs du formulaire
+        document.querySelectorAll('#caisse-form input[type="text"], #caisse-form input[type="number"], #caisse-form textarea').forEach(input => {
+            if (!input.id.includes('fond_de_caisse')) {
+                input.value = '';
+            }
+        });
+        document.getElementById('nom_comptage').value = '';
+        document.getElementById('explication').value = '';
+
+        // Réinitialiser les états internes
+        window.lockedCaisses = [];
+        window.closedCaisses = [];
+
+        // Mettre à jour l'ensemble de l'interface
+        if(typeof window.calculateAllFull === 'function') {
+            window.calculateAllFull();
+        }
+        handleInterfaceLock([], []);
+    };
+
+
     const isCaisseLockedBy = (caisseId, lockedBy) => Array.isArray(window.lockedCaisses) && lockedBy && window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString() && c.locked_by.toString() === lockedBy.toString());
     const isCaisseLocked = (caisseId) => Array.isArray(window.lockedCaisses) && window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString());
 
-    // ... (le reste du fichier reste inchangé)
     // --- Fonctions de mise à jour de l'interface ---
 
     const updateCaisseTabs = (nomsCaisses) => {
@@ -110,6 +142,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const explanationP = display.querySelector('.ecart-explanation');
                 if (isClosed && explanationP) {
                     explanationP.textContent = "Cette caisse est clôturée.";
+                } else if(explanationP && explanationP.textContent === "Cette caisse est clôturée."){
+                    // Réinitialise le message si la caisse n'est plus clôturée
+                    explanationP.textContent = "";
                 }
             }
         }
@@ -286,6 +321,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (target.classList.contains('modal-close') || target === modal) {
             modal?.classList.remove('visible');
+        }
+        
+        // CORRECTION: Logique pour l'accordéon dans la modale de clôture générale
+        const accordionHeader = target.closest('#cloture-generale-modal .accordion-header');
+        if (accordionHeader) {
+            accordionHeader.classList.toggle('active');
+            const content = accordionHeader.nextElementSibling;
+            content.classList.toggle('open');
         }
 
         const caisseItem = target.closest('.caisse-status-item');
