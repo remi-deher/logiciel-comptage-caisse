@@ -118,11 +118,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
+                // MODIFICATION: Remplace l'alerte par la modale personnalisée
                 if (data.type === 'all_caisses_closed') {
-                    alert('Toutes les caisses ont été clôturées. Le comptage est réinitialisé.');
-                    if (typeof window.resetAllCaisseFields === 'function') {
-                        window.resetAllCaisseFields();
+                    if (typeof window.showCustomAlert === 'function') {
+                        window.showCustomAlert("Toutes les caisses ont été clôturées. Le comptage est réinitialisé.", 'success');
+                    } else {
+                        // Fallback au cas où la fonction ne serait pas prête
+                        alert('Toutes les caisses ont été clôturées. Le comptage est réinitialisé.');
                     }
+                    // Vous pouvez ajouter ici la logique pour réinitialiser les champs du formulaire si nécessaire
+                    // Par exemple: window.location.reload();
                     return;
                 }
 

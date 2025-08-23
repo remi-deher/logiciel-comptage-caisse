@@ -40,7 +40,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Fonctions utilitaires ---
 
-    function showCustomAlert(message, type = 'success') {
+    // MODIFICATION: On attache la fonction à 'window' pour la rendre globale
+    window.showCustomAlert = function(message, type = 'success') {
         const existingAlert = document.getElementById('custom-alert-modal');
         if (existingAlert) existingAlert.remove();
 
@@ -74,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const isCaisseLockedBy = (caisseId, lockedBy) => Array.isArray(window.lockedCaisses) && lockedBy && window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString() && c.locked_by.toString() === lockedBy.toString());
     const isCaisseLocked = (caisseId) => Array.isArray(window.lockedCaisses) && window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString());
 
+    // ... (le reste du fichier reste inchangé)
     // --- Fonctions de mise à jour de l'interface ---
 
     const updateCaisseTabs = (nomsCaisses) => {
@@ -126,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const allCaissesNowClosed = Object.keys(nomsCaisses).length > 0 && Object.keys(nomsCaisses).every(id => window.closedCaisses.includes(id));
         if (allCaissesNowClosed && !allCaissesPreviouslyClosed) {
-            showCustomAlert("La dernière caisse a été clôturée. Allez dans le menu Clôture pour confirmer la clôture générale.", 'success');
+            window.showCustomAlert("La dernière caisse a été clôturée. Allez dans le menu Clôture pour confirmer la clôture générale.", 'success');
         }
     };
 
@@ -267,13 +269,12 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>`;
         clotureConfirmationModal.classList.add('visible');
     }
-    
 
     // --- Gestionnaire d'événements centralisé ---
 
     clotureBtn.addEventListener('click', () => {
         if (calculatorDataElement.dataset.config.includes('"isLoadedFromHistory":true')) {
-            showCustomAlert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.", 'error');
+            window.showCustomAlert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.", 'error');
             return;
         }
         showCaisseSelectionModal();
@@ -287,7 +288,6 @@ document.addEventListener('DOMContentLoaded', function() {
             modal?.classList.remove('visible');
         }
 
-        // CORRECTION: Si on clique sur la "tuile", on cible le bouton à l'intérieur
         const caisseItem = target.closest('.caisse-status-item');
         if (caisseItem && !target.closest('button')) {
             target = caisseItem.querySelector('button');
@@ -334,11 +334,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetch('index.php?action=cloture', { method: 'POST', body: formData })
                     .then(res => res.json()).then(data => {
                         if (data.success) {
-                            showCustomAlert(data.message, 'success');
+                            window.showCustomAlert(data.message, 'success');
                             window.wsConnection?.send(JSON.stringify({ type: 'cloture_caisse_confirmed', caisse_id: caisseId }));
                         } else { throw new Error(data.message); }
                     }).catch(err => {
-                        showCustomAlert("Erreur: " + err.message, 'error');
+                        window.showCustomAlert("Erreur: " + err.message, 'error');
                         window.wsConnection?.send(JSON.stringify({ type: 'cloture_unlock', caisse_id: caisseId }));
                     });
             }
