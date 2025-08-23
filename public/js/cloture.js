@@ -340,41 +340,57 @@ document.addEventListener('DOMContentLoaded', function() {
         clotureGeneraleModal.classList.add('modal');
         document.body.appendChild(clotureGeneraleModal);
         const config = JSON.parse(document.getElementById('calculator-data').dataset.config);
-        const { nomsCaisses } = config;
+        const { nomsCaisses, denominations, minToKeep, currencySymbol } = config;
 
-        let caisseSummaryHtml = '<table class="caisse-summary-table"><thead><tr><th>Caisse</th><th>Total Compté</th><th>Recette Réelle</th><th>Écart</th><th>Actions</th></tr></thead><tbody>';
-
+        let accordionHtml = '<div class="accordion-container">';
         for (const caisseId in nomsCaisses) {
             const getVal = (id) => parseFloat(document.getElementById(`${id}_${caisseId}`)?.value.replace(',', '.') || 0) || 0;
             let totalCompte = 0;
-            for (const type in config.denominations) {
-                for (const name in config.denominations[type]) {
+            const currentCounts = {};
+            for (const type in denominations) {
+                for (const name in denominations[type]) {
                     const count = parseInt(document.getElementById(`${name}_${caisseId}`)?.value || 0) || 0;
-                    totalCompte += count * config.denominations[type][name];
+                    totalCompte += count * denominations[type][name];
+                    currentCounts[name] = count;
                 }
             }
             const fondDeCaisse = getVal('fond_de_caisse');
-            const ventes = getVal('ventes');
-            const retrocession = getVal('retrocession');
             const recetteReelle = totalCompte - fondDeCaisse;
-            const ecart = recetteReelle - (ventes + retrocession);
+            const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep);
 
-            caisseSummaryHtml += `<tr>
-                <td>${nomsCaisses[caisseId]}</td>
-                <td>${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(totalCompte)}</td>
-                <td>${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(recetteReelle)}</td>
-                <td style="color: ${ecart > 0.01 ? 'var(--color-warning)' : (ecart < -0.01 ? 'var(--color-danger)' : 'var(--color-success)')};">${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(ecart)}</td>
-                <td><button class="reopen-caisse-btn action-btn-small" data-caisse-id="${caisseId}"><i class="fa-solid fa-lock-open"></i> Réouvrir</button></td>
-            </tr>`;
+            accordionHtml += `
+                <div class="accordion-card">
+                    <div class="accordion-header">
+                        <i class="fa-solid fa-cash-register"></i>
+                        <h3>${nomsCaisses[caisseId]} : Suggestion de retrait</h3>
+                        <button class="reopen-caisse-btn action-btn-small" data-caisse-id="${caisseId}"><i class="fa-solid fa-lock-open"></i> Réouvrir</button>
+                        <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="accordion-content-inner">
+                            <table class="withdrawal-suggestion-table">
+                                <thead><tr><th>Dénomination</th><th>Quantité à retirer</th></tr></thead>
+                                <tbody>`;
+            const allDenominationsSorted = [...Object.entries(denominations.billets), ...Object.entries(denominations.pieces)].sort((a, b) => b[1] - a[1]);
+            allDenominationsSorted.forEach(([name, value]) => {
+                if (suggestions[name] > 0) {
+                    const label = value >= 1 ? `${value} ${currencySymbol}` : `${value * 100} cts`;
+                    accordionHtml += `<tr><td>${label}</td><td>${suggestions[name]}</td></tr>`;
+                }
+            });
+            accordionHtml += `</tbody></table>
+                        </div>
+                    </div>
+                </div>`;
         }
-        caisseSummaryHtml += '</tbody></table>';
+        accordionHtml += '</div>';
 
         clotureGeneraleModal.innerHTML = `
             <div class="modal-content">
                  <span class="modal-close">&times;</span>
                 <div class="modal-header"><h3>Toutes les caisses sont clôturées</h3></div>
                 <p>Vous pouvez maintenant lancer la clôture générale pour finaliser et réinitialiser le comptage.</p>
-                ${caisseSummaryHtml}
+                ${accordionHtml}
                 <div class="modal-actions">
                     <button id="cancel-cloture-generale-btn" class="btn delete-btn">Annuler</button>
                     <button id="confirm-cloture-generale-btn" class="btn save-btn">Confirmer la Clôture Générale</button>
@@ -387,6 +403,13 @@ document.addEventListener('DOMContentLoaded', function() {
     document.body.addEventListener('click', function(event) {
         const target = event.target;
         const clotureGeneraleModal = document.getElementById('cloture-generale-modal');
+        
+        const accordionHeader = event.target.closest('.accordion-header');
+        if (accordionHeader && clotureGeneraleModal && clotureGeneraleModal.contains(accordionHeader)) {
+            accordionHeader.classList.toggle('active');
+            const content = accordionHeader.nextElementSibling;
+            content.classList.toggle('open');
+        }
 
         if (target.id === 'confirm-cloture-generale-btn') {
             if (window.confirm("Êtes-vous sûr de vouloir lancer la clôture générale ? Cette action est irréversible.")) {
@@ -408,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (window.wsConnection?.readyState === WebSocket.OPEN) {
                     window.wsConnection.send(JSON.stringify({ type: 'cloture_reopen', caisse_id: caisseId }));
                 }
-                clotureGeneraleModal.classList.remove('visible');
+                if (clotureGeneraleModal) clotureGeneraleModal.classList.remove('visible');
             }
         }
     });
