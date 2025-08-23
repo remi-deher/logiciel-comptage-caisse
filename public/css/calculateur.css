@@ -248,7 +248,8 @@ body[data-theme="dark"] .withdrawal-table th {
     justify-content: space-around;
 }
 
-#caisse-selection-modal .modal-content {
+#caisse-selection-modal .modal-content,
+#cloture-generale-modal .modal-content {
     background-color: var(--color-surface);
     padding: 0;
     border-radius: 12px;
@@ -257,7 +258,12 @@ body[data-theme="dark"] .withdrawal-table th {
     width: 90%;
     max-width: 600px;
 }
-#caisse-selection-modal .modal-header-cloture {
+#cloture-generale-modal .modal-content {
+    max-width: 800px;
+}
+
+#caisse-selection-modal .modal-header-cloture,
+#cloture-generale-modal .modal-header {
     background-color: var(--color-primary);
     color: white;
     padding: 25px 30px;
@@ -266,13 +272,15 @@ body[data-theme="dark"] .withdrawal-table th {
     align-items: center;
     justify-content: space-between;
 }
-#caisse-selection-modal .modal-header-cloture h3 {
+#caisse-selection-modal .modal-header-cloture h3,
+#cloture-generale-modal .modal-header h3 {
     margin: 0;
     border: none;
     color: white;
     font-size: 1.8em;
 }
-#caisse-selection-modal .modal-body-cloture {
+#caisse-selection-modal .modal-body-cloture,
+#cloture-generale-modal .modal-content > p {
     padding: 30px;
     color: var(--color-text-secondary);
 }
@@ -398,44 +406,12 @@ body[data-theme="dark"] .withdrawal-table th {
 .color-dot.color-cloturee { background-color: var(--color-warning); }
 .color-dot.color-en-cours { background-color: #8a2be2; }
 
-#cloture-generale-modal .modal-content {
-    max-width: 800px;
-}
-.caisse-summary-table {
-    width: 100%;
-    margin-top: 15px;
-    border-collapse: collapse;
-    font-size: 0.95em;
-    border: 1px solid var(--color-border-light);
-    border-radius: 8px;
-    overflow: hidden;
-}
-.caisse-summary-table th, .caisse-summary-table td {
-    padding: 12px 15px;
-    text-align: left;
-}
-.caisse-summary-table thead tr {
-    background-color: var(--color-surface-alt);
-    color: var(--color-text-primary);
-    font-weight: bold;
-}
-.caisse-summary-table tbody tr {
-    border-bottom: 1px solid var(--color-border-light);
-}
-.caisse-summary-table tbody tr:last-of-type {
-    border-bottom: none;
-}
-.caisse-summary-table tbody tr:nth-of-type(even) {
-    background-color: var(--color-surface-alt);
-}
-
-/* NOUVEAU: Style amélioré pour le bouton Réouvrir */
 .reopen-caisse-btn.action-btn-small {
     background-color: transparent;
     color: var(--color-primary);
     border: 2px solid var(--color-primary);
     font-weight: bold;
-    padding: 6px 12px; /* Ajustement du padding */
+    padding: 6px 12px;
 }
 
 .reopen-caisse-btn.action-btn-small:hover {
@@ -444,7 +420,6 @@ body[data-theme="dark"] .withdrawal-table th {
     transform: translateY(-1px);
 }
 
-/* Appliquer un style différent dans la modale de sélection sur fond orange */
 .caisse-status-item.caisse-status-cloturee .reopen-caisse-btn.action-btn-small {
     background-color: rgba(255, 255, 255, 0.25);
     color: white;
@@ -454,27 +429,47 @@ body[data-theme="dark"] .withdrawal-table th {
     background-color: rgba(255, 255, 255, 0.4);
 }
 
-/* ==========================================================================
-   Ajouts pour le style de clôture
-   ========================================================================== */
-
-/* --- Style pour l'onglet d'une caisse clôturée --- */
 .tab-link.cloturee {
-    background-color: #8a2be2; /* Violet */
+    background-color: #8a2be2;
     color: white;
     border-color: #7a1fb9;
 }
 
 .tab-link.cloturee:hover {
-    background-color: #7a1fb9; /* Violet plus foncé au survol */
+    background-color: #7a1fb9;
 }
 
-/* --- Style pour le bandeau d'écart d'une caisse clôturée --- */
 .ecart-display.ecart-cloturee {
-    background-color: rgba(138, 43, 226, 0.1); /* Fond violet clair */
-    border-color: #8a2be2; /* Bordure violette */
+    background-color: rgba(138, 43, 226, 0.1);
+    border-color: #8a2be2;
 }
 
 .ecart-display.ecart-cloturee .ecart-value {
-    color: #8a2be2; /* Texte de l'écart en violet */
+    color: #8a2be2;
+}
+
+#final-confirmation-modal .modal-content {
+    padding: 0; /* On enlève le padding pour que le header prenne toute la largeur */
+}
+
+#final-confirmation-modal .modal-header-danger {
+    background-color: var(--color-danger);
+    color: white;
+    padding: 20px;
+    border-radius: 12px 12px 0 0;
+    text-align: center;
+}
+
+#final-confirmation-modal .modal-header-danger h3 {
+    color: white;
+    font-weight: bold;
+    border-bottom: none;
+    margin: 0;
+    font-size: 1.5em;
+}
+
+#final-confirmation-modal p {
+    padding: 20px 30px 0 30px; /* On ajoute le padding au paragraphe */
+    text-align: center;
+    line-height: 1.6;
 }
