@@ -1,137 +1,477 @@
 /**
- * Module JavaScript pour la logique du calculateur de caisse.
- * Ce module gère les calculs, l'interface utilisateur et les sauvegardes.
- * Version mise à jour pour le nouveau schéma de la base de données.
+ * Module JavaScript pour la logique de clôture de caisse.
+ * Ce script est chargé uniquement sur la page du calculateur.
+ *
+ * Ce module gère l'interface utilisateur pour le processus de clôture,
+ * la communication avec le serveur WebSocket pour verrouiller les caisses
+ * et la mise à jour dynamique de l'interface.
  */
 document.addEventListener('DOMContentLoaded', function() {
-    const caisseForm = document.getElementById('caisse-form');
-    if (!caisseForm) return;
+    // --- Sélecteurs des éléments du DOM ---
+    const clotureBtn = document.getElementById('cloture-btn');
+    if (!clotureBtn) return;
+    
+    // Variables d'état globales (exposées via window pour l'interopérabilité)
+    window.lockedCaisses = [];
+    window.closedCaisses = [];
 
-    // --- Fonctions utilitaires ---
-    const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(montant);
-    const formatDateTimeFr = () => {
-        const now = new Date();
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-        return new Intl.DateTimeFormat('fr-FR', options).format(now).replace(/^\w/, c => c.toUpperCase());
+    // Crée la modale de sélection de caisse
+    const caisseSelectionModal = document.createElement('div');
+    caisseSelectionModal.id = 'caisse-selection-modal';
+    caisseSelectionModal.classList.add('modal');
+    document.body.appendChild(caisseSelectionModal);
+    
+    // Crée la modale de confirmation de clôture
+    const clotureConfirmationModal = document.createElement('div');
+    clotureConfirmationModal.id = 'cloture-confirmation-modal';
+    clotureConfirmationModal.classList.add('modal');
+    document.body.appendChild(clotureConfirmationModal);
+
+    // --- Fonctions de vérification d'état ---
+    const isCaisseLockedBy = (caisseId, lockedBy) => {
+        if (!Array.isArray(window.lockedCaisses)) return false;
+        return window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString() && c.locked_by.toString() === lockedBy.toString());
+    };
+    
+    const isCaisseLocked = (caisseId) => {
+        if (!Array.isArray(window.lockedCaisses)) return false;
+        return window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString());
+    };
+    
+    // --- Fonctions de gestion de l'interface utilisateur ---
+    const updateCaisseTabs = (nomsCaisses, currentWsId, activeCaisseId) => {
+        for (const caisseId in nomsCaisses) {
+            const tabLink = document.querySelector(`.tab-link[data-tab="caisse${caisseId}"]`);
+            const badge = document.getElementById(`caisse-status-${caisseId}`);
+
+            const isClosed = window.closedCaisses.includes(caisseId);
+            const isLocked = isCaisseLocked(caisseId);
+            const isLockedByMe = isCaisseLockedBy(caisseId, currentWsId);
+
+            if (badge) {
+                badge.className = 'caisse-status-badge';
+                if (isClosed) {
+                    badge.textContent = 'Clôturée';
+                    badge.classList.add('cloture');
+                } else if (isLocked) {
+                    badge.textContent = 'En cours';
+                    badge.classList.add('en-cours');
+                } else {
+                    badge.textContent = '';
+                }
+            }
+
+            if (tabLink) {
+                 tabLink.classList.toggle('cloture-en-cours', isLocked);
+                 tabLink.disabled = false;
+            }
+        }
+    };
+    
+    const updateFormFields = (nomsCaisses, currentWsId) => {
+        document.querySelectorAll('#caisse-form input, #caisse-form textarea').forEach(el => {
+            const elId = el.id.split('_');
+            const elCaisseId = elId[elId.length - 1];
+
+            const isClosed = window.closedCaisses.includes(elCaisseId);
+            const isLockedByMe = isCaisseLockedBy(elCaisseId, currentWsId);
+            const isLockedByAnother = isCaisseLocked(elCaisseId) && !isLockedByMe;
+
+            if (isClosed || isLockedByAnother) {
+                el.disabled = true;
+                if (isClosed) {
+                    el.readOnly = true;
+                }
+            } else {
+                el.disabled = false;
+                el.readOnly = false;
+            }
+        });
+    };
+    
+    const updateClotureButton = (activeCaisseId, currentWsId) => {
+        const formSaveButton = document.querySelector('.save-section .save-btn');
+        if (formSaveButton) {
+            const isCaisseActiveLockedByMe = isCaisseLockedBy(activeCaisseId, currentWsId);
+            const isCaisseActiveClosed = window.closedCaisses.includes(activeCaisseId);
+            formSaveButton.disabled = isCaisseActiveClosed || (isCaisseLocked(activeCaisseId) && !isCaisseActiveLockedByMe);
+        }
+        
+        clotureBtn.disabled = false;
+        clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
+
+        clotureBtn.onclick = () => {
+            const isLoadedFromHistory = document.getElementById('calculator-data')?.dataset.config.includes('isLoadedFromHistory":true');
+            if (isLoadedFromHistory) {
+                alert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.");
+                return;
+            }
+            showCaisseSelectionModal();
+        };
+    };
+    
+    window.handleInterfaceLock = function (lockedCaisses, closedCaisses) {
+        const activeTab = document.querySelector('.tab-link.active');
+        const activeCaisseId = activeTab ? activeTab.dataset.tab.replace('caisse', '') : null;
+        const currentWsId = window.wsConnection?.resourceId;
+
+        window.lockedCaisses = lockedCaisses || [];
+        window.closedCaisses = closedCaisses || [];
+        const nomsCaisses = JSON.parse(document.getElementById('calculator-data')?.dataset.config)?.nomsCaisses || {};
+        
+        updateCaisseTabs(nomsCaisses, currentWsId, activeCaisseId);
+        updateFormFields(nomsCaisses, currentWsId);
+        updateClotureButton(activeCaisseId, currentWsId);
     };
 
-    // --- Configuration et Éléments du DOM ---
-    const configElement = document.getElementById('calculator-data');
-    const config = configElement ? JSON.parse(configElement.dataset.config) : {};
-    const loadedData = configElement ? JSON.parse(configElement.dataset.loadedData) : {};
-    const minToKeep = config.minToKeep || {};
+    async function showCaisseSelectionModal() {
+        const configElement = document.getElementById('calculator-data');
+        const config = configElement ? JSON.parse(configElement.dataset.config) : {};
+        const nomsCaisses = config.nomsCaisses || {};
+        const currentWsId = window.wsConnection?.resourceId;
 
-    const tabLinks = document.querySelectorAll('.tab-link');
-    const tabContents = document.querySelectorAll('.tab-content');
-    const ecartDisplays = document.querySelectorAll('.ecart-display');
-    const nomComptageInput = document.getElementById('nom_comptage');
-    const isLoadedFromHistory = config.isLoadedFromHistory;
+        let state = { locked_caisses: [], closed_caisses: [] };
+        try {
+            const response = await fetch('index.php?action=get_cloture_state');
+            state = await response.json();
+            window.lockedCaisses = state.locked_caisses.map(c => ({
+                caisse_id: c.caisse_id.toString(),
+                locked_by: c.locked_by.toString()
+            }));
+            window.closedCaisses = state.closed_caisses.map(String);
+        } catch (e) {
+            console.error('Erreur lors de la récupération de l\'état de clôture:', e);
+        }
 
-    // Éléments de l'interface
-    const mainEcartDisplayContainer = document.querySelector('.ecart-display-container');
+        let caisseListHtml = '';
+        for (const id in nomsCaisses) {
+            const nom = nomsCaisses[id];
+            let statusClass = 'caisse-status-libre';
+            let actionHtml = '';
+            
+            const isLockedByMe = isCaisseLockedBy(id, currentWsId);
+            const isClosed = window.closedCaisses.includes(id);
+            const isLocked = isCaisseLocked(id);
+            const isLockedByAnother = isLocked && !isLockedByMe;
 
-    let isSubmitting = false;
-    let initialState = '';
-    
-    // NOUVELLE VARIABLE : État de la sauvegarde automatique
-    let isAutosaveActive = !isLoadedFromHistory;
+            if (isClosed) {
+                statusClass = 'caisse-status-cloturee';
+                actionHtml = `<button class="force-unlock-btn" data-caisse-id="${id}"><i class="fa-solid fa-lock-open"></i> Déverrouiller</button>`;
+            } else if (isLockedByMe) {
+                statusClass = 'caisse-status-en-cours';
+                actionHtml = `<button class="confirm-cloture-caisse-btn" data-caisse-id="${id}"><i class="fa-solid fa-check-circle"></i> Confirmer</button>`;
+            } else if (isLockedByAnother) {
+                statusClass = 'caisse-status-en-cours';
+                actionHtml = `<button class="force-unlock-btn" data-caisse-id="${id}"><i class="fa-solid fa-user-lock"></i> Forcer</button>`;
+            } else {
+                actionHtml = `<button class="lock-caisse-btn" data-caisse-id="${id}"><i class="fa-solid fa-lock"></i> Verrouiller</button>`;
+            }
+            
+            caisseListHtml += `
+                <div class="caisse-status-item ${statusClass}" data-caisse-id="${id}">
+                    <div class="status-info">
+                        <i class="fa-solid fa-cash-register"></i>
+                        <strong>${nom}</strong>
+                    </div>
+                    <div class="status-actions">
+                         ${actionHtml}
+                    </div>
+                </div>`;
+        }
 
-    // --- Logique de l'interface (Accordéon, Onglets) ---
-    function initAccordion() {
-        const accordionHeaders = document.querySelectorAll('.accordion-header');
-        accordionHeaders.forEach(header => {
-            header.removeEventListener('click', toggleAccordion);
-            header.addEventListener('click', toggleAccordion);
+        const modalContentHtml = `
+            <div class="modal-content">
+                <span class="modal-close">&times;</span>
+                <div class="modal-header-cloture">
+                    <h3>Sélectionnez une caisse à clôturer</h3>
+                </div>
+                <div class="modal-body-cloture">
+                    <p>Cliquez sur une caisse pour démarrer la procédure de clôture et en verrouiller l'accès.</p>
+                     <div class="color-key">
+                        <div><span class="color-dot color-libre"></span> Libre</div>
+                        <div><span class="color-dot color-cloturee"></span> Clôturée</div>
+                        <div><span class="color-dot color-en-cours"></span> En cours de clôture</div>
+                    </div>
+                    <div class="caisse-status-list">
+                        ${caisseListHtml}
+                    </div>
+                </div>
+            </div>`;
+        
+        caisseSelectionModal.innerHTML = modalContentHtml;
+        caisseSelectionModal.classList.add('visible');
+        
+        const closeModalBtn = caisseSelectionModal.querySelector('.modal-close');
+        if (closeModalBtn) {
+            closeModalBtn.onclick = function() {
+                caisseSelectionModal.classList.remove('visible');
+            };
+        }
+        window.onclick = function(event) {
+            if (event.target == caisseSelectionModal) {
+                caisseSelectionModal.classList.remove('visible');
+            }
+        };
+
+        // --- NOUVEAU: Écouteurs pour les boutons d'action spécifiques ---
+
+        // Écouteur pour les boutons de verrouillage
+        caisseSelectionModal.querySelectorAll('.lock-caisse-btn').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                 event.stopPropagation();
+                 const caisseId = btn.dataset.caisseId;
+                 console.log(`Action: Verrouillage de la caisse ${caisseId}`);
+                 if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
+                     window.wsConnection.send(JSON.stringify({ type: 'cloture_lock', caisse_id: caisseId }));
+                 }
+                 const targetTabLink = document.querySelector(`.tab-link[data-tab="caisse${caisseId}"]`);
+                 if (targetTabLink) {
+                     targetTabLink.click();
+                 }
+                 caisseSelectionModal.classList.remove('visible');
+                 showClotureConfirmationModal(caisseId);
+            });
+        });
+
+        // Écouteur pour les boutons de confirmation
+        caisseSelectionModal.querySelectorAll('.confirm-cloture-caisse-btn').forEach(btn => {
+            btn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const caisseId = btn.dataset.caisseId;
+                console.log(`Action: Affichage de la modale de confirmation pour la caisse ${caisseId}`);
+                caisseSelectionModal.classList.remove('visible');
+                showClotureConfirmationModal(caisseId);
+            });
+        });
+        
+        // Écouteur pour les boutons de déverrouillage forcé
+        caisseSelectionModal.querySelectorAll('.force-unlock-btn').forEach(btn => {
+             btn.addEventListener('click', (event) => {
+                 event.stopPropagation();
+                 const caisseId = btn.dataset.caisseId;
+                 console.log(`Action: Déverrouillage forcé de la caisse ${caisseId}`);
+                 if (window.confirm("Voulez-vous forcer le déverrouillage de cette caisse ?")) {
+                     if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
+                         window.wsConnection.send(JSON.stringify({ type: 'force_unlock', caisse_id: caisseId }));
+                     }
+                     caisseSelectionModal.classList.remove('visible');
+                 }
+             });
         });
     }
 
-    function toggleAccordion() {
-        this.classList.toggle('active');
-        this.nextElementSibling.classList.toggle('open');
-    }
-    
-    window.loadAndInitFormData = function(data) {
-        if (!data) return;
-        
-        caisseForm.reset();
-        
-        for (const caisseId in data) {
-            if (caisseId === 'nom_comptage' || caisseId === 'explication') {
-                const input = document.getElementById(caisseId);
-                if (input) input.value = data[caisseId];
-            } else {
-                const caisseData = data[caisseId];
-                document.getElementById(`fond_de_caisse_${caisseId}`).value = caisseData.fond_de_caisse || '';
-                document.getElementById(`ventes_${caisseId}`).value = caisseData.ventes || '';
-                document.getElementById(`retrocession_${caisseId}`).value = caisseData.retrocession || '';
-                
-                for (const denom in caisseData.denominations) {
-                    const input = document.getElementById(`${denom}_${caisseId}`);
-                    if (input) input.value = caisseData.denominations[denom];
-                }
-            }
-        }
-        
-        calculateAllFull();
-        initialState = window.getFormStateAsString();
-    };
-    
-    function initCalculator() {
-        tabLinks.forEach(link => {
-            link.addEventListener('click', (event) => {
-                const activeCaisseId = event.currentTarget.dataset.tab.replace('caisse', '');
-                const currentWsId = window.wsConnection?.resourceId;
+    function showClotureConfirmationModal(caisseId) {
+        if (!caisseId) return;
 
-                if (window.currentLockedCaisseId && window.currentLockerId === currentWsId) {
-                    alert("Impossible de changer de caisse en mode clôture si la caisse active n'est pas celle verrouillée.");
+        const configElement = document.getElementById('calculator-data');
+        const config = JSON.parse(configElement.dataset.config);
+        const caisseNom = config.nomsCaisses[caisseId];
+
+        clotureConfirmationModal.innerHTML = `
+            <div class="modal-content">
+                <span class="modal-close">&times;</span>
+                <div class="modal-header">
+                    <h3>Confirmer la clôture de la caisse : ${caisseNom}</h3>
+                </div>
+                <p>Voulez-vous finaliser la clôture de cette caisse ? Cette action est irréversible.</p>
+                <div class="modal-actions">
+                    <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
+                    <button id="confirm-final-cloture-btn" class="btn new-btn">Confirmer la clôture</button>
+                </div>
+            </div>`;
+
+        showWithdrawalSuggestion(caisseId);
+        showOpenCaisses(caisseId);
+
+        clotureConfirmationModal.classList.add('visible');
+
+        const closeModalBtn = clotureConfirmationModal.querySelector('.modal-close');
+        if (closeModalBtn) {
+            closeModalBtn.onclick = function() {
+                clotureConfirmationModal.classList.remove('visible');
+            };
+        }
+        window.onclick = function(event) {
+            if (event.target == clotureConfirmationModal) {
+                clotureConfirmationModal.classList.remove('visible');
+            }
+        };
+
+        const cancelClotureBtn = document.getElementById('cancel-cloture-btn');
+        if (cancelClotureBtn) {
+            cancelClotureBtn.addEventListener('click', () => {
+                clotureConfirmationModal.classList.remove('visible');
+                 console.log(`Action: Annulation et déverrouillage de la caisse ${caisseId}`);
+                 if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
+                     window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock', caisse_id: caisseId }));
+                 }
+            });
+        }
+
+        const confirmFinalClotureBtn = document.getElementById('confirm-final-cloture-btn');
+        if (confirmFinalClotureBtn) {
+            confirmFinalClotureBtn.addEventListener('click', () => {
+                clotureConfirmationModal.classList.remove('visible');
+                const caisseForm = document.getElementById('caisse-form');
+                if (!caisseForm) {
+                    alert("Erreur: Le formulaire du calculateur n'a pas été trouvé.");
                     return;
                 }
+                
+                console.log(`Action: Confirmation finale de la clôture de la caisse ${caisseId}`);
 
-                tabLinks.forEach(l => l.classList.remove('active'));
-                tabContents.forEach(c => c.classList.remove('active'));
-                event.currentTarget.classList.add('active');
-                const targetTab = document.getElementById(event.currentTarget.dataset.tab);
-                if (targetTab) {
-                    targetTab.classList.add('active');
-                }
-                ecartDisplays.forEach(display => display.classList.remove('active'));
-                document.getElementById(`ecart-display-${event.currentTarget.dataset.tab}`)?.classList.add('active');
-                calculateAllFull();
-                if (window.handleInterfaceLock) {
-                     const activeCaisseId = document.querySelector('.tab-link.active')?.dataset.tab.replace('caisse', '');
-                     const isLocked = window.lockedCaisses.some(c => c.caisse_id === activeCaisseId);
-                     const lockedBy = isLocked ? window.lockedCaisses.find(c => c.caisse_id === activeCaisseId)?.locked_by : null;
-                     window.handleInterfaceLock(window.lockedCaisses, window.closedCaisses);
-                }
-            });
-        });
+                const formData = new FormData(caisseForm);
+                formData.append('caisse_id_a_cloturer', caisseId);
 
-        if (!isLoadedFromHistory) {
-            caisseForm.addEventListener('input', (event) => {
-                calculateAllFull();
-                if (window.sendWsMessage) {
-                    window.sendWsMessage(event.target.id, event.target.value);
-                }
-            });
-            window.addEventListener('beforeunload', () => {
-                if (isSubmitting || !hasUnsavedChanges()) return;
-                performAutosaveOnExit();
+                fetch('index.php?action=cloture', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.closedCaisses.push(caisseId);
+                        window.handleInterfaceLock(window.lockedCaisses, window.closedCaisses);
+                        if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
+                            window.wsConnection.send(JSON.stringify({ type: 'cloture_caisse_confirmed', caisse_id: caisseId }));
+                        }
+                    } else {
+                        throw new Error(data.message || 'Erreur inconnue');
+                    }
+                })
+                .catch(error => {
+                    alert("Une erreur est survenue lors de la clôture: " + error.message);
+                    if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
+                        window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock', caisse_id: caisseId }));
+                    }
+                });
             });
         }
-    
-        caisseForm.addEventListener('submit', () => {
-            isSubmitting = true;
-            if (nomComptageInput && nomComptageInput.value.trim() === '') {
-                nomComptageInput.value = `Comptage du ${formatDateTimeFr().replace(', ', ' à ')}`;
-            }
-        });
-
-        setTimeout(() => { initialState = getFormStateAsString(); }, 0);
-        initAccordion();
-        handleScroll();
     }
     
-    function generateWithdrawalSuggestion(amountToWithdraw, currentCounts, denominations) {
+    function showWithdrawalSuggestion(caisseId) {
+        if (typeof window.calculateAllFull !== 'function') return;
+        window.calculateAllFull();
+
+        const activeTab = document.querySelector('.tab-link.active')?.dataset.tab;
+        const activeCaisseId = activeTab ? activeTab.replace('caisse', '') : null;
+        if (!activeCaisseId) return;
+
+        const configElement = document.getElementById('calculator-data');
+        const config = JSON.parse(configElement.dataset.config);
+        const { denominations, minToKeep, currencySymbol } = config;
+
+        const getVal = (id) => parseFloat(document.getElementById(`${id}_${caisseId}`)?.value.replace(',', '.') || 0) || 0;
+        const getInt = (id) => parseInt(document.getElementById(`${id}_${caisseId}`)?.value || 0) || 0;
+
+        let totalCompte = 0;
+        const currentCounts = {};
+        for (const type in denominations) {
+            for (const name in denominations[type]) {
+                const count = getInt(name);
+                totalCompte += count * denominations[type][name];
+                currentCounts[name] = count;
+            }
+        }
+        
+        const fondDeCaisse = getVal('fond_de_caisse');
+        const ventes = getVal('ventes');
+        const retrocession = getVal('retrocession');
+        const recetteReelle = totalCompte - fondDeCaisse;
+        const ecart = recetteReelle - (ventes + retrocession);
+
+        const suggestionContainer = document.createElement('div');
+        suggestionContainer.innerHTML = `
+            <div class="modal-body-content">
+                <h4 style="margin-top: 15px;">Détails de la clôture pour la caisse ${config.nomsCaisses[caisseId]}</h4>
+                <p><strong>Recette théorique :</strong> <span>${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(ventes + retrocession)}</span></p>
+                <p><strong>Recette réelle (à retirer) :</strong> <span>${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(recetteReelle)}</span></p>
+                <p><strong>Écart :</strong> <span style="color: ${ecart > 0.01 ? 'var(--color-warning)' : (ecart < -0.01 ? 'var(--color-danger)' : 'var(--color-success)')};">${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(ecart)}</span></p>
+            </div>
+        `;
+        
+        if (Math.abs(ecart) < 0.01) {
+            const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep);
+            let suggestionHtml = `
+                <div class="modal-body-content">
+                    <h4 style="margin-top: 15px;">Composition du retrait</h4>
+                    <p>Pour clôturer la caisse, retirez le montant suivant :</p>
+                    <div style="display: flex; justify-content: space-around; gap: 20px;">
+                        <div>
+                            <h5><i class="fa-solid fa-money-bill"></i> Billets</h5>
+                            <ul style="list-style: none; padding: 0;">
+            `;
+            let hasSuggestions = false;
+            for (const [name, value] of Object.entries(denominations.billets).sort((a, b) => b[1] - a[1])) {
+                if (suggestions[name] && suggestions[name] > 0) {
+                    hasSuggestions = true;
+                    suggestionHtml += `<li><strong>${value} ${currencySymbol}:</strong> ${suggestions[name]}</li>`;
+                }
+            }
+            suggestionHtml += `
+                            </ul>
+                        </div>
+                        <div>
+                            <h5><i class="fa-solid fa-coins"></i> Pièces</h5>
+                            <ul style="list-style: none; padding: 0;">
+            `;
+            for (const [name, value] of Object.entries(denominations.pieces).sort((a, b) => b[1] - a[1])) {
+                if (suggestions[name] && suggestions[name] > 0) {
+                    hasSuggestions = true;
+                    const label = value >= 1 ? `${value} ${currencySymbol}` : `${value * 100} cts`;
+                    suggestionHtml += `<li><strong>${label}:</strong> ${suggestions[name]}</li>`;
+                }
+            }
+            suggestionHtml += `
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            if (hasSuggestions) {
+                suggestionContainer.innerHTML += suggestionHtml;
+            }
+        }
+        
+        const modalBody = document.querySelector('#cloture-confirmation-modal .modal-content');
+        let existingContent = modalBody.querySelector('.modal-body-content');
+        if (existingContent) {
+             existingContent.remove();
+        }
+        modalBody.insertAdjacentHTML('beforeend', `<div class="modal-body-content">${suggestionContainer.innerHTML}</div>`);
+    }
+    
+    function showOpenCaisses(caisseId) {
+        const configElement = document.getElementById('calculator-data');
+        const config = configElement ? JSON.parse(configElement.dataset.config) : {};
+        const caissesOuvertes = Object.keys(config.nomsCaisses).filter(id => !window.closedCaisses.includes(id));
+        
+        const openCaissesHtml = caissesOuvertes
+            .filter(id => id.toString() !== caisseId.toString())
+            .map(id => `<li>${config.nomsCaisses[id]}</li>`)
+            .join('');
+
+        const modalBody = document.querySelector('#cloture-confirmation-modal .modal-content');
+        const existingOpenCaisses = modalBody.querySelector('#open-caisses-list-container');
+        if (existingOpenCaisses) {
+            existingOpenCaisses.remove();
+        }
+
+        if (caissesOuvertes.length > 1) {
+            const html = `
+                <div id="open-caisses-list-container" class="modal-body-content">
+                    <h4>Clôture en attente pour les caisses suivantes :</h4>
+                    <ul>
+                        ${openCaissesHtml}
+                    </ul>
+                </div>
+            `;
+            modalBody.insertAdjacentHTML('beforeend', html);
+        }
+    }
+
+    function generateWithdrawalSuggestion(amountToWithdraw, currentCounts, denominations, minToKeep) {
         let remainingAmount = amountToWithdraw;
         const suggestions = {};
         
@@ -156,357 +496,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return suggestions;
     }
-
-    function calculateAllFull() {
-        if (!config.nomsCaisses) return;
-
-        const activeTab = document.querySelector('.tab-link.active')?.dataset.tab;
-        let totauxCombines = { fdc: 0, total: 0, recette: 0, theorique: 0, ecart: 0 };
-        const caissesData = {};
-        const caissesAvecEcart = [];
-        let combinedRecetteForZeroEcart = 0;
-
-        const updateElementText = (id, value) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = value;
-        };
-        
-        for (const i of Object.keys(config.nomsCaisses)) {
-            const getVal = (id) => parseFloat(document.getElementById(`${id}_${i}`)?.value.replace(',', '.') || 0) || 0;
-            const getInt = (id) => parseInt(document.getElementById(`${id}_${i}`)?.value || 0) || 0;
-            
-            let totalCompte = 0;
-            const currentCounts = {};
-
-            for (const type in config.denominations) {
-                for (const name in config.denominations[type]) {
-                    const count = getInt(name);
-                    const totalLigne = count * config.denominations[type][name];
-                    updateElementText(`total_${name}_${i}`, formatEuros(totalLigne));
-                    totalCompte += totalLigne;
-                    currentCounts[name] = count;
-                }
-            }
-            
-            const fondDeCaisse = getVal('fond_de_caisse');
-            const ventes = getVal('ventes');
-            const retrocession = getVal('retrocession');
-            const recetteTheorique = ventes + retrocession;
-            const recetteReelle = totalCompte - fondDeCaisse;
-            const ecart = recetteReelle - recetteTheorique;
-
-            caissesData[i] = { ecart, recetteReelle, currentCounts };
-            totauxCombines.fdc += fondDeCaisse;
-            totauxCombines.total += totalCompte;
-            totauxCombines.recette += recetteReelle;
-            totauxCombines.theorique += recetteReelle;
-            totauxCombines.ecart += ecart;
-            
-            if (Math.abs(ecart) < 0.01) {
-                combinedRecetteForZeroEcart += recetteReelle;
-            } else {
-                caissesAvecEcart.push({ nom: config.nomsCaisses[i], ecart: ecart });
-            }
-
-            updateElementText(`res-c${i}-fdc`, formatEuros(fondDeCaisse));
-            updateElementText(`res-c${i}-total`, formatEuros(totalCompte));
-            updateElementText(`res-c${i}-theorique`, formatEuros(recetteTheorique));
-            updateElementText(`res-c${i}-recette`, formatEuros(recetteReelle));
-            
-            const ecartEl = document.getElementById(`res-c${i}-ecart`);
-            if (ecartEl) {
-                ecartEl.textContent = formatEuros(ecart);
-                ecartEl.parentElement.className = 'result-line total';
-                if (ecart > 0.01) {
-                    ecartEl.parentElement.classList.add('ecart-positif');
-                } else if (ecart < -0.01) {
-                    ecartEl.parentElement.classList.add('ecart-negatif');
-                }
-            }
-        }
-
-        updateElementText('res-total-fdc', formatEuros(totauxCombines.fdc));
-        updateElementText('res-total-total', formatEuros(totauxCombines.total));
-        updateElementText('res-total-theorique', formatEuros(totauxCombines.theorique));
-        updateElementText('res-total-recette', formatEuros(totauxCombines.recette));
-        const ecartTotalEl = document.getElementById('res-total-ecart');
-        if (ecartTotalEl) {
-            ecartTotalEl.textContent = formatEuros(totauxCombines.ecart);
-            ecartTotalEl.parentElement.className = 'result-line total';
-            if (totauxCombines.ecart > 0.01) {
-                ecartTotalEl.parentElement.classList.add('ecart-positif');
-            } else if (totauxCombines.ecart < -0.01) {
-                ecartTotalEl.parentElement.classList.add('ecart-negatif');
-            }
-        }
-
-        for (const i of Object.keys(config.nomsCaisses)) {
-            const topEcartDisplay = document.querySelector(`#ecart-display-caisse${i}`);
-            const suggestionAccordionContainer = document.querySelector(`#suggestion-accordion-caisse${i}`);
-            if (topEcartDisplay && suggestionAccordionContainer) {
-                const topEcartDisplayValue = topEcartDisplay.querySelector('.ecart-value');
-                const topEcartExplanation = topEcartDisplay.querySelector('.ecart-explanation');
-                const { ecart, recetteReelle, currentCounts } = caissesData[i];
-                if (topEcartDisplayValue) topEcartDisplayValue.textContent = formatEuros(ecart);
-                const wasActive = topEcartDisplay.classList.contains('active');
-                topEcartDisplay.className = 'ecart-display';
-                if (wasActive) topEcartDisplay.classList.add('active');
-                topEcartExplanation.innerHTML = '';
-                suggestionAccordionContainer.innerHTML = '';
-                
-                if (Math.abs(ecart) < 0.01) {
-                    topEcartDisplay.classList.add('ecart-ok');
-                    let explanation = `<strong>Montant à retirer pour cette caisse :</strong> <strong>${formatEuros(recetteReelle)}</strong>.<br>`;
-                    if (Object.keys(config.nomsCaisses).length > 1) {
-                        explanation += `<br>Montant total à retirer (caisses justes) : <strong>${formatEuros(combinedRecetteForZeroEcart)}</strong>`;
-                    }
-                    topEcartExplanation.innerHTML = explanation;
-                    if (`caisse${i}` === activeTab) {
-                        const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, config.denominations);
-                        let suggestionHtml = `<div class="accordion-card"><div class="accordion-header"><i class="fa-solid fa-sack-dollar"></i><h3>Suggestion de retrait</h3><i class="fa-solid fa-chevron-down accordion-toggle-icon"></i></div><div class="accordion-content"><div class="accordion-content-inner"><p style="text-align: center;">Pour clôturer la caisse, retirez le montant suivant :</p><h4><i class="fa-solid fa-money-bill"></i> Billets</h4><table class="withdrawal-table"><thead><tr><th>Dénomination</th><th>Quantité</th></tr></thead><tbody>`;
-                        let hasSuggestions = false;
-                        for (const [name, value] of Object.entries(config.denominations.billets).sort((a, b) => b[1] - a[1])) {
-                            if (suggestions[name] && suggestions[name] > 0) {
-                                hasSuggestions = true;
-                                suggestionHtml += `<tr><td>${value} ${config.currencySymbol}</td><td>${suggestions[name]}</td></tr>`;
-                            }
-                        }
-                        suggestionHtml += `</tbody></table><h4><i class="fa-solid fa-coins"></i> Pièces</h4><table class="withdrawal-table"><thead><tr><th>Dénomination</th><th>Quantité</th></tr></thead><tbody>`;
-                        for (const [name, value] of Object.entries(config.denominations.pieces).sort((a, b) => b[1] - a[1])) {
-                            if (suggestions[name] && suggestions[name] > 0) {
-                                hasSuggestions = true;
-                                const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                                suggestionHtml += `<tr><td>${label}:</td><td>${suggestions[name]}</td></tr>`;
-                            }
-                        }
-                        suggestionHtml += `</tbody></table></div></div></div>`;
-                        if (hasSuggestions) {
-                            suggestionAccordionContainer.innerHTML = suggestionHtml;
-                            initAccordion();
-                        }
-                    }
-                    if (caissesAvecEcart.length > 0) {
-                        topEcartExplanation.innerHTML += `<br><strong>Caisse(s) avec écart :</strong> `;
-                        topEcartExplanation.innerHTML += caissesAvecEcart.map(c => `${c.nom} (<span style="color: var(--color-danger);">${formatEuros(c.ecart)}</span>)`).join(', ');
-                    }
-                } else if (ecart > 0) {
-                    topEcartDisplay.classList.add('ecart-positif');
-                    topEcartExplanation.textContent = "Il y a un surplus dans la caisse. Vérifiez vos saisies.";
-                } else {
-                    topEcartDisplay.classList.add('ecart-negatif');
-                    topEcartExplanation.textContent = "Il manque de l'argent. Recomptez la caisse.";
-                }
-            }
-        }
-    }
-
-
-    window.calculateAllFull = calculateAllFull;
     
-    let isCompact = false;
-    function handleScroll() {
-        const scrollPosition = window.scrollY;
-        const offset = mainEcartDisplayContainer.offsetTop + mainEcartDisplayContainer.offsetHeight;
-
-        if (scrollPosition > offset && !isCompact) {
-            mainEcartDisplayContainer.classList.add('compact-sticky');
-            isCompact = true;
-        } else if (scrollPosition <= offset && isCompact) {
-            mainEcartDisplayContainer.classList.remove('compact-sticky');
-            isCompact = false;
-        }
-    }
-    window.addEventListener('scroll', handleScroll);
-
-
-    if (!isLoadedFromHistory) {
-        caisseForm.addEventListener('input', (event) => {
-            calculateAllFull();
-            if (window.sendWsMessage) {
-                window.sendWsMessage(event.target.id, event.target.value);
-            }
-        });
-        window.addEventListener('beforeunload', () => {
-            if (isSubmitting || !hasUnsavedChanges()) return;
-            performAutosaveOnExit();
-        });
-    }
-
-    caisseForm.addEventListener('submit', () => {
-        isSubmitting = true;
-        if (nomComptageInput && nomComptageInput.value.trim() === '') {
-            nomComptageInput.value = `Comptage du ${formatDateTimeFr().replace(', ', ' à ')}`;
-        }
-    });
-
-    let autosaveTimeout;
-    const autosaveStatusEl = document.getElementById('autosave-status');
-
-    window.getFormStateAsString = function() {
-        const formData = new FormData(caisseForm);
-        const params = new URLSearchParams(formData);
-        return params.toString();
-    };
-
-    window.hasUnsavedChanges = function() {
-        const currentState = window.getFormStateAsString();
-        return currentState !== initialState;
-    };
-
-    // Nouvelle fonction pour désactiver le minuteur
-    window.toggleAutosave = function(state) {
-        isAutosaveActive = state;
-        if (!state) {
-            if (autosaveTimeout) {
-                clearTimeout(autosaveTimeout);
-                autosaveTimeout = null;
-            }
-            if (autosaveStatusEl) {
-                autosaveStatusEl.textContent = 'Sauvegarde automatique désactivée.';
-                autosaveStatusEl.classList.remove('saving', 'success', 'error');
-            }
-        } else {
-             startAutosaveTimer();
-        }
-    };
-
-    function startAutosaveTimer() {
-        if (!isAutosaveActive) return;
-        if (autosaveTimeout) clearTimeout(autosaveTimeout);
-        autosaveTimeout = setTimeout(performAutosave, 30000);
-    }
-
-    async function performAutosave() {
-        if (!isAutosaveActive) return;
-        if (!window.hasUnsavedChanges()) {
-            if (autosaveStatusEl) {
-                autosaveStatusEl.textContent = 'Aucune modification à sauvegarder.';
-                autosaveStatusEl.classList.remove('saving', 'success', 'error');
-                setTimeout(() => autosaveStatusEl.textContent = '', 5000);
-            }
-            startAutosaveTimer();
+    clotureBtn.addEventListener('click', () => {
+        const isLoadedFromHistory = document.getElementById('calculator-data')?.dataset.config.includes('isLoadedFromHistory":true');
+        if (isLoadedFromHistory) {
+            alert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.");
             return;
         }
-
-        if (isSubmitting) {
-            startAutosaveTimer();
-            return;
-        }
-
-        if (autosaveStatusEl) {
-            autosaveStatusEl.textContent = 'Sauvegarde auto en cours...';
-            autosaveStatusEl.classList.add('saving');
-        }
-
-        const formData = new FormData(caisseForm);
-        formData.append('action', 'autosave');
-        
-        try {
-            const response = await fetch('index.php?action=autosave', {
-                method: 'POST',
-                body: formData
-            });
-            const data = await response.json();
-            if (data.success) {
-                initialState = window.getFormStateAsString();
-                if (autosaveStatusEl) {
-                    autosaveStatusEl.textContent = data.message;
-                    autosaveStatusEl.classList.remove('saving');
-                    autosaveStatusEl.classList.add('success');
-                    setTimeout(() => autosaveStatusEl.textContent = '', 5000);
-                }
-            } else {
-                if (autosaveStatusEl) {
-                    autosaveStatusEl.textContent = data.message;
-                    autosaveStatusEl.classList.remove('saving');
-                    autosaveStatusEl.classList.add('error');
-                }
-            }
-        } catch (error) {
-            console.error('Erreur de sauvegarde automatique:', error);
-            if (autosaveStatusEl) {
-                autosaveStatusEl.textContent = 'Erreur de sauvegarde automatique.';
-                autosaveStatusEl.classList.remove('saving');
-                autosaveStatusEl.classList.add('error');
-            }
-        }
-        startAutosaveTimer();
-    }
-    
-    function performAutosaveOnExit() {
-        const formData = new FormData(caisseForm);
-        formData.append('action', 'autosave');
-        
-        navigator.sendBeacon('index.php?action=autosave', formData);
-    }
-    
-    caisseForm.addEventListener('input', (event) => {
-        if (!isAutosaveActive) return;
-        clearTimeout(autosaveTimeout);
-        startAutosaveTimer();
-        
-        if (window.sendWsMessage) {
-            window.sendWsMessage(event.target.id, event.target.value);
-        }
+        showCaisseSelectionModal();
     });
-
-    window.loadFormDataFromWebSocket = function(data) {
-        if (!data || Object.keys(data).length === 0) return;
-        
-        caisseForm.reset();
-
-        const nomComptageInput = document.getElementById('nom_comptage');
-        if (nomComptageInput) nomComptageInput.value = data['nom_comptage'] || '';
-        const explicationInput = document.getElementById('explication');
-        if (explicationInput) explicationInput.value = data['explication'] || '';
-
-        for (const key in data) {
-            if (key.startsWith('caisse[')) {
-                const parts = key.match(/caisse\[(\d+)\]\[(.+)\]/);
-                if (parts) {
-                    const caisseId = parts[1];
-                    const fieldName = parts[2];
-                    const input = document.querySelector(`input[name="caisse[${caisseId}][${fieldName}]"]`);
-                    if (input) {
-                        input.value = data[key];
-                    }
-                }
-            }
-        }
-        
-        calculateAllFull();
-        initialState = window.getFormStateAsString();
-    };
-    
-    window.sendFullFormState = function() {
-        const formState = {};
-        const form = document.getElementById('caisse-form');
-        new FormData(form).forEach((value, key) => {
-            formState[key] = value;
-        });
-        window.wsConnection.send(JSON.stringify({ type: 'broadcast_state', form_state: formState }));
-    };
-    
-    window.resetAllCaisseFields = function() {
-        const nomComptageInput = document.getElementById('nom_comptage');
-        const explicationInput = document.getElementById('explication');
-        if (nomComptageInput) nomComptageInput.value = '';
-        if (explicationInput) explicationInput.value = '';
-        
-        document.querySelectorAll('#caisse-form input[type="number"], #caisse-form input[type="text"], #caisse-form textarea').forEach(el => {
-             // Ne réinitialise pas le fond de caisse s'il y a une valeur
-             if (!el.id.includes('fond_de_caisse_')) {
-                 el.value = '';
-             }
-        });
-        
-        initialState = window.getFormStateAsString();
-        calculateAllFull();
-        window.toggleAutosave(false);
-    };
-
-    initCalculator();
-    if (!isLoadedFromHistory) {
-        startAutosaveTimer();
-    }
 });

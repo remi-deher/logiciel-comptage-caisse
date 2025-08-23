@@ -2,7 +2,7 @@
 // templates/calculateur.php - Version corrigée pour le chargement des données et l'affichage sur écran 4/3.
 
 // Définir les scripts spécifiques à la page pour qu'ils soient chargés dans le footer
-$page_js = 'calculator.js'; 
+$page_js = 'calculator.js';
 
 require 'partials/header.php';
 require 'partials/navbar.php';
@@ -15,9 +15,9 @@ if (!isset($min_to_keep)) {
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
     'denominations' => $denominations ?? [],
-    'minToKeep' => $min_to_keep, 
+    'minToKeep' => $min_to_keep,
     'isLoadedFromHistory' => $isLoadedFromHistory ?? false,
-    'currencySymbol' => APP_CURRENCY_SYMBOL 
+    'currencySymbol' => APP_CURRENCY_SYMBOL
 ]);
 
 $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
@@ -53,7 +53,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                 </button>
                 <?php $is_first = false; endforeach; ?>
         </div>
-        
+
         <div class="ecart-display-container">
     <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
         <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
@@ -185,7 +185,6 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
         </div>
     </div>
 </div>
-<!-- NOUVEAU: Inclusion des scripts spécifiques à la page. -->
 <script src="/js/realtime.js"></script>
 <script src="/js/cloture.js"></script>
 <?php

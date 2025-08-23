@@ -45,6 +45,10 @@
 .tab-link.active { background-color: var(--color-surface); border-bottom: 2px solid var(--color-surface); font-weight: bold; color: var(--color-primary); }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
+.tab-link.cloture-en-cours {
+    color: #8a2be2 !important;
+    border-color: #8a2be2 !important;
+}
 
 /* --- Indicateur d'écart en haut (version d'origine) --- */
 .ecart-display-container {
@@ -215,8 +219,9 @@ body[data-theme="dark"] .withdrawal-table th {
     transition: opacity 0.3s ease;
 }
 .modal.visible {
-    opacity: 1;
-    pointer-events: auto;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    display: flex !important;
 }
 .modal-content {
     background-color: var(--color-surface);
