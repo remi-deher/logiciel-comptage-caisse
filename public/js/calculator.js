@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadedData = JSON.parse(calculatorDataElement.dataset.loadedData || '{}');
     const { nomsCaisses, denominations, minToKeep, isLoadedFromHistory, currencySymbol } = config;
     
-    // NOUVEAU : Variable pour suivre les modifications non enregistrées
+    // Variable pour suivre les modifications non enregistrées
     let hasUnsavedChanges = false;
 
     // --- Fonctions utilitaires ---
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Champs de saisie
         form.addEventListener('input', (e) => {
             if (e.target.matches('input[type="number"], input[type="text"], textarea')) {
-                hasUnsavedChanges = true; // NOUVEAU : Marque qu'il y a des modifications
+                hasUnsavedChanges = true; // Marque qu'il y a des modifications
                 calculateAllFull();
                 if (!isLoadedFromHistory && window.sendWsMessage) {
                     window.sendWsMessage(e.target.id, e.target.value);
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // NOUVEAU : Réinitialise le suivi des modifications lors d'une sauvegarde manuelle
+        // Réinitialise le suivi des modifications lors d'une sauvegarde manuelle
         form.addEventListener('submit', () => {
             hasUnsavedChanges = false;
         });
@@ -233,14 +233,13 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     /**
-     * NOUVEAU : Gère la sauvegarde de sécurité lorsque l'utilisateur quitte la page.
+     * Gère la sauvegarde de sécurité lorsque l'utilisateur quitte la page.
      */
     function initUnloadAutosave() {
         if (isLoadedFromHistory) return;
 
         window.addEventListener('beforeunload', (event) => {
             if (hasUnsavedChanges) {
-                // Utilise navigator.sendBeacon pour une sauvegarde fiable en arrière-plan
                 const formData = new FormData(document.getElementById('caisse-form'));
                 navigator.sendBeacon('index.php?action=autosave', formData);
             }
@@ -254,6 +253,5 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         calculateAllFull();
     }
-    // NOUVEAU : Appelle la nouvelle fonction de sauvegarde à la fermeture
     initUnloadAutosave();
 });

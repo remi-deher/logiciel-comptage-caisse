@@ -2,7 +2,12 @@
  * Module JavaScript pour la gestion de la communication WebSocket en temps réel.
  * Ce module est responsable de la connexion et de la diffusion des données.
  *
- * Logique MISE A JOUR : Charge d'abord la sauvegarde, puis synchronise avec les autres clients.
+ * Logique MISE A JOUR :
+ * 1. Charge la sauvegarde locale pour un affichage immédiat.
+ * 2. Met en place un verrou pour empêcher l'envoi de données.
+ * 3. Demande l'état aux autres clients.
+ * 4. Si un autre client répond, ses données deviennent la source de vérité et le verrou est levé.
+ * 5. Si personne ne répond après un délai, l'utilisateur est considéré comme seul et le verrou est levé.
  */
 document.addEventListener('DOMContentLoaded', function() {
     const statusIndicator = document.getElementById('websocket-status-indicator');
@@ -17,13 +22,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    // NOUVEAU : Verrou pour empêcher l'envoi de données avant la synchronisation.
+    window.isSynchronized = false;
+    let syncTimeout;
+
     // Fonction globale pour mettre à jour l'indicateur de statut
     window.updateWebsocketStatusIndicator = function(lockedCaisses, closedCaisses) {
         if (!statusIndicator || !statusText) return;
-
         lockedCaisses = lockedCaisses || [];
         closedCaisses = closedCaisses || [];
-
         if (lockedCaisses.length > 0) {
             statusIndicator.classList.remove('connected');
             statusIndicator.classList.add('cloture');
@@ -52,14 +59,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusText.textContent = 'Connecté en temps réel';
             }
             
-            // NOUVELLE LOGIQUE :
-            // 1. On charge immédiatement la dernière sauvegarde pour un affichage rapide.
+            // 1. Charge la sauvegarde immédiatement.
             if (typeof window.loadLastAutosave === 'function') {
                 window.loadLastAutosave();
             }
             
-            // 2. Ensuite, on demande l'état aux autres clients pour se synchroniser.
+            // 2. Demande l'état aux autres clients.
             window.wsConnection.send(JSON.stringify({ type: 'request_state' }));
+
+            // 3. Met en place un timeout. Si personne ne répond, on est seul.
+            syncTimeout = setTimeout(() => {
+                console.log("Personne n'a répondu, je suis seul. Le verrou est levé.");
+                window.isSynchronized = true;
+            }, 1500); // Délai de 1.5 secondes
         };
 
         window.wsConnection.onerror = (error) => {
@@ -82,14 +94,17 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const data = JSON.parse(e.data);
 
-                // Si on reçoit l'état d'un autre client, on met à jour notre formulaire.
-                // Cela écrasera la sauvegarde si les données en direct sont plus récentes.
-                if (data.type === 'broadcast_state' && typeof window.loadFormDataFromWebSocket === 'function') {
-                    window.loadFormDataFromWebSocket(data.form_state);
+                // 4. On reçoit l'état d'un autre client (la source de vérité).
+                if (data.type === 'broadcast_state') {
+                    console.log("Réception de l'état d'un autre client. Mise à jour et levée du verrou.");
+                    if (typeof window.loadFormDataFromWebSocket === 'function') {
+                        window.loadFormDataFromWebSocket(data.form_state);
+                    }
+                    window.isSynchronized = true; // On lève le verrou
+                    clearTimeout(syncTimeout); // On annule le timeout
                     return;
                 }
                 
-                // Un autre client demande notre état, on lui envoie.
                 if (data.type === 'send_full_state' && typeof window.sendFullFormState === 'function') {
                     window.sendFullFormState();
                     return;
@@ -133,11 +148,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (input && input.value !== data.value) {
                         input.value = data.value;
                     }
-                } else {
-                    for (const fieldId in data) {
-                        const input = document.getElementById(fieldId);
-                        if (input) input.value = data[fieldId];
-                    }
                 }
                 if (typeof window.calculateAllFull === 'function') {
                     window.calculateAllFull();
@@ -155,7 +165,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// NOUVEAU : La fonction d'envoi de message vérifie maintenant le verrou.
 window.sendWsMessage = function(id, value) {
+    if (!window.isSynchronized) {
+        console.log("Envoi bloqué : en attente de synchronisation.");
+        return; // Ne rien envoyer si le verrou est actif
+    }
     if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
         const dataToSend = { id: id, value: value };
         const jsonString = JSON.stringify(dataToSend);
