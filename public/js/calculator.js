@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function updateEcartDisplay(caisseId, ecart) {
         const display = document.getElementById(`ecart-display-caisse${caisseId}`);
+        if (!display) return;
         const valueSpan = display.querySelector('.ecart-value');
         const explanationP = display.querySelector('.ecart-explanation');
 
@@ -145,10 +146,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Accordéons
-        form.addEventListener('click', (e) => {
+        // CORRECTION: L'écouteur est maintenant sur 'document.body' pour fonctionner
+        // dans les modales créées dynamiquement.
+        document.body.addEventListener('click', (e) => {
             const header = e.target.closest('.accordion-header');
             if (header) {
+                // On s'assure de ne pas interférer avec les boutons dans l'en-tête
+                if (e.target.closest('button')) return;
+
                 header.classList.toggle('active');
                 const content = header.nextElementSibling;
                 content.classList.toggle('open');

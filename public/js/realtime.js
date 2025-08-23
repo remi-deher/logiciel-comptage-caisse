@@ -128,6 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (typeof window.showCustomAlert === 'function') {
                         window.showCustomAlert("Toutes les caisses ont été clôturées. Le comptage est réinitialisé.", 'success');
                     } else {
+                        // Fallback au cas où la fonction ne serait pas prête
                         alert('Toutes les caisses ont été clôturées. Le comptage est réinitialisé.');
                     }
                     if (typeof window.resetAllCaisseFields === 'function') {

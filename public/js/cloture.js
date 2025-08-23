@@ -69,8 +69,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // CORRECTION: La fonction ne vide plus le fond de caisse et force le recalcul
     window.resetAllCaisseFields = function() {
         document.querySelectorAll('#caisse-form input[type="text"], #caisse-form input[type="number"], #caisse-form textarea').forEach(input => {
+            // On ne vide pas le fond de caisse
             if (!input.id.includes('fond_de_caisse')) {
                 input.value = '';
             }
@@ -81,16 +83,17 @@ document.addEventListener('DOMContentLoaded', function() {
         window.lockedCaisses = [];
         window.closedCaisses = [];
 
+        // Appel du calcul complet pour mettre à jour les écarts à zéro
         if (typeof window.calculateAllFull === 'function') {
             window.calculateAllFull();
         }
         handleInterfaceLock([], []);
         
-        // NOUVEAU: Appel pour réinitialiser l'indicateur de statut
         if (typeof window.updateWebsocketStatusIndicator === 'function') {
             window.updateWebsocketStatusIndicator([], []);
         }
     };
+
 
     const isCaisseLockedBy = (caisseId, lockedBy) => Array.isArray(window.lockedCaisses) && lockedBy && window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString() && c.locked_by.toString() === lockedBy.toString());
     const isCaisseLocked = (caisseId) => Array.isArray(window.lockedCaisses) && window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString());
@@ -120,6 +123,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     };
 
+    // CORRECTION: La fonction n'efface plus le message d'écart nul
     const updateEcartDisplayForCloture = (nomsCaisses) => {
         for (const caisseId in nomsCaisses) {
             const display = document.getElementById(`ecart-display-caisse${caisseId}`);
@@ -129,8 +133,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const explanationP = display.querySelector('.ecart-explanation');
                 if (isClosed && explanationP) {
                     explanationP.textContent = "Cette caisse est clôturée.";
-                } else if(explanationP && explanationP.textContent === "Cette caisse est clôturée."){
-                    explanationP.textContent = "";
                 }
             }
         }
@@ -307,13 +309,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (target.classList.contains('modal-close') || target === modal) {
             modal?.classList.remove('visible');
-        }
-
-        const accordionHeader = target.closest('#cloture-generale-modal .accordion-header');
-        if (accordionHeader && !target.closest('button')) {
-            accordionHeader.classList.toggle('active');
-            const content = accordionHeader.nextElementSibling;
-            content.classList.toggle('open');
         }
 
         const caisseItem = target.closest('.caisse-status-item');
