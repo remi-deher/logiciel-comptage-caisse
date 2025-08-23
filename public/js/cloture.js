@@ -219,7 +219,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 document.querySelector(`.tab-link[data-tab="caisse${caisseId}"]`)?.click();
                 caisseSelectionModal.classList.remove('visible');
-                showClotureConfirmationModal(caisseId);
+                // MODIFICATION: La ligne ci-dessous a été supprimée pour forcer une action en deux temps.
+                // showClotureConfirmationModal(caisseId); 
             } else if (button.classList.contains('confirm-cloture-caisse-btn')) {
                 console.log(`Action : Confirmer la clôture pour la caisse ${caisseId}`);
                 caisseSelectionModal.classList.remove('visible');
@@ -259,7 +260,6 @@ document.addEventListener('DOMContentLoaded', function() {
         clotureConfirmationModal.classList.add('visible');
     }
 
-    // --- Gestionnaire d'événements centralisé pour la modale de confirmation (CORRIGÉ) ---
     clotureConfirmationModal.addEventListener('click', function(event) {
         const target = event.target;
         console.log("Clic détecté dans la modale de confirmation. Cible :", target);
@@ -267,7 +267,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (target.classList.contains('modal-close') || target.id === 'cloture-confirmation-modal') {
             console.log("Action : Fermeture de la modale de confirmation.");
             clotureConfirmationModal.classList.remove('visible');
-            // On ne déverrouille pas automatiquement à la fermeture par la croix
             return;
         }
 
