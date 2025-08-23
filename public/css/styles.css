@@ -115,7 +115,7 @@ h2, h3 {
 .form-group textarea { text-align: left; resize: vertical; }
 
 /* --- Styles des boutons (Material Design Inspired) --- */
-.save-btn, .new-btn, .delete-btn {
+.save-btn, .new-btn, .delete-btn, .close-alert-btn {
     font-size: 0.9em;
     font-weight: 600;
     text-transform: uppercase;
@@ -130,7 +130,7 @@ h2, h3 {
     box-shadow: 0 2px 5px rgba(0,0,0,0.15);
     -webkit-tap-highlight-color: transparent;
 }
-.save-btn:hover, .new-btn:hover, .delete-btn:hover {
+.save-btn:hover, .new-btn:hover, .delete-btn:hover, .close-alert-btn:hover {
     box-shadow: 0 5px 15px rgba(0,0,0,0.25);
 }
 .save-btn { background-color: var(--color-success); }
@@ -241,164 +241,42 @@ body[data-theme="dark"] .error {
     justify-content: space-around;
 }
 
-/* ==========================================================================
-   public/css/styles.css (Ajouts pour la modale de sélection de caisse)
-   ========================================================================== */
+/* NOUVEAU: Styles pour la modale d'alerte personnalisée (AMÉLIORÉS) */
+@keyframes alert-icon-pop {
+    0% { transform: scale(0.7); }
+    80% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
 
-/* --- Nouvelle Modale de Sélection de Caisse --- */
-#caisse-selection-modal .modal-content {
-    background-color: var(--color-surface);
-    padding: 0;
-    border-radius: 12px;
-    box-shadow: 0 4px 25px var(--shadow-color);
-    position: relative;
-    width: 90%;
-    max-width: 600px;
-}
-#caisse-selection-modal .modal-header-cloture {
-    background-color: var(--color-primary);
-    color: white;
-    padding: 25px 30px;
-    border-radius: 12px 12px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-#caisse-selection-modal .modal-header-cloture h3 {
-    margin: 0;
-    border: none;
-    color: white;
-    font-size: 1.8em;
-}
-#caisse-selection-modal .modal-body-cloture {
-    padding: 30px;
-    color: var(--color-text-secondary);
-}
-#caisse-selection-modal .modal-body-cloture p {
-    margin-top: 0;
-    margin-bottom: 25px;
-}
-.caisse-status-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 20px;
-}
-/* Style de la carte de la caisse */
-.caisse-status-item {
-    border-radius: 10px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: center;
-    gap: 15px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+.custom-alert .modal-content {
+    max-width: 400px;
     text-align: center;
-    color: white;
-    position: relative;
-    height: 100%;
-    box-sizing: border-box;
+    padding: 40px 30px 30px 30px;
+    box-shadow: 0 10px 30px var(--shadow-color);
 }
-.caisse-status-item::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.1);
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    border-radius: 10px;
+.custom-alert.visible .alert-icon {
+    animation: alert-icon-pop 0.5s ease-out forwards;
 }
-.caisse-status-item:hover::before {
-    opacity: 1;
+.custom-alert .alert-icon {
+    font-size: 4em;
+    margin-bottom: 20px;
 }
-
-/* Couleurs de fond dynamiques pour les statuts */
-.caisse-status-item.caisse-status-libre { background-color: var(--color-success); }
-.caisse-status-item.caisse-status-cloturee { background-color: var(--color-warning); }
-.caisse-status-item.caisse-status-en-cours { background-color: #8a2be2; }
-
-/* Styles pour les éléments de la carte */
-.caisse-status-item .status-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    flex-grow: 1;
-    white-space: nowrap; /* Empêche le nom de la caisse de passer à la ligne */
+.custom-alert.success .alert-icon {
+    color: var(--color-success);
 }
-.caisse-status-item .status-info i,
-.caisse-status-item strong {
-    color: white;
-    font-size: 1.2em;
-    font-weight: bold;
+.custom-alert.error .alert-icon {
+    color: var(--color-danger);
 }
-.caisse-status-item .status-info i {
-    font-size: 1.5em;
-}
-
-/* Styles pour le texte de statut et le bouton */
-.caisse-status-item .status-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-}
-.caisse-status-item .status-actions span {
-    font-weight: bold;
-}
-
-/* Bouton de déverrouillage forcé */
-.caisse-status-item .force-unlock-btn {
-    background-color: rgba(255, 255, 255, 0.2);
-    color: white;
-    padding: 8px 15px;
-    border-radius: 6px;
-    font-size: 0.9em;
-    border: none;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    width: 100%; /* Le bouton prend toute la largeur */
-}
-.caisse-status-item .force-unlock-btn:hover {
-    background-color: rgba(255, 255, 255, 0.3);
-}
-
-/* Styles pour les caisses désactivées */
-.caisse-status-item.disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.caisse-status-item.disabled:hover {
-    transform: none;
-    box-shadow: none;
-}
-
-/* Légende des couleurs */
-.color-key {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 20px;
-    margin-bottom: 25px;
-    font-size: 0.9em;
+.custom-alert p {
+    font-size: 1.1em;
     color: var(--color-text-secondary);
+    margin-bottom: 30px;
+    line-height: 1.5;
 }
-.color-key div {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.custom-alert .close-alert-btn {
+    background-color: var(--color-primary);
+    min-width: 120px;
 }
-.color-dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
+.custom-alert .close-alert-btn:hover {
+    background-color: var(--color-primary-dark);
 }
-.color-dot.color-libre { background-color: var(--color-success); }
-.color-dot.color-cloturee { background-color: var(--color-warning); }
-.color-dot.color-en-cours { background-color: #8a2be2; }

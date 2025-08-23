@@ -27,6 +27,47 @@ document.addEventListener('DOMContentLoaded', function() {
     clotureConfirmationModal.classList.add('modal');
     document.body.appendChild(clotureConfirmationModal);
 
+    // --- NOUVEAU: Fonction pour afficher une alerte personnalisée ---
+    function showCustomAlert(message, type = 'success') {
+        const existingAlert = document.getElementById('custom-alert-modal');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+
+        const alertModal = document.createElement('div');
+        alertModal.id = 'custom-alert-modal';
+        alertModal.className = `modal custom-alert ${type}`;
+
+        const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-times-circle';
+
+        alertModal.innerHTML = `
+            <div class="modal-content">
+                <div class="alert-icon"><i class="fa-solid ${iconClass}"></i></div>
+                <p>${message}</p>
+                <button class="btn close-alert-btn">OK</button>
+            </div>
+        `;
+
+        document.body.appendChild(alertModal);
+
+        // Affiche la modale avec une petite temporisation pour l'animation
+        setTimeout(() => alertModal.classList.add('visible'), 10);
+
+        const closeBtn = alertModal.querySelector('.close-alert-btn');
+        const closeModal = () => {
+            alertModal.classList.remove('visible');
+            setTimeout(() => alertModal.remove(), 300);
+        };
+        
+        closeBtn.addEventListener('click', closeModal);
+        alertModal.addEventListener('click', (event) => {
+            if (event.target === alertModal) {
+                closeModal();
+            }
+        });
+    }
+
+
     // --- Fonctions de vérification d'état ---
     const isCaisseLockedBy = (caisseId, lockedBy) => {
         if (!Array.isArray(window.lockedCaisses) || !lockedBy) return false;
@@ -301,7 +342,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            alert(data.message);
+                            showCustomAlert(data.message, 'success');
                             if (window.wsConnection?.readyState === WebSocket.OPEN) {
                                 window.wsConnection.send(JSON.stringify({ type: 'cloture_caisse_confirmed', caisse_id: caisseId }));
                                 console.log(`Message WebSocket 'cloture_caisse_confirmed' envoyé pour la caisse ${caisseId}.`);
@@ -311,7 +352,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     })
                     .catch(error => {
-                        alert("Erreur lors de la clôture : " + error.message);
+                        showCustomAlert("Erreur lors de la clôture : " + error.message, 'error');
                         if (window.wsConnection?.readyState === WebSocket.OPEN) {
                             window.wsConnection.send(JSON.stringify({ type: 'cloture_unlock', caisse_id: caisseId }));
                         }
@@ -358,19 +399,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep);
             let hasSuggestions = Object.values(suggestions).some(q => q > 0);
             if (hasSuggestions) {
-                contentHtml += `<div class="modal-body-content"><h4>Composition du retrait</h4><div class="withdrawal-suggestion">`;
-                contentHtml += `<div><h5><i class="fa-solid fa-money-bill"></i> Billets</h5><ul>`;
-                Object.entries(denominations.billets).sort((a, b) => b[1] - a[1]).forEach(([name, value]) => {
-                    if (suggestions[name] > 0) contentHtml += `<li><strong>${value} ${currencySymbol}:</strong> ${suggestions[name]}</li>`;
-                });
-                contentHtml += `</ul></div><div><h5><i class="fa-solid fa-coins"></i> Pièces</h5><ul>`;
-                Object.entries(denominations.pieces).sort((a, b) => b[1] - a[1]).forEach(([name, value]) => {
+                // MODIFICATION: Utilisation d'un tableau pour un meilleur affichage
+                contentHtml += `<div class="modal-body-content"><h4>Composition du retrait</h4><table class="withdrawal-suggestion-table">
+                    <thead><tr><th>Dénomination</th><th>Quantité à retirer</th></tr></thead><tbody>`;
+                
+                const allDenominationsSorted = [
+                    ...Object.entries(denominations.billets),
+                    ...Object.entries(denominations.pieces)
+                ].sort((a, b) => b[1] - a[1]);
+
+                allDenominationsSorted.forEach(([name, value]) => {
                     if (suggestions[name] > 0) {
                         const label = value >= 1 ? `${value} ${currencySymbol}` : `${value * 100} cts`;
-                        contentHtml += `<li><strong>${label}:</strong> ${suggestions[name]}</li>`;
+                        contentHtml += `<tr><td>${label}</td><td>${suggestions[name]}</td></tr>`;
                     }
                 });
-                contentHtml += `</ul></div></div></div>`;
+
+                contentHtml += `</tbody></table></div>`;
             }
         }
         
@@ -406,7 +451,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     clotureBtn.addEventListener('click', () => {
         if (document.getElementById('calculator-data')?.dataset.config.includes('"isLoadedFromHistory":true')) {
-            alert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.");
+            showCustomAlert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.", 'error');
             return;
         }
         showCaisseSelectionModal();
