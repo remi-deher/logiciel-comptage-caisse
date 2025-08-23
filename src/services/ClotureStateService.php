@@ -71,6 +71,15 @@ class ClotureStateService {
     }
 
     /**
+     * Ré-ouvre une caisse qui a été précédemment clôturée.
+     * @param int $caisseId L'identifiant de la caisse.
+     */
+    public function reopenCaisse($caisseId) {
+        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='open', locked_by_ws_id=NULL WHERE caisse_id = ? AND status = 'closed'");
+        $stmt->execute([$caisseId]);
+    }
+
+    /**
      * Vérifie si une caisse a déjà été clôturée.
      * @param int $caisseId L'identifiant de la caisse.
      * @return bool Vrai si la caisse est clôturée, faux sinon.

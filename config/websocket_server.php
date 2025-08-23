@@ -149,6 +149,12 @@ class Caisse implements MessageComponentInterface {
                         $this->clotureStateService->resetState(); // Reset after broadcasting
                     }
                     break;
+                // NOUVEAU: Gère la réouverture d'une caisse
+                case 'cloture_reopen':
+                    $caisseId = intval($data['caisse_id']);
+                    $this->clotureStateService->reopenCaisse($caisseId);
+                    $this->broadcastClotureState();
+                    break;
             }
         } catch (\Exception $e) {
             error_log("Erreur dans onMessage: {$e->getMessage()}");

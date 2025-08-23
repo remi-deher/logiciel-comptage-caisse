@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (isClosed) {
                 statusClass = 'caisse-status-cloturee';
-                actionHtml = `<button class="force-unlock-btn action-btn-small" data-caisse-id="${id}"><i class="fa-solid fa-lock-open"></i> Déverrouiller</button>`;
+                actionHtml = `<button class="reopen-caisse-btn action-btn-small" data-caisse-id="${id}"><i class="fa-solid fa-lock-open"></i> Réouvrir</button>`;
             } else if (isLockedByMe) {
                 statusClass = 'caisse-status-en-cours';
                 actionHtml = `<button class="confirm-cloture-caisse-btn action-btn-small" data-caisse-id="${id}"><i class="fa-solid fa-check-circle"></i> Confirmer</button>`;
@@ -219,8 +219,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 document.querySelector(`.tab-link[data-tab="caisse${caisseId}"]`)?.click();
                 caisseSelectionModal.classList.remove('visible');
-                // MODIFICATION: La ligne ci-dessous a été supprimée pour forcer une action en deux temps.
-                // showClotureConfirmationModal(caisseId); 
             } else if (button.classList.contains('confirm-cloture-caisse-btn')) {
                 console.log(`Action : Confirmer la clôture pour la caisse ${caisseId}`);
                 caisseSelectionModal.classList.remove('visible');
@@ -230,6 +228,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (window.confirm("Voulez-vous forcer le déverrouillage de cette caisse ?")) {
                     if (window.wsConnection?.readyState === WebSocket.OPEN) {
                         window.wsConnection.send(JSON.stringify({ type: 'force_unlock', caisse_id: caisseId }));
+                    }
+                    caisseSelectionModal.classList.remove('visible');
+                }
+            } else if (button.classList.contains('reopen-caisse-btn')) {
+                console.log(`Action : Réouvrir la caisse ${caisseId}`);
+                if (window.confirm("Voulez-vous vraiment réouvrir cette caisse ?")) {
+                    if (window.wsConnection?.readyState === WebSocket.OPEN) {
+                        window.wsConnection.send(JSON.stringify({ type: 'cloture_reopen', caisse_id: caisseId }));
                     }
                     caisseSelectionModal.classList.remove('visible');
                 }
