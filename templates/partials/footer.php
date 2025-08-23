@@ -1,3 +1,5 @@
+<?php
+// templates/partials/footer.php
 $current_version = 'N/A';
 $version_file = __DIR__ . '/../../VERSION';
 if (file_exists($version_file)) {
