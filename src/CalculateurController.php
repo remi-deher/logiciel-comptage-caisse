@@ -290,66 +290,7 @@ class CalculateurController {
 
             // Étape 2: On marque la caisse comme confirmée dans le service
             $this->clotureStateService->confirmCaisse($caisse_id_a_cloturer);
-
-            // Étape 3: On vérifie si toutes les caisses sont confirmées
-            $all_caisses_confirmed = true;
-            $all_caisses = array_keys($this->noms_caisses);
-            foreach ($all_caisses as $caisse_id) {
-                if (!$this->clotureStateService->isCaisseConfirmed($caisse_id)) {
-                    $all_caisses_confirmed = false;
-                    break;
-                }
-            }
-
-            // Étape 4: Si toutes les caisses sont confirmées, on procède à la sauvegarde finale et à la réinitialisation
-            if ($all_caisses_confirmed) {
-                 // Supprimer toutes les anciennes sauvegardes intermédiaires de clôture
-                 $stmt_delete_intermediate = $this->pdo->prepare("DELETE FROM comptages WHERE nom_comptage LIKE 'Clôture de la caisse%'");
-                 $stmt_delete_intermediate->execute();
-
-                // Créer un enregistrement pour la clôture finale
-                $nom_cloture_finale = "Clôture générale du " . date('Y-m-d H:i:s');
-                $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-                $stmt->execute([$nom_cloture_finale, "Clôture globale de toutes les caisses", date('Y-m-d H:i:s')]);
-                $comptage_id_cloture_globale = $this->pdo->lastInsertId();
-
-                // Insérer les détails pour toutes les caisses dans ce nouvel enregistrement de clôture
-                foreach ($this->noms_caisses as $caisse_id => $nom) {
-                    $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
-                    if (!empty($caisse_data)) {
-                        $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                        $stmt_details->execute([
-                            $comptage_id_cloture_globale,
-                            $caisse_id,
-                            get_numeric_value($caisse_data, 'fond_de_caisse'),
-                            get_numeric_value($caisse_data, 'ventes'),
-                            get_numeric_value($caisse_data, 'retrocession')
-                        ]);
-                        $comptage_detail_id = $this->pdo->lastInsertId();
-
-                        foreach ($this->denominations as $type => $denominations_list) {
-                            foreach ($denominations_list as $name => $value) {
-                                $quantite = get_numeric_value($caisse_data, $name);
-                                if ($quantite > 0) {
-                                    $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
-                                    $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Supprimer toutes les anciennes sauvegardes automatiques
-                $stmt_delete_autosave = $this->pdo->prepare("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
-                $stmt_delete_autosave->execute();
-
-                // Réinitialiser l'état de la clôture
-                $this->clotureStateService->resetState();
-
-                echo json_encode(['success' => true, 'message' => "La clôture générale a été effectuée avec succès.", 'all_caisses_confirmed' => true]);
-            } else {
-                echo json_encode(['success' => true, 'message' => "La caisse a été clôturée avec succès. En attente des autres caisses.", 'all_caisses_confirmed' => false]);
-            }
+            echo json_encode(['success' => true, 'message' => "La caisse a été clôturée avec succès. En attente des autres caisses.", 'all_caisses_confirmed' => false]);
         
         } catch (PDOException $e) {
             error_log("Erreur PDO lors de la clôture : " . $e->getMessage());

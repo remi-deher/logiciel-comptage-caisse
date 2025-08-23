@@ -422,3 +422,42 @@ body[data-theme="dark"] .withdrawal-table th {
 .color-dot.color-libre { background-color: var(--color-success); }
 .color-dot.color-cloturee { background-color: var(--color-warning); }
 .color-dot.color-en-cours { background-color: #8a2be2; }
+
+/* NOUVEAU: Section de clôture générale */
+.cloture-generale-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border-light);
+    text-align: center;
+}
+#cloture-generale-modal .modal-content {
+    max-width: 800px;
+}
+
+.caisse-summary-table {
+    width: 100%;
+    margin-top: 15px;
+    border-collapse: collapse;
+    font-size: 0.95em;
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.caisse-summary-table th, .caisse-summary-table td {
+    padding: 12px 15px;
+    text-align: left;
+}
+.caisse-summary-table thead tr {
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-primary);
+    font-weight: bold;
+}
+.caisse-summary-table tbody tr {
+    border-bottom: 1px solid var(--color-border-light);
+}
+.caisse-summary-table tbody tr:last-of-type {
+    border-bottom: none;
+}
+.caisse-summary-table tbody tr:nth-of-type(even) {
+    background-color: var(--color-surface-alt);
+}

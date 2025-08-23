@@ -144,6 +144,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const currentWsId = window.wsConnection?.resourceId;
         const nomsCaisses = JSON.parse(document.getElementById('calculator-data')?.dataset.config)?.nomsCaisses || {};
 
+        const allCaissesPreviouslyClosed = Object.keys(nomsCaisses).every(id => window.closedCaisses.includes(id));
+
         window.lockedCaisses = lockedCaisses || [];
         window.closedCaisses = (closedCaisses || []).map(String);
 
@@ -162,6 +164,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     container.innerHTML = '';
                 }
             }
+        }
+
+        const allCaissesNowClosed = Object.keys(nomsCaisses).every(id => window.closedCaisses.includes(id));
+        if (allCaissesNowClosed && !allCaissesPreviouslyClosed) {
+            showCustomAlert("La dernière caisse a été clôturée. Allez dans le menu Clôture pour confirmer la clôture générale.", 'success');
         }
     };
 
@@ -188,6 +195,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (e) {
             console.error('Erreur lors de la récupération de l\'état de clôture:', e);
+        }
+        
+        const allCaissesClosed = Object.keys(nomsCaisses).every(id => window.closedCaisses.includes(id));
+        
+        if(allCaissesClosed){
+            showClotureGeneraleModal();
+            return;
         }
 
         let caisseListHtml = '';
@@ -319,6 +333,85 @@ document.addEventListener('DOMContentLoaded', function() {
         updateConfirmationModalDetails(caisseId);
         clotureConfirmationModal.classList.add('visible');
     }
+    
+    function showClotureGeneraleModal() {
+        const clotureGeneraleModal = document.getElementById('cloture-generale-modal') || document.createElement('div');
+        clotureGeneraleModal.id = 'cloture-generale-modal';
+        clotureGeneraleModal.classList.add('modal');
+        document.body.appendChild(clotureGeneraleModal);
+        const config = JSON.parse(document.getElementById('calculator-data').dataset.config);
+        const { nomsCaisses } = config;
+
+        let caisseSummaryHtml = '<table class="caisse-summary-table"><thead><tr><th>Caisse</th><th>Total Compté</th><th>Recette Réelle</th><th>Écart</th><th>Actions</th></tr></thead><tbody>';
+
+        for (const caisseId in nomsCaisses) {
+            const getVal = (id) => parseFloat(document.getElementById(`${id}_${caisseId}`)?.value.replace(',', '.') || 0) || 0;
+            let totalCompte = 0;
+            for (const type in config.denominations) {
+                for (const name in config.denominations[type]) {
+                    const count = parseInt(document.getElementById(`${name}_${caisseId}`)?.value || 0) || 0;
+                    totalCompte += count * config.denominations[type][name];
+                }
+            }
+            const fondDeCaisse = getVal('fond_de_caisse');
+            const ventes = getVal('ventes');
+            const retrocession = getVal('retrocession');
+            const recetteReelle = totalCompte - fondDeCaisse;
+            const ecart = recetteReelle - (ventes + retrocession);
+
+            caisseSummaryHtml += `<tr>
+                <td>${nomsCaisses[caisseId]}</td>
+                <td>${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(totalCompte)}</td>
+                <td>${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(recetteReelle)}</td>
+                <td style="color: ${ecart > 0.01 ? 'var(--color-warning)' : (ecart < -0.01 ? 'var(--color-danger)' : 'var(--color-success)')};">${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(ecart)}</td>
+                <td><button class="reopen-caisse-btn action-btn-small" data-caisse-id="${caisseId}"><i class="fa-solid fa-lock-open"></i> Réouvrir</button></td>
+            </tr>`;
+        }
+        caisseSummaryHtml += '</tbody></table>';
+
+        clotureGeneraleModal.innerHTML = `
+            <div class="modal-content">
+                 <span class="modal-close">&times;</span>
+                <div class="modal-header"><h3>Toutes les caisses sont clôturées</h3></div>
+                <p>Vous pouvez maintenant lancer la clôture générale pour finaliser et réinitialiser le comptage.</p>
+                ${caisseSummaryHtml}
+                <div class="modal-actions">
+                    <button id="cancel-cloture-generale-btn" class="btn delete-btn">Annuler</button>
+                    <button id="confirm-cloture-generale-btn" class="btn save-btn">Confirmer la Clôture Générale</button>
+                </div>
+            </div>`;
+
+        clotureGeneraleModal.classList.add('visible');
+    }
+
+    document.body.addEventListener('click', function(event) {
+        const target = event.target;
+        const clotureGeneraleModal = document.getElementById('cloture-generale-modal');
+
+        if (target.id === 'confirm-cloture-generale-btn') {
+            if (window.confirm("Êtes-vous sûr de vouloir lancer la clôture générale ? Cette action est irréversible.")) {
+                if (window.wsConnection?.readyState === WebSocket.OPEN) {
+                    window.wsConnection.send(JSON.stringify({ type: 'cloture_generale' }));
+                }
+                clotureGeneraleModal.classList.remove('visible');
+            }
+        }
+
+        if (target.id === 'cancel-cloture-generale-btn' || target.closest('.modal-close') && clotureGeneraleModal.contains(target) || event.target === clotureGeneraleModal) {
+            clotureGeneraleModal.classList.remove('visible');
+        }
+        
+        const reopenBtn = target.closest('.reopen-caisse-btn');
+        if (reopenBtn) {
+            const caisseId = reopenBtn.dataset.caisseId;
+            if (window.confirm("Voulez-vous vraiment réouvrir cette caisse ?")) {
+                if (window.wsConnection?.readyState === WebSocket.OPEN) {
+                    window.wsConnection.send(JSON.stringify({ type: 'cloture_reopen', caisse_id: caisseId }));
+                }
+                clotureGeneraleModal.classList.remove('visible');
+            }
+        }
+    });
 
     clotureConfirmationModal.addEventListener('click', function(event) {
         const target = event.target;

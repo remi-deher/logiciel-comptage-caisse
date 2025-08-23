@@ -141,19 +141,17 @@ class Caisse implements MessageComponentInterface {
                     $caisseId = intval($data['caisse_id']);
                     $this->clotureStateService->confirmCaisse($caisseId);
                     $this->clotureStateService->unlockCaisse($caisseId);
-                    
                     $this->broadcastClotureState();
-                    
-                    if (count($this->clotureStateService->getClosedCaisses()) === count($this->nomsCaisses)) {
-                        $this->broadcast(['type' => 'all_caisses_closed']);
-                        $this->clotureStateService->resetState(); // Reset after broadcasting
-                    }
                     break;
                 // NOUVEAU: Gère la réouverture d'une caisse
                 case 'cloture_reopen':
                     $caisseId = intval($data['caisse_id']);
                     $this->clotureStateService->reopenCaisse($caisseId);
                     $this->broadcastClotureState();
+                    break;
+                case 'cloture_generale':
+                    $this->broadcast(['type' => 'all_caisses_closed']);
+                    $this->clotureStateService->resetState(); // Reset after broadcasting
                     break;
             }
         } catch (\Exception $e) {
