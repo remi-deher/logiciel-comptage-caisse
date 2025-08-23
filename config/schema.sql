@@ -51,3 +51,11 @@ CREATE TABLE IF NOT EXISTS `clotures` (
   PRIMARY KEY (`id`),
   FOREIGN KEY (`comptage_id`) REFERENCES `comptages`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- AJOUT: Table pour gérer l'état de verrouillage des caisses
+CREATE TABLE IF NOT EXISTS `cloture_status` (
+  `caisse_id` INT(11) NOT NULL,
+  `status` ENUM('open', 'locked', 'closed') NOT NULL DEFAULT 'open',
+  `locked_by_ws_id` VARCHAR(255) NULL,
+  PRIMARY KEY (`caisse_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
