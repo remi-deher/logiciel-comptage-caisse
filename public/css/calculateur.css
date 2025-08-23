@@ -134,6 +134,16 @@
 .grid-3 { grid-template-columns: 1fr; gap: 15px;}
 .tab-content .form-group input { text-align: right; }
 
+/* NOUVEAU: Styles pour mettre en évidence le champ de saisie actif */
+.tab-content .form-group input:focus,
+.tab-content .form-group textarea:focus {
+    border: 2px solid var(--color-primary); /* Bordure plus épaisse et de couleur primaire */
+    box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.3); /* Ombre plus visible */
+    transform: scale(1.02); /* Légère augmentation de la taille pour un effet de mise en avant */
+    transition: all 0.2s ease-in-out;
+}
+
+
 /* --- Styles des résultats --- */
 .results-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .result-box { background-color: var(--color-surface-alt); padding: 20px; border-radius: 8px; border: 1px solid var(--color-border-light); }
