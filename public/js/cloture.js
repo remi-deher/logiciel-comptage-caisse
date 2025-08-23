@@ -150,6 +150,19 @@ document.addEventListener('DOMContentLoaded', function() {
         updateCaisseTabs(nomsCaisses, currentWsId);
         updateFormFields(currentWsId);
         updateClotureButton(activeCaisseId, currentWsId);
+
+        // NOUVEAU: Affiche ou masque la suggestion de retrait sur la page principale
+        for (const caisseId in nomsCaisses) {
+            const isClosed = window.closedCaisses.includes(caisseId);
+            const container = document.getElementById(`suggestion-accordion-caisse${caisseId}`);
+            if (container) {
+                if (isClosed) {
+                    displayWithdrawalSuggestionOnPage(caisseId);
+                } else {
+                    container.innerHTML = '';
+                }
+            }
+        }
     };
 
     async function showCaisseSelectionModal() {
@@ -388,10 +401,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const recetteReelle = totalCompte - fondDeCaisse;
         const ecart = recetteReelle - (ventes + retrocession);
 
+        // MODIFICATION: Simplification de l'affichage dans la modale
         let contentHtml = `<div class="modal-body-content">
             <h4>Détails de la clôture</h4>
-            <p><strong>Recette théorique :</strong> <span>${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(ventes + retrocession)}</span></p>
-            <p><strong>Recette réelle (à retirer) :</strong> <span>${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(recetteReelle)}</span></p>
+            <p><strong>À retirer de la caisse :</strong> <span>${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(recetteReelle)}</span></p>
             <p><strong>Écart :</strong> <span style="color: ${ecart > 0.01 ? 'var(--color-warning)' : (ecart < -0.01 ? 'var(--color-danger)' : 'var(--color-success)')};">${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(ecart)}</span></p>
         </div>`;
 
@@ -399,7 +412,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep);
             let hasSuggestions = Object.values(suggestions).some(q => q > 0);
             if (hasSuggestions) {
-                // MODIFICATION: Utilisation d'un tableau pour un meilleur affichage
                 contentHtml += `<div class="modal-body-content"><h4>Composition du retrait</h4><table class="withdrawal-suggestion-table">
                     <thead><tr><th>Dénomination</th><th>Quantité à retirer</th></tr></thead><tbody>`;
                 
@@ -428,6 +440,59 @@ document.addEventListener('DOMContentLoaded', function() {
 
         clotureConfirmationModal.querySelector('.modal-body-content-wrapper').innerHTML = contentHtml;
     }
+
+    // NOUVEAU: Affiche la suggestion de retrait sur la page principale si la caisse est clôturée
+    function displayWithdrawalSuggestionOnPage(caisseId) {
+        const container = document.getElementById(`suggestion-accordion-caisse${caisseId}`);
+        if (!container) return;
+
+        const config = JSON.parse(document.getElementById('calculator-data').dataset.config);
+        const { denominations, minToKeep, currencySymbol } = config;
+
+        const getVal = (id) => parseFloat(document.getElementById(`${id}_${caisseId}`)?.value.replace(',', '.') || 0) || 0;
+        const getInt = (id) => parseInt(document.getElementById(`${id}_${caisseId}`)?.value || 0) || 0;
+
+        let totalCompte = 0;
+        const currentCounts = {};
+        for (const type in denominations) {
+            for (const name in denominations[type]) {
+                const count = getInt(name);
+                totalCompte += count * denominations[type][name];
+                currentCounts[name] = count;
+            }
+        }
+
+        const fondDeCaisse = getVal('fond_de_caisse');
+        const recetteReelle = totalCompte - fondDeCaisse;
+        const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep);
+        
+        let suggestionHtml = '';
+        if (Object.values(suggestions).some(q => q > 0)) {
+            suggestionHtml = `
+                <div class="accordion-card">
+                    <div class="accordion-header active">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                        <h3>Dernier Retrait Suggéré</h3>
+                        <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
+                    </div>
+                    <div class="accordion-content open">
+                        <div class="accordion-content-inner">
+                            <table class="withdrawal-suggestion-table">
+                                <thead><tr><th>Dénomination</th><th>Quantité à retirer</th></tr></thead>
+                                <tbody>`;
+            
+            const allDenominationsSorted = [...Object.entries(denominations.billets), ...Object.entries(denominations.pieces)].sort((a, b) => b[1] - a[1]);
+            allDenominationsSorted.forEach(([name, value]) => {
+                if (suggestions[name] > 0) {
+                    const label = value >= 1 ? `${value} ${currencySymbol}` : `${value * 100} cts`;
+                    suggestionHtml += `<tr><td>${label}</td><td>${suggestions[name]}</td></tr>`;
+                }
+            });
+            suggestionHtml += `</tbody></table></div></div></div>`;
+        }
+        container.innerHTML = suggestionHtml;
+    }
+
 
     function generateWithdrawalSuggestion(amountToWithdraw, currentCounts, denominations, minToKeep) {
         let remainingAmount = amountToWithdraw;
