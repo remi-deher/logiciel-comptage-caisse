@@ -68,22 +68,22 @@
     opacity: 0;
     background-color: var(--color-surface);
 }
-.ecart-display.active { 
-    display: block; 
-    opacity: 1; 
+.ecart-display.active {
+    display: block;
+    opacity: 1;
 }
-.ecart-display .ecart-value { 
+.ecart-display .ecart-value {
     font-size: 1.5em;
     display: block;
     margin-bottom: 5px;
 }
-.ecart-explanation { 
-    font-size: 0.9em; 
-    font-style: italic; 
-    font-weight: normal; 
-    color: var(--color-text-secondary); 
-    margin-top: 8px; 
-    min-height: 1.2em; 
+.ecart-explanation {
+    font-size: 0.9em;
+    font-style: italic;
+    font-weight: normal;
+    color: var(--color-text-secondary);
+    margin-top: 8px;
+    min-height: 1.2em;
 }
 
 /* --- Nouvelle classe pour la barre compacte en mode sticky --- */
@@ -98,15 +98,14 @@
     z-index: 100;
     border-radius: 0 0 8px 8px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    /* Les règles suivantes s'appliquent à tous les écrans */
 }
 
-.ecart-display-container.compact-sticky .ecart-value { 
+.ecart-display-container.compact-sticky .ecart-value {
     font-size: 1.2em;
     margin: 0;
 }
-.ecart-display-container.compact-sticky .ecart-explanation { 
-    display: none; 
+.ecart-display-container.compact-sticky .ecart-explanation {
+    display: none;
 }
 .ecart-display.ecart-ok { background-color: rgba(39, 174, 96, 0.1); border-color: var(--color-success); }
 .ecart-display.ecart-ok .ecart-value { color: var(--color-success); }
@@ -114,7 +113,6 @@
 .ecart-display.ecart-positif .ecart-value { color: var(--color-warning); }
 .ecart-display.ecart-negatif { background-color: rgba(192, 57, 43, 0.1); border-color: var(--color-danger); }
 .ecart-display.ecart-negatif .ecart-value { color: var(--color-danger); }
-/* NOUVEAU: Style pour le cadre de clôture */
 .ecart-display.ecart-cloturee {
     background-color: rgba(138, 43, 226, 0.1);
     border-color: #8a2be2;
@@ -163,7 +161,6 @@
     .results-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 }
 
-/* Nouveau style pour les totaux par ligne */
 .total-line {
     display: block;
     text-align: right;
@@ -173,12 +170,10 @@
     font-weight: bold;
 }
 
-/* Ajustement pour les petits écrans */
 @media (max-width: 576px) {
     .total-line { font-size: 0.8em; }
 }
 
-/* Style pour la suggestion de retrait */
 .withdrawal-table {
     width: 80%;
     margin: 10px auto;
@@ -200,7 +195,6 @@ body[data-theme="dark"] .withdrawal-table th {
     background-color: var(--color-surface);
 }
 
-/* NOUVEAU: styles pour les modales */
 .modal {
     position: fixed;
     z-index: 1000;
@@ -261,11 +255,6 @@ body[data-theme="dark"] .withdrawal-table th {
     justify-content: space-around;
 }
 
-/* ==========================================================================
-   public/css/styles.css (Ajouts pour la modale de sélection de caisse)
-   ========================================================================== */
-
-/* --- Nouvelle Modale de Sélection de Caisse --- */
 #caisse-selection-modal .modal-content {
     background-color: var(--color-surface);
     padding: 0;
@@ -303,7 +292,6 @@ body[data-theme="dark"] .withdrawal-table th {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 20px;
 }
-/* Style de la carte de la caisse */
 .caisse-status-item {
     border-radius: 10px;
     padding: 20px;
@@ -336,19 +324,17 @@ body[data-theme="dark"] .withdrawal-table th {
     opacity: 1;
 }
 
-/* Couleurs de fond dynamiques pour les statuts */
 .caisse-status-item.caisse-status-libre { background-color: var(--color-success); }
 .caisse-status-item.caisse-status-cloturee { background-color: var(--color-warning); }
 .caisse-status-item.caisse-status-en-cours { background-color: #8a2be2; }
 
-/* Styles pour les éléments de la carte */
 .caisse-status-item .status-info {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 10px;
     flex-grow: 1;
-    white-space: nowrap; /* Empêche le nom de la caisse de passer à la ligne */
+    white-space: nowrap;
 }
 .caisse-status-item .status-info i,
 .caisse-status-item strong {
@@ -360,7 +346,6 @@ body[data-theme="dark"] .withdrawal-table th {
     font-size: 1.5em;
 }
 
-/* Styles pour le texte de statut et le bouton */
 .caisse-status-item .status-actions {
     display: flex;
     flex-direction: column;
@@ -372,7 +357,6 @@ body[data-theme="dark"] .withdrawal-table th {
     font-weight: bold;
 }
 
-/* MODIFICATION: Style unifié pour tous les boutons de la modale de sélection */
 .caisse-status-item .action-btn-small {
     background-color: rgba(255, 255, 255, 0.2);
     color: white;
@@ -388,7 +372,6 @@ body[data-theme="dark"] .withdrawal-table th {
     background-color: rgba(255, 255, 255, 0.3);
 }
 
-/* Styles pour les caisses désactivées */
 .caisse-status-item.disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -399,7 +382,6 @@ body[data-theme="dark"] .withdrawal-table th {
     box-shadow: none;
 }
 
-/* Légende des couleurs */
 .color-key {
     display: flex;
     flex-wrap: wrap;
@@ -423,17 +405,9 @@ body[data-theme="dark"] .withdrawal-table th {
 .color-dot.color-cloturee { background-color: var(--color-warning); }
 .color-dot.color-en-cours { background-color: #8a2be2; }
 
-/* NOUVEAU: Section de clôture générale */
-.cloture-generale-section {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid var(--color-border-light);
-    text-align: center;
-}
 #cloture-generale-modal .modal-content {
     max-width: 800px;
 }
-
 .caisse-summary-table {
     width: 100%;
     margin-top: 15px;
@@ -460,4 +434,29 @@ body[data-theme="dark"] .withdrawal-table th {
 }
 .caisse-summary-table tbody tr:nth-of-type(even) {
     background-color: var(--color-surface-alt);
+}
+
+/* NOUVEAU: Style amélioré pour le bouton Réouvrir */
+.reopen-caisse-btn.action-btn-small {
+    background-color: transparent;
+    color: var(--color-primary);
+    border: 2px solid var(--color-primary);
+    font-weight: bold;
+    padding: 6px 12px; /* Ajustement du padding */
+}
+
+.reopen-caisse-btn.action-btn-small:hover {
+    background-color: var(--color-primary);
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* Appliquer un style différent dans la modale de sélection sur fond orange */
+.caisse-status-item.caisse-status-cloturee .reopen-caisse-btn.action-btn-small {
+    background-color: rgba(255, 255, 255, 0.25);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+.caisse-status-item.caisse-status-cloturee .reopen-caisse-btn.action-btn-small:hover {
+    background-color: rgba(255, 255, 255, 0.4);
 }
