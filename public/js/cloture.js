@@ -103,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (tabLink) {
                  tabLink.classList.toggle('cloture-en-cours', isLocked);
+                 tabLink.classList.toggle('cloturee', isClosed); // Ajout de la classe pour le style violet
                  tabLink.disabled = false;
             }
         }
@@ -125,6 +126,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 el.readOnly = false;
             }
         });
+    };
+    
+    const updateEcartDisplayForCloture = (nomsCaisses) => {
+        for (const caisseId in nomsCaisses) {
+            const display = document.getElementById(`ecart-display-caisse${caisseId}`);
+            if (display) {
+                const isClosed = window.closedCaisses.includes(caisseId);
+                if (isClosed) {
+                    display.classList.add('ecart-cloturee');
+                    const explanationP = display.querySelector('.ecart-explanation');
+                    if(explanationP) explanationP.textContent = "Cette caisse est clôturée.";
+                } else {
+                    display.classList.remove('ecart-cloturee');
+                }
+            }
+        }
     };
 
     const updateClotureButton = (activeCaisseId, currentWsId) => {
@@ -152,6 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateCaisseTabs(nomsCaisses, currentWsId);
         updateFormFields(currentWsId);
         updateClotureButton(activeCaisseId, currentWsId);
+        updateEcartDisplayForCloture(nomsCaisses);
 
         // NOUVEAU: Affiche ou masque la suggestion de retrait sur la page principale
         for (const caisseId in nomsCaisses) {
