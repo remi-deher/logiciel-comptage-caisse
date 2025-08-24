@@ -10,23 +10,34 @@ $release_info = 'Information non disponible';
 ?>
     </div>
     <footer class="main-footer">
-        <p>
-            Développé par DEHER Rémi |
-            <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer">Licence MIT</a> |
-            <a href="https://github.com/remi-deher/logiciel-comptage-caisse" target="_blank" rel="noopener noreferrer">Dépôt GitHub</a>
-        </p>
+        <div class="footer-section footer-links">
+            <h4>Ressources</h4>
+            <a href="https://opensource.org/license/mit" target="_blank" rel="noopener noreferrer">
+                <i class="fa-solid fa-file-invoice"></i> Licence MIT
+            </a>
+            <a href="https://github.com/remi-deher/logiciel-comptage-caisse" target="_blank" rel="noopener noreferrer">
+                <i class="fa-brands fa-github"></i> Dépôt GitHub
+            </a>
+        </div>
 
-        <p>
-            Version actuelle : <strong><?= htmlspecialchars($current_version) ?></strong> |
-            <span id="release-info-container">Dernière release : <span id="release-date-info"><?= htmlspecialchars($release_info) ?></span></span>
-            <button id="force-version-check" class="force-check-btn" title="Forcer la vérification">
-                <i class="fa-solid fa-arrows-rotate"></i>
-            </button>
-        </p>
-
-        <div id="update-container" class="update-container">
-            <span id="version-info">Vérification de la version...</span>
-            <a href="index.php?page=update" id="update-button" class="update-btn" style="display: none; text-decoration: none;">Mettre à jour</a>
+        <div class="footer-section footer-version">
+            <h4>Mises à jour</h4>
+            <p id="release-info-container">Dernière release : <span id="release-date-info"><?= htmlspecialchars($release_info) ?></span></p>
+            <div id="update-container" class="update-container">
+                <span id="version-info">Vérification de la version...</span>
+                <a href="index.php?page=update" id="update-button" class="update-btn" style="display: none; text-decoration: none;">Mettre à jour</a>
+                <button id="force-version-check" class="force-check-btn" title="Forcer la vérification">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="footer-section footer-copyright">
+            <h4>À propos</h4>
+            <p>
+                Développé par DEHER Rémi<br>
+                &copy; <?= date('Y') ?> Tous droits réservés.
+            </p>
         </div>
     </footer>
 

@@ -14,7 +14,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Variable pour suivre les modifications non enregistrées
     let hasUnsavedChanges = false;
-
+    
+    // NOUVEAU: Sélecteur de la nouvelle modale
+    const synthesisModal = document.getElementById('synthesis-modal');
+    const synthesisModalCloseBtn = synthesisModal ? synthesisModal.querySelector('.modal-close') : null;
+    
+    // NOUVELLE FONCTION: Gère le comportement de l'indicateur d'écart collant
+    const handleStickyEcart = () => {
+        const ecartContainer = document.querySelector('.ecart-display-container');
+        if (!ecartContainer) return;
+        const offset = 100; // Décalage en pixels avant d'appliquer la classe
+        if (window.scrollY > offset) {
+            ecartContainer.classList.add('compact-sticky');
+        } else {
+            ecartContainer.classList.remove('compact-sticky');
+        }
+    };
+    
     // --- Fonctions utilitaires ---
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
@@ -68,12 +84,12 @@ document.addEventListener('DOMContentLoaded', function() {
             totalGlobalEcart += ecart;
             totalGlobalFdc += fondDeCaisse;
 
-            // Met à jour l'affichage des résultats de la caisse
+            // Met à jour l'affichage des résultats de la caisse (dans la modale)
             updateResultsDisplay(caisseId, { fondDeCaisse, totalCaisseCompte, recetteTheorique, recetteReelle, ecart });
             updateEcartDisplay(caisseId, ecart);
         }
 
-        // Met à jour l'affichage des résultats combinés
+        // Met à jour l'affichage des résultats combinés (dans la modale)
         updateCombinedResultsDisplay({ totalGlobalFdc, totalGlobalCompte, totalGlobalRecetteTheorique, totalGlobalRecetteReelle, totalGlobalEcart });
     };
 
@@ -81,6 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
      * Met à jour la section des résultats pour une caisse spécifique.
      */
     function updateResultsDisplay(caisseId, results) {
+        // CORRECTION: Les sélecteurs pointent maintenant vers les éléments dans la modale
         document.getElementById(`res-c${caisseId}-fdc`).textContent = formatCurrency(results.fondDeCaisse);
         document.getElementById(`res-c${caisseId}-total`).textContent = formatCurrency(results.totalCaisseCompte);
         document.getElementById(`res-c${caisseId}-theorique`).textContent = formatCurrency(results.recetteTheorique);
@@ -94,6 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
      * Met à jour la section des résultats combinés.
      */
     function updateCombinedResultsDisplay(totals) {
+        // CORRECTION: Les sélecteurs pointent maintenant vers les éléments dans la modale
         document.getElementById('res-total-fdc').textContent = formatCurrency(totals.totalGlobalFdc);
         document.getElementById('res-total-total').textContent = formatCurrency(totals.totalGlobalCompte);
         document.getElementById('res-total-theorique').textContent = formatCurrency(totals.totalGlobalRecetteTheorique);
@@ -132,6 +150,10 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function setupEventListeners() {
         const form = document.getElementById('caisse-form');
+        // NOUVEAU: Événement de défilement pour l'indicateur d'écart
+        window.addEventListener('scroll', handleStickyEcart);
+        // NOUVEAU: Appel initial pour un bon affichage au chargement
+        handleStickyEcart();
 
         // Onglets
         document.querySelector('.tab-selector').addEventListener('click', (e) => {
@@ -151,6 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.addEventListener('click', (e) => {
             const header = e.target.closest('.accordion-header');
             if (header) {
+                // CORRECTION: On s'assure que le clic ne vient pas d'un bouton
                 if (e.target.closest('button')) return;
                 header.classList.toggle('active');
                 const content = header.nextElementSibling;
@@ -198,6 +221,27 @@ document.addEventListener('DOMContentLoaded', function() {
         form.addEventListener('submit', () => {
             hasUnsavedChanges = false;
         });
+
+        // NOUVEAU: Gère l'ouverture de la modale de synthèse
+        const openSynthesisBtn = document.getElementById('open-synthesis-modal-btn');
+        if (openSynthesisBtn) {
+            openSynthesisBtn.addEventListener('click', () => {
+                calculateAllFull(); // Assure que les résultats sont à jour
+                synthesisModal.classList.add('visible');
+            });
+        }
+        
+        // NOUVEAU: Gère la fermeture de la modale de synthèse
+        if (synthesisModalCloseBtn) {
+            synthesisModalCloseBtn.onclick = function() {
+                synthesisModal.classList.remove('visible');
+            };
+            window.onclick = function(event) {
+                if (event.target === synthesisModal) {
+                    synthesisModal.classList.remove('visible');
+                }
+            };
+        }
     }
 
     /**

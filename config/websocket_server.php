@@ -17,7 +17,7 @@ class Caisse implements MessageComponentInterface {
     protected $clients;
     private $clotureStateService;
     private $nomsCaisses;
-    private $pdo; // Ajout de la propriété PDO
+    private $pdo;
 
     public function __construct() {
         $this->clients = new \SplObjectStorage;
@@ -42,6 +42,33 @@ class Caisse implements MessageComponentInterface {
         echo "Serveur de caisse démarré.\n";
     }
 
+    // NOUVELLE MÉTHODE : Vérifie et rétablit la connexion à la base de données si elle est perdue.
+    private function reconnect() {
+        try {
+            // Tente de faire une requête simple pour vérifier l'état de la connexion
+            $this->pdo->query('SELECT 1');
+        } catch (PDOException $e) {
+            // Si la connexion a échoué (par exemple, "server has gone away"), on se reconnecte.
+            if (strpos($e->getMessage(), 'server has gone away') !== false) {
+                echo "Connexion BDD perdue. Tentative de reconnexion...\n";
+                try {
+                    $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+                    $this->pdo = new PDO($dsn, DB_USER, DB_PASS);
+                    $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                    $this->clotureStateService = new ClotureStateService($this->pdo); // Met à jour le service avec la nouvelle connexion
+                    echo "Reconnexion BDD réussie.\n";
+                } catch (PDOException $reconnect_e) {
+                    echo "Échec de la reconnexion BDD : " . $reconnect_e->getMessage() . "\n";
+                    // En cas d'échec, on peut choisir d'arrêter le serveur ou de laisser l'erreur se propager.
+                    throw $reconnect_e;
+                }
+            } else {
+                // Si c'est une autre erreur, on la propage.
+                throw $e;
+            }
+        }
+    }
+
     public function onOpen(ConnectionInterface $conn) {
         $this->clients->attach($conn);
         echo "Nouvelle connexion! ({$conn->resourceId})\n";
@@ -55,6 +82,9 @@ class Caisse implements MessageComponentInterface {
 
     public function onMessage(ConnectionInterface $from, $msg) {
         try {
+            // NOUVEAU: Vérifie la connexion BDD avant toute opération.
+            $this->reconnect();
+
             $data = json_decode($msg, true);
             if (!is_array($data)) {
                 return;
@@ -163,13 +193,19 @@ class Caisse implements MessageComponentInterface {
         $this->clients->detach($conn);
         echo "Connexion {$conn->resourceId} terminée\n";
         
-        $lockedState = $this->clotureStateService->getLockedCaisses();
-        foreach($lockedState as $lockedCaisse) {
-            if ($lockedCaisse['locked_by'] === (string)$conn->resourceId) {
-                $this->clotureStateService->unlockCaisse(intval($lockedCaisse['caisse_id']));
-                $this->broadcastClotureState();
-                break;
+        // NOUVEAU: Tente de se reconnecter avant de vérifier l'état
+        try {
+            $this->reconnect();
+            $lockedState = $this->clotureStateService->getLockedCaisses();
+            foreach($lockedState as $lockedCaisse) {
+                if ($lockedCaisse['locked_by'] === (string)$conn->resourceId) {
+                    $this->clotureStateService->unlockCaisse(intval($lockedCaisse['caisse_id']));
+                    $this->broadcastClotureState();
+                    break;
+                }
             }
+        } catch (\Exception $e) {
+            error_log("Erreur lors de la gestion de la déconnexion : {$e->getMessage()}");
         }
     }
 

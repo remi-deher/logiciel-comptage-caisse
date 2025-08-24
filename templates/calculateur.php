@@ -72,6 +72,9 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                             <i class="fa-solid fa-cash-register"></i>
                             <h3>Informations Caisse</h3>
                             <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
+                            <button type="button" id="open-synthesis-modal-btn" class="action-btn-small new-btn" style="margin-left: auto;">
+                                <i class="fa-solid fa-chart-pie"></i> Synthèse
+                            </button>
                         </div>
                         <div class="accordion-content open">
                             <div class="accordion-content-inner">
@@ -146,45 +149,43 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
             </div>
         </div>
     </form>
+</div>
 
-    <div class="accordion-container" style="margin-top: 30px;">
-        <div class="accordion-card">
-            <div class="accordion-header active">
-                <i class="fa-solid fa-chart-pie"></i>
-                <h3>Synthèse en Temps Réel</h3>
-                <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
-            </div>
-            <div class="accordion-content open">
-                <div class="accordion-content-inner">
-                    <div class="results" id="results-container">
-                        <div class="results-grid">
-                            <?php foreach ($noms_caisses as $id => $nom): ?>
-                            <div class="result-box">
-                                <h3><?= htmlspecialchars($nom) ?></h3>
-                                <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id ?>-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id ?>-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <hr>
-                                <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id ?>-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line total"><span>Recette réelle (à retirer) :</span> <span id="res-c<?= $id ?>-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id ?>-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                        <div class="result-box combined-results">
-                            <h3>Totaux Combinés</h3>
-                            <div class="result-line"><span>Total Fonds de caisse :</span> <span id="res-total-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                            <div class="result-line"><span>Total compté (global) :</span> <span id="res-total-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                            <hr>
-                            <div class="result-line"><span>Recette théorique totale :</span> <span id="res-total-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                            <div class="result-line total"><span>Recette réelle totale (à retirer) :</span> <span id="res-total-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                            <div class="result-line total"><span>ÉCART TOTAL :</span> <span id="res-total-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                        </div>
+<div id="synthesis-modal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <div class="modal-header">
+            <h3>Synthèse en Temps Réel</h3>
+        </div>
+        <div class="modal-body-content-wrapper">
+            <div class="results" id="results-container">
+                <div class="results-grid">
+                    <?php foreach ($noms_caisses as $id => $nom): ?>
+                    <div class="result-box">
+                        <h3><?= htmlspecialchars($nom) ?></h3>
+                        <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id ?>-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                        <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id ?>-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                        <hr>
+                        <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id ?>-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                        <div class="result-line total"><span>Recette réelle (à retirer) :</span> <span id="res-c<?= $id ?>-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                        <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id ?>-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
                     </div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="result-box combined-results">
+                    <h3>Totaux Combinés</h3>
+                    <div class="result-line"><span>Total Fonds de caisse :</span> <span id="res-total-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                    <div class="result-line"><span>Total compté (global) :</span> <span id="res-total-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                    <hr>
+                    <div class="result-line"><span>Recette théorique totale :</span> <span id="res-total-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                    <div class="result-line total"><span>Recette réelle totale (à retirer) :</span> <span id="res-total-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                    <div class="result-line total"><span>ÉCART TOTAL :</span> <span id="res-total-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
 <script src="/js/realtime.js"></script>
 <script src="/js/cloture.js"></script>
 <?php
