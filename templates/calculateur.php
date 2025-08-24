@@ -72,9 +72,6 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                             <i class="fa-solid fa-cash-register"></i>
                             <h3>Informations Caisse</h3>
                             <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
-                            <button type="button" id="open-synthesis-modal-btn" class="action-btn-small new-btn" style="margin-left: auto;">
-                                <i class="fa-solid fa-chart-pie"></i> Synthèse
-                            </button>
                         </div>
                         <div class="accordion-content open">
                             <div class="accordion-content-inner">
@@ -101,6 +98,9 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                             <i class="fa-solid fa-money-bill-wave"></i>
                             <h3>Détail des Espèces</h3>
                             <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
+                            <button type="button" class="open-synthesis-modal-btn action-btn-small new-btn" data-caisse-id="<?= $id ?>" style="margin-left: auto;">
+                                <i class="fa-solid fa-chart-pie"></i> Synthèse
+                            </button>
                         </div>
                         <div class="accordion-content open">
                             <div class="accordion-content-inner">
@@ -153,24 +153,42 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 
 <div id="synthesis-modal" class="modal">
     <div class="modal-content">
-        <span class="modal-close">&times;</span>
         <div class="modal-header">
             <h3>Synthèse en Temps Réel</h3>
         </div>
         <div class="modal-body-content-wrapper">
             <div class="results" id="results-container">
-                <div class="results-grid">
-                    <?php foreach ($noms_caisses as $id => $nom): ?>
-                    <div class="result-box">
-                        <h3><?= htmlspecialchars($nom) ?></h3>
-                        <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id ?>-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                        <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id ?>-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                        <hr>
-                        <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id ?>-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                        <div class="result-line total"><span>Recette réelle (à retirer) :</span> <span id="res-c<?= $id ?>-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                        <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id ?>-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                    </div>
-                    <?php endforeach; ?>
+                <div class="synthesis-grid">
+                    <?php 
+                    $caisse_ids = array_keys($noms_caisses);
+                    $num_caisses = count($caisse_ids);
+                    for ($i = 0; $i < $num_caisses; $i += 2): 
+                        $id1 = $caisse_ids[$i];
+                        $nom1 = $noms_caisses[$id1];
+                        $id2 = isset($caisse_ids[$i+1]) ? $caisse_ids[$i+1] : null;
+                        $nom2 = isset($noms_caisses[$id2]) ? $noms_caisses[$id2] : null;
+                    ?>
+                        <div class="synthesis-pair">
+                            <div class="result-box">
+                                <h3><?= htmlspecialchars($nom1) ?></h3>
+                                <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id1 ?>-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id1 ?>-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id1 ?>-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line total"><span>Recette réelle (à retirer) :</span> <span id="res-c<?= $id1 ?>-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id1 ?>-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                            </div>
+                            <?php if ($id2 !== null): ?>
+                            <div class="result-box">
+                                <h3><?= htmlspecialchars($nom2) ?></h3>
+                                <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id2 ?>-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id2 ?>-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id2 ?>-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line total"><span>Recette réelle (à retirer) :</span> <span id="res-c<?= $id2 ?>-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                                <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id2 ?>-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endfor; ?>
                 </div>
                 <div class="result-box combined-results">
                     <h3>Totaux Combinés</h3>
@@ -186,6 +204,75 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
     </div>
 </div>
 
+<div id="details-modal" class="modal">
+    <div class="modal-content">
+        <div id="modal-details-content"></div>
+    </div>
+</div>
+<div id="help-modal" class="modal">
+    <div class="modal-content">
+        <div id="help-modal-content">
+            </div>
+    </div>
+</div>
+<div id="cloture-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Confirmer la clôture des caisses</h3>
+        </div>
+        <p>Êtes-vous sûr de vouloir lancer la procédure de clôture pour toutes les caisses ?</p>
+        <p>Cette action sauvegardera l'état actuel et mettra les caisses à zéro.</p>
+        <div class="modal-actions">
+            <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
+            <button id="confirm-final-cloture-btn" class="btn new-btn" style="display: none;">Confirmer la clôture</button>
+        </div>
+    </div>
+</div>
+<div id="caisse-selection-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header-cloture"><h3>Gestion de la Clôture</h3></div>
+        <div class="modal-body-cloture">
+            <p>Sélectionnez une caisse pour commencer ou modifier son état de clôture.</p>
+            <div class="color-key">
+                <div><span class="color-dot color-libre"></span> Libre</div>
+                <div><span class="color-dot color-cloturee"></span> Clôturée</div>
+                <div><span class="color-dot color-en-cours"></span> En cours</div>
+            </div>
+            <div class="caisse-status-list"></div>
+        </div>
+    </div>
+</div>
+<div id="cloture-confirmation-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><h3>Confirmer la clôture</h3></div>
+        <p>Voulez-vous finaliser la clôture de cette caisse ? Cette action est irréversible.</p>
+        <div class="modal-body-content-wrapper"></div>
+        <div class="modal-actions">
+            <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
+            <button id="confirm-final-cloture-btn" class="btn new-btn">Confirmer la clôture</button>
+        </div>
+    </div>
+</div>
+<div id="final-confirmation-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header modal-header-danger"><h3>Confirmation Finale</h3></div>
+        <p>Validez la clôture de la journée ?<br>Cela remettra les caisses à 0 en gardant le fond de caisse et va créer une sauvegarde des comptages.</p>
+        <div class="modal-actions">
+            <button id="cancel-final-cloture-action-btn" class="btn delete-btn">Annuler</button>
+            <button id="confirm-final-cloture-action-btn" class="btn save-btn">Confirmer</button>
+        </div>
+    </div>
+</div>
+<div id="cloture-generale-modal" class="modal">
+    <div class="modal-content">
+         <div class="modal-header"><h3>Toutes les caisses sont clôturées</h3></div>
+        <p>Vérifiez les suggestions de retrait une dernière fois avant de lancer la clôture générale.</p>
+        <div class="accordion-container"></div>
+        <div class="modal-actions">
+            <button id="confirm-cloture-generale-btn" class="btn save-btn">Confirmer la Clôture Générale</button>
+        </div>
+    </div>
+</div>
 <script src="/js/realtime.js"></script>
 <script src="/js/cloture.js"></script>
 <?php

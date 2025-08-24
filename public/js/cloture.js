@@ -14,25 +14,10 @@ document.addEventListener('DOMContentLoaded', function() {
     window.closedCaisses = [];
 
     // --- Création des modales ---
-    const caisseSelectionModal = document.createElement('div');
-    caisseSelectionModal.id = 'caisse-selection-modal';
-    caisseSelectionModal.classList.add('modal');
-    document.body.appendChild(caisseSelectionModal);
-
-    const clotureConfirmationModal = document.createElement('div');
-    clotureConfirmationModal.id = 'cloture-confirmation-modal';
-    clotureConfirmationModal.classList.add('modal');
-    document.body.appendChild(clotureConfirmationModal);
-
-    const finalConfirmationModal = document.createElement('div');
-    finalConfirmationModal.id = 'final-confirmation-modal';
-    finalConfirmationModal.classList.add('modal');
-    document.body.appendChild(finalConfirmationModal);
-
-    const clotureGeneraleModal = document.createElement('div');
-    clotureGeneraleModal.id = 'cloture-generale-modal';
-    clotureGeneraleModal.classList.add('modal');
-    document.body.appendChild(clotureGeneraleModal);
+    const caisseSelectionModal = document.getElementById('caisse-selection-modal');
+    const clotureConfirmationModal = document.getElementById('cloture-confirmation-modal');
+    const finalConfirmationModal = document.getElementById('final-confirmation-modal');
+    const clotureGeneraleModal = document.getElementById('cloture-generale-modal');
 
     // --- Fonctions utilitaires ---
 
@@ -201,21 +186,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="status-actions">${actionHtml}</div>
                 </div>`;
         }
-
-        caisseSelectionModal.innerHTML = `
-            <div class="modal-content">
-                <span class="modal-close">&times;</span>
-                <div class="modal-header-cloture"><h3>Gestion de la Clôture</h3></div>
-                <div class="modal-body-cloture">
-                    <p>Sélectionnez une caisse pour commencer ou modifier son état de clôture.</p>
-                    <div class="color-key">
-                        <div><span class="color-dot color-libre"></span> Libre</div>
-                        <div><span class="color-dot color-cloturee"></span> Clôturée</div>
-                        <div><span class="color-dot color-en-cours"></span> En cours</div>
-                    </div>
-                    <div class="caisse-status-list">${caisseListHtml}</div>
-                </div>
-            </div>`;
+        
+        const modalBody = caisseSelectionModal.querySelector('.caisse-status-list');
+        if (modalBody) modalBody.innerHTML = caisseListHtml;
         caisseSelectionModal.classList.add('visible');
     }
 
@@ -248,30 +221,12 @@ document.addEventListener('DOMContentLoaded', function() {
             accordionHtml += `</tbody></table></div></div></div>`;
         }
         accordionHtml += '</div>';
-
-        clotureGeneraleModal.innerHTML = `
-            <div class="modal-content">
-                 <span class="modal-close">&times;</span>
-                <div class="modal-header"><h3>Toutes les caisses sont clôturées</h3></div>
-                <p>Vérifiez les suggestions de retrait une dernière fois avant de lancer la clôture générale.</p>
-                ${accordionHtml}
-                <div class="modal-actions">
-                    <button id="confirm-cloture-generale-btn" class="btn save-btn">Confirmer la Clôture Générale</button>
-                </div>
-            </div>`;
+        
+        clotureGeneraleModal.querySelector('.modal-content .accordion-container').innerHTML = accordionHtml;
         clotureGeneraleModal.classList.add('visible');
     }
     
     function showFinalConfirmationModal() {
-        finalConfirmationModal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header modal-header-danger"><h3>Confirmation Finale</h3></div>
-                <p>Validez la clôture de la journée ?<br>Cela remettra les caisses à 0 en gardant le fond de caisse et va créer une sauvegarde des comptages.</p>
-                <div class="modal-actions">
-                    <button id="cancel-final-cloture-action-btn" class="btn delete-btn">Annuler</button>
-                    <button id="confirm-final-cloture-action-btn" class="btn save-btn">Confirmer</button>
-                </div>
-            </div>`;
         finalConfirmationModal.classList.add('visible');
     }
     
@@ -279,17 +234,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!caisseId) return;
         const config = JSON.parse(calculatorDataElement.dataset.config);
         const caisseNom = config.nomsCaisses[caisseId];
-        clotureConfirmationModal.innerHTML = `
-            <div class="modal-content">
-                <span class="modal-close">&times;</span>
-                <div class="modal-header"><h3>Confirmer la clôture de : ${caisseNom}</h3></div>
-                <p>Voulez-vous finaliser la clôture de cette caisse ? Cette action est irréversible.</p>
-                <div class="modal-body-content-wrapper"></div>
-                <div class="modal-actions">
-                    <button id="cancel-cloture-btn" class="btn delete-btn" data-caisse-id="${caisseId}">Annuler</button>
-                    <button id="confirm-final-cloture-btn" class="btn new-btn" data-caisse-id="${caisseId}">Confirmer la clôture</button>
-                </div>
-            </div>`;
+        
+        clotureConfirmationModal.querySelector('h3').textContent = `Confirmer la clôture de : ${caisseNom}`;
+        clotureConfirmationModal.querySelector('p').textContent = "Voulez-vous finaliser la clôture de cette caisse ? Cette action est irréversible.";
+        clotureConfirmationModal.querySelector('#cancel-cloture-btn').dataset.caisseId = caisseId;
+        clotureConfirmationModal.querySelector('#confirm-final-cloture-btn').dataset.caisseId = caisseId;
         clotureConfirmationModal.classList.add('visible');
     }
 
@@ -305,9 +254,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.body.addEventListener('click', function(event) {
         let target = event.target;
+        // On ne gère plus la fermeture par le bouton, juste le clic en dehors
         const modal = target.closest('.modal');
-
-        if (target.classList.contains('modal-close') || target === modal) {
+        if (target === modal) {
             modal?.classList.remove('visible');
         }
 

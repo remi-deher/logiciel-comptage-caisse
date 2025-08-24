@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // NOUVEAU: Sélecteur de la nouvelle modale
     const synthesisModal = document.getElementById('synthesis-modal');
-    const synthesisModalCloseBtn = synthesisModal ? synthesisModal.querySelector('.modal-close') : null;
     
     // NOUVELLE FONCTION: Gère le comportement de l'indicateur d'écart collant
     const handleStickyEcart = () => {
@@ -97,7 +96,6 @@ document.addEventListener('DOMContentLoaded', function() {
      * Met à jour la section des résultats pour une caisse spécifique.
      */
     function updateResultsDisplay(caisseId, results) {
-        // CORRECTION: Les sélecteurs pointent maintenant vers les éléments dans la modale
         document.getElementById(`res-c${caisseId}-fdc`).textContent = formatCurrency(results.fondDeCaisse);
         document.getElementById(`res-c${caisseId}-total`).textContent = formatCurrency(results.totalCaisseCompte);
         document.getElementById(`res-c${caisseId}-theorique`).textContent = formatCurrency(results.recetteTheorique);
@@ -111,7 +109,6 @@ document.addEventListener('DOMContentLoaded', function() {
      * Met à jour la section des résultats combinés.
      */
     function updateCombinedResultsDisplay(totals) {
-        // CORRECTION: Les sélecteurs pointent maintenant vers les éléments dans la modale
         document.getElementById('res-total-fdc').textContent = formatCurrency(totals.totalGlobalFdc);
         document.getElementById('res-total-total').textContent = formatCurrency(totals.totalGlobalCompte);
         document.getElementById('res-total-theorique').textContent = formatCurrency(totals.totalGlobalRecetteTheorique);
@@ -223,24 +220,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // NOUVEAU: Gère l'ouverture de la modale de synthèse
-        const openSynthesisBtn = document.getElementById('open-synthesis-modal-btn');
+        const openSynthesisBtn = document.querySelectorAll('.open-synthesis-modal-btn');
         if (openSynthesisBtn) {
-            openSynthesisBtn.addEventListener('click', () => {
-                calculateAllFull(); // Assure que les résultats sont à jour
-                synthesisModal.classList.add('visible');
+            openSynthesisBtn.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    calculateAllFull(); // Assure que les résultats sont à jour
+                    synthesisModal.classList.add('visible');
+                });
             });
         }
         
         // NOUVEAU: Gère la fermeture de la modale de synthèse
-        if (synthesisModalCloseBtn) {
-            synthesisModalCloseBtn.onclick = function() {
-                synthesisModal.classList.remove('visible');
-            };
-            window.onclick = function(event) {
+        if (synthesisModal) {
+            window.addEventListener('click', (event) => {
                 if (event.target === synthesisModal) {
                     synthesisModal.classList.remove('visible');
                 }
-            };
+            });
         }
     }
 
