@@ -26,35 +26,35 @@ class CalculateurController {
         $loaded_data = [];
         $isLoadedFromHistory = false;
         $isAutosaveLoaded = false;
-
-        // Nouvelle logique de chargement pour le schéma normalisé
-        if (isset($_GET['load'])) {
-            $comptageIdToLoad = intval($_GET['load']);
-            error_log("Tentative de chargement du comptage ID: " . $comptageIdToLoad);
-            
-            // CORRECTION : On vérifie si le chargement vient d'une sauvegarde récente
-            if (isset($_SESSION['just_saved']) && $_SESSION['just_saved'] == $comptageIdToLoad) {
+    
+        // NOUVELLE LOGIQUE : Gère le chargement normal, après sauvegarde, et pour reprendre un comptage
+        $comptageIdToLoad = intval($_GET['load'] ?? $_GET['resume_from'] ?? 0);
+    
+        if ($comptageIdToLoad > 0) {
+            if (isset($_GET['resume_from'])) {
+                // L'utilisateur veut reprendre un comptage, on le charge en mode actif
                 $isLoadedFromHistory = false;
-                unset($_SESSION['just_saved']); // On nettoie la variable de session
+                 $_SESSION['message'] = "Le comptage a été repris. N'oubliez pas de l'enregistrer sous un nouveau nom.";
+            } elseif (isset($_SESSION['just_saved']) && $_SESSION['just_saved'] == $comptageIdToLoad) {
+                // On vient de sauvegarder, on reste en mode actif
+                $isLoadedFromHistory = false;
+                unset($_SESSION['just_saved']);
             } else {
+                // Chargement standard depuis l'historique en mode consultation
                 $isLoadedFromHistory = true;
             }
-
+    
             $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE id = ?");
             $stmt->execute([$comptageIdToLoad]);
             $loaded_comptage = $stmt->fetch() ?: [];
-
+    
             if ($loaded_comptage) {
-                error_log("Comptage trouvé avec l'ID: " . $comptageIdToLoad);
-                // La méthode loadComptageData a été mise à jour pour renvoyer le bon format
                 $loaded_data = $this->loadComptageData($loaded_comptage['id']);
                 $loaded_data['nom_comptage'] = $loaded_comptage['nom_comptage'];
                 $loaded_data['explication'] = $loaded_comptage['explication'];
-            } else {
-                error_log("Comptage avec l'ID " . $comptageIdToLoad . " non trouvé.");
             }
         }
-
+    
         $message = $_SESSION['message'] ?? null;
         unset($_SESSION['message']);
         $noms_caisses = $this->noms_caisses;

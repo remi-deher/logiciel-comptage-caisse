@@ -24,7 +24,8 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 ?>
 
 <div id="calculator-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'
-     data-loaded-data='<?= htmlspecialchars(json_encode($loaded_data), ENT_QUOTES, 'UTF-8') ?>'></div>
+     data-loaded-data='<?= htmlspecialchars(json_encode($loaded_data), ENT_QUOTES, 'UTF-8') ?>'
+     data-comptage-id="<?= htmlspecialchars($_GET['load'] ?? '') ?>"></div>
 
 <div class="container">
     <?php if ($isLoadedFromHistory ?? false): ?>
@@ -34,7 +35,9 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                 <strong>Mode Consultation</strong>
                 <p>Vous consultez un ancien comptage. Le temps réel et la sauvegarde automatique sont désactivés.</p>
             </div>
-            <a href="index.php?page=calculateur" class="btn new-btn">Reprendre le comptage en direct</a>
+            <button type="button" id="resume-counting-btn" class="btn new-btn">
+                <i class="fa-solid fa-play"></i> Reprendre ce comptage
+            </button>
         </div>
     <?php endif; ?>
 
@@ -149,6 +152,33 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
             </div>
         </div>
     </form>
+</div>
+
+<div id="resume-choice-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Reprendre un comptage</h3>
+        </div>
+        <p>Que souhaitez-vous faire ?</p>
+        <div class="modal-actions">
+            <a href="index.php?page=calculateur" class="btn delete-btn"><i class="fa-solid fa-xmark"></i> Annuler et retourner au comptage en direct</a>
+            <button id="load-from-history-btn" class="btn new-btn"><i class="fa-solid fa-download"></i> Charger ce comptage</button>
+        </div>
+    </div>
+</div>
+
+<div id="resume-confirm-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header" style="background-color: var(--color-warning); color: white; border-radius: 8px 8px 0 0; padding: 15px;">
+            <h3 style="color: white; border: none;"><i class="fa-solid fa-triangle-exclamation"></i> Avertissement</h3>
+        </div>
+        <p style="margin-top: 20px;">Vous êtes sur le point d'écraser le comptage actuellement en cours. Cette action est irréversible.</p>
+        <p><strong>Êtes-vous sûr de vouloir continuer ?</strong></p>
+        <div class="modal-actions">
+            <button id="cancel-resume-btn" class="btn new-btn">Annuler</button>
+            <a href="#" id="confirm-resume-btn" class="btn delete-btn">Confirmer et Écraser</a>
+        </div>
+    </div>
 </div>
 
 <div id="synthesis-modal" class="modal">

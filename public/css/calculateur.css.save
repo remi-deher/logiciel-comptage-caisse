@@ -18,29 +18,7 @@
 .history-view-banner div { flex-grow: 1; }
 .history-view-banner strong { font-size: 1.1em; display: block; }
 .history-view-banner p { margin: 4px 0 0 0; font-size: 0.9em; color: var(--color-text-secondary); }
-
-/* NOUVEAU STYLE POUR LE BOUTON "REPRENDRE" */
-.history-view-banner .resume-btn {
-    flex-shrink: 0;
-    padding: 10px 20px;
-    font-size: 1em;
-    font-weight: bold;
-    background-color: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s ease;
-}
-.history-view-banner .resume-btn:hover {
-    background-color: var(--color-primary-dark);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px var(--shadow-color);
-}
-
+.history-view-banner .btn { flex-shrink: 0; padding: 10px 15px; font-size: 0.9em; }
 
 /* --- Section de sauvegarde en haut --- */
 .top-save-section {
@@ -506,13 +484,3 @@ body[data-theme="dark"] .withdrawal-table th {
     line-height: 1.6;
 }
 
-/* NOUVEAU: Styles pour les modales de reprise de comptage */
-#resume-choice-modal .modal-content, #resume-confirm-modal .modal-content {
-    text-align: center;
-}
-#resume-choice-modal .modal-actions, #resume-confirm-modal .modal-actions {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin-top: 25px;
-}

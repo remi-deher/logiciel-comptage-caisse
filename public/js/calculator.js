@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const config = JSON.parse(calculatorDataElement.dataset.config || '{}');
     const loadedData = JSON.parse(calculatorDataElement.dataset.loadedData || '{}');
     const { nomsCaisses, denominations, minToKeep, isLoadedFromHistory, currencySymbol } = config;
+    const comptageId = calculatorDataElement.dataset.comptageId;
 
     // Variable pour suivre les modifications non enregistrées
     let hasUnsavedChanges = false;
@@ -238,27 +239,89 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+        
+        // NOUVEAU: Logique pour la reprise de comptage avec modales
+        const resumeChoiceModal = document.getElementById('resume-choice-modal');
+        const resumeConfirmModal = document.getElementById('resume-confirm-modal');
+        const resumeCountingBtn = document.getElementById('resume-counting-btn');
+        const loadFromHistoryBtn = document.getElementById('load-from-history-btn');
+        const confirmResumeBtn = document.getElementById('confirm-resume-btn');
+        const cancelResumeBtn = document.getElementById('cancel-resume-btn');
+        const closeChoiceModalBtn = resumeChoiceModal.querySelector('.modal-close');
+        const closeConfirmModalBtn = resumeConfirmModal.querySelector('.modal-close');
+
+        if (resumeCountingBtn) {
+            resumeCountingBtn.addEventListener('click', () => {
+                resumeChoiceModal.classList.add('visible');
+            });
+        }
+
+        if (loadFromHistoryBtn) {
+            loadFromHistoryBtn.addEventListener('click', () => {
+                resumeChoiceModal.classList.remove('visible');
+                resumeConfirmModal.classList.add('visible');
+            });
+        }
+        
+        if (confirmResumeBtn && comptageId) {
+            confirmResumeBtn.href = `index.php?page=calculateur&resume_from=${comptageId}`;
+        }
+
+        if(cancelResumeBtn) {
+            cancelResumeBtn.addEventListener('click', () => {
+                resumeConfirmModal.classList.remove('visible');
+            });
+        }
+
+        if(closeChoiceModalBtn) {
+            closeChoiceModalBtn.addEventListener('click', () => resumeChoiceModal.classList.remove('visible'));
+        }
+        
+        if(closeConfirmModalBtn) {
+             closeConfirmModalBtn.addEventListener('click', () => resumeConfirmModal.classList.remove('visible'));
+        }
     }
+
+    /**
+     * NOUVEAU: Réinitialise tous les champs du formulaire.
+     */
+    function resetAllFormFields() {
+        document.querySelectorAll('#caisse-form input[type="text"], #caisse-form input[type="number"], #caisse-form textarea').forEach(input => {
+            input.value = '';
+        });
+        document.querySelectorAll('.total-line').forEach(el => el.textContent = formatCurrency(0));
+    }
+
 
     /**
      * Charge les données (depuis l'historique ou la sauvegarde) dans le formulaire.
      */
     window.loadAndInitFormData = function(data) {
         if (!data) return;
+        
+        resetAllFormFields(); // On s'assure que le formulaire est vide avant de le remplir
 
         document.getElementById('nom_comptage').value = data.nom_comptage || '';
         document.getElementById('explication').value = data.explication || '';
 
+        // Itérer sur les données chargées
         for (const caisseId in data) {
+            // S'assurer que c'est bien une donnée de caisse et non nom_comptage etc.
             if (!nomsCaisses.hasOwnProperty(caisseId)) continue;
 
             const caisseData = data[caisseId];
-            document.getElementById(`fond_de_caisse_${caisseId}`).value = caisseData.fond_de_caisse || '';
-            document.getElementById(`ventes_${caisseId}`).value = caisseData.ventes || '';
-            document.getElementById(`retrocession_${caisseId}`).value = caisseData.retrocession || '';
+            
+            const fondDeCaisseInput = document.getElementById(`fond_de_caisse_${caisseId}`);
+            if (fondDeCaisseInput) fondDeCaisseInput.value = caisseData.fond_de_caisse || '';
+            
+            const ventesInput = document.getElementById(`ventes_${caisseId}`);
+            if (ventesInput) ventesInput.value = caisseData.ventes || '';
+            
+            const retrocessionInput = document.getElementById(`retrocession_${caisseId}`);
+            if (retrocessionInput) retrocessionInput.value = caisseData.retrocession || '';
 
             if (caisseData.denominations) {
-                for (const name in caisseData.denominations) {
+                 for (const name in caisseData.denominations) {
                     const input = document.getElementById(`${name}_${caisseId}`);
                     if (input) {
                         input.value = caisseData.denominations[name];
@@ -266,7 +329,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
-        calculateAllFull();
+        calculateAllFull(); // Recalculer après avoir tout rempli
     };
 
     /**

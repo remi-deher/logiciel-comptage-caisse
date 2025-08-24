@@ -278,18 +278,6 @@ body[data-theme="dark"] .error {
 .modal.visible .modal-content {
     transform: scale(1);
 }
-.modal-close {
-    color: var(--color-text-muted);
-    position: absolute;
-    top: 15px;
-    right: 25px;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-}
-.modal-close:hover, .modal-close:focus {
-    color: var(--color-text-primary);
-}
 .modal-header h3 {
     margin: 0;
     border: none;
