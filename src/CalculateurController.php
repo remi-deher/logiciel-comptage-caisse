@@ -31,7 +31,15 @@ class CalculateurController {
         if (isset($_GET['load'])) {
             $comptageIdToLoad = intval($_GET['load']);
             error_log("Tentative de chargement du comptage ID: " . $comptageIdToLoad);
-            $isLoadedFromHistory = true;
+            
+            // CORRECTION : On vérifie si le chargement vient d'une sauvegarde récente
+            if (isset($_SESSION['just_saved']) && $_SESSION['just_saved'] == $comptageIdToLoad) {
+                $isLoadedFromHistory = false;
+                unset($_SESSION['just_saved']); // On nettoie la variable de session
+            } else {
+                $isLoadedFromHistory = true;
+            }
+
             $stmt = $this->pdo->prepare("SELECT * FROM comptages WHERE id = ?");
             $stmt->execute([$comptageIdToLoad]);
             $loaded_comptage = $stmt->fetch() ?: [];
@@ -135,7 +143,7 @@ class CalculateurController {
 
     private function handleSave($is_autosave) {
         if ($is_autosave) { header('Content-Type: application/json'); ob_start(); }
-
+    
         $nom_comptage = trim($_POST['nom_comptage'] ?? '');
         $explication = trim($_POST['explication'] ?? '');
         $has_data = false;
@@ -147,40 +155,50 @@ class CalculateurController {
             else { $_SESSION['message'] = "Aucune donnée n'a été saisie."; header('Location: index.php?page=calculateur'); }
             exit;
         }
-
+    
         try {
+            $this->pdo->beginTransaction(); // DÉBUT DE LA TRANSACTION
+    
             $comptage_id = null;
-
-            // NOUVEAU: Logique de nommage correct pour la sauvegarde automatique
+    
             if ($is_autosave) {
-                // S'assure que le nom du comptage est reconnu comme une sauvegarde automatique
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
-                // On crée un NOUVEL enregistrement de comptage à chaque autosave pour avoir un historique des états
                 $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
                 $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
                 $comptage_id = $this->pdo->lastInsertId();
-
             } else {
-                // Logique de SAUVEGARDE MANUELLE
                 if (empty($nom_comptage)) {
                     $nom_comptage = "Comptage du " . date('Y-m-d H:i:s');
                 }
                 $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
                 $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
                 $comptage_id = $this->pdo->lastInsertId();
-
-                // On supprime l'ancienne sauvegarde automatique pour qu'elle ne soit plus chargée par défaut
                 $stmt_delete_autosave = $this->pdo->prepare("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
                 $stmt_delete_autosave->execute();
             }
-
-            // Étape d'insertion commune pour les détails et les dénominations
+    
+            // VÉRIFICATION DE SÉCURITÉ
+            if (empty($comptage_id)) {
+                throw new Exception("La création de l'enregistrement de comptage a échoué.");
+            }
+    
             foreach ($this->noms_caisses as $caisse_id => $nom) {
                 $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
-                if (empty($caisse_data)) {
-                    continue;
+                
+                // VÉRIFICATION AMÉLIORÉE : On ne traite que les caisses avec des données.
+                $has_real_data_for_caisse = false;
+                foreach ($caisse_data as $value) {
+                    // Vérifie si la valeur est un nombre et n'est pas zéro
+                    if (is_numeric(str_replace(',', '.', $value)) && floatval(str_replace(',', '.', $value)) != 0) {
+                        $has_real_data_for_caisse = true;
+                        break;
+                    }
                 }
-
+                
+                if (!$has_real_data_for_caisse) {
+                    continue; // On passe à la caisse suivante si celle-ci est vide
+                }
+    
                 $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
                 $stmt_details->execute([
                     $comptage_id,
@@ -190,7 +208,7 @@ class CalculateurController {
                     get_numeric_value($caisse_data, 'retrocession')
                 ]);
                 $comptage_detail_id = $this->pdo->lastInsertId();
-
+    
                 foreach ($this->denominations as $type => $denominations_list) {
                     foreach ($denominations_list as $name => $value) {
                         $quantite = get_numeric_value($caisse_data, $name);
@@ -201,18 +219,24 @@ class CalculateurController {
                     }
                 }
             }
-
+            
+            $this->pdo->commit(); // FIN DE LA TRANSACTION (TOUT EST OK)
+    
             if ($is_autosave) {
                 ob_end_clean();
                 echo json_encode(['success' => true, 'message' => 'Sauvegarde auto à ' . date('H:i:s')]);
             } else {
                 $_SESSION['message'] = "Comptage '" . htmlspecialchars($nom_comptage) . "' créé avec succès !";
-                // Rediriger vers le calculateur pour effacer la session de sauvegarde auto
-                header('Location: index.php?page=calculateur');
+                // CORRECTION : On utilise une variable de session pour indiquer que la sauvegarde vient d'être faite
+                $_SESSION['just_saved'] = $comptage_id;
+                header('Location: index.php?page=calculateur&load=' . $comptage_id);
             }
             exit;
-
-        } catch (PDOException $e) {
+    
+        } catch (Exception $e) { // On attrape toutes les exceptions (PDO ou autres)
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack(); // ANNULATION DE LA TRANSACTION EN CAS D'ERREUR
+            }
             if ($is_autosave) {
                 ob_end_clean();
                 echo json_encode(['success' => false, 'message' => 'Erreur de BDD: ' . $e->getMessage()]);
