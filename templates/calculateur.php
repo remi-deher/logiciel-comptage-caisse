@@ -232,6 +232,80 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<div id="caisse-selection-modal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <div class="modal-header-cloture">
+            <h3><i class="fa-solid fa-store"></i> Gestion de la Clôture</h3>
+            <p>Sélectionnez une caisse pour commencer la procédure.</p>
+        </div>
+        <div class="modal-body-cloture">
+            <div class="color-key">
+                <div><span class="color-dot color-libre"></span> Libre</div>
+                <div><span class="color-dot color-en-cours"></span> En cours</div>
+                <div><span class="color-dot color-cloturee"></span> Clôturée</div>
+            </div>
+            <div class="caisse-status-list">
+                </div>
+        </div>
+    </div>
+</div>
+
+<div id="cloture-confirmation-modal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-check-double"></i> Confirmer la clôture de : <span id="confirm-caisse-name"></span></h3>
+        </div>
+        <p>Veuillez vérifier les informations ci-dessous avant de confirmer la clôture définitive de cette caisse.</p>
+        <div id="confirm-caisse-summary"></div>
+        <div id="confirm-caisse-withdrawal"></div>
+        <div id="confirm-caisse-cheques"></div>
+        <p class="warning-text">Cette action est irréversible et créera un enregistrement final dans l'historique.</p>
+        <div class="modal-actions">
+            <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
+            <button id="confirm-final-cloture-btn" class="btn save-btn">Confirmer la Clôture</button>
+        </div>
+    </div>
+</div>
+
+<div id="cloture-generale-modal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close">&times;</span>
+        <div class="modal-header">
+            <i class="fa-solid fa-flag-checkered"></i>
+            <div>
+                <h3>Clôture Générale</h3>
+                <p>Toutes les caisses ont été confirmées. Voici le récapitulatif final avant de préparer la journée suivante.</p>
+            </div>
+        </div>
+        <div class="modal-body">
+            <div class="accordion-container"></div>
+            <div id="cheques-summary-container"></div>
+            <div class="modal-actions">
+                <button id="confirm-cloture-generale-btn" class="btn save-btn"><i class="fa-solid fa-power-off"></i> Lancer la Clôture Générale</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="final-confirmation-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header-danger">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <h3>Êtes-vous absolument sûr ?</h3>
+        </div>
+        <div class="modal-body">
+            <p>Cette action va finaliser tous les comptages de la journée et réinitialiser les caisses pour demain. Elle ne peut pas être annulée.</p>
+            <div class="modal-actions">
+                <button id="cancel-final-cloture-action-btn" class="btn delete-btn">Annuler</button>
+                <button id="confirm-final-cloture-action-btn" class="btn save-btn">Oui, terminer la journée</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <?php
 require 'partials/footer.php';
 ?>

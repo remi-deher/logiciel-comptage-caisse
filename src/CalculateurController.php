@@ -280,8 +280,15 @@ class CalculateurController {
             $closedCaisses = $this->clotureStateService->getClosedCaisses();
             echo json_encode(['success' => true, 'locked_caisses' => $lockedCaisses, 'closed_caisses' => $closedCaisses]);
         } catch (Exception $e) {
-            error_log("Erreur lors de la récupération de l'état de clôture : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Erreur lors de la récupération de l\'état de clôture.']);
+            // Enregistre l'erreur côté serveur pour le débogage
+            error_log("Erreur dans getClotureState : " . $e->getMessage());
+            
+            // Définit explicitement le code d'erreur HTTP et renvoie un JSON d'erreur
+            http_response_code(500);
+            echo json_encode([
+                'success' => false, 
+                'message' => 'Erreur serveur lors de la récupération de l\'état de clôture.'
+            ]);
         }
         exit;
     }

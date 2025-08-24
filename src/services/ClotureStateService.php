@@ -113,4 +113,14 @@ class ClotureStateService {
     public function resetState() {
         $this->pdo->exec("TRUNCATE TABLE cloture_status");
     }
+
+    /**
+     * Force le déverrouillage de toutes les caisses verrouillées par un ID de connexion spécifique.
+     * Cette méthode est cruciale pour nettoyer les verrous lors de la déconnexion d'un client.
+     * @param string $connectionId L'identifiant de la connexion WebSocket.
+     */
+    public function forceUnlockByConnectionId($connectionId) {
+        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='open', locked_by_ws_id=NULL WHERE locked_by_ws_id = ?");
+        $stmt->execute([$connectionId]);
+    }
 }

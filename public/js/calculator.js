@@ -281,6 +281,21 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
+        // AJOUT : Écouteur pour l'ajout/suppression de chèques
+        document.body.addEventListener('click', function(event) {
+            const addButton = event.target.closest('.add-cheque-btn');
+            const removeButton = event.target.closest('.remove-cheque-btn');
+
+            if (addButton || removeButton) {
+                hasUnsavedChanges = true;
+                // Après une modification de la structure, on envoie l'état complet du formulaire
+                if (!isLoadedFromHistory && typeof window.sendFullFormState === 'function') {
+                    // On attend que le DOM se mette à jour avant d'envoyer
+                    setTimeout(window.sendFullFormState, 100);
+                }
+            }
+        });
+        
         const resumeChoiceModal = document.getElementById('resume-choice-modal');
         const resumeConfirmModal = document.getElementById('resume-confirm-modal');
         const resumeCountingBtn = document.getElementById('resume-counting-btn');
@@ -347,19 +362,61 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     window.loadFormDataFromWebSocket = function(formState) {
+        // Gérer les champs fixes (tout sauf les chèques)
         for (const id in formState) {
             const input = document.getElementById(id);
-            if (input && input.value !== formState[id]) {
-                input.value = formState[id];
+            // On s'assure de ne pas traiter les chèques ici
+            if (input && !input.name.includes('[cheques]')) {
+                 if (input.value !== formState[id]) {
+                    input.value = formState[id];
+                }
             }
         }
+        
+        // Gérer les champs de chèques dynamiques
+        for (const caisseId in config.nomsCaisses) {
+            const chequesContainer = document.querySelector(`#cheques-container-${caisseId} .cheques-grid`);
+            if (!chequesContainer) continue;
+
+            const chequeValuesInState = [];
+            for (const id in formState) {
+                const el = document.getElementById(id);
+                if (el && el.name === `caisse[${caisseId}][cheques][]`) {
+                    chequeValuesInState.push(formState[id]);
+                }
+            }
+
+            chequesContainer.innerHTML = ''; // Vider les champs existants
+            
+            // Reconstruire les champs
+            const valuesToRender = chequeValuesInState.length > 0 ? chequeValuesInState : ['']; // Toujours afficher au moins un champ
+            valuesToRender.forEach((value, index) => {
+                 const isFirst = index === 0;
+                const newChequeHtml = `
+                    <div class="form-group cheque-item">
+                        <label>Chèque N°${index + 1} (${config.currencySymbol})</label>
+                         <div style="display: flex; gap: 5px;">
+                            <input type="text" id="cheque_${caisseId}_${index}" name="caisse[${caisseId}][cheques][]" placeholder="0,00" value="${value || ''}">
+                            ${!isFirst ? '<button type="button" class="action-btn-small delete-btn remove-cheque-btn"><i class="fa-solid fa-trash-can"></i></button>' : ''}
+                        </div>
+                    </div>`;
+                chequesContainer.insertAdjacentHTML('beforeend', newChequeHtml);
+            });
+        }
+
         calculateAllFull();
     };
 
+    // MISE À JOUR : La fonction génère un ID unique pour chaque champ, y compris les chèques
     window.sendFullFormState = function() {
         if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
             const formState = {};
-            document.querySelectorAll('#caisse-form input, #caisse-form textarea').forEach(el => {
+            document.querySelectorAll('#caisse-form input, #caisse-form textarea').forEach((el, index) => {
+                // Assurer un ID unique pour chaque champ, surtout les chèques
+                if (!el.id) {
+                    const name = el.name.replace(/\[|\]/g, '_');
+                    el.id = `${name}_${index}`;
+                }
                 if (el.id) {
                     formState[el.id] = el.value;
                 }
