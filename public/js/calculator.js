@@ -24,6 +24,12 @@ document.addEventListener('DOMContentLoaded', function() {
         return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
     };
 
+    const parseLocaleFloat = (str) => {
+        if (typeof str !== 'string') return 0;
+        return parseFloat(str.replace(',', '.')) || 0;
+    };
+
+
     const handleStickyEcart = () => {
         const ecartContainer = document.querySelector('.ecart-display-container');
         if (!ecartContainer) return;
@@ -34,6 +40,43 @@ document.addEventListener('DOMContentLoaded', function() {
             ecartContainer.classList.remove('compact-sticky');
         }
     };
+    
+    // MISE À JOUR : La fonction gère maintenant les messages d'aide
+    function calculateCBTotals(caisseId) {
+        let totalConstate = 0;
+        document.querySelectorAll(`.cb-input[data-caisse-id="${caisseId}"]`).forEach(input => {
+            totalConstate += parseLocaleFloat(input.value);
+        });
+
+        const attenduInput = document.getElementById(`cb_attendu_${caisseId}`);
+        const totalAttendu = parseLocaleFloat(attenduInput.value);
+        const ecart = totalConstate - totalAttendu;
+
+        document.getElementById(`cb_constate_${caisseId}`).value = formatCurrency(totalConstate);
+        
+        const ecartInput = document.getElementById(`cb_ecart_${caisseId}`);
+        ecartInput.value = formatCurrency(ecart);
+        
+        const messageSpan = document.getElementById(`cb_ecart_message_${caisseId}`);
+        
+        ecartInput.classList.remove('ecart-ok', 'ecart-positif-alt', 'ecart-negatif');
+        messageSpan.classList.remove('ecart-ok', 'ecart-positif-alt', 'ecart-negatif');
+        
+        if (Math.abs(ecart) < 0.01) {
+            ecartInput.classList.add('ecart-ok');
+            messageSpan.classList.add('ecart-ok');
+            messageSpan.textContent = "La valeur attendue correspond.";
+        } else if (ecart > 0) {
+            ecartInput.classList.add('ecart-positif-alt');
+            messageSpan.classList.add('ecart-positif-alt');
+            messageSpan.textContent = "Il y a trop d'argent dans les TPE, vérifier s'il ne vous manque pas des encaissements.";
+        } else {
+            ecartInput.classList.add('ecart-negatif');
+            messageSpan.classList.add('ecart-negatif');
+            messageSpan.textContent = "Il manque de l'argent dans le TPE, vérifier si vous n'avez pas des encaissements en trop.";
+        }
+    }
+
 
     /**
      * Calcule tous les totaux pour toutes les caisses et met à jour l'affichage.
@@ -65,9 +108,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            const fondDeCaisse = parseFloat(document.getElementById(`fond_de_caisse_${caisseId}`).value.replace(',', '.')) || 0;
-            const ventes = parseFloat(document.getElementById(`ventes_${caisseId}`).value.replace(',', '.')) || 0;
-            const retrocession = parseFloat(document.getElementById(`retrocession_${caisseId}`).value.replace(',', '.')) || 0;
+            const fondDeCaisse = parseLocaleFloat(document.getElementById(`fond_de_caisse_${caisseId}`).value);
+            const ventes = parseLocaleFloat(document.getElementById(`ventes_${caisseId}`).value);
+            const retrocession = parseLocaleFloat(document.getElementById(`retrocession_${caisseId}`).value);
 
             const recetteTheorique = ventes + retrocession;
             const recetteReelle = totalCaisseCompte - fondDeCaisse;
@@ -81,6 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             updateResultsDisplay(caisseId, { fondDeCaisse, totalCaisseCompte, recetteTheorique, recetteReelle, ecart });
             updateEcartDisplay(caisseId, ecart);
+            calculateCBTotals(caisseId);
         }
 
         updateCombinedResultsDisplay({ totalGlobalFdc, totalGlobalCompte, totalGlobalRecetteTheorique, totalGlobalRecetteReelle, totalGlobalEcart });

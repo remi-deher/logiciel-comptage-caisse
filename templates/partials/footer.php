@@ -42,9 +42,18 @@ $release_info = 'Information non disponible';
     </footer>
 
     <script src="/js/main.js"></script>
-    <?php if (!empty($page_js)): ?>
-        <script src="/js/<?= htmlspecialchars($page_js) ?>"></script>
-    <?php endif; ?>
+    <?php 
+    // MISE À JOUR : Gère à la fois une chaîne et un tableau pour $page_js
+    if (!empty($page_js)) {
+        if (is_array($page_js)) {
+            foreach ($page_js as $script) {
+                echo '<script src="/js/' . htmlspecialchars($script) . '"></script>';
+            }
+        } else {
+            echo '<script src="/js/' . htmlspecialchars($page_js) . '"></script>';
+        }
+    }
+    ?>
     <div id="cloture-modal" class="modal">
         <div class="modal-content">
             <span class="modal-close">&times;</span>

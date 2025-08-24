@@ -198,6 +198,51 @@
     border: 1px solid rgba(52, 152, 219, 0.3);
 }
 
+/* --- NOUVEAUX STYLES pour la section TPE --- */
+.cb-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border-light);
+}
+.cb-summary input[readonly] {
+    background-color: var(--color-surface-alt);
+    font-weight: bold;
+    text-align: right;
+}
+input#cb_ecart_1, input#cb_ecart_2 {
+    font-weight: bold;
+}
+.ecart-ok {
+    color: var(--color-success) !important;
+}
+.ecart-positif {
+    color: var(--color-warning) !important;
+}
+/* Couleur bleue pour l'écart TPE positif */
+.ecart-positif-alt {
+    color: var(--color-primary) !important;
+}
+.ecart-negatif {
+    color: var(--color-danger) !important;
+}
+.ecart-message {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.85em;
+    min-height: 1.2em;
+}
+
+
+/* --- Styles pour les chèques --- */
+.cheques-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+}
+
 /* --- Styles améliorés pour la modale de clôture --- */
 #caisse-selection-modal .modal-content {
     padding: 0;

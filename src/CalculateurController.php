@@ -61,7 +61,11 @@ class CalculateurController {
         $noms_caisses = $this->noms_caisses;
         $denominations = $this->denominations;
         $terminaux_par_caisse = $this->terminaux_par_caisse;
+        
+        // MISE À JOUR : On définit un tableau de scripts à charger
+        $page_js = ['calculator.js', 'realtime.js', 'cloture.js'];
         $page_css = 'calculateur.css';
+        
         require __DIR__ . '/../templates/calculateur.php';
     }
     
@@ -285,21 +289,17 @@ class CalculateurController {
     public function cloture() {
         header('Content-Type: application/json');
 
-        error_log("Requête de clôture reçue. Données POST brutes : " . file_get_contents('php://input'));
-        error_log("Données POST décodées : " . print_r($_POST, true));
-
         try {
             $caisse_id_a_cloturer = intval($_POST['caisse_id_a_cloturer'] ?? 0);
             if ($caisse_id_a_cloturer === 0) {
-                error_log("Erreur: ID de caisse invalide reçu.");
-                echo json_encode(['success' => false, 'message' => 'ID de caisse invalide.']);
-                exit;
+                throw new Exception("ID de caisse invalide.");
             }
-            error_log("ID de caisse à clôturer: {$caisse_id_a_cloturer}");
 
-            $nom_cloture = "Clôture de la caisse {$caisse_id_a_cloturer} du " . date('Y-m-d H:i:s');
-            $explication = "Clôture quotidienne de la caisse " . $caisse_id_a_cloturer;
+            $nom_cloture = "Clôture Caisse " . ($this->noms_caisses[$caisse_id_a_cloturer] ?? $caisse_id_a_cloturer) . " du " . date('Y-m-d H:i:s');
+            $explication = "Clôture quotidienne de la caisse.";
             
+            $this->pdo->beginTransaction();
+
             $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt->execute([$nom_cloture, $explication, date('Y-m-d H:i:s')]);
             $comptage_id_cloture = $this->pdo->lastInsertId();
@@ -326,23 +326,22 @@ class CalculateurController {
                     }
                 }
             }
-
+            
+            $this->pdo->commit();
+            
             $this->clotureStateService->confirmCaisse($caisse_id_a_cloturer);
-            echo json_encode(['success' => true, 'message' => "La caisse a été clôturée avec succès. En attente des autres caisses.", 'all_caisses_confirmed' => false]);
+            echo json_encode(['success' => true, 'message' => "La caisse a été clôturée avec succès."]);
         
-        } catch (PDOException $e) {
-            error_log("Erreur PDO lors de la clôture : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Erreur de BDD lors de la clôture : ' . $e->getMessage()]);
         } catch (Exception $e) {
-            error_log("Erreur générale lors de la clôture : " . $e->getMessage());
-            echo json_encode(['success' => false, 'message' => 'Erreur inattendue lors de la clôture.']);
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            error_log("Erreur lors de la clôture : " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erreur lors de la clôture : ' . $e->getMessage()]);
         }
         exit;
     }
 
-    /**
-     * NOUVELLE MÉTHODE : Gère la clôture générale de la journée.
-     */
     public function cloture_generale() {
         global $min_to_keep;
         header('Content-Type: application/json');
@@ -360,7 +359,6 @@ class CalculateurController {
             foreach ($this->noms_caisses as $caisse_id => $nom) {
                 $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
                 
-                // Calcul de la recette et des suggestions de retrait
                 $total_compte = 0;
                 $current_counts = [];
                 foreach ($this->denominations as $type => $denominations_list) {
@@ -375,12 +373,10 @@ class CalculateurController {
                 
                 $suggestions = $this->generateWithdrawalSuggestion($recette_reelle, $current_counts, $this->denominations, $min_to_keep ?? []);
 
-                // Insertion des détails du comptage J+1
                 $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, 0, 0)");
                 $stmt_details->execute([$comptage_id, $caisse_id, $fond_de_caisse]);
                 $comptage_detail_id = $this->pdo->lastInsertId();
 
-                // Insertion des nouvelles dénominations pour J+1
                 foreach ($current_counts as $name => $quantite) {
                     $quantite_a_retirer = $suggestions[$name] ?? 0;
                     $nouvelle_quantite = $quantite - $quantite_a_retirer;
@@ -393,7 +389,7 @@ class CalculateurController {
             }
 
             $this->pdo->commit();
-            $this->clotureStateService->resetState(); // Réinitialise l'état de clôture
+            $this->clotureStateService->resetState();
 
             echo json_encode(['success' => true, 'message' => "Clôture générale réussie. Les caisses sont prêtes pour demain."]);
 
@@ -407,15 +403,12 @@ class CalculateurController {
         exit;
     }
 
-    /**
-     * NOUVELLE MÉTHODE PRIVÉE : Génère la suggestion de retrait côté serveur.
-     */
     private function generateWithdrawalSuggestion($amountToWithdraw, $currentCounts, $denominations, $minToKeep) {
         $remainingAmount = $amountToWithdraw;
         $suggestions = [];
 
         $allDenominations = array_merge($denominations['billets'], $denominations['pieces']);
-        arsort($allDenominations); // Trie par valeur décroissante
+        arsort($allDenominations);
 
         foreach ($allDenominations as $name => $value) {
             $countInCaisse = $currentCounts[$name] ?? 0;

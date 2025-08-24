@@ -1,7 +1,9 @@
 <?php
 // templates/calculateur.php
 
-$page_js = 'calculator.js';
+// MISE À JOUR : La variable $page_js est maintenant définie dans le contrôleur
+// $page_js = 'calculator.js'; 
+
 require 'partials/header.php';
 require 'partials/navbar.php';
 
@@ -127,9 +129,24 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                 <?php foreach ($terminaux_par_caisse[$id] as $terminal): ?>
                                 <div class="form-group">
                                     <label><?= htmlspecialchars($terminal['nom_terminal']) ?> (<?= APP_CURRENCY_SYMBOL ?>)</label>
-                                    <input type="text" id="cb_<?= $terminal['id'] ?>_<?= $id ?>" name="caisse[<?= $id ?>][cb][<?= $terminal['id'] ?>]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['cb'][$terminal['id']] ?? '') ?>" <?= $disabled_attr ?>>
+                                    <input type="text" class="cb-input" data-caisse-id="<?= $id ?>" name="caisse[<?= $id ?>][cb][<?= $terminal['id'] ?>]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['cb'][$terminal['id']] ?? '') ?>" <?= $disabled_attr ?>>
                                 </div>
                                 <?php endforeach; ?>
+                            </div>
+                            <div class="cb-summary">
+                                <div class="form-group">
+                                    <label>Total encaissement CB logiciel (<?= APP_CURRENCY_SYMBOL ?>)</label>
+                                    <input type="text" id="cb_attendu_<?= $id ?>" class="cb-attendu" data-caisse-id="<?= $id ?>" placeholder="0,00" <?= $disabled_attr ?>>
+                                </div>
+                                <div class="form-group">
+                                    <label>Encaissement CB réalisé (<?= APP_CURRENCY_SYMBOL ?>)</label>
+                                    <input type="text" id="cb_constate_<?= $id ?>" readonly>
+                                </div>
+                                <div class="form-group">
+                                    <label>Écart TPE</label>
+                                    <input type="text" id="cb_ecart_<?= $id ?>" readonly>
+                                    <span class="ecart-message" id="cb_ecart_message_<?= $id ?>"></span>
+                                </div>
                             </div>
                         <?php else: ?>
                             <p class="info-message">Aucun terminal de paiement n'est associé à cette caisse. Vous pouvez en ajouter dans le panneau d'administration.</p>
@@ -148,7 +165,9 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                     <label>Chèque N°<?= $index + 1 ?> (<?= APP_CURRENCY_SYMBOL ?>)</label>
                                     <div style="display: flex; gap: 5px;">
                                         <input type="text" name="caisse[<?= $id ?>][cheques][]" placeholder="0,00" value="<?= htmlspecialchars($montant) ?>" <?= $disabled_attr ?>>
-                                        <button type="button" class="action-btn-small delete-btn remove-cheque-btn" <?= $disabled_attr ?>><i class="fa-solid fa-trash-can"></i></button>
+                                        <?php if ($index > 0): ?>
+                                            <button type="button" class="action-btn-small delete-btn remove-cheque-btn" <?= $disabled_attr ?>><i class="fa-solid fa-trash-can"></i></button>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                                 <?php endforeach; ?>
@@ -180,152 +199,6 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
     </form>
 </div>
 
-<div id="resume-choice-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Reprendre un comptage</h3>
-        </div>
-        <p>Que souhaitez-vous faire ?</p>
-        <div class="modal-actions">
-            <a href="index.php?page=calculateur" class="btn delete-btn"><i class="fa-solid fa-xmark"></i> Annuler et retourner au comptage en direct</a>
-            <button id="load-from-history-btn" class="btn new-btn"><i class="fa-solid fa-download"></i> Charger ce comptage</button>
-        </div>
-    </div>
-</div>
-
-<div id="resume-confirm-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header" style="background-color: var(--color-warning); color: white; border-radius: 8px 8px 0 0; padding: 15px;">
-            <h3 style="color: white; border: none;"><i class="fa-solid fa-triangle-exclamation"></i> Avertissement</h3>
-        </div>
-        <p style="margin-top: 20px;">Vous êtes sur le point d'écraser le comptage actuellement en cours. Cette action est irréversible.</p>
-        <p><strong>Êtes-vous sûr de vouloir continuer ?</strong></p>
-        <div class="modal-actions">
-            <button id="cancel-resume-btn" class="btn new-btn">Annuler</button>
-            <a href="#" id="confirm-resume-btn" class="btn delete-btn">Confirmer et Écraser</a>
-        </div>
-    </div>
-</div>
-
-<div id="synthesis-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Synthèse en Temps Réel</h3>
-        </div>
-        <div class="modal-body-content-wrapper">
-            <div class="results" id="results-container">
-                <div class="synthesis-grid">
-                    <?php 
-                    $caisse_ids = array_keys($noms_caisses);
-                    $num_caisses = count($caisse_ids);
-                    for ($i = 0; $i < $num_caisses; $i += 2): 
-                        $id1 = $caisse_ids[$i];
-                        $nom1 = $noms_caisses[$id1];
-                        $id2 = isset($caisse_ids[$i+1]) ? $caisse_ids[$i+1] : null;
-                        $nom2 = isset($noms_caisses[$id2]) ? $noms_caisses[$id2] : null;
-                    ?>
-                        <div class="synthesis-pair">
-                            <div class="result-box">
-                                <h3><?= htmlspecialchars($nom1) ?></h3>
-                                <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id1 ?>-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id1 ?>-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id1 ?>-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line total"><span>Recette réelle (à retirer) :</span> <span id="res-c<?= $id1 ?>-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id1 ?>-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                            </div>
-                            <?php if ($id2 !== null): ?>
-                            <div class="result-box">
-                                <h3><?= htmlspecialchars($nom2) ?></h3>
-                                <div class="result-line"><span>Fond de caisse :</span> <span id="res-c<?= $id2 ?>-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line total"><span>Total compté :</span> <span id="res-c<?= $id2 ?>-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line"><span>Recette théorique :</span> <span id="res-c<?= $id2 ?>-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line total"><span>Recette réelle (à retirer) :</span> <span id="res-c<?= $id2 ?>-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                                <div class="result-line total"><span>ÉCART :</span> <span id="res-c<?= $id2 ?>-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endfor; ?>
-                </div>
-                <div class="result-box combined-results">
-                    <h3>Totaux Combinés</h3>
-                    <div class="result-line"><span>Total Fonds de caisse :</span> <span id="res-total-fdc">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                    <div class="result-line"><span>Total compté (global) :</span> <span id="res-total-total">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                    <hr>
-                    <div class="result-line"><span>Recette théorique totale :</span> <span id="res-total-theorique">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                    <div class="result-line total"><span>Recette réelle totale (à retirer) :</span> <span id="res-total-recette">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                    <div class="result-line total"><span>ÉCART TOTAL :</span> <span id="res-total-ecart">0,00 <?= APP_CURRENCY_SYMBOL ?></span></div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="caisse-selection-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header-cloture">
-            <h3><i class="fa-solid fa-store-lock"></i> Gestion de la Clôture</h3>
-            <p>Sélectionnez une caisse pour commencer ou modifier son état de clôture.</p>
-        </div>
-        <div class="modal-body-cloture">
-            <div class="color-key">
-                <div><span class="color-dot color-libre"></span> Libre</div>
-                <div><span class="color-dot color-cloturee"></span> Clôturée</div>
-                <div><span class="color-dot color-en-cours"></span> Verrouillée</div>
-            </div>
-            <div class="caisse-status-list"></div>
-        </div>
-    </div>
-</div>
-<div id="cloture-confirmation-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3><i class="fa-solid fa-circle-question" style="color: var(--color-warning);"></i> Confirmer la clôture</h3>
-        </div>
-        <p>Voulez-vous finaliser la clôture pour : <strong id="confirm-caisse-name"></strong> ?</p>
-        <div id="confirm-caisse-summary"></div>
-        <div id="confirm-caisse-withdrawal"></div>
-        <div id="confirm-caisse-cheques"></div>
-        <p class="warning-text">Cette action peut être annulée avec le bouton "Réouvrir".</p>
-        <div class="modal-actions">
-            <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
-            <button id="confirm-final-cloture-btn" class="btn new-btn">Confirmer la clôture</button>
-        </div>
-    </div>
-</div>
-<div id="final-confirmation-modal" class="modal">
-    <div class="modal-content" style="padding:0;">
-        <div class="modal-header-danger">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <h3>Confirmation Finale Requise</h3>
-        </div>
-        <div class="modal-body" style="padding:25px;">
-             <p>Validez la clôture définitive de la journée ?<br>Cette action réinitialisera les caisses pour le jour suivant (le fond de caisse sera conservé).</p>
-            <div class="modal-actions">
-                <button id="cancel-final-cloture-action-btn" class="btn delete-btn">Annuler</button>
-                <button id="confirm-final-cloture-action-btn" class="btn save-btn">Confirmer et Terminer</button>
-            </div>
-        </div>
-    </div>
-</div>
-<div id="cloture-generale-modal" class="modal">
-    <div class="modal-content" style="padding: 0;">
-         <div class="modal-header" style="background-color: var(--color-success); color: white; border-radius: 12px 12px 0 0;">
-            <i class="fa-solid fa-flag-checkered"></i>
-            <h3 style="border:none; color:white;">Toutes les caisses sont clôturées</h3>
-         </div>
-        <div class="modal-body" style="padding: 25px;">
-            <p style="text-align:center; margin-top:0;">Vérifiez les suggestions de retrait et les chèques à retirer avant de lancer la clôture générale.</p>
-            <div class="accordion-container"></div>
-            <div id="cheques-summary-container"></div>
-        </div>
-        <div class="modal-actions" style="padding: 20px; background-color: var(--color-surface-alt); border-top: 1px solid var(--color-border-light); justify-content: flex-end;">
-            <button id="confirm-cloture-generale-btn" class="btn save-btn">Lancer la Clôture Générale</button>
-        </div>
-    </div>
-</div>
-
-<script src="/js/realtime.js"></script>
-<script src="/js/cloture.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.add-cheque-btn').forEach(btn => {
@@ -348,13 +221,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.body.addEventListener('click', function(event) {
         if (event.target.closest('.remove-cheque-btn')) {
-            event.target.closest('.cheque-item').remove();
-            const container = event.target.closest('.cheques-grid');
-            if(container) {
-                container.querySelectorAll('.cheque-item label').forEach((label, index) => {
-                    label.textContent = `Chèque N°${index + 1} (<?= APP_CURRENCY_SYMBOL ?>)`;
-                });
-            }
+            const itemToRemove = event.target.closest('.cheque-item');
+            const container = itemToRemove.closest('.cheques-grid');
+            itemToRemove.remove();
+            
+            container.querySelectorAll('.cheque-item label').forEach((label, index) => {
+                label.textContent = `Chèque N°${index + 1} (<?= APP_CURRENCY_SYMBOL ?>)`;
+            });
         }
     });
 });
