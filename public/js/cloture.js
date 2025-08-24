@@ -54,21 +54,56 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // CORRECTION: La fonction ne vide plus le fond de caisse et force le recalcul
-    window.resetAllCaisseFields = function() {
-        document.querySelectorAll('#caisse-form input[type="text"], #caisse-form input[type="number"], #caisse-form textarea').forEach(input => {
-            // On ne vide pas le fond de caisse
-            if (!input.id.includes('fond_de_caisse')) {
-                input.value = '';
+    // MISE À JOUR : La fonction réinitialise le formulaire pour J+1
+    window.resetCaisseForNextDay = function() {
+        const config = JSON.parse(calculatorDataElement.dataset.config);
+        const { nomsCaisses, denominations, minToKeep } = config;
+
+        for (const caisseId in nomsCaisses) {
+            const caisseData = {}; // On simule les données du POST
+            document.querySelectorAll(`#caisse${caisseId} input[type="text"], #caisse${caisseId} input[type="number"]`).forEach(input => {
+                const key = input.id.replace(`_${caisseId}`, '');
+                caisseData[key] = input.value;
+            });
+            
+            // Calcul de la recette et des suggestions
+            let totalCompte = 0;
+            const currentCounts = {};
+            for (const type in denominations) {
+                for (const name in denominations[type]) {
+                    const quantite = parseInt(caisseData[name] || 0);
+                    currentCounts[name] = quantite;
+                    totalCompte += quantite * parseFloat(denominations[type][name]);
+                }
             }
-        });
+            const fondDeCaisse = parseFloat(caisseData.fond_de_caisse?.replace(',', '.') || 0);
+            const recetteReelle = totalCompte - fondDeCaisse;
+            const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep || {});
+
+            // Réinitialisation des champs, SAUF le fond de caisse
+            document.getElementById(`ventes_${caisseId}`).value = '';
+            document.getElementById(`retrocession_${caisseId}`).value = '';
+            document.querySelectorAll(`#cheques-container-${caisseId} .cheque-item`).forEach((item, index) => {
+                if (index > 0) item.remove(); // Garde seulement le premier champ chèque
+            });
+            document.querySelector(`#cheques-container-${caisseId} input`).value = '';
+
+
+            // Mise à jour des quantités de dénominations
+            for (const name in currentCounts) {
+                const quantite_a_retirer = suggestions[name] || 0;
+                const nouvelle_quantite = currentCounts[name] - quantite_a_retirer;
+                document.getElementById(`${name}_${caisseId}`).value = nouvelle_quantite > 0 ? nouvelle_quantite : '';
+            }
+        }
+        
         document.getElementById('nom_comptage').value = '';
         document.getElementById('explication').value = '';
 
         window.lockedCaisses = [];
         window.closedCaisses = [];
 
-        // Appel du calcul complet pour mettre à jour les écarts à zéro
+        // Appel du calcul complet pour mettre à jour les affichages
         if (typeof window.calculateAllFull === 'function') {
             window.calculateAllFull();
         }
@@ -399,11 +434,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Logique pour la modale de confirmation finale
+        // MISE À JOUR : Logique pour la modale de confirmation finale
         if (button.closest('#final-confirmation-modal')) {
             if (button.id === 'confirm-final-cloture-action-btn') {
-                window.wsConnection?.send(JSON.stringify({ type: 'cloture_generale' }));
                 finalConfirmationModal.classList.remove('visible');
+                const formData = new FormData(document.getElementById('caisse-form'));
+                fetch('index.php?action=cloture_generale', { method: 'POST', body: formData })
+                    .then(res => res.json()).then(data => {
+                        if (data.success) {
+                            window.showCustomAlert(data.message, 'success');
+                            // On envoie le message au WebSocket pour synchroniser les autres clients
+                            window.wsConnection?.send(JSON.stringify({ type: 'cloture_generale' }));
+                            // On réinitialise l'interface locale
+                            window.resetCaisseForNextDay();
+                        } else { 
+                            throw new Error(data.message); 
+                        }
+                    }).catch(err => {
+                        window.showCustomAlert("Erreur lors de la clôture générale: " + err.message, 'error');
+                    });
+
             } else if (button.id === 'cancel-final-cloture-action-btn') {
                 finalConfirmationModal.classList.remove('visible');
             }

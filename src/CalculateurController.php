@@ -339,4 +339,98 @@ class CalculateurController {
         }
         exit;
     }
+
+    /**
+     * NOUVELLE MÉTHODE : Gère la clôture générale de la journée.
+     */
+    public function cloture_generale() {
+        global $min_to_keep;
+        header('Content-Type: application/json');
+
+        try {
+            $this->pdo->beginTransaction();
+
+            $nom_comptage = "Fond de caisse J+1 - cloture du " . date('d/m/Y');
+            $explication = "Comptage généré automatiquement après la clôture générale.";
+
+            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
+            $comptage_id = $this->pdo->lastInsertId();
+
+            foreach ($this->noms_caisses as $caisse_id => $nom) {
+                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
+                
+                // Calcul de la recette et des suggestions de retrait
+                $total_compte = 0;
+                $current_counts = [];
+                foreach ($this->denominations as $type => $denominations_list) {
+                    foreach ($denominations_list as $name => $value) {
+                        $quantite = get_numeric_value($caisse_data, $name);
+                        $current_counts[$name] = $quantite;
+                        $total_compte += $quantite * $value;
+                    }
+                }
+                $fond_de_caisse = get_numeric_value($caisse_data, 'fond_de_caisse');
+                $recette_reelle = $total_compte - $fond_de_caisse;
+                
+                $suggestions = $this->generateWithdrawalSuggestion($recette_reelle, $current_counts, $this->denominations, $min_to_keep ?? []);
+
+                // Insertion des détails du comptage J+1
+                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, 0, 0)");
+                $stmt_details->execute([$comptage_id, $caisse_id, $fond_de_caisse]);
+                $comptage_detail_id = $this->pdo->lastInsertId();
+
+                // Insertion des nouvelles dénominations pour J+1
+                foreach ($current_counts as $name => $quantite) {
+                    $quantite_a_retirer = $suggestions[$name] ?? 0;
+                    $nouvelle_quantite = $quantite - $quantite_a_retirer;
+
+                    if ($nouvelle_quantite > 0) {
+                        $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                        $stmt_denom->execute([$comptage_detail_id, $name, $nouvelle_quantite]);
+                    }
+                }
+            }
+
+            $this->pdo->commit();
+            $this->clotureStateService->resetState(); // Réinitialise l'état de clôture
+
+            echo json_encode(['success' => true, 'message' => "Clôture générale réussie. Les caisses sont prêtes pour demain."]);
+
+        } catch (Exception $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            error_log("Erreur lors de la clôture générale : " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Erreur de BDD lors de la clôture générale: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /**
+     * NOUVELLE MÉTHODE PRIVÉE : Génère la suggestion de retrait côté serveur.
+     */
+    private function generateWithdrawalSuggestion($amountToWithdraw, $currentCounts, $denominations, $minToKeep) {
+        $remainingAmount = $amountToWithdraw;
+        $suggestions = [];
+
+        $allDenominations = array_merge($denominations['billets'], $denominations['pieces']);
+        arsort($allDenominations); // Trie par valeur décroissante
+
+        foreach ($allDenominations as $name => $value) {
+            $countInCaisse = $currentCounts[$name] ?? 0;
+            $toKeep = $minToKeep[$name] ?? 0;
+            $availableToRemove = max(0, $countInCaisse - $toKeep);
+            
+            if ($value > 0) {
+                $numToRemove = min(floor($remainingAmount / $value), $availableToRemove);
+                if ($numToRemove > 0) {
+                    $suggestions[$name] = $numToRemove;
+                    $remainingAmount -= $numToRemove * $value;
+                    $remainingAmount = round($remainingAmount, 2);
+                }
+            }
+        }
+        return $suggestions;
+    }
 }

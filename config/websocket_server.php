@@ -179,9 +179,11 @@ class Caisse implements MessageComponentInterface {
                     $this->clotureStateService->reopenCaisse($caisseId);
                     $this->broadcastClotureState();
                     break;
+                // MISE À JOUR : Gère la clôture générale
                 case 'cloture_generale':
-                    $this->broadcast(['type' => 'all_caisses_closed']);
-                    $this->clotureStateService->resetState(); // Reset after broadcasting
+                    // On notifie tous les clients de la réinitialisation
+                    $this->broadcast(['type' => 'all_caisses_closed_and_reset']);
+                    // Le reset de la BDD est déjà géré par le contrôleur PHP
                     break;
             }
         } catch (\Exception $e) {

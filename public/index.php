@@ -113,6 +113,10 @@ if ($ajax_action) {
         case 'cloture': // NOUVEAU: Ajout de l'action de clôture
             $calculateurController->cloture();
             exit;
+        // NOUVEAU: Route pour la clôture générale
+        case 'cloture_generale':
+            $calculateurController->cloture_generale();
+            exit;
         // NOUVEAU: Route pour récupérer la dernière sauvegarde automatique
         case 'get_last_autosave_data':
             $calculateurController->getLastAutosaveData();
