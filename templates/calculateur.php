@@ -283,6 +283,8 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
         </div>
         <p>Voulez-vous finaliser la clôture pour : <strong id="confirm-caisse-name"></strong> ?</p>
         <div id="confirm-caisse-summary"></div>
+        <div id="confirm-caisse-withdrawal"></div>
+        <div id="confirm-caisse-cheques"></div>
         <p class="warning-text">Cette action peut être annulée avec le bouton "Réouvrir".</p>
         <div class="modal-actions">
             <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
@@ -312,8 +314,9 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
             <h3 style="border:none; color:white;">Toutes les caisses sont clôturées</h3>
          </div>
         <div class="modal-body" style="padding: 25px;">
-            <p style="text-align:center; margin-top:0;">Vérifiez les suggestions de retrait une dernière fois avant de lancer la clôture générale.</p>
+            <p style="text-align:center; margin-top:0;">Vérifiez les suggestions de retrait et les chèques à retirer avant de lancer la clôture générale.</p>
             <div class="accordion-container"></div>
+            <div id="cheques-summary-container"></div>
         </div>
         <div class="modal-actions" style="padding: 20px; background-color: var(--color-surface-alt); border-top: 1px solid var(--color-border-light); justify-content: flex-end;">
             <button id="confirm-cloture-generale-btn" class="btn save-btn">Lancer la Clôture Générale</button>

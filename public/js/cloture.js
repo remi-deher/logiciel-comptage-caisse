@@ -195,9 +195,16 @@ document.addEventListener('DOMContentLoaded', function() {
     function showClotureGeneraleModal() {
         const config = JSON.parse(calculatorDataElement.dataset.config);
         const { nomsCaisses, denominations, currencySymbol } = config;
-        let accordionHtml = '<div class="accordion-container">';
+        let accordionHtml = '';
+        let allCheques = [];
+        const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+
         for (const caisseId in nomsCaisses) {
-            const { suggestions } = calculateCaisseData(caisseId, config);
+            const { suggestions, cheques } = calculateCaisseDataForConfirmation(caisseId, config);
+            if (cheques.length > 0) {
+                allCheques.push({ caisseNom: nomsCaisses[caisseId], cheques: cheques });
+            }
+
             accordionHtml += `
                 <div class="accordion-card">
                     <div class="accordion-header">
@@ -220,9 +227,31 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             accordionHtml += `</tbody></table></div></div></div>`;
         }
-        accordionHtml += '</div>';
-        
-        clotureGeneraleModal.querySelector('.modal-content .accordion-container').innerHTML = accordionHtml;
+
+        const accordionContainer = clotureGeneraleModal.querySelector('.accordion-container');
+        if(accordionContainer) accordionContainer.innerHTML = accordionHtml;
+
+        const chequesContainer = clotureGeneraleModal.querySelector('#cheques-summary-container');
+        if (chequesContainer) {
+            let chequesHtml = '<h4><i class="fa-solid fa-money-check-dollar"></i> Récapitulatif Total des Chèques</h4>';
+            if (allCheques.length > 0) {
+                let totalGlobalCheques = 0;
+                chequesHtml += '<ul class="cheque-summary-list">';
+                allCheques.forEach(caisse => {
+                    chequesHtml += `<li class="caisse-cheque-header"><strong>${caisse.caisseNom}</strong></li>`;
+                    caisse.cheques.forEach((cheque, index) => {
+                        const montant = parseFloat(cheque.replace(',', '.')) || 0;
+                        totalGlobalCheques += montant;
+                        chequesHtml += `<li><span>Chèque #${index + 1}</span><strong>${formatCurrency(montant)}</strong></li>`;
+                    });
+                });
+                chequesHtml += `</ul><div style="text-align:right; font-weight:bold; margin-top:5px;">Total Général Chèques: ${formatCurrency(totalGlobalCheques)}</div>`;
+            } else {
+                chequesHtml += '<p>Aucun chèque enregistré pour cette période.</p>';
+            }
+            chequesContainer.innerHTML = chequesHtml;
+        }
+
         clotureGeneraleModal.classList.add('visible');
     }
     
@@ -234,17 +263,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!caisseId) return;
         const config = JSON.parse(calculatorDataElement.dataset.config);
         const caisseNom = config.nomsCaisses[caisseId];
-    
+        const { currencySymbol, denominations } = config;
+
         const confirmCaisseNameEl = document.getElementById('confirm-caisse-name');
-        if (confirmCaisseNameEl) {
-            confirmCaisseNameEl.textContent = caisseNom;
-        }
-    
+        if (confirmCaisseNameEl) confirmCaisseNameEl.textContent = caisseNom;
+        
+        const { recetteReelle, ecart, suggestions, cheques } = calculateCaisseDataForConfirmation(caisseId, config);
+        const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+
         const summaryContainer = document.getElementById('confirm-caisse-summary');
         if (summaryContainer) {
-            const { recetteReelle, ecart } = calculateCaisseDataForSummary(caisseId, config);
-            const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
-            
             summaryContainer.innerHTML = `
                 <div class="caisse-summary-box">
                     <div><span>Recette réelle :</span> <strong>${formatCurrency(recetteReelle)}</strong></div>
@@ -252,11 +280,50 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
         }
-    
+        
+        const withdrawalContainer = document.getElementById('confirm-caisse-withdrawal');
+        if (withdrawalContainer) {
+            let withdrawalHtml = '<h4><i class="fa-solid fa-cash-register"></i> Suggestion de retrait</h4>';
+            let hasSuggestions = false;
+            let tableHtml = `<table class="withdrawal-suggestion-table"><thead><tr><th>Dénomination</th><th>Quantité</th></tr></thead><tbody>`;
+            
+            const allDenominationsSorted = [...Object.entries(denominations.billets), ...Object.entries(denominations.pieces)].sort((a, b) => b[1] - a[1]);
+            allDenominationsSorted.forEach(([name, value]) => {
+                if (suggestions[name] > 0) {
+                    hasSuggestions = true;
+                    const label = value >= 1 ? `${value} ${currencySymbol}` : `${value * 100} cts`;
+                    tableHtml += `<tr><td>${label}</td><td>${suggestions[name]}</td></tr>`;
+                }
+            });
+            
+            tableHtml += `</tbody></table>`;
+            withdrawalHtml += hasSuggestions ? tableHtml : '<p>Aucune suggestion de retrait (la recette est nulle ou négative).</p>';
+            withdrawalContainer.innerHTML = withdrawalHtml;
+        }
+
+        const chequesContainer = document.getElementById('confirm-caisse-cheques');
+        if (chequesContainer) {
+            let chequesHtml = '<h4><i class="fa-solid fa-money-check-dollar"></i> Chèques à retirer</h4>';
+            if (cheques.length > 0) {
+                let totalCheques = 0;
+                chequesHtml += '<ul class="cheque-summary-list">';
+                cheques.forEach((cheque, index) => {
+                    const montant = parseFloat(cheque.replace(',', '.')) || 0;
+                    totalCheques += montant;
+                    chequesHtml += `<li><span>Chèque #${index + 1}</span><strong>${formatCurrency(montant)}</strong></li>`;
+                });
+                chequesHtml += `</ul><div style="text-align:right; font-weight:bold; margin-top:5px;">Total Chèques: ${formatCurrency(totalCheques)}</div>`;
+            } else {
+                chequesHtml += '<p>Aucun chèque enregistré pour cette caisse.</p>';
+            }
+            chequesContainer.innerHTML = chequesHtml;
+        }
+
         clotureConfirmationModal.querySelector('#cancel-cloture-btn').dataset.caisseId = caisseId;
         clotureConfirmationModal.querySelector('#confirm-final-cloture-btn').dataset.caisseId = caisseId;
         clotureConfirmationModal.classList.add('visible');
     }
+
 
     // --- Gestionnaire d'événements centralisé ---
 
@@ -363,15 +430,18 @@ document.addEventListener('DOMContentLoaded', function() {
         return { recetteReelle, suggestions };
     }
     
-    function calculateCaisseDataForSummary(caisseId, config) {
-        const { denominations } = config;
+    function calculateCaisseDataForConfirmation(caisseId, config) {
+        const { denominations, minToKeep } = config;
         const getVal = (id) => parseFloat(document.getElementById(`${id}_${caisseId}`)?.value.replace(',', '.') || 0) || 0;
         const getInt = (id) => parseInt(document.getElementById(`${id}_${caisseId}`)?.value || 0) || 0;
 
         let totalCompte = 0;
+        const currentCounts = {};
         for (const type in denominations) {
             for (const name in denominations[type]) {
-                totalCompte += getInt(name) * denominations[type][name];
+                const count = getInt(name);
+                totalCompte += count * denominations[type][name];
+                currentCounts[name] = count;
             }
         }
 
@@ -381,9 +451,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const recetteTheorique = ventes + retrocession;
         const recetteReelle = totalCompte - fondDeCaisse;
         const ecart = recetteReelle - recetteTheorique;
+        const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep);
 
-        return { recetteReelle, ecart };
+        const chequesInputs = document.querySelectorAll(`#cheques-container-${caisseId} input[name="caisse[${caisseId}][cheques][]"]`);
+        const cheques = Array.from(chequesInputs).map(input => input.value).filter(value => value.trim() !== '');
+
+        return { recetteReelle, ecart, suggestions, cheques };
     }
+
 
     function generateWithdrawalSuggestion(amountToWithdraw, currentCounts, denominations, minToKeep) {
         let remainingAmount = amountToWithdraw;

@@ -303,7 +303,9 @@
 
 #cloture-confirmation-modal .warning-text {
     font-weight: bold;
-    color: var(--color-danger);
+    color: var(--color-text-secondary);
+    font-style: italic;
+    font-size: 0.9em;
     margin-top: 15px;
     text-align: center;
 }
@@ -313,13 +315,49 @@
     border: 1px solid var(--color-border-light);
     border-radius: 8px;
     padding: 15px;
-    margin-top: 15px;
+    margin: 15px 0;
 }
 #confirm-caisse-summary div {
     display: flex;
     justify-content: space-between;
     font-size: 1.1em;
     padding: 5px 0;
+}
+
+#confirm-caisse-withdrawal, #confirm-caisse-cheques {
+    margin-top: 15px;
+}
+#confirm-caisse-withdrawal h4, #confirm-caisse-cheques h4, #cheques-summary-container h4 {
+    font-size: 1.1em;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--color-border-light);
+    padding-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cheque-summary-list {
+    list-style: none;
+    padding: 0;
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid var(--color-border-light);
+    border-radius: 6px;
+}
+.cheque-summary-list li {
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+}
+.cheque-summary-list li:nth-child(odd) {
+    background-color: var(--color-surface-alt);
+}
+.cheque-summary-list strong {
+    font-family: monospace;
+}
+#cheques-summary-container {
+    margin-top: 20px;
 }
 
 
