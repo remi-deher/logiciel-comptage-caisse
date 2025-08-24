@@ -212,17 +212,17 @@
 #caisse-selection-modal .modal-header-cloture h3 {
     color: white;
     border: none;
-    margin: 0;
+    margin: 0 0 5px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+#caisse-selection-modal .modal-header-cloture p {
+    margin:0;
+    opacity: 0.9;
 }
 #caisse-selection-modal .modal-body-cloture {
     padding: 25px;
-}
-#caisse-selection-modal .modal-body-cloture p {
-    text-align: center;
-    font-size: 1.1em;
-    color: var(--color-text-secondary);
-    margin-top: 0;
-    margin-bottom: 25px;
 }
 .color-key {
     display: flex;
@@ -301,6 +301,28 @@
 .caisse-status-item.caisse-status-en-cours .status-actions button { background-color: rgba(255, 255, 255, 0.2); color: white; }
 .caisse-status-item.caisse-status-en-cours .status-actions button:hover { background-color: rgba(255, 255, 255, 0.3); }
 
+#cloture-confirmation-modal .warning-text {
+    font-weight: bold;
+    color: var(--color-danger);
+    margin-top: 15px;
+    text-align: center;
+}
+
+#confirm-caisse-summary {
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+}
+#confirm-caisse-summary div {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.1em;
+    padding: 5px 0;
+}
+
+
 /* --- Styles améliorés pour la modale de clôture générale --- */
 #cloture-generale-modal .modal-content {
     padding: 0;
@@ -308,11 +330,12 @@
 }
 #cloture-generale-modal .modal-header {
     background-color: var(--color-success);
+    color: white;
     display: flex;
     align-items: center;
-    justify-content: center; /* Centre le contenu */
     gap: 15px;
     padding: 25px 30px;
+    border-radius: 12px 12px 0 0;
 }
 #cloture-generale-modal .modal-header i {
     font-size: 2.5em;
@@ -320,15 +343,15 @@
 #cloture-generale-modal .modal-header h3 {
     font-size: 1.6em;
     font-weight: 600;
+    color: white;
+    border: none;
 }
 #cloture-generale-modal .modal-body {
     padding: 25px;
 }
 #cloture-generale-modal .modal-body p {
     text-align: center;
-    font-weight: bold;
-    color: var(--color-danger);
-    font-size: 1.2em;
+    margin-top: 0;
 }
 #cloture-generale-modal .accordion-header {
     background-color: var(--color-surface);

@@ -180,7 +180,6 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
     </form>
 </div>
 
-<!-- Modales -->
 <div id="resume-choice-modal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -261,16 +260,17 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
     </div>
 </div>
 
-<!-- Modales de Clôture -->
 <div id="caisse-selection-modal" class="modal">
     <div class="modal-content">
-        <div class="modal-header-cloture"><h3>Gestion de la Clôture</h3></div>
-        <div class="modal-body-cloture">
+        <div class="modal-header-cloture">
+            <h3><i class="fa-solid fa-store-lock"></i> Gestion de la Clôture</h3>
             <p>Sélectionnez une caisse pour commencer ou modifier son état de clôture.</p>
+        </div>
+        <div class="modal-body-cloture">
             <div class="color-key">
                 <div><span class="color-dot color-libre"></span> Libre</div>
                 <div><span class="color-dot color-cloturee"></span> Clôturée</div>
-                <div><span class="color-dot color-en-cours"></span> En cours</div>
+                <div><span class="color-dot color-en-cours"></span> Verrouillée</div>
             </div>
             <div class="caisse-status-list"></div>
         </div>
@@ -278,9 +278,12 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 </div>
 <div id="cloture-confirmation-modal" class="modal">
     <div class="modal-content">
-        <div class="modal-header"><h3>Confirmer la clôture</h3></div>
-        <p>Voulez-vous finaliser la clôture de cette caisse ? Cette action est irréversible.</p>
-        <div class="modal-body-content-wrapper"></div>
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-circle-question" style="color: var(--color-warning);"></i> Confirmer la clôture</h3>
+        </div>
+        <p>Voulez-vous finaliser la clôture pour : <strong id="confirm-caisse-name"></strong> ?</p>
+        <div id="confirm-caisse-summary"></div>
+        <p class="warning-text">Cette action peut être annulée avec le bouton "Réouvrir".</p>
         <div class="modal-actions">
             <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
             <button id="confirm-final-cloture-btn" class="btn new-btn">Confirmer la clôture</button>
@@ -288,22 +291,32 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
     </div>
 </div>
 <div id="final-confirmation-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header modal-header-danger"><h3>Confirmation Finale</h3></div>
-        <p>Validez la clôture de la journée ?<br>Cela remettra les caisses à 0 en gardant le fond de caisse et va créer une sauvegarde des comptages.</p>
-        <div class="modal-actions">
-            <button id="cancel-final-cloture-action-btn" class="btn delete-btn">Annuler</button>
-            <button id="confirm-final-cloture-action-btn" class="btn save-btn">Confirmer</button>
+    <div class="modal-content" style="padding:0;">
+        <div class="modal-header-danger">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <h3>Confirmation Finale Requise</h3>
+        </div>
+        <div class="modal-body" style="padding:25px;">
+             <p>Validez la clôture définitive de la journée ?<br>Cette action réinitialisera les caisses pour le jour suivant (le fond de caisse sera conservé).</p>
+            <div class="modal-actions">
+                <button id="cancel-final-cloture-action-btn" class="btn delete-btn">Annuler</button>
+                <button id="confirm-final-cloture-action-btn" class="btn save-btn">Confirmer et Terminer</button>
+            </div>
         </div>
     </div>
 </div>
 <div id="cloture-generale-modal" class="modal">
-    <div class="modal-content">
-         <div class="modal-header"><h3>Toutes les caisses sont clôturées</h3></div>
-        <p>Vérifiez les suggestions de retrait une dernière fois avant de lancer la clôture générale.</p>
-        <div class="accordion-container"></div>
-        <div class="modal-actions">
-            <button id="confirm-cloture-generale-btn" class="btn save-btn">Confirmer la Clôture Générale</button>
+    <div class="modal-content" style="padding: 0;">
+         <div class="modal-header" style="background-color: var(--color-success); color: white; border-radius: 12px 12px 0 0;">
+            <i class="fa-solid fa-flag-checkered"></i>
+            <h3 style="border:none; color:white;">Toutes les caisses sont clôturées</h3>
+         </div>
+        <div class="modal-body" style="padding: 25px;">
+            <p style="text-align:center; margin-top:0;">Vérifiez les suggestions de retrait une dernière fois avant de lancer la clôture générale.</p>
+            <div class="accordion-container"></div>
+        </div>
+        <div class="modal-actions" style="padding: 20px; background-color: var(--color-surface-alt); border-top: 1px solid var(--color-border-light); justify-content: flex-end;">
+            <button id="confirm-cloture-generale-btn" class="btn save-btn">Lancer la Clôture Générale</button>
         </div>
     </div>
 </div>

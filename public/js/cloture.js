@@ -234,9 +234,25 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!caisseId) return;
         const config = JSON.parse(calculatorDataElement.dataset.config);
         const caisseNom = config.nomsCaisses[caisseId];
-        
-        clotureConfirmationModal.querySelector('h3').textContent = `Confirmer la clôture de : ${caisseNom}`;
-        clotureConfirmationModal.querySelector('p').textContent = "Voulez-vous finaliser la clôture de cette caisse ? Cette action est irréversible.";
+    
+        const confirmCaisseNameEl = document.getElementById('confirm-caisse-name');
+        if (confirmCaisseNameEl) {
+            confirmCaisseNameEl.textContent = caisseNom;
+        }
+    
+        const summaryContainer = document.getElementById('confirm-caisse-summary');
+        if (summaryContainer) {
+            const { recetteReelle, ecart } = calculateCaisseDataForSummary(caisseId, config);
+            const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+            
+            summaryContainer.innerHTML = `
+                <div class="caisse-summary-box">
+                    <div><span>Recette réelle :</span> <strong>${formatCurrency(recetteReelle)}</strong></div>
+                    <div><span>Écart constaté :</span> <strong class="${ecart > 0.01 ? 'ecart-positif' : ecart < -0.01 ? 'ecart-negatif' : ''}">${formatCurrency(ecart)}</strong></div>
+                </div>
+            `;
+        }
+    
         clotureConfirmationModal.querySelector('#cancel-cloture-btn').dataset.caisseId = caisseId;
         clotureConfirmationModal.querySelector('#confirm-final-cloture-btn').dataset.caisseId = caisseId;
         clotureConfirmationModal.classList.add('visible');
@@ -345,6 +361,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const recetteReelle = totalCompte - fondDeCaisse;
         const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep);
         return { recetteReelle, suggestions };
+    }
+    
+    function calculateCaisseDataForSummary(caisseId, config) {
+        const { denominations } = config;
+        const getVal = (id) => parseFloat(document.getElementById(`${id}_${caisseId}`)?.value.replace(',', '.') || 0) || 0;
+        const getInt = (id) => parseInt(document.getElementById(`${id}_${caisseId}`)?.value || 0) || 0;
+
+        let totalCompte = 0;
+        for (const type in denominations) {
+            for (const name in denominations[type]) {
+                totalCompte += getInt(name) * denominations[type][name];
+            }
+        }
+
+        const fondDeCaisse = getVal('fond_de_caisse');
+        const ventes = getVal('ventes');
+        const retrocession = getVal('retrocession');
+        const recetteTheorique = ventes + retrocession;
+        const recetteReelle = totalCompte - fondDeCaisse;
+        const ecart = recetteReelle - recetteTheorique;
+
+        return { recetteReelle, ecart };
     }
 
     function generateWithdrawalSuggestion(amountToWithdraw, currentCounts, denominations, minToKeep) {
