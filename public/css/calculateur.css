@@ -1,5 +1,6 @@
 /* ==========================================================================
-   public/css/calculateur.css (Avec Thème Sombre)
+   public/css/calculateur.css
+   Fichier de styles complet et corrigé pour la page du calculateur.
    ========================================================================== */
 
 /* --- Bandeau pour le Mode Consultation --- */
@@ -19,60 +20,19 @@
 .history-view-banner strong { font-size: 1.1em; display: block; }
 .history-view-banner p { margin: 4px 0 0 0; font-size: 0.9em; color: var(--color-text-secondary); }
 
-/* NOUVEAU STYLE POUR LE BOUTON "REPRENDRE" */
-.history-view-banner .resume-btn {
-    flex-shrink: 0;
-    padding: 10px 20px;
-    font-size: 1em;
-    font-weight: bold;
-    background-color: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s ease;
-}
-.history-view-banner .resume-btn:hover {
-    background-color: var(--color-primary-dark);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px var(--shadow-color);
-}
-
-
-/* --- Section de sauvegarde en haut --- */
-.top-save-section {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 15px;
-    padding: 20px;
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--color-border-light);
-    border-radius: 12px;
-    margin-bottom: 25px;
-}
-.top-save-section .form-group { flex-grow: 1; margin-bottom: 0; }
-.top-save-section .form-group label { font-size: 0.9em; margin-bottom: 5px; }
-.top-save-section input { padding: 8px; }
-.top-save-section .save-btn { padding: 8px 20px; font-size: 1em; flex-shrink: 0; }
-.top-save-section .autosave-status { flex-basis: 100%; text-align: right; font-size: 0.85em; min-height: 0; margin-top: 5px; }
-
-/* --- Styles des onglets --- */
+/* --- Styles des onglets de Caisse --- */
 .tab-selector { border-bottom: 2px solid var(--color-border-light); margin-bottom: 20px; display: flex; flex-wrap: wrap; }
-.tab-link { background-color: var(--color-surface-alt); border: 1px solid var(--color-border-light); border-bottom: none; padding: 10px 15px; cursor: pointer; font-size: 1em; border-radius: 5px 5px 0 0; margin-right: 5px; color: var(--color-text-secondary); transition: background-color 0.2s, color 0.2s; }
-.tab-link:hover { background-color: var(--color-surface-alt-hover); }
-.tab-link.active { background-color: var(--color-surface); border-bottom: 2px solid var(--color-surface); font-weight: bold; color: var(--color-primary); }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
-.tab-link.cloture-en-cours {
-    color: #8a2be2 !important;
-    border-color: #8a2be2 !important;
-}
+.tab-link { background-color: transparent; border: none; border-bottom: 3px solid transparent; padding: 12px 18px; cursor: pointer; font-size: 1.1em; color: var(--color-text-secondary); transition: all 0.2s; font-weight: 600; }
+.tab-link:hover { color: var(--color-primary); }
+.tab-link.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+.caisse-tab-content { display: none; }
+.caisse-tab-content.active { display: block; animation: fadeIn 0.5s; }
+.tab-link.cloture-en-cours { color: #8a2be2 !important; }
+.tab-link.cloturee { background-color: #8a2be2; color: white; border-color: #7a1fb9; }
+.tab-link.cloturee:hover { background-color: #7a1fb9; }
 
-/* --- Indicateur d'écart en haut (version d'origine) --- */
+
+/* --- Indicateur d'écart en haut --- */
 .ecart-display-container {
     text-align: center;
     margin-bottom: 20px;
@@ -94,50 +54,76 @@
     display: block;
     opacity: 1;
 }
-.ecart-display .ecart-value {
-    font-size: 1.5em;
-    display: block;
-    margin-bottom: 5px;
-}
-.ecart-explanation {
-    font-size: 0.9em;
-    font-style: italic;
-    font-weight: normal;
-    color: var(--color-text-secondary);
-    margin-top: 8px;
-    min-height: 1.2em;
-}
+.ecart-display .ecart-value { font-size: 1.5em; display: block; margin-bottom: 5px; }
+.ecart-explanation { font-size: 0.9em; font-style: italic; font-weight: normal; color: var(--color-text-secondary); margin-top: 8px; min-height: 1.2em; }
 
-/* --- Nouvelle classe pour la barre compacte en mode sticky --- */
-.ecart-display-container.compact-sticky {
-    position: fixed;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
-    max-width: 400px;
-    padding: 10px 15px;
-    z-index: 100;
-    border-radius: 0 0 8px 8px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-
-.ecart-display-container.compact-sticky .ecart-value {
-    font-size: 1.2em;
-    margin: 0;
-}
-.ecart-display-container.compact-sticky .ecart-explanation {
-    display: none;
-}
 .ecart-display.ecart-ok { background-color: rgba(39, 174, 96, 0.1); border-color: var(--color-success); }
 .ecart-display.ecart-ok .ecart-value { color: var(--color-success); }
 .ecart-display.ecart-positif { background-color: rgba(243, 156, 18, 0.1); border-color: var(--color-warning); }
 .ecart-display.ecart-positif .ecart-value { color: var(--color-warning); }
 .ecart-display.ecart-negatif { background-color: rgba(192, 57, 43, 0.1); border-color: var(--color-danger); }
 .ecart-display.ecart-negatif .ecart-value { color: var(--color-danger); }
+.ecart-display.ecart-cloturee { background-color: rgba(138, 43, 226, 0.1); border-color: #8a2be2; }
+.ecart-display.ecart-cloturee .ecart-value { color: #8a2be2; }
+
+
+/* --- Styles pour les onglets de mode de paiement --- */
+.payment-method-tabs {
+    margin-top: 20px;
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.payment-method-selector {
+    display: flex;
+    background-color: var(--color-surface-alt);
+    border-bottom: 1px solid var(--color-border-light);
+}
+.payment-tab-link {
+    flex: 1;
+    padding: 15px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.payment-tab-link:hover {
+    background-color: var(--color-surface-alt-hover);
+}
+.payment-tab-link.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    background-color: var(--color-surface);
+}
+.payment-tab-content {
+    display: none;
+    padding: 20px;
+    background-color: var(--color-surface);
+}
+.payment-tab-content.active {
+    display: block;
+    animation: fadeIn 0.5s;
+}
+.info-message {
+    text-align: center;
+    padding: 20px;
+    color: var(--color-text-muted);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
 
 /* --- STRUCTURE EN ACCORDÉON --- */
-.accordion-container { display: flex; flex-direction: column; gap: 15px; }
 .accordion-card { border: 1px solid var(--color-border-light); border-radius: 12px; overflow: hidden; transition: all 0.3s ease; }
 .accordion-header { display: flex; align-items: center; gap: 15px; padding: 20px; cursor: pointer; background-color: var(--color-surface-alt); transition: background-color 0.2s; }
 .accordion-header:hover { background-color: var(--color-surface-alt-hover); }
@@ -146,45 +132,13 @@
 .accordion-toggle-icon { font-size: 1.2em; transition: transform 0.3s ease; }
 .accordion-header.active .accordion-toggle-icon { transform: rotate(180deg); }
 .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out, padding 0.4s ease-out; background-color: var(--color-surface); }
-.accordion-content.open { max-height: 1000px; transition: max-height 0.5s ease-in, padding 0.5s ease-in; }
+.accordion-content.open { max-height: 1000px; }
 .accordion-content-inner { padding: 20px; }
-.results h2 { display: none; }
 
 /* --- Styles des grilles de saisie --- */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; }
-.grid-2 { grid-template-columns: 1fr 1fr; }
 .grid-3 { grid-template-columns: 1fr; gap: 15px;}
-.tab-content .form-group input { text-align: right; }
-
-/* NOUVEAU: Styles pour mettre en évidence le champ de saisie actif */
-.tab-content .form-group input:focus,
-.tab-content .form-group textarea:focus {
-    border: 2px solid var(--color-primary); /* Bordure plus épaisse et de couleur primaire */
-    box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.3); /* Ombre plus visible */
-    transform: scale(1.02); /* Légère augmentation de la taille pour un effet de mise en avant */
-    transition: all 0.2s ease-in-out;
-}
-
-
-/* --- Styles des résultats --- */
-.results-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-.result-box { background-color: var(--color-surface-alt); padding: 20px; border-radius: 8px; border: 1px solid var(--color-border-light); }
-.result-box .result-line { display: flex; justify-content: space-between; padding: 8px 0; }
-.result-box .result-line.total { font-weight: bold; }
-.result-box .result-line span:last-child { font-family: monospace; }
-.result-box .ecart-positif { color: var(--color-warning); }
-.result-box .ecart-negatif { color: var(--color-danger); }
-.combined-results { background-color: rgba(52, 152, 219, 0.1); border: 1px solid rgba(52, 152, 219, 0.3); }
-
-.autosave-status { text-align: center; font-size: 0.9em; color: var(--color-text-muted); min-height: 1.2em; transition: color 0.5s; }
-.autosave-status.saving { color: var(--color-primary); }
-.autosave-status.success { color: var(--color-success); }
-.autosave-status.error { color: var(--color-danger); }
-
-@media (min-width: 576px) {
-    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-    .results-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-}
+.caisse-tab-content .form-group input, .payment-tab-content .form-group input { text-align: right; }
 
 .total-line {
     display: block;
@@ -195,239 +149,95 @@
     font-weight: bold;
 }
 
-@media (max-width: 576px) {
-    .total-line { font-size: 0.8em; }
-}
-
-.withdrawal-table {
-    width: 80%;
-    margin: 10px auto;
-    border-collapse: collapse;
-}
-
-.withdrawal-table th, .withdrawal-table td {
-    border: 1px solid var(--color-border);
-    padding: 8px;
-    text-align: center;
-}
-
-.withdrawal-table th {
-    background-color: var(--color-surface-alt);
-    color: var(--color-text-secondary);
-}
-
-body[data-theme="dark"] .withdrawal-table th {
-    background-color: var(--color-surface);
-}
-
-.modal {
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.6);
-    display: none;
-    align-items: center;
-    justify-content: center;
+.save-section {
+    margin-top: 30px;
     padding: 20px;
-    box-sizing: border-box;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-}
-.modal.visible {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    display: flex !important;
-}
-.modal-content {
-    background-color: var(--color-surface);
-    padding: 30px;
-    border: 1px solid var(--color-border);
-    width: 90%;
-    max-width: 500px;
+    background-color: var(--color-surface-alt);
     border-radius: 12px;
-    position: relative;
-    max-height: 90vh;
-    overflow-y: auto;
-    transform: scale(0.95);
-    transition: transform 0.3s ease;
-}
-.modal.visible .modal-content {
-    transform: scale(1);
-}
-.modal-close {
-    color: var(--color-text-muted);
-    position: absolute;
-    top: 15px;
-    right: 25px;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-}
-.modal-close:hover, .modal-close:focus {
-    color: var(--color-text-primary);
-}
-.modal-header h3 {
-    margin: 0;
-    border: none;
-}
-.modal-actions {
-    margin-top: 20px;
-    display: flex;
-    justify-content: space-around;
 }
 
-#caisse-selection-modal .modal-content,
-#cloture-generale-modal .modal-content {
-    background-color: var(--color-surface);
-    padding: 0;
-    border-radius: 12px;
-    box-shadow: 0 4px 25px var(--shadow-color);
-    position: relative;
-    width: 90%;
-    max-width: 600px;
-}
-#cloture-generale-modal .modal-content {
+/* --- Styles pour les modales de la page --- */
+#synthesis-modal .modal-content {
     max-width: 800px;
 }
+.synthesis-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+.synthesis-pair {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+.result-box {
+    background-color: var(--color-surface-alt);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border-light);
+}
+.result-box h3 {
+    margin-top: 0;
+    font-size: 1.2em;
+}
+.result-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-border-light);
+}
+.result-line:last-child {
+    border-bottom: none;
+}
+.result-line.total {
+    font-weight: bold;
+}
+.combined-results {
+    margin-top: 20px;
+    background-color: rgba(52, 152, 219, 0.1);
+    border: 1px solid rgba(52, 152, 219, 0.3);
+}
 
-#caisse-selection-modal .modal-header-cloture,
-#cloture-generale-modal .modal-header {
+/* --- Styles améliorés pour la modale de clôture --- */
+#caisse-selection-modal .modal-content {
+    padding: 0;
+    max-width: 700px;
+}
+#caisse-selection-modal .modal-header-cloture {
     background-color: var(--color-primary);
     color: white;
-    padding: 25px 30px;
+    padding: 20px;
     border-radius: 12px 12px 0 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
 }
-#caisse-selection-modal .modal-header-cloture h3,
-#cloture-generale-modal .modal-header h3 {
-    margin: 0;
-    border: none;
+#caisse-selection-modal .modal-header-cloture h3 {
     color: white;
-    font-size: 1.8em;
+    border: none;
+    margin: 0;
 }
-#caisse-selection-modal .modal-body-cloture,
-#cloture-generale-modal .modal-content > p {
-    padding: 30px;
-    color: var(--color-text-secondary);
+#caisse-selection-modal .modal-body-cloture {
+    padding: 25px;
 }
 #caisse-selection-modal .modal-body-cloture p {
+    text-align: center;
+    font-size: 1.1em;
+    color: var(--color-text-secondary);
     margin-top: 0;
     margin-bottom: 25px;
 }
-.caisse-status-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 20px;
-}
-.caisse-status-item {
-    border-radius: 10px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: center;
-    gap: 15px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-align: center;
-    color: white;
-    position: relative;
-    height: 100%;
-    box-sizing: border-box;
-}
-.caisse-status-item::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.1);
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    border-radius: 10px;
-}
-.caisse-status-item:hover::before {
-    opacity: 1;
-}
-
-.caisse-status-item.caisse-status-libre { background-color: var(--color-success); }
-.caisse-status-item.caisse-status-cloturee { background-color: var(--color-warning); }
-.caisse-status-item.caisse-status-en-cours { background-color: #8a2be2; }
-
-.caisse-status-item .status-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    flex-grow: 1;
-    white-space: nowrap;
-}
-.caisse-status-item .status-info i,
-.caisse-status-item strong {
-    color: white;
-    font-size: 1.2em;
-    font-weight: bold;
-}
-.caisse-status-item .status-info i {
-    font-size: 1.5em;
-}
-
-.caisse-status-item .status-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-}
-.caisse-status-item .status-actions span {
-    font-weight: bold;
-}
-
-.caisse-status-item .action-btn-small {
-    background-color: rgba(255, 255, 255, 0.2);
-    color: white;
-    padding: 8px 15px;
-    border-radius: 6px;
-    font-size: 0.9em;
-    border: none;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    width: 100%;
-}
-.caisse-status-item .action-btn-small:hover {
-    background-color: rgba(255, 255, 255, 0.3);
-}
-
-.caisse-status-item.disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.caisse-status-item.disabled:hover {
-    transform: none;
-    box-shadow: none;
-}
-
 .color-key {
     display: flex;
-    flex-wrap: wrap;
     justify-content: center;
     gap: 20px;
     margin-bottom: 25px;
-    font-size: 0.9em;
-    color: var(--color-text-secondary);
+    padding: 10px;
+    background-color: var(--color-surface-alt);
+    border-radius: 8px;
 }
 .color-key div {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-size: 0.9em;
 }
 .color-dot {
     width: 14px;
@@ -438,60 +248,108 @@ body[data-theme="dark"] .withdrawal-table th {
 .color-dot.color-cloturee { background-color: var(--color-warning); }
 .color-dot.color-en-cours { background-color: #8a2be2; }
 
-.reopen-caisse-btn.action-btn-small {
-    background-color: transparent;
-    color: var(--color-primary);
-    border: 2px solid var(--color-primary);
-    font-weight: bold;
-    padding: 6px 12px;
+.caisse-status-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+.caisse-status-item {
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid transparent;
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 15px;
+}
+.caisse-status-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px var(--shadow-color);
+}
+.caisse-status-item strong {
+    font-size: 1.2em;
+    display: block;
+    margin-bottom: 0;
+}
+.caisse-status-item .status-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+}
+.caisse-status-item .status-actions button {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 0.9em;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
 }
 
-.reopen-caisse-btn.action-btn-small:hover {
-    background-color: var(--color-primary);
+.caisse-status-item.caisse-status-libre { background-color: var(--color-success); color: white; }
+.caisse-status-item.caisse-status-libre .status-actions button { background-color: rgba(255, 255, 255, 0.2); color: white; }
+.caisse-status-item.caisse-status-libre .status-actions button:hover { background-color: rgba(255, 255, 255, 0.3); }
+
+.caisse-status-item.caisse-status-cloturee { background-color: var(--color-warning); color: #333; }
+.caisse-status-item.caisse-status-cloturee .status-actions button { background-color: rgba(0, 0, 0, 0.1); color: var(--color-text-primary); }
+.caisse-status-item.caisse-status-cloturee .status-actions button:hover { background-color: rgba(0, 0, 0, 0.2); }
+
+.caisse-status-item.caisse-status-en-cours { background-color: #8a2be2; color: white; }
+.caisse-status-item.caisse-status-en-cours .status-actions button { background-color: rgba(255, 255, 255, 0.2); color: white; }
+.caisse-status-item.caisse-status-en-cours .status-actions button:hover { background-color: rgba(255, 255, 255, 0.3); }
+
+/* --- Styles améliorés pour la modale de clôture générale --- */
+#cloture-generale-modal .modal-content {
+    padding: 0;
+    max-width: 800px;
+}
+#cloture-generale-modal .modal-header {
+    background-color: var(--color-success);
+}
+#cloture-generale-modal .accordion-header {
+    background-color: var(--color-surface);
+}
+#cloture-generale-modal .accordion-header:hover {
+    background-color: var(--color-surface-alt);
+}
+#cloture-generale-modal .reopen-caisse-btn {
+    background-color: var(--color-warning);
     color: white;
-    transform: translateY(-1px);
+    margin-left: auto;
+    margin-right: 15px;
+}
+#cloture-generale-modal .reopen-caisse-btn:hover {
+    background-color: #e67e22;
+}
+#cloture-generale-modal .modal-actions {
+    padding: 20px;
+    background-color: var(--color-surface-alt);
+    border-top: 1px solid var(--color-border-light);
 }
 
-.caisse-status-item.caisse-status-cloturee .reopen-caisse-btn.action-btn-small {
-    background-color: rgba(255, 255, 255, 0.25);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-}
-.caisse-status-item.caisse-status-cloturee .reopen-caisse-btn.action-btn-small:hover {
-    background-color: rgba(255, 255, 255, 0.4);
-}
 
-.tab-link.cloturee {
-    background-color: #8a2be2;
-    color: white;
-    border-color: #7a1fb9;
+#final-confirmation-modal .modal-content, #resume-choice-modal .modal-content, #resume-confirm-modal .modal-content {
+    text-align: center;
 }
-
-.tab-link.cloturee:hover {
-    background-color: #7a1fb9;
-}
-
-.ecart-display.ecart-cloturee {
-    background-color: rgba(138, 43, 226, 0.1);
-    border-color: #8a2be2;
-}
-
-.ecart-display.ecart-cloturee .ecart-value {
-    color: #8a2be2;
-}
-
 #final-confirmation-modal .modal-content {
-    padding: 0; /* On enlève le padding pour que le header prenne toute la largeur */
+    padding: 0;
 }
-
 #final-confirmation-modal .modal-header-danger {
     background-color: var(--color-danger);
     color: white;
-    padding: 20px;
+    padding: 30px 20px;
     border-radius: 12px 12px 0 0;
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
 }
-
+#final-confirmation-modal .modal-header-danger i {
+    font-size: 3em;
+}
 #final-confirmation-modal .modal-header-danger h3 {
     color: white;
     font-weight: bold;
@@ -499,20 +357,26 @@ body[data-theme="dark"] .withdrawal-table th {
     margin: 0;
     font-size: 1.5em;
 }
-
-#final-confirmation-modal p {
-    padding: 20px 30px 0 30px; /* On ajoute le padding au paragraphe */
-    text-align: center;
+#final-confirmation-modal .modal-body {
+    padding: 25px;
+}
+#final-confirmation-modal .modal-body p {
+    color: var(--color-text-secondary);
     line-height: 1.6;
+    margin: 0 0 25px 0;
 }
-
-/* NOUVEAU: Styles pour les modales de reprise de comptage */
-#resume-choice-modal .modal-content, #resume-confirm-modal .modal-content {
-    text-align: center;
-}
-#resume-choice-modal .modal-actions, #resume-confirm-modal .modal-actions {
+#final-confirmation-modal .modal-actions {
     display: flex;
     justify-content: center;
     gap: 15px;
-    margin-top: 25px;
+    padding-bottom: 25px;
+}
+
+@media (min-width: 576px) {
+    .grid-3 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+    .synthesis-grid { grid-template-columns: 1fr 1fr; }
+    .synthesis-pair { grid-template-columns: 1fr; }
+}
+@media (min-width: 992px) {
+    .synthesis-pair { grid-template-columns: 1fr 1fr; }
 }

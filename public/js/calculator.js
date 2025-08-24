@@ -1,39 +1,38 @@
 /**
  * Module JavaScript pour la logique de la page du calculateur.
  * Ce script gère les calculs en temps réel, les onglets, les accordéons,
- * la sauvegarde intelligente en quittant la page et l'interaction avec le formulaire principal.
+ * la sauvegarde et la reprise de comptage.
  */
 document.addEventListener('DOMContentLoaded', function() {
     const calculatorDataElement = document.getElementById('calculator-data');
-    if (!calculatorDataElement) return;
+    if (!calculatorDataElement) {
+        console.error("Élément #calculator-data introuvable. Le script ne peut pas continuer.");
+        return;
+    }
 
     // --- Configuration et état global ---
     const config = JSON.parse(calculatorDataElement.dataset.config || '{}');
     const loadedData = JSON.parse(calculatorDataElement.dataset.loadedData || '{}');
-    const { nomsCaisses, denominations, minToKeep, isLoadedFromHistory, currencySymbol } = config;
+    const { nomsCaisses, denominations, isLoadedFromHistory } = config;
     const comptageId = calculatorDataElement.dataset.comptageId;
 
-    // Variable pour suivre les modifications non enregistrées
     let hasUnsavedChanges = false;
-    
-    // NOUVEAU: Sélecteur de la nouvelle modale
     const synthesisModal = document.getElementById('synthesis-modal');
-    
-    // NOUVELLE FONCTION: Gère le comportement de l'indicateur d'écart collant
+
+    // --- Fonctions utilitaires ---
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+    };
+
     const handleStickyEcart = () => {
         const ecartContainer = document.querySelector('.ecart-display-container');
         if (!ecartContainer) return;
-        const offset = 100; // Décalage en pixels avant d'appliquer la classe
+        const offset = 100;
         if (window.scrollY > offset) {
             ecartContainer.classList.add('compact-sticky');
         } else {
             ecartContainer.classList.remove('compact-sticky');
         }
-    };
-    
-    // --- Fonctions utilitaires ---
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
     };
 
     /**
@@ -48,130 +47,136 @@ document.addEventListener('DOMContentLoaded', function() {
 
         for (const caisseId in nomsCaisses) {
             let totalCaisseCompte = 0;
-            const currentCounts = {};
 
-            // Calcule le total compté pour la caisse
-            for (const type in denominations) {
-                for (const name in denominations[type]) {
-                    const input = document.getElementById(`${name}_${caisseId}`);
-                    const quantite = parseInt(input.value, 10) || 0;
-                    const valeur = parseFloat(denominations[type][name]);
-                    const totalLigne = quantite * valeur;
-                    totalCaisseCompte += totalLigne;
-                    currentCounts[name] = quantite;
+            if (denominations) {
+                for (const type in denominations) {
+                    for (const name in denominations[type]) {
+                        const input = document.getElementById(`${name}_${caisseId}`);
+                        const quantite = input ? (parseInt(input.value, 10) || 0) : 0;
+                        const valeur = parseFloat(denominations[type][name]);
+                        const totalLigne = quantite * valeur;
+                        totalCaisseCompte += totalLigne;
 
-                    const totalLigneElement = document.getElementById(`total_${name}_${caisseId}`);
-                    if (totalLigneElement) {
-                        totalLigneElement.textContent = formatCurrency(totalLigne);
+                        const totalLigneElement = document.getElementById(`total_${name}_${caisseId}`);
+                        if (totalLigneElement) {
+                            totalLigneElement.textContent = formatCurrency(totalLigne);
+                        }
                     }
                 }
             }
 
-            // Récupère les autres valeurs
             const fondDeCaisse = parseFloat(document.getElementById(`fond_de_caisse_${caisseId}`).value.replace(',', '.')) || 0;
             const ventes = parseFloat(document.getElementById(`ventes_${caisseId}`).value.replace(',', '.')) || 0;
             const retrocession = parseFloat(document.getElementById(`retrocession_${caisseId}`).value.replace(',', '.')) || 0;
 
-            // Calcule les résultats
             const recetteTheorique = ventes + retrocession;
             const recetteReelle = totalCaisseCompte - fondDeCaisse;
             const ecart = recetteReelle - recetteTheorique;
 
-            // Met à jour les totaux globaux
             totalGlobalCompte += totalCaisseCompte;
             totalGlobalRecetteReelle += recetteReelle;
             totalGlobalRecetteTheorique += recetteTheorique;
             totalGlobalEcart += ecart;
             totalGlobalFdc += fondDeCaisse;
 
-            // Met à jour l'affichage des résultats de la caisse (dans la modale)
             updateResultsDisplay(caisseId, { fondDeCaisse, totalCaisseCompte, recetteTheorique, recetteReelle, ecart });
             updateEcartDisplay(caisseId, ecart);
         }
 
-        // Met à jour l'affichage des résultats combinés (dans la modale)
         updateCombinedResultsDisplay({ totalGlobalFdc, totalGlobalCompte, totalGlobalRecetteTheorique, totalGlobalRecetteReelle, totalGlobalEcart });
     };
 
-    /**
-     * Met à jour la section des résultats pour une caisse spécifique.
-     */
     function updateResultsDisplay(caisseId, results) {
-        document.getElementById(`res-c${caisseId}-fdc`).textContent = formatCurrency(results.fondDeCaisse);
-        document.getElementById(`res-c${caisseId}-total`).textContent = formatCurrency(results.totalCaisseCompte);
-        document.getElementById(`res-c${caisseId}-theorique`).textContent = formatCurrency(results.recetteTheorique);
-        document.getElementById(`res-c${caisseId}-recette`).textContent = formatCurrency(results.recetteReelle);
+        const fdcElement = document.getElementById(`res-c${caisseId}-fdc`);
+        if (fdcElement) fdcElement.textContent = formatCurrency(results.fondDeCaisse);
+        const totalElement = document.getElementById(`res-c${caisseId}-total`);
+        if (totalElement) totalElement.textContent = formatCurrency(results.totalCaisseCompte);
+        const theoriqueElement = document.getElementById(`res-c${caisseId}-theorique`);
+        if (theoriqueElement) theoriqueElement.textContent = formatCurrency(results.recetteTheorique);
+        const recetteElement = document.getElementById(`res-c${caisseId}-recette`);
+        if (recetteElement) recetteElement.textContent = formatCurrency(results.recetteReelle);
         const ecartElement = document.getElementById(`res-c${caisseId}-ecart`);
-        ecartElement.textContent = formatCurrency(results.ecart);
-        ecartElement.className = results.ecart > 0.01 ? 'ecart-positif' : (results.ecart < -0.01 ? 'ecart-negatif' : '');
+        if (ecartElement) {
+            ecartElement.textContent = formatCurrency(results.ecart);
+            ecartElement.className = results.ecart > 0.01 ? 'ecart-positif' : (results.ecart < -0.01 ? 'ecart-negatif' : '');
+        }
     }
 
-    /**
-     * Met à jour la section des résultats combinés.
-     */
     function updateCombinedResultsDisplay(totals) {
-        document.getElementById('res-total-fdc').textContent = formatCurrency(totals.totalGlobalFdc);
-        document.getElementById('res-total-total').textContent = formatCurrency(totals.totalGlobalCompte);
-        document.getElementById('res-total-theorique').textContent = formatCurrency(totals.totalGlobalRecetteTheorique);
-        document.getElementById('res-total-recette').textContent = formatCurrency(totals.totalGlobalRecetteReelle);
-        const ecartElement = document.getElementById('res-total-ecart');
-        ecartElement.textContent = formatCurrency(totals.totalGlobalEcart);
-        ecartElement.className = totals.totalGlobalEcart > 0.01 ? 'ecart-positif' : (totals.totalGlobalEcart < -0.01 ? 'ecart-negatif' : '');
+        const totalFdcElement = document.getElementById('res-total-fdc');
+        if (totalFdcElement) totalFdcElement.textContent = formatCurrency(totals.totalGlobalFdc);
+        const totalTotalElement = document.getElementById('res-total-total');
+        if (totalTotalElement) totalTotalElement.textContent = formatCurrency(totals.totalGlobalCompte);
+        const totalTheoriqueElement = document.getElementById('res-total-theorique');
+        if (totalTheoriqueElement) totalTheoriqueElement.textContent = formatCurrency(totals.totalGlobalRecetteTheorique);
+        const totalRecetteElement = document.getElementById('res-total-recette');
+        if (totalRecetteElement) totalRecetteElement.textContent = formatCurrency(totals.totalGlobalRecetteReelle);
+        const totalEcartElement = document.getElementById('res-total-ecart');
+        if (totalEcartElement) {
+            totalEcartElement.textContent = formatCurrency(totals.totalGlobalEcart);
+            totalEcartElement.className = totals.totalGlobalEcart > 0.01 ? 'ecart-positif' : (totals.totalGlobalEcart < -0.01 ? 'ecart-negatif' : '');
+        }
     }
 
-    /**
-     * Met à jour l'indicateur d'écart principal pour une caisse.
-     */
     function updateEcartDisplay(caisseId, ecart) {
         const display = document.getElementById(`ecart-display-caisse${caisseId}`);
         if (!display) return;
         const valueSpan = display.querySelector('.ecart-value');
         const explanationP = display.querySelector('.ecart-explanation');
-
-        valueSpan.textContent = formatCurrency(ecart);
+        if(valueSpan) valueSpan.textContent = formatCurrency(ecart);
         display.classList.remove('ecart-ok', 'ecart-positif', 'ecart-negatif');
-
         if (Math.abs(ecart) < 0.01) {
             display.classList.add('ecart-ok');
-            explanationP.textContent = "L'écart est nul. La caisse est juste.";
+            if(explanationP) explanationP.textContent = "L'écart est nul. La caisse est juste.";
         } else if (ecart > 0) {
             display.classList.add('ecart-positif');
-            explanationP.textContent = "Il y a un surplus dans la caisse.";
+            if(explanationP) explanationP.textContent = "Il y a un surplus dans la caisse.";
         } else {
             display.classList.add('ecart-negatif');
-            explanationP.textContent = "Il manque de l'argent dans la caisse.";
+            if(explanationP) explanationP.textContent = "Il manque de l'argent dans la caisse.";
         }
     }
 
-    /**
-     * Met en place tous les écouteurs d'événements pour la page.
-     */
     function setupEventListeners() {
         const form = document.getElementById('caisse-form');
-        // NOUVEAU: Événement de défilement pour l'indicateur d'écart
         window.addEventListener('scroll', handleStickyEcart);
-        // NOUVEAU: Appel initial pour un bon affichage au chargement
         handleStickyEcart();
 
-        // Onglets
+        // Écouteur pour les onglets de CAISSE
         document.querySelector('.tab-selector').addEventListener('click', (e) => {
-            if (e.target.classList.contains('tab-link')) {
-                const tabId = e.target.dataset.tab;
+            const button = e.target.closest('.tab-link');
+            if (button) {
+                const tabId = button.dataset.tab;
                 document.querySelectorAll('.tab-link').forEach(tab => tab.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                document.querySelectorAll('.caisse-tab-content').forEach(content => content.classList.remove('active'));
                 document.querySelectorAll('.ecart-display').forEach(display => display.classList.remove('active'));
 
-                e.target.classList.add('active');
+                button.classList.add('active');
                 document.getElementById(tabId).classList.add('active');
                 document.getElementById(`ecart-display-${tabId}`).classList.add('active');
             }
+        });
+
+        // Écouteur pour les onglets de MODE DE PAIEMENT
+        document.querySelectorAll('.payment-method-selector').forEach(selector => {
+            selector.addEventListener('click', (e) => {
+                const button = e.target.closest('.payment-tab-link');
+                if (button) {
+                    const tabId = button.dataset.paymentTab;
+                    const parentContainer = button.closest('.payment-method-tabs');
+                    parentContainer.querySelectorAll('.payment-tab-link').forEach(tab => tab.classList.remove('active'));
+                    parentContainer.querySelectorAll('.payment-tab-content').forEach(content => content.classList.remove('active'));
+
+                    button.classList.add('active');
+                    document.getElementById(tabId).classList.add('active');
+                }
+            });
         });
 
         // Accordéons
         document.body.addEventListener('click', (e) => {
             const header = e.target.closest('.accordion-header');
             if (header) {
-                // CORRECTION: On s'assure que le clic ne vient pas d'un bouton
                 if (e.target.closest('button')) return;
                 header.classList.toggle('active');
                 const content = header.nextElementSibling;
@@ -182,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Champs de saisie
         form.addEventListener('input', (e) => {
             if (e.target.matches('input[type="number"], input[type="text"], textarea')) {
-                hasUnsavedChanges = true; // Marque qu'il y a des modifications
+                hasUnsavedChanges = true;
                 calculateAllFull();
                 if (!isLoadedFromHistory && window.sendWsMessage) {
                     window.sendWsMessage(e.target.id, e.target.value);
@@ -190,76 +195,65 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // NOUVEAU: Gère la touche 'Entrée' pour passer au champ suivant.
         form.addEventListener('keydown', (e) => {
-            // Vérifie si la touche est 'Enter' et si l'élément actif est un champ de saisie
             if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
                 e.preventDefault();
                 const formElements = Array.from(form.querySelectorAll('input, textarea, button, a[href]'));
                 const index = formElements.indexOf(e.target);
                 if (index > -1) {
                     let nextElement = formElements[index + 1];
-                    // Boucle pour trouver le prochain élément focusable
                     while (nextElement && (nextElement.disabled || nextElement.readOnly || nextElement.offsetParent === null)) {
                         index++;
                         nextElement = formElements[index + 1];
                     }
-                    // Si le prochain élément existe, on y déplace le focus
                     if (nextElement) {
                         nextElement.focus();
                     } else {
-                        // Si on est sur le dernier élément, on revient au premier
                         formElements[0].focus();
                     }
                 }
             }
         });
 
-        // Réinitialise le suivi des modifications lors d'une sauvegarde manuelle
         form.addEventListener('submit', () => {
             hasUnsavedChanges = false;
         });
 
-        // NOUVEAU: Gère l'ouverture de la modale de synthèse
         const openSynthesisBtn = document.querySelectorAll('.open-synthesis-modal-btn');
         if (openSynthesisBtn) {
             openSynthesisBtn.forEach(btn => {
                 btn.addEventListener('click', () => {
-                    calculateAllFull(); // Assure que les résultats sont à jour
-                    synthesisModal.classList.add('visible');
+                    calculateAllFull();
+                    if(synthesisModal) synthesisModal.classList.add('visible');
                 });
             });
         }
         
-        // NOUVEAU: Gère la fermeture de la modale de synthèse
         if (synthesisModal) {
-            window.addEventListener('click', (event) => {
+            synthesisModal.addEventListener('click', (event) => {
                 if (event.target === synthesisModal) {
                     synthesisModal.classList.remove('visible');
                 }
             });
         }
         
-        // NOUVEAU: Logique pour la reprise de comptage avec modales
         const resumeChoiceModal = document.getElementById('resume-choice-modal');
         const resumeConfirmModal = document.getElementById('resume-confirm-modal');
         const resumeCountingBtn = document.getElementById('resume-counting-btn');
         const loadFromHistoryBtn = document.getElementById('load-from-history-btn');
         const confirmResumeBtn = document.getElementById('confirm-resume-btn');
         const cancelResumeBtn = document.getElementById('cancel-resume-btn');
-        const closeChoiceModalBtn = resumeChoiceModal.querySelector('.modal-close');
-        const closeConfirmModalBtn = resumeConfirmModal.querySelector('.modal-close');
 
         if (resumeCountingBtn) {
             resumeCountingBtn.addEventListener('click', () => {
-                resumeChoiceModal.classList.add('visible');
+                if(resumeChoiceModal) resumeChoiceModal.classList.add('visible');
             });
         }
 
         if (loadFromHistoryBtn) {
             loadFromHistoryBtn.addEventListener('click', () => {
-                resumeChoiceModal.classList.remove('visible');
-                resumeConfirmModal.classList.add('visible');
+                if(resumeChoiceModal) resumeChoiceModal.classList.remove('visible');
+                if(resumeConfirmModal) resumeConfirmModal.classList.add('visible');
             });
         }
         
@@ -269,72 +263,45 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if(cancelResumeBtn) {
             cancelResumeBtn.addEventListener('click', () => {
-                resumeConfirmModal.classList.remove('visible');
+                if(resumeConfirmModal) resumeConfirmModal.classList.remove('visible');
             });
         }
-
-        if(closeChoiceModalBtn) {
-            closeChoiceModalBtn.addEventListener('click', () => resumeChoiceModal.classList.remove('visible'));
-        }
-        
-        if(closeConfirmModalBtn) {
-             closeConfirmModalBtn.addEventListener('click', () => resumeConfirmModal.classList.remove('visible'));
-        }
     }
-
-    /**
-     * NOUVEAU: Réinitialise tous les champs du formulaire.
-     */
+    
     function resetAllFormFields() {
-        document.querySelectorAll('#caisse-form input[type="text"], #caisse-form input[type="number"], #caisse-form textarea').forEach(input => {
-            input.value = '';
-        });
+        const form = document.getElementById('caisse-form');
+        if(form) form.reset();
         document.querySelectorAll('.total-line').forEach(el => el.textContent = formatCurrency(0));
     }
 
-
-    /**
-     * Charge les données (depuis l'historique ou la sauvegarde) dans le formulaire.
-     */
     window.loadAndInitFormData = function(data) {
         if (!data) return;
         
-        resetAllFormFields(); // On s'assure que le formulaire est vide avant de le remplir
+        resetAllFormFields();
 
         document.getElementById('nom_comptage').value = data.nom_comptage || '';
         document.getElementById('explication').value = data.explication || '';
 
-        // Itérer sur les données chargées
-        for (const caisseId in data) {
-            // S'assurer que c'est bien une donnée de caisse et non nom_comptage etc.
-            if (!nomsCaisses.hasOwnProperty(caisseId)) continue;
-
-            const caisseData = data[caisseId];
-            
-            const fondDeCaisseInput = document.getElementById(`fond_de_caisse_${caisseId}`);
-            if (fondDeCaisseInput) fondDeCaisseInput.value = caisseData.fond_de_caisse || '';
-            
-            const ventesInput = document.getElementById(`ventes_${caisseId}`);
-            if (ventesInput) ventesInput.value = caisseData.ventes || '';
-            
-            const retrocessionInput = document.getElementById(`retrocession_${caisseId}`);
-            if (retrocessionInput) retrocessionInput.value = caisseData.retrocession || '';
+        for (const caisseId in nomsCaisses) {
+             const caisseData = data[caisseId] || {};
+            document.getElementById(`fond_de_caisse_${caisseId}`).value = caisseData.fond_de_caisse || '';
+            document.getElementById(`ventes_${caisseId}`).value = caisseData.ventes || '';
+            document.getElementById(`retrocession_${caisseId}`).value = caisseData.retrocession || '';
 
             if (caisseData.denominations) {
-                 for (const name in caisseData.denominations) {
+                for (const name in denominations.billets) {
                     const input = document.getElementById(`${name}_${caisseId}`);
-                    if (input) {
-                        input.value = caisseData.denominations[name];
-                    }
+                    if (input) input.value = caisseData.denominations[name] || '';
+                }
+                for (const name in denominations.pieces) {
+                     const input = document.getElementById(`${name}_${caisseId}`);
+                    if (input) input.value = caisseData.denominations[name] || '';
                 }
             }
         }
-        calculateAllFull(); // Recalculer après avoir tout rempli
+        calculateAllFull();
     };
 
-    /**
-     * Met à jour le formulaire avec les données reçues via WebSocket.
-     */
     window.loadFormDataFromWebSocket = function(formState) {
         for (const id in formState) {
             const input = document.getElementById(id);
@@ -345,9 +312,6 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateAllFull();
     };
 
-    /**
-     * Envoie l'état complet du formulaire via WebSocket.
-     */
     window.sendFullFormState = function() {
         if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
             const formState = {};
@@ -360,9 +324,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    /**
-     * Gère la sauvegarde de sécurité lorsque l'utilisateur quitte la page.
-     */
     function initUnloadAutosave() {
         if (isLoadedFromHistory) return;
 
@@ -374,7 +335,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Initialisation de la page ---
     setupEventListeners();
     if (Object.keys(loadedData).length > 0) {
         loadAndInitFormData(loadedData);

@@ -3,6 +3,7 @@
 
 require_once __DIR__ . '/Utils.php';
 require_once 'services/CurrencyService.php';
+require_once 'services/TerminalManagementService.php'; // AJOUT
 
 class AdminController {
     private $pdo;
@@ -12,6 +13,7 @@ class AdminController {
     private $userService;
     private $caisseManagementService;
     private $currencyService;
+    private $terminalManagementService; // AJOUT
 
     public function __construct($pdo) {
         $this->pdo = $pdo;
@@ -21,6 +23,7 @@ class AdminController {
         $this->userService = new UserService($pdo);
         $this->caisseManagementService = new CaisseManagementService($pdo, $this->configService);
         $this->currencyService = new CurrencyService();
+        $this->terminalManagementService = new TerminalManagementService($pdo, $this->configService); // AJOUT
     }
 
     public function index() {
@@ -33,12 +36,10 @@ class AdminController {
                 case 'update_db_config': $this->updateDbConfig(); break;
                 case 'update_app_config': $this->updateAppConfig(); break;
                 case 'update_withdrawal_config': $this->updateWithdrawalConfig(); break;
-                // NOUVEAU: Gère l'action de mise à jour des dénominations
                 case 'update_denominations_config': $this->updateDenominationsConfig(); break;
                 
                 // Actions de sauvegarde
                 case 'create_backup': $this->createBackup(); break;
-                // NOUVEAU: Action de suppression de sauvegarde
                 case 'delete_backup': $this->deleteBackup(); break;
                 
                 // Actions utilisateur
@@ -50,6 +51,17 @@ class AdminController {
                 case 'add_caisse': $this->caisseManagementService->addCaisse($_POST['caisse_name'] ?? ''); break;
                 case 'rename_caisse': $this->caisseManagementService->renameCaisse(intval($_POST['caisse_id'] ?? 0), $_POST['caisse_name'] ?? ''); break;
                 case 'delete_caisse': $this->caisseManagementService->deleteCaisse(intval($_POST['caisse_id'] ?? 0)); break;
+
+                // AJOUT : Actions de gestion des terminaux
+                case 'add_terminal': 
+                    $this->terminalManagementService->addTerminal($_POST['terminal_name'] ?? '', $_POST['caisse_associee'] ?? 0); 
+                    break;
+                case 'rename_terminal': 
+                    $this->terminalManagementService->renameTerminal(intval($_POST['terminal_id'] ?? 0), $_POST['terminal_name'] ?? '', $_POST['caisse_associee'] ?? 0); 
+                    break;
+                case 'delete_terminal': 
+                    $this->terminalManagementService->deleteTerminal(intval($_POST['terminal_id'] ?? 0)); 
+                    break;
             }
             header('Location: index.php?page=admin');
             exit;
@@ -77,25 +89,24 @@ class AdminController {
         $caisses = $noms_caisses;
         $timezones = DateTimeZone::listIdentifiers(DateTimeZone::EUROPE);
 
-        // NOUVEAU: Récupère les données des devises
+        // NOUVEAU: Récupère les terminaux depuis la BDD
+        $stmt = $this->pdo->query("SELECT * FROM terminaux_paiement ORDER BY nom_terminal ASC");
+        $terminaux = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
         $currenciesData = $this->currencyService->getCurrenciesData();
-        // Lit la devise actuelle depuis la configuration
         $current_currency_code = defined('APP_CURRENCY') ? APP_CURRENCY : 'EUR';
         
         $page_css = 'admin.css';
         require __DIR__ . '/../templates/admin.php';
     }
 
-    // NOUVELLE MÉTHODE POUR METTRE À JOUR LES DÉNOMINATIONS
     private function updateDenominationsConfig() {
         $denominations = $_POST['denominations'] ?? [];
         $min_to_keep = $_POST['min_to_keep'] ?? [];
         $currency_code = $_POST['currency_code'] ?? 'EUR';
         
-        // Sauvegarde les dénominations dans le fichier JSON
         $result = $this->currencyService->updateCurrency($currency_code, $denominations, $min_to_keep);
 
-        // Met à jour le fichier de configuration PHP
         if ($result) {
             $updates = [
                 'denominations' => $denominations,
@@ -143,13 +154,11 @@ class AdminController {
         $backupDir = dirname(__DIR__, 2) . '/backups';
         $filePath = $backupDir . '/' . $filename;
     
-        // Vérification de la validité du nom de fichier
         if (empty($filename) || !preg_match('/^[a-zA-Z0-9\-\.]+\.sql\.gz$/', $filename)) {
             $_SESSION['admin_error'] = "Nom de fichier non valide.";
             return;
         }
     
-        // Vérification de l'existence du fichier et du chemin
         $realBackupDir = realpath($backupDir);
         $realFilePath = realpath($filePath);
     
@@ -158,13 +167,11 @@ class AdminController {
             return;
         }
     
-        // NOUVEAU : Vérification plus explicite de la permission d'écriture
         if (!is_writable($realFilePath)) {
             $_SESSION['admin_error'] = "Erreur : Le fichier '{$filename}' n'est pas accessible en écriture. Vérifiez les permissions du dossier '/backups'.";
             return;
         }
     
-        // Tentative de suppression
         if (unlink($realFilePath)) {
             $_SESSION['admin_message'] = "La sauvegarde '{$filename}' a été supprimée avec succès.";
         } else {
@@ -177,14 +184,12 @@ class AdminController {
         $backupDir = dirname(__DIR__, 2) . '/backups';
         $filePath = $backupDir . '/' . $filename;
     
-        // Vérification de la validité du nom de fichier
         if (empty($filename) || !preg_match('/^[a-zA-Z0-9\-\.]+\.sql\.gz$/', $filename)) {
             $_SESSION['admin_error'] = "Nom de fichier non valide.";
             header('Location: index.php?page=admin');
             exit;
         }
     
-        // Vérification de l'existence du fichier et du chemin
         $realBackupDir = realpath($backupDir);
         $realFilePath = realpath($filePath);
     
@@ -194,14 +199,12 @@ class AdminController {
             exit;
         }
     
-        // NOUVEAU : Vérification plus explicite de la permission de lecture
         if (!is_readable($realFilePath)) {
             $_SESSION['admin_error'] = "Erreur : Le fichier '{$filename}' n'est pas accessible en lecture. Vérifiez les permissions du dossier '/backups'.";
             header('Location: index.php?page=admin');
             exit;
         }
     
-        // Envoie les headers pour forcer le téléchargement
         header('Content-Description: File Transfer');
         header('Content-Type: application/gzip');
         header('Content-Disposition: attachment; filename="' . $filename . '"');

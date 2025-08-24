@@ -1,16 +1,12 @@
 <?php
-// templates/calculateur.php - Version corrigée pour le chargement des données et l'affichage sur écran 4/3.
+// templates/calculateur.php
 
-// Définir les scripts spécifiques à la page pour qu'ils soient chargés dans le footer
 $page_js = 'calculator.js';
-
 require 'partials/header.php';
 require 'partials/navbar.php';
 
 global $min_to_keep;
-if (!isset($min_to_keep)) {
-    $min_to_keep = [];
-}
+if (!isset($min_to_keep)) $min_to_keep = [];
 
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
@@ -25,7 +21,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 
 <div id="calculator-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'
      data-loaded-data='<?= htmlspecialchars(json_encode($loaded_data), ENT_QUOTES, 'UTF-8') ?>'
-     data-comptage-id="<?= htmlspecialchars($_GET['load'] ?? '') ?>"></div>
+     data-comptage-id="<?= htmlspecialchars($_GET['load'] ?? $_GET['resume_from'] ?? '') ?>"></div>
 
 <div class="container">
     <?php if ($isLoadedFromHistory ?? false): ?>
@@ -58,82 +54,112 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
         </div>
 
         <div class="ecart-display-container">
-    <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
-        <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
-            Écart Caisse Actuelle : <span class="ecart-value">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
-            <p class="ecart-explanation"></p>
-        </div>
-        <div id="suggestion-accordion-caisse<?= $id ?>" class="suggestion-accordion-container"></div>
-        <?php $is_first = false; endforeach; ?>
+            <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
+            <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
+                Écart Caisse Actuelle : <span class="ecart-value">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
+                <p class="ecart-explanation"></p>
+            </div>
+            <?php $is_first = false; endforeach; ?>
         </div>
 
-        <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
-            <div id="caisse<?= $id ?>" class="tab-content <?= $is_first ? 'active' : '' ?>">
-                <div class="accordion-container">
-                    <div class="accordion-card">
-                        <div class="accordion-header active">
-                            <i class="fa-solid fa-cash-register"></i>
-                            <h3>Informations Caisse</h3>
-                            <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
-                        </div>
-                        <div class="accordion-content open">
-                            <div class="accordion-content-inner">
-                                <div class="grid grid-3">
-                                    <div class="form-group">
-                                        <label>Fond de Caisse (<?= APP_CURRENCY_SYMBOL ?>)</label>
-                                        <input type="text" id="fond_de_caisse_<?= $id ?>" name="caisse[<?= $id ?>][fond_de_caisse]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['fond_de_caisse'] ?? '') ?>" <?= $disabled_attr ?>>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Total Ventes du Jour (<?= APP_CURRENCY_SYMBOL ?>)</label>
-                                        <input type="text" id="ventes_<?= $id ?>" name="caisse[<?= $id ?>][ventes]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['ventes'] ?? '') ?>" <?= $disabled_attr ?>>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Rétrocessions / Prélèvements (<?= APP_CURRENCY_SYMBOL ?>)</label>
-                                        <input type="text" id="retrocession_<?= $id ?>" name="caisse[<?= $id ?>][retrocession]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['retrocession'] ?? '') ?>" <?= $disabled_attr ?>>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+        <?php $is_first_caisse = true; foreach ($noms_caisses as $id => $nom): ?>
+            <div id="caisse<?= $id ?>" class="caisse-tab-content <?= $is_first_caisse ? 'active' : '' ?>">
+                
+                <div class="accordion-card" style="margin-bottom: 20px;">
+                    <div class="accordion-header active">
+                        <i class="fa-solid fa-info-circle"></i>
+                        <h3>Informations Générales de la Caisse</h3>
+                        <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
                     </div>
-
-                    <div class="accordion-card">
-                        <div class="accordion-header active">
-                            <i class="fa-solid fa-money-bill-wave"></i>
-                            <h3>Détail des Espèces</h3>
-                            <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
-                            <button type="button" class="open-synthesis-modal-btn action-btn-small new-btn" data-caisse-id="<?= $id ?>" style="margin-left: auto;">
-                                <i class="fa-solid fa-chart-pie"></i> Synthèse
-                            </button>
-                        </div>
-                        <div class="accordion-content open">
-                            <div class="accordion-content-inner">
-                                <h4>Billets</h4>
-                                <div class="grid">
-                                    <?php foreach($denominations['billets'] as $name => $valeur): ?>
-                                    <div class="form-group">
-                                        <label><?= $valeur ?> <?= APP_CURRENCY_SYMBOL ?></label>
-                                        <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data[$id]['denominations'][$name] ?? '') ?>" <?= $disabled_attr ?>>
-                                        <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
-                                    </div>
-                                    <?php endforeach; ?>
+                    <div class="accordion-content open">
+                        <div class="accordion-content-inner">
+                            <div class="grid grid-3">
+                                <div class="form-group">
+                                    <label>Fond de Caisse (<?= APP_CURRENCY_SYMBOL ?>)</label>
+                                    <input type="text" id="fond_de_caisse_<?= $id ?>" name="caisse[<?= $id ?>][fond_de_caisse]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['fond_de_caisse'] ?? '') ?>" <?= $disabled_attr ?>>
                                 </div>
-                                <h4 style="margin-top: 20px;">Pièces</h4>
-                                <div class="grid">
-                                    <?php foreach($denominations['pieces'] as $name => $valeur): ?>
-                                    <div class="form-group">
-                                        <label><?= $valeur >= 1 ? $valeur.' '.APP_CURRENCY_SYMBOL : ($valeur*100).' cts' ?></label>
-                                        <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data[$id]['denominations'][$name] ?? '') ?>" <?= $disabled_attr ?>>
-                                        <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
-                                    </div>
-                                    <?php endforeach; ?>
+                                <div class="form-group">
+                                    <label>Total Ventes du Jour (<?= APP_CURRENCY_SYMBOL ?>)</label>
+                                    <input type="text" id="ventes_<?= $id ?>" name="caisse[<?= $id ?>][ventes]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['ventes'] ?? '') ?>" <?= $disabled_attr ?>>
+                                </div>
+                                <div class="form-group">
+                                    <label>Rétrocessions / Prélèvements (<?= APP_CURRENCY_SYMBOL ?>)</label>
+                                    <input type="text" id="retrocession_<?= $id ?>" name="caisse[<?= $id ?>][retrocession]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['retrocession'] ?? '') ?>" <?= $disabled_attr ?>>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <?php $is_first = false; endforeach; ?>
 
+                <div class="payment-method-tabs">
+                    <div class="payment-method-selector">
+                        <button type="button" class="payment-tab-link active" data-payment-tab="especes-<?= $id ?>"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>
+                        <button type="button" class="payment-tab-link" data-payment-tab="cb-<?= $id ?>"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>
+                        <button type="button" class="payment-tab-link" data-payment-tab="cheques-<?= $id ?>"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button>
+                    </div>
+
+                    <div id="especes-<?= $id ?>" class="payment-tab-content active">
+                        <h4>Billets</h4>
+                        <div class="grid">
+                            <?php foreach($denominations['billets'] as $name => $valeur): ?>
+                            <div class="form-group">
+                                <label><?= $valeur ?> <?= APP_CURRENCY_SYMBOL ?></label>
+                                <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data[$id]['denominations'][$name] ?? '') ?>" <?= $disabled_attr ?>>
+                                <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <h4 style="margin-top: 20px;">Pièces</h4>
+                        <div class="grid">
+                            <?php foreach($denominations['pieces'] as $name => $valeur): ?>
+                            <div class="form-group">
+                                <label><?= $valeur >= 1 ? $valeur.' '.APP_CURRENCY_SYMBOL : ($valeur*100).' cts' ?></label>
+                                <input type="number" id="<?= $name ?>_<?= $id ?>" name="caisse[<?= $id ?>][<?= $name ?>]" min="0" step="1" placeholder="0" value="<?= htmlspecialchars($loaded_data[$id]['denominations'][$name] ?? '') ?>" <?= $disabled_attr ?>>
+                                <span class="total-line" id="total_<?= $name ?>_<?= $id ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <div id="cb-<?= $id ?>" class="payment-tab-content">
+                        <?php if (isset($terminaux_par_caisse[$id]) && !empty($terminaux_par_caisse[$id])): ?>
+                            <div class="grid grid-3">
+                                <?php foreach ($terminaux_par_caisse[$id] as $terminal): ?>
+                                <div class="form-group">
+                                    <label><?= htmlspecialchars($terminal['nom_terminal']) ?> (<?= APP_CURRENCY_SYMBOL ?>)</label>
+                                    <input type="text" id="cb_<?= $terminal['id'] ?>_<?= $id ?>" name="caisse[<?= $id ?>][cb][<?= $terminal['id'] ?>]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['cb'][$terminal['id']] ?? '') ?>" <?= $disabled_attr ?>>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <p class="info-message">Aucun terminal de paiement n'est associé à cette caisse. Vous pouvez en ajouter dans le panneau d'administration.</p>
+                        <?php endif; ?>
+                    </div>
+
+                    <div id="cheques-<?= $id ?>" class="payment-tab-content">
+                        <div id="cheques-container-<?= $id ?>">
+                            <div class="grid grid-3 cheques-grid">
+                                <?php 
+                                $cheques = $loaded_data[$id]['cheques'] ?? [''];
+                                if (empty($cheques)) $cheques = [''];
+                                foreach ($cheques as $index => $montant):
+                                ?>
+                                <div class="form-group cheque-item">
+                                    <label>Chèque N°<?= $index + 1 ?> (<?= APP_CURRENCY_SYMBOL ?>)</label>
+                                    <div style="display: flex; gap: 5px;">
+                                        <input type="text" name="caisse[<?= $id ?>][cheques][]" placeholder="0,00" value="<?= htmlspecialchars($montant) ?>" <?= $disabled_attr ?>>
+                                        <button type="button" class="action-btn-small delete-btn remove-cheque-btn" <?= $disabled_attr ?>><i class="fa-solid fa-trash-can"></i></button>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <button type="button" class="new-btn add-cheque-btn" data-caisse-id="<?= $id ?>" style="margin-top: 15px;" <?= $disabled_attr ?>><i class="fa-solid fa-plus"></i> Ajouter un chèque</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php $is_first_caisse = false; endforeach; ?>
+        
         <div class="save-section">
             <h3>Enregistrer le comptage</h3>
             <div class="form-group">
@@ -154,6 +180,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
     </form>
 </div>
 
+<!-- Modales -->
 <div id="resume-choice-modal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -234,30 +261,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
     </div>
 </div>
 
-<div id="details-modal" class="modal">
-    <div class="modal-content">
-        <div id="modal-details-content"></div>
-    </div>
-</div>
-<div id="help-modal" class="modal">
-    <div class="modal-content">
-        <div id="help-modal-content">
-            </div>
-    </div>
-</div>
-<div id="cloture-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Confirmer la clôture des caisses</h3>
-        </div>
-        <p>Êtes-vous sûr de vouloir lancer la procédure de clôture pour toutes les caisses ?</p>
-        <p>Cette action sauvegardera l'état actuel et mettra les caisses à zéro.</p>
-        <div class="modal-actions">
-            <button id="cancel-cloture-btn" class="btn delete-btn">Annuler</button>
-            <button id="confirm-final-cloture-btn" class="btn new-btn" style="display: none;">Confirmer la clôture</button>
-        </div>
-    </div>
-</div>
+<!-- Modales de Clôture -->
 <div id="caisse-selection-modal" class="modal">
     <div class="modal-content">
         <div class="modal-header-cloture"><h3>Gestion de la Clôture</h3></div>
@@ -303,8 +307,42 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
         </div>
     </div>
 </div>
+
 <script src="/js/realtime.js"></script>
 <script src="/js/cloture.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.add-cheque-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const caisseId = this.dataset.caisseId;
+            const container = document.querySelector(`#cheques-container-${caisseId} .cheques-grid`);
+            const chequeCount = container.querySelectorAll('.cheque-item').length + 1;
+            
+            const newChequeHtml = `
+                <div class="form-group cheque-item">
+                    <label>Chèque N°${chequeCount} (<?= APP_CURRENCY_SYMBOL ?>)</label>
+                     <div style="display: flex; gap: 5px;">
+                        <input type="text" name="caisse[${caisseId}][cheques][]" placeholder="0,00">
+                        <button type="button" class="action-btn-small delete-btn remove-cheque-btn"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                </div>`;
+            container.insertAdjacentHTML('beforeend', newChequeHtml);
+        });
+    });
+
+    document.body.addEventListener('click', function(event) {
+        if (event.target.closest('.remove-cheque-btn')) {
+            event.target.closest('.cheque-item').remove();
+            const container = event.target.closest('.cheques-grid');
+            if(container) {
+                container.querySelectorAll('.cheque-item label').forEach((label, index) => {
+                    label.textContent = `Chèque N°${index + 1} (<?= APP_CURRENCY_SYMBOL ?>)`;
+                });
+            }
+        }
+    });
+});
+</script>
 <?php
 require 'partials/footer.php';
 ?>
