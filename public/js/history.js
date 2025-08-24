@@ -30,7 +30,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- LOGIQUE DE LA MODALE (CORRIGÉE ET AMÉLIORÉE) ---
     const modal = document.getElementById('details-modal');
     const modalContent = document.getElementById('modal-details-content');
-    const closeModalBtn = modal ? modal.querySelector('.modal-close') : null;
 
     // Fonction pour fermer la modale
     const closeModal = () => {
@@ -268,9 +267,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Écouteurs pour fermer la modale
-    if (closeModalBtn) {
-        closeModalBtn.addEventListener('click', closeModal);
-    }
     if (modal) {
         modal.addEventListener('click', (event) => {
             if (event.target === modal) {
@@ -378,7 +374,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderMiniChart(element, data) {
-        if (!data || data.every(val => val === 0)) {
+        // --- DÉBUT BLOC DE DÉBOGAGE ---
+        console.log("--- Affichage du mini-graphique ---");
+        console.log("Données de vente reçues :", data);
+        const dataIsAllZeros = data.every(val => val === 0);
+        console.log("Est-ce que toutes les valeurs sont à zéro ?", dataIsAllZeros);
+        // --- FIN BLOC DE DÉBOGAGE ---
+
+        if (!data || dataIsAllZeros) {
             element.innerHTML = '<p class="no-chart-data">Pas de données de vente.</p>';
             return;
         }
@@ -432,9 +435,24 @@ document.addEventListener('DOMContentLoaded', function() {
             historyGrid.innerHTML = '<p>Aucun enregistrement trouvé pour ces critères.</p>';
             return;
         }
+
+        console.log("%c[DEBUG] Données globales des caisses (nomsCaisses):", "color: blue; font-weight: bold;", globalConfig.nomsCaisses);
+
         historique.forEach(comptage => {
+            console.group(`Traitement du comptage : ${comptage.nom_comptage}`);
+            console.log("Données brutes du comptage :", comptage);
+            
             const calculated = calculateResults(comptage);
-            const caisseVentesData = Object.values(calculated.caisses).map(caisse => caisse.ventes);
+            console.log("Données calculées :", calculated);
+            
+            // CORRECTION: Assure que les données pour le graphique sont dans le bon ordre
+            const caisseVentesData = Object.keys(globalConfig.nomsCaisses).map(caisseId => {
+                const caisseData = calculated.caisses[caisseId];
+                return caisseData ? parseFloat(caisseData.ventes) : 0;
+            });
+            
+            console.log("%cDonnées finales pour le graphique (caisseVentesData):", "color: green; font-weight: bold;", caisseVentesData);
+            console.groupEnd();
 
             const cardDiv = document.createElement('div');
             cardDiv.classList.add('history-card');
