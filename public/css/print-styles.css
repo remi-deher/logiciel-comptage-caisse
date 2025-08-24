@@ -1,0 +1,70 @@
+/* public/css/print-styles.css */
+@media print {
+    body {
+        font-family: Arial, sans-serif;
+        color: #333;
+        background-color: #fff;
+    }
+
+    .print-container {
+        padding: 20px;
+    }
+
+    .modal-header {
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+    }
+
+    .modal-header h3 {
+        font-size: 1.5em;
+        color: #2c3e50;
+        margin: 0;
+    }
+
+    .modal-actions, .modal-close {
+        display: none !important;
+    }
+
+    p {
+        font-size: 1em;
+        color: #555;
+    }
+
+    h4.modal-table-title {
+        font-size: 1.2em;
+        color: #3498db;
+        margin-top: 30px;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 5px;
+    }
+
+    .modal-details-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        font-size: 0.9em;
+    }
+
+    .modal-details-table th, .modal-details-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+
+    .modal-details-table th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+    }
+
+    .modal-details-table td:nth-child(2), 
+    .modal-details-table td:nth-child(3) {
+        text-align: right;
+    }
+
+    h4, h5.modal-table-total {
+        text-align: right;
+        font-size: 1.1em;
+        margin-top: 10px;
+    }
+}

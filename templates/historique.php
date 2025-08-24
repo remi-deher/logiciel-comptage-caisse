@@ -111,6 +111,7 @@ function renderPagination($page_courante, $pages_totales) {
 
 <div id="details-modal" class="modal">
     <div class="modal-content">
+        <span class="modal-close">&times;</span>
         <div id="modal-details-content"></div>
     </div>
 </div>
