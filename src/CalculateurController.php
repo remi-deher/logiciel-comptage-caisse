@@ -3,6 +3,7 @@
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
 require_once __DIR__ . '/services/ClotureStateService.php';
+require_once __DIR__ . '/services/BackupService.php';
 
 class CalculateurController {
     private $pdo;
@@ -10,17 +11,17 @@ class CalculateurController {
     private $denominations;
     private $versionService;
     private $clotureStateService;
+    private $backupService;
     private $terminaux_par_caisse = [];
 
-    // CORRECTION : Le constructeur accepte à nouveau le 4ème paramètre pour la compatibilité
     public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse_obsolete) {
         $this->pdo = $pdo;
         $this->noms_caisses = $noms_caisses;
         $this->denominations = $denominations;
         $this->versionService = new VersionService();
         $this->clotureStateService = new ClotureStateService($pdo);
+        $this->backupService = new BackupService();
 
-        // Charger les terminaux depuis la BDD
         $stmt = $this->pdo->query("SELECT id, nom_terminal, caisse_associee FROM terminaux_paiement ORDER BY nom_terminal");
         $terminaux = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($terminaux as $terminal) {
@@ -62,28 +63,43 @@ class CalculateurController {
         $denominations = $this->denominations;
         $terminaux_par_caisse = $this->terminaux_par_caisse;
         
-        // MISE À JOUR : On définit un tableau de scripts à charger
         $page_js = ['calculator.js', 'realtime.js', 'cloture.js'];
         $page_css = 'calculateur.css';
         
         require __DIR__ . '/../templates/calculateur.php';
     }
     
-    public function getLastAutosaveData() {
-        $stmt = $this->pdo->prepare("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY date_comptage DESC LIMIT 1");
-        $stmt->execute();
-        $loaded_comptage = $stmt->fetch() ?: [];
-        
-        $data = null;
-        if ($loaded_comptage) {
-            $data = $this->loadComptageData($loaded_comptage['id']);
-            $data['nom_comptage'] = $loaded_comptage['nom_comptage'];
-            $data['explication'] = $loaded_comptage['explication'];
-        }
-        
+    public function getInitialData() {
         header('Content-Type: application/json');
-        echo json_encode(['success' => !is_null($data), 'data' => $data]);
+
+        // On récupère la toute dernière sauvegarde, quelle qu'elle soit
+        $stmt = $this->pdo->prepare("SELECT id, nom_comptage, explication FROM comptages ORDER BY id DESC LIMIT 1");
+        $stmt->execute();
+        $last_comptage = $stmt->fetch();
+
+        if ($last_comptage) {
+            $nom = $last_comptage['nom_comptage'];
+            $data = null;
+
+            if (strpos($nom, 'Fond de caisse J+1') === 0) {
+                $data = $this->loadComptageData($last_comptage['id']);
+                $data['nom_comptage'] = ''; 
+                $data['explication'] = '';
+                echo json_encode(['success' => true, 'data' => $data]);
+                exit;
+            } 
+            elseif (strpos($nom, 'Sauvegarde auto') === 0) {
+                $data = $this->loadComptageData($last_comptage['id']);
+                $data['nom_comptage'] = $last_comptage['nom_comptage'];
+                $data['explication'] = $last_comptage['explication'];
+                echo json_encode(['success' => true, 'data' => $data]);
+                exit;
+            }
+        }
+
+        echo json_encode(['success' => false, 'data' => null]);
     }
+
 
     private function loadComptageData($comptage_id) {
         $data = [];
@@ -115,21 +131,18 @@ class CalculateurController {
                 'cheques' => []
             ];
             
-            // Charger les dénominations
             $stmt_denoms = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
             $stmt_denoms->execute([$comptage_detail_id]);
             while ($denom_row = $stmt_denoms->fetch()) {
                 $data[$caisse_id]['denominations'][$denom_row['denomination_nom']] = $denom_row['quantite'];
             }
 
-            // Charger les montants CB
             $stmt_cb = $this->pdo->prepare("SELECT terminal_id, montant FROM comptage_cb WHERE comptage_detail_id = ?");
             $stmt_cb->execute([$comptage_detail_id]);
             while ($cb_row = $stmt_cb->fetch()) {
                 $data[$caisse_id]['cb'][$cb_row['terminal_id']] = $cb_row['montant'];
             }
             
-            // Charger les chèques
             $stmt_cheques = $this->pdo->prepare("SELECT montant FROM comptage_cheques WHERE comptage_detail_id = ?");
             $stmt_cheques->execute([$comptage_detail_id]);
             $data[$caisse_id]['cheques'] = $stmt_cheques->fetchAll(PDO::FETCH_COLUMN, 0);
@@ -179,8 +192,6 @@ class CalculateurController {
                 $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
                 $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
                 $comptage_id = $this->pdo->lastInsertId();
-                $stmt_delete_autosave = $this->pdo->prepare("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
-                $stmt_delete_autosave->execute();
             }
     
             if (empty($comptage_id)) {
@@ -280,10 +291,7 @@ class CalculateurController {
             $closedCaisses = $this->clotureStateService->getClosedCaisses();
             echo json_encode(['success' => true, 'locked_caisses' => $lockedCaisses, 'closed_caisses' => $closedCaisses]);
         } catch (Exception $e) {
-            // Enregistre l'erreur côté serveur pour le débogage
             error_log("Erreur dans getClotureState : " . $e->getMessage());
-            
-            // Définit explicitement le code d'erreur HTTP et renvoie un JSON d'erreur
             http_response_code(500);
             echo json_encode([
                 'success' => false, 
@@ -352,17 +360,49 @@ class CalculateurController {
     public function cloture_generale() {
         global $min_to_keep;
         header('Content-Type: application/json');
+        
+        $newState = null;
 
         try {
             $this->pdo->beginTransaction();
-
-            $nom_comptage = "Fond de caisse J+1 - cloture du " . date('d/m/Y');
-            $explication = "Comptage généré automatiquement après la clôture générale.";
-
-            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-            $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
-            $comptage_id = $this->pdo->lastInsertId();
-
+    
+            $nom_comptage_final = "Comptage final du " . date('d/m/Y H:i:s');
+            $explication_final = "Sauvegarde complète avant la clôture générale.";
+            $stmt_final = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt_final->execute([$nom_comptage_final, $explication_final, date('Y-m-d H:i:s')]);
+            $comptage_id_final = $this->pdo->lastInsertId();
+    
+            foreach ($this->noms_caisses as $caisse_id => $nom) {
+                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
+                if (!empty($caisse_data)) {
+                    $stmt_details_final = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+                    $stmt_details_final->execute([
+                        $comptage_id_final,
+                        $caisse_id,
+                        get_numeric_value($caisse_data, 'fond_de_caisse'),
+                        get_numeric_value($caisse_data, 'ventes'),
+                        get_numeric_value($caisse_data, 'retrocession')
+                    ]);
+                    $comptage_detail_id_final = $this->pdo->lastInsertId();
+    
+                    foreach ($this->denominations as $type => $denominations_list) {
+                        foreach ($denominations_list as $name => $value) {
+                            $quantite = get_numeric_value($caisse_data, $name);
+                            if ($quantite > 0) {
+                                $stmt_denom_final = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                                $stmt_denom_final->execute([$comptage_detail_id_final, $name, $quantite]);
+                            }
+                        }
+                    }
+                }
+            }
+    
+            $nom_comptage_j1 = "Fond de caisse J+1 - cloture du " . date('d/m/Y');
+            $explication_j1 = "Comptage généré automatiquement après la clôture générale.";
+            $stmt_j1 = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt_j1->execute([$nom_comptage_j1, $explication_j1, date('Y-m-d H:i:s')]);
+            $comptage_id_j1 = $this->pdo->lastInsertId();
+    
             foreach ($this->noms_caisses as $caisse_id => $nom) {
                 $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
                 
@@ -379,27 +419,37 @@ class CalculateurController {
                 $recette_reelle = $total_compte - $fond_de_caisse;
                 
                 $suggestions = $this->generateWithdrawalSuggestion($recette_reelle, $current_counts, $this->denominations, $min_to_keep ?? []);
-
-                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, 0, 0)");
-                $stmt_details->execute([$comptage_id, $caisse_id, $fond_de_caisse]);
-                $comptage_detail_id = $this->pdo->lastInsertId();
-
+    
+                $stmt_details_j1 = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, 0, 0)");
+                $stmt_details_j1->execute([$comptage_id_j1, $caisse_id, $fond_de_caisse]);
+                $comptage_detail_id_j1 = $this->pdo->lastInsertId();
+    
                 foreach ($current_counts as $name => $quantite) {
                     $quantite_a_retirer = $suggestions[$name] ?? 0;
                     $nouvelle_quantite = $quantite - $quantite_a_retirer;
-
+    
                     if ($nouvelle_quantite > 0) {
-                        $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
-                        $stmt_denom->execute([$comptage_detail_id, $name, $nouvelle_quantite]);
+                        $stmt_denom_j1 = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                        $stmt_denom_j1->execute([$comptage_detail_id_j1, $name, $nouvelle_quantite]);
                     }
                 }
             }
-
+    
             $this->pdo->commit();
+    
+            $stmt_delete = $this->pdo->prepare(
+                "DELETE FROM comptages WHERE DATE(date_comptage) = CURDATE() AND id NOT IN (?, ?)"
+            );
+            $stmt_delete->execute([$comptage_id_final, $comptage_id_j1]);
+    
+            $newState = $this->loadComptageData($comptage_id_j1);
+            $newState['nom_comptage'] = '';
+            $newState['explication'] = '';
+
             $this->clotureStateService->resetState();
-
-            echo json_encode(['success' => true, 'message' => "Clôture générale réussie. Les caisses sont prêtes pour demain."]);
-
+    
+            echo json_encode(['success' => true, 'message' => "Clôture générale réussie. Les sauvegardes finales ont été créées et les sauvegardes intermédiaires nettoyées.", 'newState' => $newState]);
+    
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
@@ -409,7 +459,7 @@ class CalculateurController {
         }
         exit;
     }
-
+    
     private function generateWithdrawalSuggestion($amountToWithdraw, $currentCounts, $denominations, $minToKeep) {
         $remainingAmount = $amountToWithdraw;
         $suggestions = [];

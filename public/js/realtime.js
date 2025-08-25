@@ -1,13 +1,5 @@
 /**
  * Module JavaScript pour la gestion de la communication WebSocket en temps réel.
- * Ce module est responsable de la connexion et de la diffusion des données.
- *
- * Logique MISE A JOUR :
- * 1. Charge la sauvegarde locale pour un affichage immédiat.
- * 2. Met en place un verrou pour empêcher l'envoi de données.
- * 3. Demande l'état aux autres clients.
- * 4. Si un autre client répond, ses données deviennent la source de vérité et le verrou est levé.
- * 5. Si personne ne répond après un délai, l'utilisateur est considéré comme seul et le verrou est levé.
  */
 document.addEventListener('DOMContentLoaded', function() {
     const statusIndicator = document.getElementById('websocket-status-indicator');
@@ -22,11 +14,9 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    // NOUVEAU : Verrou pour empêcher l'envoi de données avant la synchronisation.
     window.isSynchronized = false;
     let syncTimeout;
 
-    // Fonction globale pour mettre à jour l'indicateur de statut
     window.updateWebsocketStatusIndicator = function(lockedCaisses, closedCaisses) {
         if (!statusIndicator || !statusText) return;
         lockedCaisses = lockedCaisses || [];
@@ -59,19 +49,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusText.textContent = 'Connecté en temps réel';
             }
             
-            // 1. Charge la sauvegarde immédiatement.
-            if (typeof window.loadLastAutosave === 'function') {
-                window.loadLastAutosave();
+            // MODIFIÉ : Appel à la nouvelle fonction de chargement initial
+            if (typeof window.loadInitialData === 'function') {
+                window.loadInitialData();
             }
             
-            // 2. Demande l'état aux autres clients.
             window.wsConnection.send(JSON.stringify({ type: 'request_state' }));
 
-            // 3. Met en place un timeout. Si personne ne répond, on est seul.
             syncTimeout = setTimeout(() => {
                 console.log("Personne n'a répondu, je suis seul. Le verrou est levé.");
                 window.isSynchronized = true;
-            }, 1500); // Délai de 1.5 secondes
+            }, 1500);
         };
 
         window.wsConnection.onerror = (error) => {
@@ -94,14 +82,13 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const data = JSON.parse(e.data);
 
-                // 4. On reçoit l'état d'un autre client (la source de vérité).
                 if (data.type === 'broadcast_state') {
                     console.log("Réception de l'état d'un autre client. Mise à jour et levée du verrou.");
                     if (typeof window.loadFormDataFromWebSocket === 'function') {
                         window.loadFormDataFromWebSocket(data.form_state);
                     }
-                    window.isSynchronized = true; // On lève le verrou
-                    clearTimeout(syncTimeout); // On annule le timeout
+                    window.isSynchronized = true;
+                    clearTimeout(syncTimeout);
                     return;
                 }
                 
@@ -131,14 +118,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                if (data.type === 'all_caisses_closed') {
+                if (data.type === 'all_caisses_closed_and_reset') { // Message spécifique pour la réinitialisation
                     if (typeof window.showCustomAlert === 'function') {
                         window.showCustomAlert("Toutes les caisses ont été clôturées. Le comptage est réinitialisé.", 'success');
-                    } else {
-                        alert('Toutes les caisses ont été clôturées. Le comptage est réinitialisé.');
                     }
-                    if (typeof window.resetAllCaisseFields === 'function') {
-                        window.resetAllCaisseFields();
+                    // La logique de rechargement est maintenant gérée par la diffusion du nouvel état
+                    if (data.newState && typeof window.loadAndInitFormData === 'function') {
+                        window.loadAndInitFormData(data.newState);
                     }
                     return;
                 }
@@ -165,11 +151,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// NOUVEAU : La fonction d'envoi de message vérifie maintenant le verrou.
 window.sendWsMessage = function(id, value) {
     if (!window.isSynchronized) {
         console.log("Envoi bloqué : en attente de synchronisation.");
-        return; // Ne rien envoyer si le verrou est actif
+        return;
     }
     if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
         const dataToSend = { id: id, value: value };
@@ -179,8 +164,9 @@ window.sendWsMessage = function(id, value) {
     }
 };
 
-window.loadLastAutosave = function() {
-    fetch('index.php?action=get_last_autosave_data')
+// MODIFIÉ : Renommage de la fonction et modification de l'URL du fetch
+window.loadInitialData = function() {
+    fetch('index.php?action=get_initial_data')
         .then(response => response.json())
         .then(data => {
             if (data && data.success) {
@@ -188,6 +174,6 @@ window.loadLastAutosave = function() {
             }
         })
         .catch(error => {
-            console.error("Erreur lors du chargement de la sauvegarde automatique:", error);
+            console.error("Erreur lors du chargement des données initiales:", error);
         });
 };

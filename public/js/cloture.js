@@ -54,67 +54,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // MISE À JOUR : La fonction réinitialise le formulaire pour J+1
-    window.resetCaisseForNextDay = function() {
-        const config = JSON.parse(calculatorDataElement.dataset.config);
-        const { nomsCaisses, denominations, minToKeep } = config;
-
-        for (const caisseId in nomsCaisses) {
-            const caisseData = {}; // On simule les données du POST
-            document.querySelectorAll(`#caisse${caisseId} input[type="text"], #caisse${caisseId} input[type="number"]`).forEach(input => {
-                const key = input.id.replace(`_${caisseId}`, '');
-                caisseData[key] = input.value;
-            });
-            
-            // Calcul de la recette et des suggestions
-            let totalCompte = 0;
-            const currentCounts = {};
-            for (const type in denominations) {
-                for (const name in denominations[type]) {
-                    const quantite = parseInt(caisseData[name] || 0);
-                    currentCounts[name] = quantite;
-                    totalCompte += quantite * parseFloat(denominations[type][name]);
-                }
-            }
-            const fondDeCaisse = parseFloat(caisseData.fond_de_caisse?.replace(',', '.') || 0);
-            const recetteReelle = totalCompte - fondDeCaisse;
-            const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep || {});
-
-            // Réinitialisation des champs, SAUF le fond de caisse
-            document.getElementById(`ventes_${caisseId}`).value = '';
-            document.getElementById(`retrocession_${caisseId}`).value = '';
-            document.querySelectorAll(`#cheques-container-${caisseId} .cheque-item`).forEach((item, index) => {
-                if (index > 0) item.remove(); // Garde seulement le premier champ chèque
-            });
-            document.querySelector(`#cheques-container-${caisseId} input`).value = '';
-
-
-            // Mise à jour des quantités de dénominations
-            for (const name in currentCounts) {
-                const quantite_a_retirer = suggestions[name] || 0;
-                const nouvelle_quantite = currentCounts[name] - quantite_a_retirer;
-                document.getElementById(`${name}_${caisseId}`).value = nouvelle_quantite > 0 ? nouvelle_quantite : '';
-            }
-        }
-        
-        document.getElementById('nom_comptage').value = '';
-        document.getElementById('explication').value = '';
-
-        window.lockedCaisses = [];
-        window.closedCaisses = [];
-
-        // Appel du calcul complet pour mettre à jour les affichages
-        if (typeof window.calculateAllFull === 'function') {
-            window.calculateAllFull();
-        }
-        handleInterfaceLock([], []);
-        
-        if (typeof window.updateWebsocketStatusIndicator === 'function') {
-            window.updateWebsocketStatusIndicator([], []);
-        }
-    };
-
-
     const isCaisseLockedBy = (caisseId, lockedBy) => Array.isArray(window.lockedCaisses) && lockedBy && window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString() && c.locked_by.toString() === lockedBy.toString());
     const isCaisseLocked = (caisseId) => Array.isArray(window.lockedCaisses) && window.lockedCaisses.some(c => c.caisse_id.toString() === caisseId.toString());
 
@@ -143,7 +82,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     };
 
-    // CORRECTION: La fonction n'efface plus le message d'écart nul
     const updateEcartDisplayForCloture = (nomsCaisses) => {
         for (const caisseId in nomsCaisses) {
             const display = document.getElementById(`ecart-display-caisse${caisseId}`);
@@ -359,9 +297,6 @@ document.addEventListener('DOMContentLoaded', function() {
         clotureConfirmationModal.classList.add('visible');
     }
 
-
-    // --- Gestionnaire d'événements centralisé ---
-
     clotureBtn.addEventListener('click', () => {
         if (calculatorDataElement.dataset.config.includes('"isLoadedFromHistory":true')) {
             window.showCustomAlert("La clôture ne peut pas être lancée depuis le mode consultation de l'historique.", 'error');
@@ -372,7 +307,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.body.addEventListener('click', function(event) {
         let target = event.target;
-        // On ne gère plus la fermeture par le bouton, juste le clic en dehors
         const modal = target.closest('.modal');
         if (target === modal) {
             modal?.classList.remove('visible');
@@ -386,7 +320,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const button = target.closest('button');
         if (!button) return;
 
-        // Logique pour la modale de sélection et de clôture générale
         if (button.closest('#caisse-selection-modal, #cloture-generale-modal')) {
             const caisseId = button.dataset.caisseId;
             if (caisseId) {
@@ -411,7 +344,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Logique pour la modale de confirmation d'une caisse
         if (button.closest('#cloture-confirmation-modal')) {
             const caisseId = button.dataset.caisseId;
             if (button.id === 'cancel-cloture-btn') {
@@ -434,19 +366,33 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // MISE À JOUR : Logique pour la modale de confirmation finale
         if (button.closest('#final-confirmation-modal')) {
             if (button.id === 'confirm-final-cloture-action-btn') {
                 finalConfirmationModal.classList.remove('visible');
-                const formData = new FormData(document.getElementById('caisse-form'));
+                
+                const form = document.getElementById('caisse-form');
+                const disabledFields = form.querySelectorAll(':disabled');
+                
+                disabledFields.forEach(field => field.disabled = false);
+                const formData = new FormData(form);
+                disabledFields.forEach(field => field.disabled = true);
+                
                 fetch('index.php?action=cloture_generale', { method: 'POST', body: formData })
                     .then(res => res.json()).then(data => {
                         if (data.success) {
                             window.showCustomAlert(data.message, 'success');
-                            // On envoie le message au WebSocket pour synchroniser les autres clients
-                            window.wsConnection?.send(JSON.stringify({ type: 'cloture_generale' }));
-                            // On réinitialise l'interface locale
-                            window.resetCaisseForNextDay();
+                            
+                            if (data.newState && typeof window.loadAndInitFormData === 'function') {
+                                window.loadAndInitFormData(data.newState);
+                            }
+    
+                            if (window.wsConnection && data.newState) {
+                                window.wsConnection.send(JSON.stringify({ 
+                                    type: 'all_caisses_closed_and_reset', 
+                                    newState: data.newState 
+                                }));
+                            }
+                            
                         } else { 
                             throw new Error(data.message); 
                         }
@@ -461,25 +407,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- Fonctions de calcul ---
-    function calculateCaisseData(caisseId, config) {
-        const { denominations, minToKeep } = config;
-        const getVal = (id) => parseFloat(document.getElementById(`${id}_${caisseId}`)?.value.replace(',', '.') || 0) || 0;
-        const getInt = (id) => parseInt(document.getElementById(`${id}_${caisseId}`)?.value || 0) || 0;
-        let totalCompte = 0;
-        const currentCounts = {};
-        for (const type in denominations) {
-            for (const name in denominations[type]) {
-                const count = getInt(name);
-                totalCompte += count * denominations[type][name];
-                currentCounts[name] = count;
-            }
-        }
-        const fondDeCaisse = getVal('fond_de_caisse');
-        const recetteReelle = totalCompte - fondDeCaisse;
-        const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep);
-        return { recetteReelle, suggestions };
-    }
-    
     function calculateCaisseDataForConfirmation(caisseId, config) {
         const { denominations, minToKeep } = config;
         const getVal = (id) => parseFloat(document.getElementById(`${id}_${caisseId}`)?.value.replace(',', '.') || 0) || 0;
@@ -501,7 +428,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const recetteTheorique = ventes + retrocession;
         const recetteReelle = totalCompte - fondDeCaisse;
         const ecart = recetteReelle - recetteTheorique;
-        const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep);
+        const suggestions = generateWithdrawalSuggestion(recetteReelle, currentCounts, denominations, minToKeep || {});
 
         const chequesInputs = document.querySelectorAll(`#cheques-container-${caisseId} input[name="caisse[${caisseId}][cheques][]"]`);
         const cheques = Array.from(chequesInputs).map(input => input.value).filter(value => value.trim() !== '');

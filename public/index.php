@@ -98,30 +98,27 @@ if ($ajax_action) {
             $calculateurController->autosave();
             exit;
         case 'get_stats_data':
-            // Nouvelle route pour récupérer les données de statistiques
             $statistiquesController->getStatsData();
             exit;
-        case 'get_historique_data': // NOUVEAU
+        case 'get_historique_data':
             $historiqueController->getHistoriqueDataJson();
             exit;
-        case 'delete_historique_data': // NOUVEAU
+        case 'delete_historique_data':
             $historiqueController->delete();
             exit;
-        case 'export_csv': // NOUVEAU
+        case 'export_csv':
             $historiqueController->exportCsv();
             exit;
-        case 'cloture': // NOUVEAU: Ajout de l'action de clôture
+        case 'cloture':
             $calculateurController->cloture();
             exit;
-        // NOUVEAU: Route pour la clôture générale
         case 'cloture_generale':
             $calculateurController->cloture_generale();
             exit;
-        // NOUVEAU: Route pour récupérer la dernière sauvegarde automatique
-        case 'get_last_autosave_data':
-            $calculateurController->getLastAutosaveData();
+        // MODIFIÉ : Remplace l'ancienne route par la nouvelle logique de chargement
+        case 'get_initial_data':
+            $calculateurController->getInitialData();
             exit;
-        // NOUVEAU: Route pour récupérer l'état de clôture des caisses
         case 'get_cloture_state':
             $calculateurController->getClotureState();
             exit;
