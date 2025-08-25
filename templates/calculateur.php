@@ -235,7 +235,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <div id="caisse-selection-modal" class="modal">
     <div class="modal-content">
-        <span class="modal-close">&times;</span>
         <div class="modal-header-cloture">
             <h3><i class="fa-solid fa-store"></i> Gestion de la Clôture</h3>
             <p>Sélectionnez une caisse pour commencer la procédure.</p>
@@ -254,7 +253,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <div id="cloture-confirmation-modal" class="modal">
     <div class="modal-content">
-        <span class="modal-close">&times;</span>
         <div class="modal-header">
             <h3><i class="fa-solid fa-check-double"></i> Confirmer la clôture de : <span id="confirm-caisse-name"></span></h3>
         </div>
@@ -272,7 +270,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <div id="cloture-generale-modal" class="modal">
     <div class="modal-content">
-        <span class="modal-close">&times;</span>
         <div class="modal-header">
             <i class="fa-solid fa-flag-checkered"></i>
             <div>
