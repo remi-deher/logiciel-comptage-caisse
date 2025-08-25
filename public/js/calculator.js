@@ -1,7 +1,7 @@
 /**
  * Module JavaScript pour la logique de la page du calculateur.
  * Ce script gère les calculs en temps réel, les onglets, les accordéons,
- * la sauvegarde et la reprise de comptage.
+ * et la sauvegarde du comptage.
  */
 document.addEventListener('DOMContentLoaded', function() {
     const calculatorDataElement = document.getElementById('calculator-data');
@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const comptageId = calculatorDataElement.dataset.comptageId;
 
     let hasUnsavedChanges = false;
-    const synthesisModal = document.getElementById('synthesis-modal');
+    const form = document.getElementById('caisse-form');
 
     // --- Fonctions utilitaires ---
     const formatCurrency = (amount) => {
@@ -41,7 +41,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     
-    // MISE À JOUR : La fonction gère maintenant les messages d'aide
     function calculateCBTotals(caisseId) {
         let totalConstate = 0;
         document.querySelectorAll(`.cb-input[data-caisse-id="${caisseId}"]`).forEach(input => {
@@ -82,12 +81,6 @@ document.addEventListener('DOMContentLoaded', function() {
      * Calcule tous les totaux pour toutes les caisses et met à jour l'affichage.
      */
     window.calculateAllFull = function() {
-        let totalGlobalCompte = 0;
-        let totalGlobalRecetteReelle = 0;
-        let totalGlobalRecetteTheorique = 0;
-        let totalGlobalEcart = 0;
-        let totalGlobalFdc = 0;
-
         for (const caisseId in nomsCaisses) {
             let totalCaisseCompte = 0;
 
@@ -116,51 +109,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const recetteReelle = totalCaisseCompte - fondDeCaisse;
             const ecart = recetteReelle - recetteTheorique;
 
-            totalGlobalCompte += totalCaisseCompte;
-            totalGlobalRecetteReelle += recetteReelle;
-            totalGlobalRecetteTheorique += recetteTheorique;
-            totalGlobalEcart += ecart;
-            totalGlobalFdc += fondDeCaisse;
-
-            updateResultsDisplay(caisseId, { fondDeCaisse, totalCaisseCompte, recetteTheorique, recetteReelle, ecart });
             updateEcartDisplay(caisseId, ecart);
             calculateCBTotals(caisseId);
         }
-
-        updateCombinedResultsDisplay({ totalGlobalFdc, totalGlobalCompte, totalGlobalRecetteTheorique, totalGlobalRecetteReelle, totalGlobalEcart });
     };
-
-    function updateResultsDisplay(caisseId, results) {
-        const fdcElement = document.getElementById(`res-c${caisseId}-fdc`);
-        if (fdcElement) fdcElement.textContent = formatCurrency(results.fondDeCaisse);
-        const totalElement = document.getElementById(`res-c${caisseId}-total`);
-        if (totalElement) totalElement.textContent = formatCurrency(results.totalCaisseCompte);
-        const theoriqueElement = document.getElementById(`res-c${caisseId}-theorique`);
-        if (theoriqueElement) theoriqueElement.textContent = formatCurrency(results.recetteTheorique);
-        const recetteElement = document.getElementById(`res-c${caisseId}-recette`);
-        if (recetteElement) recetteElement.textContent = formatCurrency(results.recetteReelle);
-        const ecartElement = document.getElementById(`res-c${caisseId}-ecart`);
-        if (ecartElement) {
-            ecartElement.textContent = formatCurrency(results.ecart);
-            ecartElement.className = results.ecart > 0.01 ? 'ecart-positif' : (results.ecart < -0.01 ? 'ecart-negatif' : '');
-        }
-    }
-
-    function updateCombinedResultsDisplay(totals) {
-        const totalFdcElement = document.getElementById('res-total-fdc');
-        if (totalFdcElement) totalFdcElement.textContent = formatCurrency(totals.totalGlobalFdc);
-        const totalTotalElement = document.getElementById('res-total-total');
-        if (totalTotalElement) totalTotalElement.textContent = formatCurrency(totals.totalGlobalCompte);
-        const totalTheoriqueElement = document.getElementById('res-total-theorique');
-        if (totalTheoriqueElement) totalTheoriqueElement.textContent = formatCurrency(totals.totalGlobalRecetteTheorique);
-        const totalRecetteElement = document.getElementById('res-total-recette');
-        if (totalRecetteElement) totalRecetteElement.textContent = formatCurrency(totals.totalGlobalRecetteReelle);
-        const totalEcartElement = document.getElementById('res-total-ecart');
-        if (totalEcartElement) {
-            totalEcartElement.textContent = formatCurrency(totals.totalGlobalEcart);
-            totalEcartElement.className = totals.totalGlobalEcart > 0.01 ? 'ecart-positif' : (totals.totalGlobalEcart < -0.01 ? 'ecart-negatif' : '');
-        }
-    }
 
     function updateEcartDisplay(caisseId, ecart) {
         const display = document.getElementById(`ecart-display-caisse${caisseId}`);
@@ -182,11 +134,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function setupEventListeners() {
-        const form = document.getElementById('caisse-form');
         window.addEventListener('scroll', handleStickyEcart);
         handleStickyEcart();
 
-        // Écouteur pour les onglets de CAISSE
         document.querySelector('.tab-selector').addEventListener('click', (e) => {
             const button = e.target.closest('.tab-link');
             if (button) {
@@ -201,7 +151,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Écouteur pour les onglets de MODE DE PAIEMENT
         document.querySelectorAll('.payment-method-selector').forEach(selector => {
             selector.addEventListener('click', (e) => {
                 const button = e.target.closest('.payment-tab-link');
@@ -217,7 +166,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-        // Accordéons
         document.body.addEventListener('click', (e) => {
             const header = e.target.closest('.accordion-header');
             if (header) {
@@ -228,7 +176,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Champs de saisie
         form.addEventListener('input', (e) => {
             if (e.target.matches('input[type="number"], input[type="text"], textarea')) {
                 hasUnsavedChanges = true;
@@ -259,76 +206,57 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        form.addEventListener('submit', () => {
+        // CORRECTION : La soumission du formulaire est maintenant gérée par fetch pour éviter le rechargement.
+        form.addEventListener('submit', (e) => {
+            e.preventDefault(); 
             hasUnsavedChanges = false;
+
+            const saveButton = form.querySelector('button[type="submit"]');
+            const originalButtonText = saveButton.innerHTML;
+            saveButton.disabled = true;
+            saveButton.innerHTML = 'Enregistrement...';
+
+            const formData = new FormData(form);
+
+            fetch('index.php?page=calculateur', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (typeof window.showCustomAlert === 'function') {
+                        window.showCustomAlert(data.message, 'success');
+                    } else {
+                        alert(data.message);
+                    }
+                } else {
+                    throw new Error(data.message || 'Une erreur inconnue est survenue.');
+                }
+            })
+            .catch(err => {
+                if (typeof window.showCustomAlert === 'function') {
+                    window.showCustomAlert('Erreur lors de la sauvegarde : ' + err.message, 'error');
+                } else {
+                    alert('Erreur lors de la sauvegarde : ' + err.message);
+                }
+                hasUnsavedChanges = true; 
+            })
+            .finally(() => {
+                saveButton.disabled = false;
+                saveButton.innerHTML = originalButtonText;
+            });
         });
 
-        const openSynthesisBtn = document.querySelectorAll('.open-synthesis-modal-btn');
-        if (openSynthesisBtn) {
-            openSynthesisBtn.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    calculateAllFull();
-                    if(synthesisModal) synthesisModal.classList.add('visible');
-                });
-            });
-        }
-        
-        if (synthesisModal) {
-            synthesisModal.addEventListener('click', (event) => {
-                if (event.target === synthesisModal) {
-                    synthesisModal.classList.remove('visible');
-                }
-            });
-        }
-        
-        // AJOUT : Écouteur pour l'ajout/suppression de chèques
-        document.body.addEventListener('click', function(event) {
-            const addButton = event.target.closest('.add-cheque-btn');
-            const removeButton = event.target.closest('.remove-cheque-btn');
-
-            if (addButton || removeButton) {
-                hasUnsavedChanges = true;
-                // Après une modification de la structure, on envoie l'état complet du formulaire
-                if (!isLoadedFromHistory && typeof window.sendFullFormState === 'function') {
-                    // On attend que le DOM se mette à jour avant d'envoyer
-                    setTimeout(window.sendFullFormState, 100);
-                }
-            }
-        });
-        
-        const resumeChoiceModal = document.getElementById('resume-choice-modal');
-        const resumeConfirmModal = document.getElementById('resume-confirm-modal');
         const resumeCountingBtn = document.getElementById('resume-counting-btn');
-        const loadFromHistoryBtn = document.getElementById('load-from-history-btn');
-        const confirmResumeBtn = document.getElementById('confirm-resume-btn');
-        const cancelResumeBtn = document.getElementById('cancel-resume-btn');
-
-        if (resumeCountingBtn) {
+        if (resumeCountingBtn && comptageId) {
             resumeCountingBtn.addEventListener('click', () => {
-                if(resumeChoiceModal) resumeChoiceModal.classList.add('visible');
-            });
-        }
-
-        if (loadFromHistoryBtn) {
-            loadFromHistoryBtn.addEventListener('click', () => {
-                if(resumeChoiceModal) resumeChoiceModal.classList.remove('visible');
-                if(resumeConfirmModal) resumeConfirmModal.classList.add('visible');
-            });
-        }
-        
-        if (confirmResumeBtn && comptageId) {
-            confirmResumeBtn.href = `index.php?page=calculateur&resume_from=${comptageId}`;
-        }
-
-        if(cancelResumeBtn) {
-            cancelResumeBtn.addEventListener('click', () => {
-                if(resumeConfirmModal) resumeConfirmModal.classList.remove('visible');
+                window.location.href = `index.php?page=calculateur&resume_from=${comptageId}`;
             });
         }
     }
     
     function resetAllFormFields() {
-        const form = document.getElementById('caisse-form');
         if(form) form.reset();
         document.querySelectorAll('.total-line').forEach(el => el.textContent = formatCurrency(0));
     }
@@ -362,10 +290,8 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     window.loadFormDataFromWebSocket = function(formState) {
-        // Gérer les champs fixes (tout sauf les chèques)
         for (const id in formState) {
             const input = document.getElementById(id);
-            // On s'assure de ne pas traiter les chèques ici
             if (input && !input.name.includes('[cheques]')) {
                  if (input.value !== formState[id]) {
                     input.value = formState[id];
@@ -373,7 +299,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // Gérer les champs de chèques dynamiques
         for (const caisseId in config.nomsCaisses) {
             const chequesContainer = document.querySelector(`#cheques-container-${caisseId} .cheques-grid`);
             if (!chequesContainer) continue;
@@ -386,10 +311,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            chequesContainer.innerHTML = ''; // Vider les champs existants
+            chequesContainer.innerHTML = ''; 
             
-            // Reconstruire les champs
-            const valuesToRender = chequeValuesInState.length > 0 ? chequeValuesInState : ['']; // Toujours afficher au moins un champ
+            const valuesToRender = chequeValuesInState.length > 0 ? chequeValuesInState : [''];
             valuesToRender.forEach((value, index) => {
                  const isFirst = index === 0;
                 const newChequeHtml = `
@@ -407,12 +331,10 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateAllFull();
     };
 
-    // MISE À JOUR : La fonction génère un ID unique pour chaque champ, y compris les chèques
     window.sendFullFormState = function() {
         if (window.wsConnection && window.wsConnection.readyState === WebSocket.OPEN) {
             const formState = {};
             document.querySelectorAll('#caisse-form input, #caisse-form textarea').forEach((el, index) => {
-                // Assurer un ID unique pour chaque champ, surtout les chèques
                 if (!el.id) {
                     const name = el.name.replace(/\[|\]/g, '_');
                     el.id = `${name}_${index}`;
@@ -428,9 +350,24 @@ document.addEventListener('DOMContentLoaded', function() {
     function initUnloadAutosave() {
         if (isLoadedFromHistory) return;
 
+        setInterval(() => {
+            if (hasUnsavedChanges) {
+                const formData = new FormData(form);
+                fetch('index.php?action=autosave', {
+                    method: 'POST',
+                    body: formData,
+                }).then(res => res.json()).then(data => {
+                    if (data.success) {
+                        console.log('Autosave successful at ' + new Date().toLocaleTimeString());
+                        hasUnsavedChanges = false;
+                    }
+                });
+            }
+        }, 30000);
+
         window.addEventListener('beforeunload', (event) => {
             if (hasUnsavedChanges) {
-                const formData = new FormData(document.getElementById('caisse-form'));
+                const formData = new FormData(form);
                 navigator.sendBeacon('index.php?action=autosave', formData);
             }
         });
