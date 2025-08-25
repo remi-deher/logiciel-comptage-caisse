@@ -155,7 +155,10 @@ class CalculateurController {
     public function autosave() { $this->handleSave(true); }
 
     private function handleSave($is_autosave) {
-        if ($is_autosave) { header('Content-Type: application/json'); ob_start(); }
+        header('Content-Type: application/json');
+        if ($is_autosave) { 
+            ob_start(); 
+        }
     
         $nom_comptage = trim($_POST['nom_comptage'] ?? '');
         $explication = trim($_POST['explication'] ?? '');
@@ -170,8 +173,10 @@ class CalculateurController {
             }
         }
         if (!$has_data) {
-            if ($is_autosave) { ob_end_clean(); echo json_encode(['success' => false, 'message' => 'Aucune donnée à sauvegarder.']); }
-            else { $_SESSION['message'] = "Aucune donnée n'a été saisie."; header('Location: index.php?page=calculateur'); }
+            if ($is_autosave) { 
+                ob_end_clean();
+            }
+            echo json_encode(['success' => false, 'message' => "Aucune donnée n'a été saisie pour la sauvegarde."]);
             exit;
         }
     
@@ -181,18 +186,17 @@ class CalculateurController {
             $comptage_id = null;
     
             if ($is_autosave) {
+                $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
-                $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-                $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
-                $comptage_id = $this->pdo->lastInsertId();
             } else {
                 if (empty($nom_comptage)) {
                     $nom_comptage = "Comptage du " . date('Y-m-d H:i:s');
                 }
-                $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-                $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
-                $comptage_id = $this->pdo->lastInsertId();
             }
+            
+            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
+            $comptage_id = $this->pdo->lastInsertId();
     
             if (empty($comptage_id)) {
                 throw new Exception("La création de l'enregistrement de comptage a échoué.");
@@ -235,26 +239,6 @@ class CalculateurController {
                         }
                     }
                 }
-
-                if (isset($caisse_data['cb']) && is_array($caisse_data['cb'])) {
-                    foreach ($caisse_data['cb'] as $terminal_id => $montant) {
-                        $montant_numerique = get_numeric_value(['montant' => $montant], 'montant');
-                        if ($montant_numerique > 0) {
-                            $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant) VALUES (?, ?, ?)");
-                            $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_numerique]);
-                        }
-                    }
-                }
-                
-                if (isset($caisse_data['cheques']) && is_array($caisse_data['cheques'])) {
-                    foreach ($caisse_data['cheques'] as $montant) {
-                        $montant_numerique = get_numeric_value(['montant' => $montant], 'montant');
-                        if ($montant_numerique > 0) {
-                            $stmt_cheque = $this->pdo->prepare("INSERT INTO comptage_cheques (comptage_detail_id, montant) VALUES (?, ?)");
-                            $stmt_cheque->execute([$comptage_detail_id, $montant_numerique]);
-                        }
-                    }
-                }
             }
             
             $this->pdo->commit();
@@ -263,9 +247,7 @@ class CalculateurController {
                 ob_end_clean();
                 echo json_encode(['success' => true, 'message' => 'Sauvegarde auto à ' . date('H:i:s')]);
             } else {
-                $_SESSION['message'] = "Comptage '" . htmlspecialchars($nom_comptage) . "' créé avec succès !";
-                $_SESSION['just_saved'] = $comptage_id;
-                header('Location: index.php?page=calculateur&load=' . $comptage_id);
+                echo json_encode(['success' => true, 'message' => "Comptage '" . htmlspecialchars($nom_comptage) . "' créé avec succès !"]);
             }
             exit;
     
@@ -275,11 +257,8 @@ class CalculateurController {
             }
             if ($is_autosave) {
                 ob_end_clean();
-                echo json_encode(['success' => false, 'message' => 'Erreur de BDD: ' . $e->getMessage()]);
-            } else {
-                $_SESSION['message'] = "Erreur de BDD lors de la sauvegarde : " . $e->getMessage();
-                header('Location: index.php?page=calculateur');
             }
+            echo json_encode(['success' => false, 'message' => 'Erreur de BDD: ' . $e->getMessage()]);
             exit;
         }
     }
