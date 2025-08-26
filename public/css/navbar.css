@@ -1,67 +1,77 @@
 /* ==========================================================================
-   public/css/navbar.css (Avec Thème Sombre)
+   public/css/navbar.css (Avec Thème Sombre Amélioré)
    ========================================================================== */
+
 .navbar {
     max-width: 1200px;
-    margin: 20px auto 0 auto;
+    margin: 20px auto 0 auto; /* La marge basse est à 0 pour coller au conteneur */
     box-sizing: border-box;
     width: 100%;
     padding: 0 20px;
-    background-color: #34495e;
-    border-radius: 12px 12px 0 0;
+    background-color: var(--color-surface); /* Utilise la couleur de surface du thème */
+    border-radius: 12px 12px 0 0; /* Uniquement les coins supérieurs sont arrondis */
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 15px;
     position: relative;
-    border: 1px solid #4a6883;
-    border-bottom: none;
-    font-family: 'Arial', sans-serif; /* Correction de la police pour unifier le design */
-}
-body[data-theme="dark"] .navbar {
-    background-color: #212529;
-    border-color: #343a40;
+    border: 1px solid var(--color-border-light); /* Bordure assortie au thème */
+    border-bottom: none; /* Pas de bordure en bas pour fusionner avec le conteneur */
+    font-family: 'Arial', sans-serif;
 }
 
 .navbar-brand {
-    color: white;
-    font-size: 1.5em;
-    font-weight: bold;
+    color: var(--color-primary); /* Utilise la couleur primaire du thème */
+    font-size: 1.8em;
     text-decoration: none;
     padding: 15px 0;
+    transition: transform 0.2s ease-in-out;
+}
+
+.navbar-brand:hover {
+    transform: scale(1.1);
 }
 
 .navbar-collapse {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
 }
+
 .navbar-nav {
     display: flex;
     list-style: none;
     margin: 0;
     padding: 0;
 }
+
 .nav-item a {
-    color: white;
+    color: var(--color-text-secondary); /* Couleur de texte secondaire */
     text-decoration: none;
     padding: 20px 15px;
-    display: block;
-    transition: background-color 0.3s;
+    display: flex; /* Flex pour aligner icône et texte */
+    align-items: center;
+    gap: 8px; /* Espace entre l'icône et le texte */
+    font-weight: 600;
+    border-bottom: 3px solid transparent;
+    transition: color 0.3s, border-color 0.3s;
 }
-.nav-item a:hover, .nav-item a.active {
-    background-color: #2c3e50;
+
+.nav-item a:hover {
+    color: var(--color-primary);
 }
-body[data-theme="dark"] .nav-item a:hover, body[data-theme="dark"] .nav-item a.active {
-    background-color: #343a40;
+
+.nav-item a.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
 }
 
 .navbar-toggler {
     display: none;
     background: none;
     border: none;
-    color: white;
+    color: var(--color-text-primary);
     font-size: 1.8em;
     cursor: pointer;
 }
@@ -72,7 +82,7 @@ body[data-theme="dark"] .nav-item a:hover, body[data-theme="dark"] .nav-item a.a
     gap: 10px;
 }
 
-/* --- Indicateur de statut WebSocket (CORRIGÉ) --- */
+/* --- Indicateur de statut WebSocket (Inchangé mais utilise les variables) --- */
 .status-indicator {
     display: flex;
     align-items: center;
@@ -81,7 +91,7 @@ body[data-theme="dark"] .nav-item a:hover, body[data-theme="dark"] .nav-item a.a
     font-size: 0.9em;
     font-weight: bold;
     color: white;
-    background-color: var(--color-warning); /* Utilise la variable de couleur */
+    background-color: var(--color-warning);
     transition: background-color 0.5s ease;
 }
 .status-indicator .status-dot {
@@ -102,12 +112,11 @@ body[data-theme="dark"] .nav-item a:hover, body[data-theme="dark"] .nav-item a.a
     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
 }
 
-
 /* --- Bouton de Thème --- */
 .theme-switch-btn {
-    background: none;
-    border: 2px solid #7f8c8d;
-    color: #ecf0f1;
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border-light);
+    color: var(--color-text-secondary);
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -119,7 +128,8 @@ body[data-theme="dark"] .nav-item a:hover, body[data-theme="dark"] .nav-item a.a
     transition: all 0.3s ease;
 }
 .theme-switch-btn:hover {
-    border-color: white;
+    color: var(--color-primary);
+    border-color: var(--color-primary);
     transform: rotate(15deg);
 }
 .theme-switch-btn .fa-sun { display: none; }
@@ -128,8 +138,9 @@ body[data-theme="dark"] .nav-item a:hover, body[data-theme="dark"] .nav-item a.a
 body[data-theme="dark"] .theme-switch-btn .fa-sun { display: block; }
 body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
 
+
 @media (max-width: 1200px) {
-    .navbar, .container {
+    .navbar {
         margin-left: 10px;
         margin-right: 10px;
     }
@@ -142,29 +153,23 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
         flex-direction: column;
         align-items: stretch;
         width: 100%;
-        background-color: #3f5870;
+        background-color: var(--color-surface);
         padding: 10px 0;
-    }
-    body[data-theme="dark"] .navbar-collapse {
-        background-color: #2c3034;
     }
     .navbar-collapse.show { display: flex; }
     .navbar-nav { flex-direction: column; width: 100%; }
-    .nav-item a { padding: 15px 20px; border-bottom: 1px solid #4a6883; }
-    body[data-theme="dark"] .nav-item a { border-bottom: 1px solid #343a40; }
+    .nav-item a { padding: 15px 20px; border-bottom: 1px solid var(--color-border-light); }
     .nav-item:last-child a { border-bottom: none; }
     .navbar-controls { margin: 10px 20px; justify-content: center; }
 }
 
 @media (min-width: 992.01px) {
     .navbar-collapse { flex-grow: 1; justify-content: flex-end; }
-    .navbar-nav { position: static; left: auto; top: auto; transform: none; width: auto; display: flex; align-items: center; }
-    .navbar-controls { margin-left: 15px; } /* Ajustement de la marge pour les contrôles */
 }
 
-/* NOUVEAU: Styles pour le bouton de clôture */
+/* --- Styles pour le bouton de clôture --- */
 .cloture-btn {
-    background-color: #8a2be2; /* Couleur violette */
+    background-color: #8a2be2;
     color: white;
     border: none;
     padding: 8px 15px;
@@ -182,7 +187,6 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
     transform: translateY(-2px);
 }
 
-/* NOUVEAU: Nouvelle couleur pour le statut "Clôture" */
 .status-indicator.cloture {
     background-color: #8a2be2;
     color: white;
