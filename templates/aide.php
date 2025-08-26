@@ -24,7 +24,25 @@ require 'partials/navbar.php';
         <div class="help-card"
              data-title="Le Calculateur"
              data-icon="fa-solid fa-calculator"
-             data-content="<h4>Une interface intuitive</h4><p>La page du calculateur est organisée en sections déroulantes (accordéons) pour une meilleure clarté :</p><ol><li><strong><span class='highlight'>Informations Caisse</span> :</strong> Saisissez ici le fond de caisse, le total des ventes de la journée et les éventuelles rétrocessions (prélèvements).</li><li><strong><span class='highlight'>Détail des Espèces</span> :</strong> Renseignez le nombre de billets et de pièces comptés. Le total se calcule automatiquement.</li></ol><h4>Indicateur d'écart en temps réel</h4><p>Situé en haut de la page, cet encadré est votre guide. Il change de couleur et de message pour vous informer de l'état de la caisse active :</p><ul><li><strong style='color: #27ae60;'>Vert :</strong> Félicitations ! L'écart est nul, votre caisse est juste. Un accordéon <strong class='highlight'>Suggestion de retrait</strong> apparaîtra pour vous indiquer la composition exacte de l'argent à retirer pour clôturer la caisse.</li><li><strong style='color: #f39c12;'>Orange :</strong> Il y a un surplus d'argent. Vérifiez vos saisies.</li><li><strong style='color: #c0392b;'>Rouge :</strong> Il manque de l'argent. Un recomptage est conseillé.</li></ul>">
+             data-content="<h4>Une interface intuitive et complète</h4><p>La page du calculateur est organisée en onglets pour chaque caisse, et chaque caisse dispose de plusieurs sections pour une saisie claire et rapide :</p>
+             <ol>
+                <li><strong><span class='highlight'>Informations Générales</span> :</strong> Saisissez ici le fond de caisse, le total des ventes théoriques de la journée et les éventuelles rétrocessions (prélèvements).</li>
+                <li><strong><span class='highlight'>Détail par mode de paiement</span> :</strong>
+                    <ul>
+                        <li><strong>Espèces :</strong> Renseignez le nombre de billets et de pièces comptés. Le total se calcule automatiquement.</li>
+                        <li><strong>Carte Bancaire :</strong> Entrez les montants de chaque terminal de paiement. L'application calcule l'écart par rapport au total attendu.</li>
+                        <li><strong>Chèques :</strong> Ajoutez autant de chèques que nécessaire. Le total est calculé automatiquement.</li>
+                    </ul>
+                </li>
+             </ol>
+             <h4>Indicateur d'écart en temps réel</h4>
+             <p>Situé en haut de la page, cet encadré est votre guide. Il change de couleur et de message pour vous informer de l'état de la caisse active :</p>
+             <ul>
+                <li><strong style='color: #27ae60;'>Vert :</strong> Félicitations ! L'écart est nul, votre caisse est juste.</li>
+                <li><strong style='color: #f39c12;'>Orange :</strong> Il y a un surplus d'argent. Vérifiez vos saisies.</li>
+                <li><strong style='color: #c0392b;'>Rouge :</strong> Il manque de l'argent. Un recomptage est conseillé.</li>
+             </ul>"
+             >
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-calculator"></i></div>
                 <h3>Le Calculateur</h3>
@@ -38,7 +56,15 @@ require 'partials/navbar.php';
         <div class="help-card"
              data-title="L'Historique"
              data-icon="fa-solid fa-history"
-             data-content="<h4>Retrouvez et analysez vos comptages</h4><p>La page d'historique affiche par défaut les comptages du jour pour un accès rapide. Vous pouvez basculer sur la vue 'Tous les comptages' grâce aux onglets.</p><ul><li class='list-item-with-icon'><i class='fa-solid fa-filter'></i> <span><strong><span class='highlight'>Filtrage puissant</span> :</strong> Utilisez les champs en haut pour rechercher un comptage par nom ou pour filtrer par une période spécifique. Des boutons de filtre rapide sont également disponibles pour 'Aujourd'hui', 'Hier', '7 derniers jours', et '30 derniers jours'.</span></li><li class='list-item-with-icon'><i class='fa-solid fa-chart-bar'></i> <span><strong><span class='highlight'>Nouveau : Graphiques par carte</span> :</strong> Pour chaque comptage, un graphique en barres est désormais affiché pour visualiser rapidement la répartition des ventes entre vos différentes caisses.</span></li><li class='list-item-with-icon'><i class='fa-solid fa-file-export'></i> <span><strong><span class='highlight'>Détails et Exports</span> :</strong> Sur chaque carte, cliquez sur le nom d'une caisse pour voir son décompte détaillé. Cliquez sur 'Ensemble' pour une vue complète avec une synthèse globale. Depuis cette fenêtre, vous pouvez exporter les détails en PDF ou Excel.</span></li></ul><h4>Mode Consultation</h4><p>En cliquant sur un comptage depuis l'historique, vous passez en <strong><span class='highlight'>Mode Consultation</span></strong>. Dans ce mode, toutes les modifications en temps réel et la sauvegarde automatique sont désactivées pour vous permettre de consulter les données sans risque de les modifier. Un bandeau spécial vous l'indique en haut de la page.</p>">
+             data-content="<h4>Retrouvez et analysez vos comptages</h4><p>La page d'historique affiche tous vos comptages passés sous forme de cartes interactives.</p>
+             <ul>
+                <li class='list-item-with-icon'><i class='fa-solid fa-filter'></i> <span><strong><span class='highlight'>Filtrage puissant</span> :</strong> Utilisez les champs en haut pour rechercher un comptage par nom ou pour filtrer par une période spécifique. Des boutons de filtre rapide sont également disponibles pour 'Aujourd'hui', 'Hier', '7 derniers jours', et '30 derniers jours'.</span></li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-chart-bar'></i> <span><strong><span class='highlight'>Graphiques par carte</span> :</strong> Chaque carte de comptage inclut un mini-graphique en barres pour visualiser rapidement la répartition des ventes entre vos différentes caisses.</span></li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-file-export'></i> <span><strong><span class='highlight'>Détails et Exports</span> :</strong> Sur chaque carte, cliquez sur le nom d'une caisse pour voir son décompte détaillé. Cliquez sur 'Ensemble' pour une vue complète avec une synthèse globale. Depuis cette fenêtre, vous pouvez exporter les détails en PDF ou Excel.</span></li>
+             </ul>
+             <h4>Mode Consultation</h4>
+             <p>En cliquant sur un comptage depuis l'historique, vous passez en <strong><span class='highlight'>Mode Consultation</span></strong>. Dans ce mode, toutes les modifications en temps réel et la sauvegarde automatique sont désactivées pour vous permettre de consulter les données sans risque de les modifier. Un bandeau spécial vous l'indique en haut de la page.</p>"
+             >
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-history"></i></div>
                 <h3>L'Historique</h3>
@@ -52,7 +78,14 @@ require 'partials/navbar.php';
         <div class="help-card"
              data-title="Les Statistiques"
              data-icon="fa-solid fa-chart-pie"
-             data-content="<h4>Analysez vos données</h4><p>La page de statistiques vous offre un tableau de bord complet pour analyser vos données de comptage. Elle se divise en plusieurs sections :</p><ul><li class='list-item-with-icon'><i class='fa-solid fa-calendar-days'></i> <span><strong><span class='highlight'>Filtres</span> :</strong> Vous pouvez filtrer les données par période grâce à des boutons de raccourci ('Aujourd'hui', '7 derniers jours', etc.) ou en choisissant une période personnalisée.</span></li><li class='list-item-with-icon'><i class='fa-solid fa-gauge-high'></i> <span><strong><span class='highlight'>Indicateurs Clés (KPI)</span> :</strong> Une série de cartes vous donne des informations importantes en un coup d'œil, comme le nombre total de comptages, les ventes totales et les ventes moyennes. En cliquant sur ces cartes, vous obtenez un détail par caisse dans une fenêtre modale.</span></li><li class='list-item-with-icon'><i class='fa-solid fa-chart-line'></i> <span><strong><span class='highlight'>Graphiques</span> :</strong> Un graphique en secteurs vous montre la répartition des ventes entre vos différentes caisses, vous aidant à visualiser les performances de chacune.</span></li><li class='list-item-with-icon'><i class='fa-solid fa-file-export'></i> <span><strong><span class='highlight'>Exports</span> :</strong> Exportez l'ensemble du tableau de bord au format PDF ou CSV en un clic.</span></li></ul>">
+             data-content="<h4>Analysez vos données</h4><p>La page de statistiques vous offre un tableau de bord complet pour analyser vos données de comptage. Elle se divise en plusieurs sections :</p>
+             <ul>
+                <li class='list-item-with-icon'><i class='fa-solid fa-calendar-days'></i> <span><strong><span class='highlight'>Filtres</span> :</strong> Vous pouvez filtrer les données par période grâce à des boutons de raccourci ou en choisissant une période personnalisée.</span></li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-gauge-high'></i> <span><strong><span class='highlight'>Indicateurs Clés (KPI)</span> :</strong> Une série de cartes vous donne des informations importantes en un coup d'œil, comme le nombre total de comptages, les ventes totales et les ventes moyennes.</span></li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-chart-line'></i> <span><strong><span class='highlight'>Graphiques interactifs</span> :</strong> Visualisez l'évolution des ventes, la répartition par caisse, et d'autres analyses grâce à des graphiques dynamiques (lignes, barres, secteurs, etc.).</span></li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-file-export'></i> <span><strong><span class='highlight'>Exports</span> :</strong> Exportez l'ensemble du tableau de bord au format PDF ou CSV en un clic.</span></li>
+             </ul>"
+             >
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-chart-pie"></i></div>
                 <h3>Les Statistiques</h3>
@@ -69,7 +102,10 @@ require 'partials/navbar.php';
         <div class="help-card"
              data-title="Collaboration en Temps Réel"
              data-icon="fa-solid fa-wifi"
-             data-content="<h4>Comment ça marche ?</h4><p>Grâce à une technologie appelée <strong class='highlight'>WebSocket</strong>, l'application maintient une connexion permanente avec le serveur. L'indicateur 'Connecté en temps réel' en haut à droite vous confirme que cette connexion est active.</p><p><strong>Exemple concret :</strong> Vous êtes sur la page du calculateur et vous saisissez '5' dans la case des billets de 10€. Si un de vos collègues a la même page ouverte, il verra le chiffre '5' apparaître dans la case correspondante sur son écran, sans avoir besoin de rafraîchir la page. Tous les calculs se mettront à jour simultanément pour tout le monde.</p><p><strong>Mode Consultation :</strong> Si vous chargez un ancien comptage depuis l'historique, vous passez en '<strong><span class='highlight'>Mode Consultation</span></strong>'. Le temps réel est alors désactivé pour éviter d'écraser le comptage en cours.</p>">
+             data-content="<h4>Comment ça marche ?</h4><p>Grâce à une technologie appelée <strong class='highlight'>WebSocket</strong>, l'application maintient une connexion permanente avec le serveur. L'indicateur de connexion en haut à droite vous confirme que cette fonctionnalité est active.</p>
+             <p><strong>Exemple concret :</strong> Vous êtes sur la page du calculateur et vous saisissez '5' dans la case des billets de 10€. Si un de vos collègues a la même page ouverte, il verra le chiffre '5' apparaître dans la case correspondante sur son écran, sans avoir besoin de rafraîchir la page. Tous les calculs se mettront à jour simultanément pour tout le monde.</p>
+             <p><strong>Mode Consultation :</strong> Si vous chargez un ancien comptage depuis l'historique, vous passez en '<strong><span class='highlight'>Mode Consultation</span></strong>'. Le temps réel est alors désactivé pour éviter d'écraser le comptage en cours.</p>"
+             >
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-wifi"></i></div>
                 <h3>Collaboration en Temps Réel</h3>
@@ -80,7 +116,15 @@ require 'partials/navbar.php';
         <div class="help-card"
              data-title="Processus de Clôture"
              data-icon="fa-solid fa-lock"
-             data-content="<h4><span class='highlight'>Pourquoi la clôture ?</span></h4><p>Le bouton 'Clôture' dans la barre de navigation est un outil de collaboration qui permet de sauvegarder l'état des caisses de manière sécurisée et coordonnée. Il est particulièrement utile en fin de journée pour figer les comptages avant un retrait d'argent et une réinitialisation. Le processus de clôture ne peut pas être annulé une fois confirmé et sert de sauvegarde finale.</p><h4><span class='highlight'>Étapes du processus</span></h4><ol><li class='list-item-with-icon'><i class='fa-solid fa-lock'></i> <strong>Verrouillage et déverrouillage :</strong> La première étape consiste à verrouiller une caisse via la fenêtre modale de gestion. L'application enregistre alors le verrouillage dans la base de données (`cloture_status`) et empêche les autres utilisateurs de modifier cette caisse. Pour la déverrouiller, l'utilisateur ayant posé le verrou peut cliquer sur le bouton 'Déverrouiller' depuis la modale ou via un bouton directement sur l'onglet de la caisse. Un administrateur peut 'Forcer' le déverrouillage d'une caisse.</li><li class='list-item-with-icon'><i class='fa-solid fa-check-circle'></i> <strong>Confirmation de la caisse :</strong> Une fois que le comptage d'une caisse est terminé et que les totaux sont vérifiés, l'utilisateur la 'confirme' via une fenêtre de dialogue. Cette action génère un enregistrement dans l'historique (marqué comme 'Clôture') et la caisse est marquée comme 'clôturée' dans la base de données.</li><li class='list-item-with-icon'><i class='fa-solid fa-flag-checkered'></i> <strong>Clôture Générale :</strong> Lorsque toutes les caisses ont été confirmées, une fenêtre de dialogue 'Clôture Générale' apparaît. Elle affiche une synthèse finale des montants à retirer pour la journée. Après confirmation, les caisses sont réinitialisées pour le lendemain (le fond de caisse est conservé, les autres champs sont remis à zéro).</li></ol><h4><span class='highlight'>Sécurité et Temps Réel</span></h4><p>Le service de clôture repose sur le système de WebSockets pour informer tous les clients en temps réel de l'état des caisses (Libre, Verrouillée, Clôturée), garantissant ainsi que tous les utilisateurs voient la même chose au même moment.</p>">
+             data-content="<h4><span class='highlight'>Pourquoi la clôture ?</span></h4><p>Le bouton 'Clôture' dans la barre de navigation est un outil de collaboration qui permet de sauvegarder l'état des caisses de manière sécurisée et coordonnée en fin de journée. Il permet de figer les comptages avant un retrait d'argent et une réinitialisation pour le lendemain.</p>
+             <h4><span class='highlight'>Étapes du processus</span></h4>
+             <ol>
+                <li class='list-item-with-icon'><i class='fa-solid fa-lock'></i> <strong>Verrouillage :</strong> La première étape consiste à 'Verrouiller' une caisse depuis la fenêtre de gestion de la clôture. Cela empêche les autres utilisateurs de la modifier. Seul l'utilisateur qui a verrouillé la caisse (ou un administrateur) peut la déverrouiller.</li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-check-circle'></i> <strong>Confirmation :</strong> Une fois le comptage d'une caisse terminé et vérifié, l'utilisateur la 'Confirme'. Cette action enregistre un comptage final dans l'historique et marque la caisse comme 'clôturée'. Elle ne peut plus être modifiée (sauf si un administrateur la 'Réouvre').</li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-flag-checkered'></i> <strong>Clôture Générale :</strong> Lorsque toutes les caisses ont été confirmées, une fenêtre de 'Clôture Générale' apparaît. Elle affiche une synthèse finale des montants à retirer. Confirmer cette étape réinitialise toutes les caisses pour le lendemain (le fond de caisse est conservé, les autres champs sont remis à zéro).</li>
+             </ol>
+             <h4><span class='highlight'>Sécurité et Temps Réel</span></h4><p>Le système de WebSockets informe tous les clients en temps réel de l'état des caisses (Libre, Verrouillée, Clôturée), garantissant ainsi que tous les utilisateurs voient la même chose au même moment.</p>"
+             >
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-lock"></i></div>
                 <h3>Processus de Clôture</h3>
@@ -89,20 +133,18 @@ require 'partials/navbar.php';
         </div>
 
         <div class="help-card"
-             data-title="Fonctionnalités Avancées"
-             data-icon="fa-solid fa-star"
-             data-content="<h4><span class='highlight'>Ne perdez jamais votre travail</span></h4><ul><li class='list-item-with-icon'><i class='fa-solid fa-save'></i> <strong>Sauvegarde de Sécurité :</strong> Si vous avez des modifications non enregistrées et que vous fermez accidentellement la page, l'application effectue une dernière sauvegarde. Lorsque vous reviendrez sur le calculateur, cette sauvegarde sera chargée automatiquement.</li><li class='list-item-with-icon'><i class='fa-solid fa-magic'></i> <strong>Nommage Automatique :</strong> Si vous laissez le champ 'Nom du comptage' vide et que vous cliquez sur 'Enregistrer', l'application lui donnera automatiquement un nom basé sur la date et l'heure actuelles.</li><li class='list-item-with-icon'><i class='fa-solid fa-cloud-arrow-down'></i> <strong>Mises à jour intelligentes :</strong> Le pied de page vous informe si une nouvelle version est disponible. En cliquant sur 'Mettre à jour', vous accédez à une page dédiée qui vous montre les notes de version et les modifications de base de données avant de lancer le processus.</li></ul>">
-            <div class="help-card-header">
-                <div class="help-card-icon"><i class="fa-solid fa-star"></i></div>
-                <h3>Fonctionnalités Avancées</h3>
-            </div>
-            <p>Découvrez la sauvegarde de sécurité et le système de mise à jour intelligent.</p>
-        </div>
-
-        <div class="help-card"
              data-title="Panneau d'Administration"
              data-icon="fa-solid fa-toolbox"
-             data-content="<p>Cette section, accessible via un compte sécurisé, est le centre de contrôle technique de l'application. Elle est réservée aux utilisateurs ayant les droits d'administration.</p><h4><span class='highlight'>Fonctions principales</span> :</h4><ul><li class='list-item-with-icon'><i class='fa-solid fa-cash-register'></i> <strong>Gestion des Caisses :</strong> Vous pouvez ajouter de nouvelles caisses, renommer celles qui existent, ou en supprimer. L'ajout et la suppression de caisses entraînent des modifications directes sur la structure de la base de données (ajout ou suppression de colonnes).</li><li class='list-item-with-icon'><i class='fa-solid fa-cogs'></i> <strong>Configuration :</strong> Modifiez les paramètres de connexion à la base de données et choisissez le fuseau horaire de l'application pour que toutes les dates soient correctes.</li><li class='list-item-with-icon'><i class='fa-solid fa-shield-alt'></i> <strong>Sécurité :</strong> Gérez les comptes des autres administrateurs, mettez à jour leur mot de passe et créez des sauvegardes complètes de votre base de données en un clic.</li></ul>">
+             data-content="<p>Cette section, accessible via un compte sécurisé, est le centre de contrôle de l'application.</p>
+             <h4><span class='highlight'>Fonctions principales</span> :</h4>
+             <ul>
+                <li class='list-item-with-icon'><i class='fa-solid fa-cash-register'></i> <strong>Gestion des Caisses :</strong> Ajoutez, renommez ou supprimez des caisses.</li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-credit-card'></i> <strong>Gestion des Terminaux de Paiement :</strong> Ajoutez, renommez et associez des terminaux de paiement à des caisses spécifiques.</li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-users-cog'></i> <strong>Gestion des Administrateurs :</strong> Gérez les comptes des autres administrateurs et mettez à jour leur mot de passe.</li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-coins'></i> <strong>Configuration des Devises :</strong> Choisissez la devise de l'application (EUR, USD, etc.) et personnalisez les billets et pièces correspondants.</li>
+                <li class='list-item-with-icon'><i class='fa-solid fa-database'></i> <strong>Sauvegardes :</strong> Créez et téléchargez des sauvegardes complètes de votre base de données en un clic.</li>
+             </ul>"
+             >
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="fa-solid fa-toolbox"></i></div>
                 <h3>Panneau d'Administration</h3>
@@ -112,76 +154,12 @@ require 'partials/navbar.php';
                 <a href="index.php?page=admin" class="btn help-btn-link"><i class="fa-solid fa-arrow-right"></i> Accéder à la page</a>
             </div>
         </div>
-
-        <div class="help-card"
-             data-title="Installation & Maintenance"
-             data-icon="fa-solid fa-wrench"
-             data-content="<h4><span class='highlight'>Installation sur le serveur</span></h4><p>Un script <strong>`install.sh`</strong> est fourni pour simplifier le déploiement sur un serveur Debian 12. Il automatise l'installation des dépendances (Nginx ou Apache, PHP-FPM, MariaDB), le clonage du dépôt Git, la configuration du serveur web et l'initialisation de la base de données.</p><h4><span class='highlight'>Migration du schéma</span></h4><p>En cas de mise à jour majeure du schéma de la base de données, l'application détecte automatiquement les différences. La page de mise à jour accessible via le pied de page génère un script SQL pour migrer vos données existantes vers la nouvelle structure, après avoir créé une sauvegarde de sécurité.</p>">
-            <div class="help-card-header">
-                <div class="help-card-icon"><i class="fa-solid fa-wrench"></i></div>
-                <h3>Installation & Maintenance</h3>
-            </div>
-            <p>Découvrez les outils d'installation et de mise à jour du logiciel sur votre serveur.</p>
-            <div class="help-card-footer">
-                <a href="index.php?page=update" class="btn help-btn-link"><i class="fa-solid fa-arrow-right"></i> Accéder à la page</a>
-            </div>
-        </div>
-
-        <div class="help-card"
-             data-title="Commandes Console"
-             data-icon="fa-solid fa-terminal"
-             data-content="<h4>Script <span class='highlight'>`config/console.php`</span></h4><p>Un outil en ligne de commande est disponible pour effectuer des tâches de maintenance sans passer par l'interface web. Il est utile pour les installations headless ou la gestion automatisée.</p><h5><span class='highlight'>Exemples de commandes</span> :</h5><ul><li class='list-item-with-icon'><i class='fa-solid fa-user-plus'></i> `php config/console.php admin:create` : Crée un nouvel administrateur.</li><li class='list-item-with-icon'><i class='fa-solid fa-database'></i> `php config/console.php backup:create` : Crée une sauvegarde de la base de données.</li><li class='list-item-with-icon'><i class='fa-solid fa-cogs'></i> `php config/console.php config-db` : Met à jour la configuration de la base de données.</li></ul>">
-            <div class="help-card-header">
-                <div class="help-card-icon"><i class="fa-solid fa-terminal"></i></div>
-                <h3>Commandes Console</h3>
-            </div>
-            <p>Accédez à des outils de maintenance et d'administration via la ligne de commande.</p>
-        </div>
     </div>
-
-    <h3 class="help-category-title">Informations techniques</h3>
-    <div class="help-grid">
-        <div class="help-card"
-             data-title="Architecture & Base de Données"
-             data-icon="fa-solid fa-sitemap"
-             data-content="<h4><span class='highlight'>Architecture Front Controller</span></h4><p>L'application suit un modèle MVC simple avec un unique point d'entrée, <strong><span class='highlight'>`index.php`</span></strong>. Toutes les requêtes sont gérées par ce fichier qui, selon les paramètres de l'URL, délègue le traitement à un contrôleur spécifique (ex: `CalculateurController`, `HistoriqueController`).</p><h4><span class='highlight'>Schéma de la base de données</span></h4><p>Cette version a été refactorisée avec un <strong><span class='highlight'>schéma de base de données normalisé</span></strong>. Au lieu d'avoir des colonnes pour chaque caisse et chaque dénomination, les données sont désormais stockées dans des tables séparées pour une meilleure flexibilité et évolutivité :</p><ul><li class='list-item-with-icon'><i class='fa-solid fa-clipboard-list'></i> <strong><span class='highlight'>`comptages`</span> :</strong> Informations de base (nom, date, explication)</li><li class='list-item-with-icon'><i class='fa-solid fa-cash-register'></i> <strong><span class='highlight'>`caisses`</span> :</strong> Liste des caisses configurées.</li><li class='list-item-with-icon'><i class='fa-solid fa-receipt'></i> <strong><span class='highlight'>`comptage_details`</span> :</strong> Détails spécifiques à chaque caisse pour un comptage donné (ventes, fond de caisse).</li><li class='list-item-with-icon'><i class='fa-solid fa-coins'></i> <strong><span class='highlight'>`comptage_denominations`</span> :</strong> Détail des quantités pour chaque dénomination.</li></ul>">
-            <div class="help-card-header">
-                <div class="help-card-icon"><i class="fa-solid fa-sitemap"></i></div>
-                <h3>Architecture & Base de Données</h3>
-            </div>
-            <p>Comprenez le fonctionnement interne de l'application et la nouvelle structure de la base de données.</p>
-        </div>
-
-        <div class="help-card"
-             data-title="Journal des Modifications"
-             data-icon="fa-solid fa-rocket"
-             data-content="<p>La page '<strong><span class='highlight'>Changelog</span></strong>' est directement connectée au dépôt GitHub du projet. Elle récupère et affiche la liste de toutes les versions officielles de l'application dans une interface claire et moderne.</p><p>Pour chaque version, vous verrez les notes de version telles qu'elles ont été rédigées par le développeur, y compris les listes de nouveautés, les corrections de bugs, et même les captures d'écran si elles ont été incluses. C'est le meilleur moyen de rester informé des évolutions de l'outil que vous utilisez.</p>">
-            <div class="help-card-header">
-                <div class="help-card-icon"><i class="fa-solid fa-rocket"></i></div>
-                <h3>Journal des Modifications</h3>
-            </div>
-            <p>Suivez l'évolution de l'application et les dernières nouveautés.</p>
-            <div class="help-card-footer">
-                <a href="index.php?page=changelog" class="btn help-btn-link"><i class="fa-solid fa-arrow-right"></i> Accéder à la page</a>
-            </div>
-        </div>
-
-        <div class="help-card"
-             data-title="Services & WebSockets"
-             data-icon="fa-solid fa-cubes"
-             data-content="<h4><span class='highlight'>Logique métier</span></h4><p>L'application utilise des '<strong><span class='highlight'>Services</span></strong>' (classes PHP) pour séparer la logique métier du contrôleur. Par exemple, `ClotureStateService` gère la logique de verrouillage des caisses, `VersionService` gère les vérifications de mise à jour, et `BackupService` s'occupe des sauvegardes.</p><h4><span class='highlight'>Communication WebSocket</span></h4><p>Le serveur WebSocket (<strong><span class='highlight'>`config/websocket_server.php`</span></strong>) utilise désormais la base de données (via `ClotureStateService`) pour gérer l'état de clôture des caisses. Cette approche, plus robuste, remplace l'ancien système basé sur des fichiers pour éviter les problèmes de concurrence et les incohérences d'état.">
-            <div class="help-card-header">
-                <div class="help-card-icon"><i class="fa-solid fa-cubes"></i></div>
-                <h3>Services & WebSockets</h3>
-            </div>
-            <p>Apprenez-en plus sur l'architecture orientée services et le fonctionnement du temps réel.</p>
-        </div>
-    </div>
-
 </div>
 
 <div id="help-modal" class="modal">
     <div class="modal-content">
+        <span class="modal-close">&times;</span>
         <div id="help-modal-content">
             </div>
     </div>
