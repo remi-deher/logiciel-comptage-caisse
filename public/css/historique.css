@@ -1,6 +1,6 @@
 /* Fichier : public/css/historique.css */
 /* ==========================================================================
-   public/css/historique.css (Avec Thème Sombre Amélioré)
+   public/css/historique.css (Avec Thème Sombre Amélioré et mode comparaison)
    ========================================================================== */
 
 /* --- Onglets de vue --- */
@@ -57,13 +57,18 @@
     cursor: pointer;
     font-size: 0.9em;
     font-weight: 600;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, opacity 0.2s;
     display: inline-flex;
     align-items: center;
     gap: 8px;
 }
 .action-btn:last-child { border-right: none; }
 .action-btn:hover { background-color: var(--color-surface-alt-hover); }
+.action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--color-surface-alt);
+}
 
 .filter-form {
     display: flex;
@@ -73,7 +78,6 @@
 }
 .filter-form .form-group { margin-bottom: 0; }
 
-/* Styles pour la nouvelle section de filtre */
 .filter-section {
     background-color: var(--color-surface-alt); 
     border: 1px solid var(--color-border-light);
@@ -123,6 +127,30 @@
     color: var(--color-text-primary);
 }
 
+/* NOUVEAU : Barre d'outils pour la comparaison */
+.comparison-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: var(--color-surface-alt);
+    border-radius: 8px;
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+}
+.comparison-toolbar.visible {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+}
+#comparison-counter {
+    font-weight: bold;
+    color: var(--color-text-secondary);
+}
 
 /* --- Grille des cartes --- */
 .history-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 25px; }
@@ -134,18 +162,34 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    position: relative; /* Pour la checkbox */
 }
 .history-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px var(--shadow-color); }
+
+/* NOUVEAU : Style pour la carte sélectionnée */
+.history-card.selected {
+    border-color: var(--color-primary);
+    box-shadow: 0 8px 30px var(--shadow-color), 0 0 0 3px var(--color-primary);
+}
+
+/* NOUVEAU : Style pour la checkbox de comparaison */
+.comparison-checkbox {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    transform: scale(1.5);
+    cursor: pointer;
+}
+
 .history-card-header { border-bottom: 1px solid var(--color-border-light); padding: 20px; }
-.history-card-header h4 { color: var(--color-text-primary); margin: 0 0 5px 0; font-size: 1.3em; }
+.history-card-header h4 { color: var(--color-text-primary); margin: 0 0 5px 0; font-size: 1.3em; padding-right: 25px; /* Espace pour la checkbox */}
 .history-card-header .date { color: var(--color-text-muted); font-size: 0.9em; }
 .history-card-header .explication { color: var(--color-text-secondary); font-size: 0.95em; font-style: italic; margin-top: 8px; }
 .history-card-body { padding: 20px; flex-grow: 1; }
 .summary-line { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; font-size: 1.05em; }
 .summary-line:not(:last-child) { border-bottom: 1px solid var(--color-border-light); }
 .summary-line div { display: flex; align-items: center; gap: 10px; }
-.summary-line .caisse-name { color: var(--color-text-secondary); padding-left: 25px; font-size: 0.95em; }
 .summary-line span { font-weight: bold; font-family: monospace; font-size: 1.1em; }
 .icon-total { color: var(--color-success); }
 .icon-ecart { color: var(--color-primary); }
@@ -153,7 +197,6 @@
 .ecart-negatif { color: var(--color-danger); }
 .card-divider { border-top: 1px solid var(--color-border-light); margin: 15px 0; }
 
-/* NOUVEAU: Styles pour le conteneur du graphique */
 .mini-chart-container {
     height: 150px;
     min-height: 150px;
@@ -168,8 +211,6 @@
     font-size: 0.9em;
 }
 
-
-/* --- NOUVEAUX STYLES POUR LE FOOTER DE LA CARTE --- */
 .history-card-footer { 
     background-color: var(--color-surface-alt); 
     border-top: 1px solid var(--color-border-light); 
@@ -193,19 +234,12 @@
     gap: 6px;
     text-decoration: none;
 }
-
-/* Style pour "Ensemble" et les boutons de détails par caisse */
 .details-all-btn, .details-btn {
     background-color: var(--color-surface);
     color: var(--color-text-secondary);
     border-color: var(--color-border-light);
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
-body[data-theme="dark"] .details-all-btn, body[data-theme="dark"] .details-btn {
-    background-color: var(--color-surface-alt-hover);
-    border-color: var(--color-border);
-}
-
 .details-all-btn:hover, .details-btn:hover {
     background-color: var(--color-surface-alt-hover);
     color: var(--color-primary);
@@ -213,200 +247,78 @@ body[data-theme="dark"] .details-all-btn, body[data-theme="dark"] .details-btn {
     transform: translateY(-1px);
     box-shadow: 0 4px 10px var(--shadow-color);
 }
-body[data-theme="dark"] .details-all-btn:hover, body[data-theme="dark"] .details-btn:hover {
-    background-color: var(--color-bg);
-}
-
-.save-btn.action-btn-small, .delete-btn.action-btn-small {
-    box-shadow: none;
-}
-
 
 /* --- Pagination --- */
-.pagination-nav {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 20px;
-    overflow-x: auto;
-    padding: 10px 0;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-}
-.pagination-nav::-webkit-scrollbar {
-    display: none;
-}
-.pagination {
-    display: inline-flex;
-    flex-shrink: 0;
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    gap: 8px;
-}
-.pagination li a, .pagination li span {
-    background-color: var(--color-surface-alt);
-    border: 1px solid var(--color-border-light);
-    color: var(--color-text-secondary);
-    border-radius: 6px;
-    padding: 10px 18px;
-    text-decoration: none;
-    transition: all 0.2s ease;
-    font-weight: 600;
-}
-.pagination li a:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background-color: rgba(52, 152, 219, 0.1);
-}
-.pagination li.active span {
-    background-color: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
-    cursor: default;
-    font-weight: bold;
-}
-.pagination li.disabled span {
-    color: var(--color-text-muted);
-    background-color: var(--color-surface-alt);
-    border-color: var(--color-border-light);
-    cursor: not-allowed;
-}
+.pagination-nav { display: flex; justify-content: center; margin-bottom: 20px; }
+.pagination { display: inline-flex; list-style: none; padding: 0; margin: 0; gap: 8px; }
+.pagination li a, .pagination li span { background-color: var(--color-surface-alt); border: 1px solid var(--color-border-light); color: var(--color-text-secondary); border-radius: 6px; padding: 10px 18px; text-decoration: none; transition: all 0.2s ease; font-weight: 600; }
+.pagination li a:hover { border-color: var(--color-primary); color: var(--color-primary); background-color: rgba(52, 152, 219, 0.1); }
+.pagination li.active span { background-color: var(--color-primary); color: white; border-color: var(--color-primary); }
+.pagination li.disabled span { color: var(--color-text-muted); cursor: not-allowed; }
 
-/* --- Fenêtre Modale (inchangée) --- */
-.modal { 
-    display: none; 
-    position: fixed; 
-    z-index: 1000; 
-    left: 0; 
-    top: 0; 
-    width: 100%; 
-    height: 100%; 
-    background-color: rgba(0,0,0,0.6); 
-    animation: fadeIn 0.3s; 
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    box-sizing: border-box;
-}
-.modal.visible {
-    display: flex;
-    opacity: 1;
-    pointer-events: auto;
-}
-.modal-content { 
-    background-color: var(--color-surface); 
-    padding: 30px; 
-    border: 1px solid var(--color-border); 
-    width: 100%; 
-    max-width: 800px; 
-    border-radius: 12px; 
-    position: relative; 
-    animation: slideIn 0.3s; 
-    max-height: 90vh;
-    overflow-y: auto;
-}
-.modal-close { 
-    color: var(--color-text-muted); 
-    position: absolute; 
-    top: 15px; 
-    right: 25px; 
-    font-size: 28px; 
-    font-weight: bold; 
-    cursor: pointer; 
-}
-.modal-close:hover, .modal-close:focus { 
-    color: var(--color-text-primary); 
-}
+/* --- Fenêtre Modale --- */
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); animation: fadeIn 0.3s; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+.modal.visible { display: flex; }
+.modal-content { background-color: var(--color-surface); padding: 30px; border: 1px solid var(--color-border); width: 100%; max-width: 900px; border-radius: 12px; position: relative; animation: slideIn 0.3s; max-height: 90vh; overflow-y: auto; }
+.modal-content.wide { max-width: 1100px; } /* Pour la modale de comparaison */
 
-.modal-header {
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 20px;
-    border-bottom: 1px solid var(--color-border-light);
-    padding-bottom: 15px;
-    margin-bottom: 15px;
-}
-.modal-header h3 {
-    margin: 0;
-    border: none;
-}
-.modal-actions {
-    display: flex;
-    gap: 10px;
-}
-.modal-table-title {
-    margin-top: 20px;
-    border-bottom: 1px solid #ccc;
-    padding-bottom: 5px;
-}
-.modal-table-total {
-    text-align: right;
-    margin-top: 10px;
-}
-
-.modal-details-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-.modal-details-table th, .modal-details-table td { border: 1px solid var(--color-border); }
-.modal-details-table th { background-color: #34495e; color: white; }
-body[data-theme="dark"] .modal-details-table th { background-color: #495057; }
+.modal-close { color: var(--color-text-muted); position: absolute; top: 15px; right: 25px; font-size: 28px; font-weight: bold; cursor: pointer; }
+.modal-close:hover { color: var(--color-text-primary); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-border-light); padding-bottom: 15px; margin-bottom: 15px; }
+.modal-header h3 { margin: 0; border: none; }
+.modal-details-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.modal-details-table th, .modal-details-table td { padding: 8px; border: 1px solid var(--color-border); text-align: right;}
+.modal-details-table th { background-color: var(--color-surface-alt); text-align: left;}
+.modal-details-table td:first-child {text-align: left;}
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.quick-filter-btn.active { background-color: var(--color-success); color: white; border-color: var(--color-success); font-weight: bold; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); }
 
-/* --- Responsive --- */
-@media (max-width: 992px) {
-    .history-controls { flex-direction: column; align-items: stretch; }
-    .filter-form { flex-direction: column; align-items: stretch; }
-    .filter-form .form-group, .filter-form button, .filter-form a { width: 100%; box-sizing: border-box; }
-    .filter-form button, .filter-form a { justify-content: center; }
-    .pagination-nav { justify-content: flex-start; }
+/* --- Styles pour la modale améliorée --- */
+.modal-details-grid { display: grid; grid-template-columns: 1fr; gap: 25px; margin-top: 20px; }
+@media (min-width: 768px) { .modal-details-grid { grid-template-columns: 1fr 1.2fr; } }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
+.summary-box { background-color: var(--color-surface-alt); padding: 15px; border-radius: 8px; border: 1px solid var(--color-border-light); text-align: center; }
+.summary-box span { display: block; font-size: 0.9em; color: var(--color-text-secondary); margin-bottom: 5px; }
+.summary-box strong { font-size: 1.3em; color: var(--color-text-primary); }
+.summary-box.ecart-ok strong { color: var(--color-success); }
+.summary-box.ecart-positif strong { color: var(--color-warning); }
+.summary-box.ecart-negatif strong { color: var(--color-danger); }
+#modal-chart-container .no-chart-data { color: var(--color-text-muted); font-style: italic; font-size: 0.9em; text-align: center; padding-top: 50px; }
 
-    /* NOUVEAU: Optimisation du tableau sur mobile */
-    .modal-details-table, .modal-details-table thead, .modal-details-table tbody, .modal-details-table th, .modal-details-table td, .modal-details-table tr { 
-        display: block; 
-    }
-    .modal-details-table thead tr { 
-        position: absolute;
-        top: -9999px;
-        left: -9999px;
-    }
-    .modal-details-table tr {
-        border: 1px solid var(--color-border);
-        margin-bottom: var(--space-md);
-        border-radius: var(--space-sm);
-        background-color: var(--color-surface-alt);
-    }
-    .modal-details-table td {
-        border: none;
-        position: relative;
-        padding-left: 50%;
-        text-align: left;
-    }
-    .modal-details-table td:before {
-        content: attr(data-label);
-        position: absolute;
-        left: var(--space-md);
-        width: 45%;
-        padding-right: 10px;
-        white-space: nowrap;
-        font-weight: bold;
-        color: var(--color-text-secondary);
-    }
-    .modal-details-table td:last-child {
-        border-bottom: 1px solid var(--color-border);
-    }
+/* NOUVEAU : Styles pour la modale de comparaison */
+.comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
 }
-@media (max-width: 480px) {
-    .history-grid { grid-template-columns: 1fr; }
-    .pagination li a, .pagination li span { padding: 6px 12px; font-size: 0.9em; }
+.comparison-column h4 {
+    font-size: 1.3em;
+    color: var(--color-primary);
+    border-bottom: 1px solid var(--color-border-light);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
 }
-
-/* NOUVEAU : Style pour le bouton actif */
-.quick-filter-btn.active {
-    background-color: var(--color-success);
-    color: white;
-    border-color: var(--color-success);
+.comparison-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-border-light);
+}
+.comparison-item:last-child {
+    border-bottom: none;
+}
+.comparison-item-label {
+    color: var(--color-text-secondary);
+}
+.comparison-item-value {
     font-weight: bold;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+.comparison-item-value.positive { color: var(--color-success); }
+.comparison-item-value.negative { color: var(--color-danger); }
+.value-diff {
+    font-size: 0.85em;
+    margin-left: 8px;
+    font-family: monospace;
 }

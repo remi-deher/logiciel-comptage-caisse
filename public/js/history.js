@@ -1,5 +1,5 @@
 // Fichier JavaScript pour la page d'historique.
-// Mise à jour pour fonctionner avec le nouveau schéma normalisé de la base de données et corriger le bug de la modale.
+// Mise à jour pour le mode comparaison et la modale analytique.
 
 document.addEventListener('DOMContentLoaded', function() {
     const historyPage = document.getElementById('history-page');
@@ -21,149 +21,84 @@ document.addEventListener('DOMContentLoaded', function() {
     const paginationNav = document.querySelector('.pagination-nav');
     const form = document.getElementById('history-filter-form');
     const quickFilterBtns = document.querySelectorAll('.quick-filter-btn');
-    const resetBtn = document.querySelector('.filter-section .action-btn');
     const globalChartContainer = document.getElementById('global-chart-container');
     
+    // NOUVEAU : Éléments pour la comparaison
+    const comparisonToolbar = document.getElementById('comparison-toolbar');
+    const comparisonCounter = document.getElementById('comparison-counter');
+    const compareBtn = document.getElementById('compare-btn');
+    const comparisonModal = document.getElementById('comparison-modal');
+    const comparisonModalContent = document.getElementById('modal-comparison-content');
+    let selectedForComparison = [];
+
     // --- Variables d'état ---
     let globalChart = null;
+    let modalChart = null;
 
-    // --- LOGIQUE DE LA MODALE (CORRIGÉE ET AMÉLIORÉE) ---
-    const modal = document.getElementById('details-modal');
-    const modalContent = document.getElementById('modal-details-content');
+    // --- LOGIQUE DE LA MODALE DE DÉTAILS ---
+    const detailsModal = document.getElementById('details-modal');
+    const detailsModalContent = document.getElementById('modal-details-content');
 
-    // Fonction pour fermer la modale
-    const closeModal = () => {
-        if (modal) {
-            modal.classList.remove('visible');
+    const closeDetailsModal = () => {
+        if (detailsModal) {
+            detailsModal.classList.remove('visible');
+            if (modalChart) {
+                modalChart.destroy();
+                modalChart = null;
+            }
         }
     };
 
-    // Fonctions d'export et d'impression
-    const exportModalToPdf = (comptageData, caisseId = null) => {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const caisseNom = caisseId ? globalConfig.nomsCaisses[caisseId] : 'Ensemble';
-        const fileName = `Export-${comptageData.nom_comptage.replace(/\s/g, '_')}-${caisseNom}.pdf`;
-
-        doc.setFontSize(18);
-        doc.text(`Détails du comptage : ${comptageData.nom_comptage}`, 14, 22);
-        doc.setFontSize(11);
-        doc.setTextColor(100);
-        doc.text(`Date: ${formatDateFr(comptageData.date_comptage)}`, 14, 30);
-
-        const tableHeaders = ["Dénomination", "Quantité", "Total"];
+    const renderModalChart = (element, comptageData, caisseId = null) => {
+        if (!element) return;
         
+        let denominationsData = {};
+        let totalCaisse = 0;
+
         const processCaisse = (caisseDetails) => {
-            const rows = [];
-            let totalCaisse = 0;
-            if (globalConfig.denominations && caisseDetails && caisseDetails.denominations) {
-                for (const type in globalConfig.denominations) {
-                    for (const [name, value] of Object.entries(globalConfig.denominations[type])) {
-                        const quantite = parseInt(caisseDetails.denominations[name] || 0);
-                        if (quantite > 0) {
-                            const totalLigne = quantite * value;
-                            totalCaisse += totalLigne;
-                            const label = value >= 1 ? `${value} ${globalConfig.currencySymbol}` : `${value * 100} cts`;
-                            rows.push([`${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}`, quantite, formatEuros(totalLigne)]);
-                        }
+            if (caisseDetails && caisseDetails.denominations) {
+                for(const name in caisseDetails.denominations) {
+                    const quantite = parseInt(caisseDetails.denominations[name] || 0);
+                    let valeur = 0;
+                    if(globalConfig.denominations.billets[name]) valeur = globalConfig.denominations.billets[name];
+                    if(globalConfig.denominations.pieces[name]) valeur = globalConfig.denominations.pieces[name];
+                    
+                    const totalLigne = quantite * valeur;
+                    if(totalLigne > 0) {
+                        const label = valeur >= 1 ? `${valeur} ${globalConfig.currencySymbol}` : `${valeur * 100} cts`;
+                        denominationsData[label] = (denominationsData[label] || 0) + totalLigne;
+                        totalCaisse += totalLigne;
                     }
                 }
             }
-            rows.push([{content: 'Total Compté', colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' }}, {content: formatEuros(totalCaisse), styles: { fontStyle: 'bold' }}]);
-            return rows;
         };
 
-        let startY = 40;
         if (caisseId) {
-            doc.setFontSize(14);
-            doc.text(`Caisse : ${caisseNom}`, 14, startY);
-            doc.autoTable({
-                startY: startY + 5,
-                head: [tableHeaders],
-                body: processCaisse(comptageData.caisses_data[caisseId]),
-            });
-        } else {
-             for (const id in comptageData.caisses_data) {
-                const nom = globalConfig.nomsCaisses[id];
-                doc.setFontSize(14);
-                doc.text(`Caisse : ${nom}`, 14, startY);
-                doc.autoTable({
-                    startY: startY + 5,
-                    head: [tableHeaders],
-                    body: processCaisse(comptageData.caisses_data[id]),
-                });
-                startY = doc.autoTable.previous.finalY + 15;
-             }
-        }
-       
-        doc.save(fileName);
-    };
-
-    const exportModalToCsv = (comptageData, caisseId = null) => {
-        let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += `Comptage;${comptageData.nom_comptage}\r\n`;
-        csvContent += `Date;${formatDateFr(comptageData.date_comptage)}\r\n\r\n`;
-
-        const processCaisse = (caisseDetails, caisseNom) => {
-            let content = `Caisse;${caisseNom}\r\n`;
-            content += "Dénomination;Quantité;Total\r\n";
-             let totalCaisse = 0;
-            if (globalConfig.denominations && caisseDetails && caisseDetails.denominations) {
-                for (const type in globalConfig.denominations) {
-                    for (const [name, value] of Object.entries(globalConfig.denominations[type])) {
-                        const quantite = parseInt(caisseDetails.denominations[name] || 0);
-                        if (quantite > 0) {
-                            const totalLigne = quantite * value;
-                            totalCaisse += totalLigne;
-                            const label = value >= 1 ? `${value} ${globalConfig.currencySymbol}` : `${value * 100} cts`;
-                            content += `"${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}";${quantite};"${formatEuros(totalLigne)}"\r\n`;
-                        }
-                    }
-                }
-            }
-            content += `\r\nTotal;;"${formatEuros(totalCaisse)}"\r\n\r\n`;
-            return content;
-        };
-        
-        if (caisseId) {
-            csvContent += processCaisse(comptageData.caisses_data[caisseId], globalConfig.nomsCaisses[caisseId]);
+            processCaisse(comptageData.caisses_data[caisseId]);
         } else {
             for (const id in comptageData.caisses_data) {
-                 csvContent += processCaisse(comptageData.caisses_data[id], globalConfig.nomsCaisses[id]);
+                processCaisse(comptageData.caisses_data[id]);
             }
         }
+        
+        if (Object.keys(denominationsData).length === 0) {
+            element.innerHTML = '<p class="no-chart-data">Aucune donnée de dénomination à afficher.</p>';
+            return;
+        }
 
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `Export-${comptageData.nom_comptage.replace(/\s/g, '_')}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const options = {
+            chart: { type: 'donut', height: 300 },
+            series: Object.values(denominationsData),
+            labels: Object.keys(denominationsData),
+            legend: { position: 'bottom' },
+            tooltip: { y: { formatter: (val) => formatEuros(val) } },
+            plotOptions: { pie: { donut: { labels: { show: true, total: { show: true, label: 'Total Espèces', formatter: () => formatEuros(totalCaisse) } } } } }
+        };
+
+        modalChart = new ApexCharts(element, options);
+        modalChart.render();
     };
 
-    const printModal = () => {
-        const contentToPrint = modalContent.innerHTML;
-        
-        const printWindow = window.open('', '', 'height=800,width=1000');
-        printWindow.document.write('<html><head><title>Détails du comptage</title>');
-        printWindow.document.write('<link rel="stylesheet" href="css/print-styles.css" type="text/css" />');
-        printWindow.document.write('</head><body>');
-        printWindow.document.write('<div class="print-container">');
-        printWindow.document.write(contentToPrint);
-        printWindow.document.write('</div>');
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        
-        setTimeout(() => {
-            printWindow.focus();
-            printWindow.print();
-            printWindow.close();
-        }, 500);
-    };
-
-
-    // Écouteur pour ouvrir la modale, attaché à la grille des cartes
     if (historyGrid) {
         historyGrid.addEventListener('click', function(event) {
             const detailsButton = event.target.closest('.details-btn, .details-all-btn');
@@ -173,117 +108,227 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!card || !card.dataset.comptage) return;
 
             const comptageData = JSON.parse(card.dataset.comptage);
+            const calculatedResults = calculateResults(comptageData);
             let html = '';
             let caisseIdForExport = null;
 
-            // Si le bouton pour une seule caisse est cliqué
-            if (detailsButton.classList.contains('details-btn')) {
-                const caisseId = detailsButton.dataset.caisseId;
-                caisseIdForExport = caisseId;
-                const caisseNom = detailsButton.dataset.caisseNom;
-                const caisseDetails = comptageData.caisses_data[caisseId];
-                
-                html = `<div class="modal-header"><h3>Détails pour : ${caisseNom}</h3><div class="modal-actions"><button class="action-btn modal-print-btn"><i class="fa-solid fa-print"></i> Imprimer</button><button class="action-btn modal-export-pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button><button class="action-btn modal-export-excel"><i class="fa-solid fa-file-csv"></i> Excel</button></div></div>`;
-                html += `<p><strong>Nom du comptage :</strong> ${comptageData.nom_comptage}</p>`;
-                html += '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead><tbody>';
-
+            const generateSummaryHtml = (summaryData) => {
+                const ecartClass = summaryData.ecart > 0.01 ? 'ecart-positif' : (summaryData.ecart < -0.01 ? 'ecart-negatif' : 'ecart-ok');
+                return `
+                    <div class="summary-grid">
+                        <div class="summary-box"><span>Fond de Caisse</span><strong>${formatEuros(summaryData.fond_de_caisse)}</strong></div>
+                        <div class="summary-box"><span>Ventes Théoriques</span><strong>${formatEuros(summaryData.ventes)}</strong></div>
+                        <div class="summary-box"><span>Rétrocessions</span><strong>${formatEuros(summaryData.retrocession)}</strong></div>
+                        <div class="summary-box"><span>Total Compté</span><strong>${formatEuros(summaryData.total_compte)}</strong></div>
+                        <div class="summary-box"><span>Recette Réelle</span><strong>${formatEuros(summaryData.recette_reelle)}</strong></div>
+                        <div class="summary-box ${ecartClass}"><span>Écart Final</span><strong>${formatEuros(summaryData.ecart)}</strong></div>
+                    </div>
+                `;
+            };
+            
+            const generateDenominationsTableHtml = (caisseDetails) => {
+                let tableHtml = '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead><tbody>';
                 let totalCaisse = 0;
-                if (globalConfig.denominations && caisseDetails && caisseDetails.denominations) {
+                 if (globalConfig.denominations && caisseDetails && caisseDetails.denominations) {
                     for (const type in globalConfig.denominations) {
                         for (const [name, value] of Object.entries(globalConfig.denominations[type])) {
                             const quantite = caisseDetails.denominations[name] || 0;
                             const totalLigne = quantite * value;
                             totalCaisse += totalLigne;
-                            const label = value >= 1 ? `${value} ${globalConfig.currencySymbol}` : `${value * 100} cts`;
-                            html += `<tr><td data-label="Dénomination">${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}</td><td data-label="Quantité">${quantite}</td><td data-label="Total">${formatEuros(totalLigne)}</td></tr>`;
+                            if (quantite > 0) {
+                                const label = value >= 1 ? `${value} ${globalConfig.currencySymbol}` : `${value * 100} cts`;
+                                tableHtml += `<tr><td>${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                            }
                         }
                     }
                 }
-                html += '</tbody></table>';
-                html += `<h4 style="text-align: right; margin-top: 15px;">Total Compté : ${formatEuros(totalCaisse)}</h4>`;
-            }
-            
-            // Si le bouton "Ensemble" est cliqué
-            if (detailsButton.classList.contains('details-all-btn')) {
-                 html = `<div class="modal-header"><h3>Détails Complets du Comptage</h3><div class="modal-actions"><button class="action-btn modal-print-btn"><i class="fa-solid fa-print"></i> Imprimer</button><button class="action-btn modal-export-pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button><button class="action-btn modal-export-excel"><i class="fa-solid fa-file-csv"></i> Excel</button></div></div>`;
-                html += `<p><strong>Nom du comptage :</strong> ${comptageData.nom_comptage}</p>`;
-                
+                tableHtml += '</tbody></table>';
+                return tableHtml;
+            };
+
+            const generateCombinedDenominationsTableHtml = (comptageData) => {
                 const summaryQuantities = {};
                 let summaryTotal = 0;
-
-                if (globalConfig.nomsCaisses) {
-                    for (const caisseId in comptageData.caisses_data) {
-                        const caisseNom = globalConfig.nomsCaisses[caisseId];
-                        const caisseDetails = comptageData.caisses_data[caisseId];
-                        html += `<h4 class="modal-table-title">${caisseNom}</h4>`;
-                        html += '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead><tbody>';
-
-                        let totalCaisse = 0;
-                        if (globalConfig.denominations && caisseDetails.denominations) {
-                             for (const type in globalConfig.denominations) {
-                                for (const [name, value] of Object.entries(globalConfig.denominations[type])) {
-                                    const quantite = caisseDetails.denominations[name] || 0;
-                                    summaryQuantities[name] = (summaryQuantities[name] || 0) + parseInt(quantite);
-                                    const totalLigne = quantite * value;
-                                    totalCaisse += totalLigne;
-                                    const label = value >= 1 ? `${value} ${globalConfig.currencySymbol}` : `${value * 100} cts`;
-                                    html += `<tr><td data-label="Dénomination">${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}</td><td data-label="Quantité">${quantite}</td><td data-label="Total">${formatEuros(totalLigne)}</td></tr>`;
-                                }
-                            }
-                        }
-                        html += '</tbody></table>';
-                        html += `<h5 class="modal-table-total">Total (${caisseNom}) : ${formatEuros(totalCaisse)}</h5>`;
-                    }
-
-                    html += `<h4 class="modal-table-title">Synthèse Globale</h4>`;
-                    html += '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité Totale</th><th>Total</th></tr></thead><tbody>';
-
-                    if (globalConfig.denominations) {
-                        for (const type in globalConfig.denominations) {
-                            for (const [name, value] of Object.entries(globalConfig.denominations[type])) {
-                                const quantite = summaryQuantities[name] || 0;
-                                const totalLigne = quantite * value;
-                                summaryTotal += totalLigne;
-                                const label = value >= 1 ? `${value} ${globalConfig.currencySymbol}` : `${value * 100} cts`;
-                                html += `<tr><td data-label="Dénomination">${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}</td><td data-label="Quantité">${quantite}</td><td data-label="Total">${formatEuros(totalLigne)}</td></tr>`;
-                            }
-                        }
-                    }
-                    html += '</tbody></table>';
-                    html += `<h5 class="modal-table-total">Total Général Compté : ${formatEuros(summaryTotal)}</h5>`;
-                }
-            }
-
-            if (html && modalContent) {
-                modalContent.innerHTML = html;
-                modal.classList.add('visible');
+                let tableHtml = '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité Totale</th><th>Total</th></tr></thead><tbody>';
                 
-                // Attache les écouteurs aux nouveaux boutons
-                modalContent.querySelector('.modal-export-pdf').addEventListener('click', () => exportModalToPdf(comptageData, caisseIdForExport));
-                modalContent.querySelector('.modal-export-excel').addEventListener('click', () => exportModalToCsv(comptageData, caisseIdForExport));
-                modalContent.querySelector('.modal-print-btn').addEventListener('click', printModal);
-            }
-        });
-    }
-    
-    // Écouteurs pour fermer la modale
-    if (modal) {
-        modal.addEventListener('click', (event) => {
-            if (event.target === modal) {
-                closeModal();
-            }
-        });
-    }
-    // FIN DE LA LOGIQUE DE LA MODALE
+                for (const caisseId in comptageData.caisses_data) {
+                    const caisseDetails = comptageData.caisses_data[caisseId];
+                    if (caisseDetails.denominations) {
+                        for (const name in caisseDetails.denominations) {
+                             summaryQuantities[name] = (summaryQuantities[name] || 0) + parseInt(caisseDetails.denominations[name] || 0);
+                        }
+                    }
+                }
 
+                if (globalConfig.denominations) {
+                    for (const type in globalConfig.denominations) {
+                        for (const [name, value] of Object.entries(globalConfig.denominations[type])) {
+                            const quantite = summaryQuantities[name] || 0;
+                            const totalLigne = quantite * value;
+                            summaryTotal += totalLigne;
+                             if (quantite > 0) {
+                                const label = value >= 1 ? `${value} ${globalConfig.currencySymbol}` : `${value * 100} cts`;
+                                tableHtml += `<tr><td>${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}</td><td>${quantite}</td><td>${formatEuros(totalLigne)}</td></tr>`;
+                            }
+                        }
+                    }
+                }
+                tableHtml += '</tbody></table>';
+                return tableHtml;
+            };
+
+            if (detailsButton.classList.contains('details-btn')) {
+                const caisseId = detailsButton.dataset.caisseId;
+                caisseIdForExport = caisseId;
+                const caisseNom = detailsButton.dataset.caisseNom;
+                
+                html = `<div class="modal-header"><h3>Détails pour : ${caisseNom}</h3><span class="modal-close">&times;</span></div>
+                        <h4>Résumé Financier</h4>
+                        ${generateSummaryHtml(calculatedResults.caisses[caisseId])}
+                        <div class="modal-details-grid">
+                            <div>
+                                <h4>Répartition des Espèces</h4>
+                                <div id="modal-chart-container"></div>
+                            </div>
+                            <div>
+                                <h4>Détail des Espèces</h4>
+                                ${generateDenominationsTableHtml(comptageData.caisses_data[caisseId])}
+                            </div>
+                         </div>`;
+            }
+            
+            if (detailsButton.classList.contains('details-all-btn')) {
+                html = `<div class="modal-header"><h3>Détails Complets du Comptage</h3><span class="modal-close">&times;</span></div>
+                        <h4>Résumé Financier Global</h4>
+                        ${generateSummaryHtml(calculatedResults.combines)}
+                        <div class="modal-details-grid">
+                            <div>
+                                <h4>Répartition Globale des Espèces</h4>
+                                <div id="modal-chart-container"></div>
+                            </div>
+                            <div>
+                                <h4>Synthèse Globale des Espèces</h4>
+                                ${generateCombinedDenominationsTableHtml(comptageData)}
+                            </div>
+                         </div>`;
+            }
+
+            if (html && detailsModalContent) {
+                detailsModalContent.innerHTML = html;
+                detailsModal.classList.add('visible');
+                
+                const modalChartContainer = document.getElementById('modal-chart-container');
+                renderModalChart(modalChartContainer, comptageData, caisseIdForExport);
+            }
+        });
+    }
     
-    // Fonction de calcul mise à jour pour le nouveau schéma
+    if (detailsModal) {
+        detailsModal.addEventListener('click', (event) => {
+            if (event.target === detailsModal || event.target.closest('.modal-close')) {
+                closeDetailsModal();
+            }
+        });
+    }
+
+    // --- NOUVEAU : LOGIQUE DE COMPARAISON ---
+
+    const updateComparisonToolbar = () => {
+        const count = selectedForComparison.length;
+        comparisonCounter.textContent = `${count}/2 comptages sélectionnés`;
+        if (count > 0) {
+            comparisonToolbar.classList.add('visible');
+        } else {
+            comparisonToolbar.classList.remove('visible');
+        }
+        compareBtn.disabled = count !== 2;
+    };
+
+    const handleSelectionChange = (event) => {
+        const checkbox = event.target;
+        if (!checkbox.classList.contains('comparison-checkbox')) return;
+
+        const card = checkbox.closest('.history-card');
+        const comptageId = card.dataset.id;
+        
+        if (checkbox.checked) {
+            if (selectedForComparison.length < 2) {
+                selectedForComparison.push(comptageId);
+                card.classList.add('selected');
+            } else {
+                checkbox.checked = false;
+                alert("Vous ne pouvez comparer que 2 comptages à la fois.");
+            }
+        } else {
+            selectedForComparison = selectedForComparison.filter(id => id !== comptageId);
+            card.classList.remove('selected');
+        }
+        updateComparisonToolbar();
+    };
+
+    const renderComparisonModal = () => {
+        if (selectedForComparison.length !== 2) return;
+
+        const data1 = JSON.parse(document.querySelector(`.history-card[data-id="${selectedForComparison[0]}"]`).dataset.comptage);
+        const data2 = JSON.parse(document.querySelector(`.history-card[data-id="${selectedForComparison[1]}"]`).dataset.comptage);
+
+        const results1 = calculateResults(data1);
+        const results2 = calculateResults(data2);
+
+        const renderValue = (val1, val2) => {
+            const diff = val2 - val1;
+            let diffHtml = '';
+            if (Math.abs(diff) > 0.001) {
+                const diffClass = diff > 0 ? 'positive' : 'negative';
+                const sign = diff > 0 ? '+' : '';
+                diffHtml = `<span class="value-diff ${diffClass}">(${sign}${formatEuros(diff)})</span>`;
+            }
+            return `<span class="comparison-item-value">${formatEuros(val2)}</span> ${diffHtml}`;
+        };
+
+        const html = `
+            <div class="modal-header">
+                <h3>Comparaison de Comptages</h3>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="comparison-grid">
+                <div class="comparison-column">
+                    <h4>${data1.nom_comptage}</h4>
+                    <div class="comparison-item"><span class="comparison-item-label">Date</span><span class="comparison-item-value">${formatDateFr(data1.date_comptage)}</span></div>
+                    <div class="comparison-item"><span class="comparison-item-label">Total Compté</span><span class="comparison-item-value">${formatEuros(results1.combines.total_compté)}</span></div>
+                    <div class="comparison-item"><span class="comparison-item-label">Recette Réelle</span><span class="comparison-item-value">${formatEuros(results1.combines.recette_reelle)}</span></div>
+                    <div class="comparison-item"><span class="comparison-item-label">Écart Final</span><span class="comparison-item-value">${formatEuros(results1.combines.ecart)}</span></div>
+                </div>
+                <div class="comparison-column">
+                    <h4>${data2.nom_comptage}</h4>
+                    <div class="comparison-item"><span class="comparison-item-label">Date</span><span class="comparison-item-value">${formatDateFr(data2.date_comptage)}</span></div>
+                     <div class="comparison-item"><span class="comparison-item-label">Total Compté</span><span>${renderValue(results1.combines.total_compté, results2.combines.total_compté)}</span></div>
+                    <div class="comparison-item"><span class="comparison-item-label">Recette Réelle</span><span>${renderValue(results1.combines.recette_reelle, results2.combines.recette_reelle)}</span></div>
+                    <div class="comparison-item"><span class="comparison-item-label">Écart Final</span><span>${renderValue(results1.combines.ecart, results2.combines.ecart)}</span></div>
+                </div>
+            </div>
+        `;
+        
+        comparisonModalContent.innerHTML = html;
+        comparisonModal.classList.add('visible');
+    };
+
+    historyGrid.addEventListener('change', handleSelectionChange);
+    compareBtn.addEventListener('click', renderComparisonModal);
+    comparisonModal.addEventListener('click', (event) => {
+        if (event.target === comparisonModal || event.target.closest('.modal-close')) {
+            comparisonModal.classList.remove('visible');
+        }
+    });
+
+    // --- Fonctions de rendu et de chargement (existantes) ---
+
     function calculateResults(comptageData) {
-        const results = { caisses: {}, combines: { total_compté: 0, recette_reelle: 0, ecart: 0, recette_theorique: 0 }};
-        const noms_caisses = globalConfig.nomsCaisses;
+        const results = { caisses: {}, combines: { total_compté: 0, recette_reelle: 0, ecart: 0, recette_theorique: 0, fond_de_caisse: 0, ventes: 0, retrocession: 0 }};
         const denominations = globalConfig.denominations;
         
         for (const caisseId in comptageData.caisses_data) {
+            if (!comptageData.caisses_data.hasOwnProperty(caisseId)) continue;
             const caisseData = comptageData.caisses_data[caisseId];
             let total_compte = 0;
             
@@ -307,66 +352,32 @@ document.addEventListener('DOMContentLoaded', function() {
             results.combines.recette_reelle += recette_reelle;
             results.combines.recette_theorique += recette_theorique;
             results.combines.ecart += ecart;
+            results.combines.fond_de_caisse += fond_de_caisse;
+            results.combines.ventes += ventes;
+            results.combines.retrocession += retrocession;
         }
-
         return results;
     }
-    
+
     function renderGlobalChart(historique) {
         if (!globalChartContainer) return;
-        
-        if (globalChart) {
-            globalChart.destroy();
-            globalChart = null;
-        }
-
+        if (globalChart) { globalChart.destroy(); globalChart = null; }
         if (!historique || historique.length === 0) {
              globalChartContainer.innerHTML = '<p class="no-chart-data">Aucune donnée disponible pour le graphique.</p>';
              return;
         }
-        
         const sortedHistorique = historique.sort((a, b) => new Date(a.date_comptage) - new Date(b.date_comptage));
         const dates = sortedHistorique.map(c => new Date(c.date_comptage).toLocaleDateString('fr-FR'));
-        
-        // Calcule les totaux globaux et les écarts
         const ventesTotales = sortedHistorique.map(c => calculateResults(c).combines.recette_reelle);
         const ecartsGlobaux = sortedHistorique.map(c => calculateResults(c).combines.ecart);
-
         const options = {
-            chart: {
-                type: 'line',
-                height: 350
-            },
-            series: [
-                {
-                    name: 'Ventes totales',
-                    data: ventesTotales
-                },
-                {
-                    name: 'Écart global',
-                    data: ecartsGlobaux
-                }
-            ],
-            xaxis: {
-                categories: dates
-            },
-            yaxis: {
-                labels: {
-                    formatter: function (value) {
-                        return formatEuros(value);
-                    }
-                }
-            },
+            chart: { type: 'line', height: 350 },
+            series: [{ name: 'Ventes totales', data: ventesTotales }, { name: 'Écart global', data: ecartsGlobaux }],
+            xaxis: { categories: dates },
+            yaxis: { labels: { formatter: (value) => formatEuros(value) } },
             colors: ['#3498db', '#e74c3c'],
-            tooltip: {
-                y: {
-                    formatter: function (value) {
-                        return formatEuros(value);
-                    }
-                }
-            }
+            tooltip: { y: { formatter: (value) => formatEuros(value) } }
         };
-        // NOUVEAU : On initialise le graphique avec un petit délai
         setTimeout(() => {
             globalChart = new ApexCharts(globalChartContainer, options);
             globalChart.render();
@@ -374,53 +385,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderMiniChart(element, data) {
-        // --- DÉBUT BLOC DE DÉBOGAGE ---
-        console.log("--- Affichage du mini-graphique ---");
-        console.log("Données de vente reçues :", data);
         const dataIsAllZeros = data.every(val => val === 0);
-        console.log("Est-ce que toutes les valeurs sont à zéro ?", dataIsAllZeros);
-        // --- FIN BLOC DE DÉBOGAGE ---
-
         if (!data || dataIsAllZeros) {
             element.innerHTML = '<p class="no-chart-data">Pas de données de vente.</p>';
             return;
         }
-
         element.innerHTML = '';
-        
         const labels = Object.values(globalConfig.nomsCaisses);
         const options = {
-            chart: {
-                type: 'bar',
-                height: 150,
-                toolbar: { show: false }
-            },
-            series: [{
-                data: data
-            }],
+            chart: { type: 'bar', height: 150, toolbar: { show: false } },
+            series: [{ data: data }],
             labels: labels,
             colors: ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6'],
             legend: { show: false },
-            dataLabels: {
-                enabled: false,
-            },
-            tooltip: {
-                y: {
-                    formatter: function (value) {
-                        return formatEuros(value);
-                    }
-                }
-            },
+            dataLabels: { enabled: false },
+            tooltip: { y: { formatter: (value) => formatEuros(value) } },
             xaxis: {
                 categories: labels,
-                labels: {
-                    style: {
-                        colors: getComputedStyle(document.body).getPropertyValue('--color-text-secondary')
-                    }
-                }
+                labels: { style: { colors: getComputedStyle(document.body).getPropertyValue('--color-text-secondary') } }
             }
         };
-        // NOUVEAU : On initialise le graphique avec un petit délai
         setTimeout(() => {
             const chart = new ApexCharts(element, options);
             chart.render();
@@ -428,37 +412,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 100);
     }
 
-
     function renderHistoriqueCards(historique) {
         historyGrid.innerHTML = '';
         if (historique.length === 0) {
             historyGrid.innerHTML = '<p>Aucun enregistrement trouvé pour ces critères.</p>';
             return;
         }
-
-        console.log("%c[DEBUG] Données globales des caisses (nomsCaisses):", "color: blue; font-weight: bold;", globalConfig.nomsCaisses);
-
         historique.forEach(comptage => {
-            console.group(`Traitement du comptage : ${comptage.nom_comptage}`);
-            console.log("Données brutes du comptage :", comptage);
-            
             const calculated = calculateResults(comptage);
-            console.log("Données calculées :", calculated);
-            
-            // CORRECTION: Assure que les données pour le graphique sont dans le bon ordre
             const caisseVentesData = Object.keys(globalConfig.nomsCaisses).map(caisseId => {
                 const caisseData = calculated.caisses[caisseId];
                 return caisseData ? parseFloat(caisseData.ventes) : 0;
             });
-            
-            console.log("%cDonnées finales pour le graphique (caisseVentesData):", "color: green; font-weight: bold;", caisseVentesData);
-            console.groupEnd();
-
             const cardDiv = document.createElement('div');
             cardDiv.classList.add('history-card');
             cardDiv.dataset.comptage = JSON.stringify(comptage);
+            cardDiv.dataset.id = comptage.id;
 
             cardDiv.innerHTML = `
+                <input type="checkbox" class="comparison-checkbox" title="Sélectionner pour comparer">
                 <div class="history-card-header">
                     <h4>${comptage.nom_comptage}</h4>
                     <div class="date"><i class="fa-regular fa-calendar"></i> ${formatDateFr(comptage.date_comptage)}</div>
@@ -489,11 +461,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <a href="index.php?page=calculateur&load=${comptage.id}" class="action-btn-small save-btn"><i class="fa-solid fa-pen-to-square"></i></a>
                     <button type="button" class="action-btn-small delete-btn delete-comptage-btn" data-id-to-delete="${comptage.id}"><i class="fa-solid fa-trash-can"></i></button>
                 </div>`;
-            
             historyGrid.appendChild(cardDiv);
-            
-            const miniChartElement = cardDiv.querySelector('.mini-chart-container');
-            renderMiniChart(miniChartElement, caisseVentesData);
+            renderMiniChart(cardDiv.querySelector('.mini-chart-container'), caisseVentesData);
         });
     }
 
@@ -501,98 +470,55 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!paginationNav) return;
         paginationNav.innerHTML = '';
         if (totalPages <= 1) return;
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const params = urlParams.toString().replace(/&?p=\d+/, '');
-        const maxVisible = 5;
-        const start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-        const end = Math.min(totalPages, start + maxVisible - 1);
-
         let paginationHtml = '<ul class="pagination">';
-
-        if (currentPage > 1) {
-            paginationHtml += `<li><a href="#" data-page="${currentPage - 1}">« Préc.</a></li>`;
-        } else {
-            paginationHtml += `<li class="disabled"><span>« Préc.</span></li>`;
+        if (currentPage > 1) paginationHtml += `<li><a href="#" data-page="${currentPage - 1}">« Préc.</a></li>`;
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === currentPage) paginationHtml += `<li class="active"><span>${i}</span></li>`;
+            else paginationHtml += `<li><a href="#" data-page="${i}">${i}</a></li>`;
         }
-
-        for (let i = start; i <= end; i++) {
-            if (i === currentPage) {
-                paginationHtml += `<li class="active"><span>${i}</span></li>`;
-            } else {
-                paginationHtml += `<li><a href="#" data-page="${i}">${i}</a></li>`;
-            }
-        }
-
-        if (currentPage < totalPages) {
-            paginationHtml += `<li><a href="#" data-page="${currentPage + 1}">Suiv. »</a></li>`;
-        } else {
-            paginationHtml += `<li class="disabled"><span>Suiv. »</span></li>`;
-        }
-        
+        if (currentPage < totalPages) paginationHtml += `<li><a href="#" data-page="${currentPage + 1}">Suiv. »</a></li>`;
         paginationHtml += '</ul>';
         paginationNav.innerHTML = paginationHtml;
     }
 
     function loadHistoriqueData(params) {
+        selectedForComparison = [];
+        document.querySelectorAll('.history-card.selected').forEach(card => card.classList.remove('selected'));
+        updateComparisonToolbar();
+
         const query = new URLSearchParams(params).toString();
-        // Ajout d'un paramètre anti-cache pour forcer le rechargement
-        const cacheBuster = `&_=${new Date().getTime()}`;
-        
-        fetch(`index.php?action=get_historique_data&${query}${cacheBuster}`)
+        fetch(`index.php?action=get_historique_data&${query}&_=${new Date().getTime()}`)
             .then(response => response.json())
             .then(data => {
-                // Débogage : Affiche les données brutes reçues du serveur
-                console.log("Données de l'historique reçues:", data);
                 renderHistoriqueCards(data.historique);
                 renderPagination(data.page_courante, data.pages_totales);
                 renderGlobalChart(data.historique_complet);
-                
-                // Met à jour les boutons de filtre rapide
                 updateQuickFilterButtons(params);
             })
-            .catch(error => {
-                console.error("Erreur de chargement de l'historique:", error);
-                historyGrid.innerHTML = '<p>Erreur lors du chargement des données. Veuillez réessayer.</p>';
-            });
+            .catch(error => console.error("Erreur de chargement de l'historique:", error));
     }
 
-    // NOUVELLE FONCTION : Met à jour la classe "active" sur les boutons de filtre rapide
     function updateQuickFilterButtons(params) {
-        // Retire la classe 'active' de tous les boutons
         quickFilterBtns.forEach(btn => btn.classList.remove('active'));
-
         if (params.date_debut && params.date_fin) {
-            // Vérifie si les dates correspondent à un filtre rapide
             const today = new Date();
             const formatDate = (date) => date.toISOString().split('T')[0];
-            
             const start = params.date_debut;
             const end = params.date_fin;
-
             quickFilterBtns.forEach(btn => {
                 const days = parseInt(btn.dataset.days);
                 const startDate = new Date();
                 startDate.setDate(today.getDate() - days);
-                
-                const filterStart = formatDate(startDate);
-                const filterEnd = formatDate(today);
-
-                if (start === filterStart && end === filterEnd) {
+                if (start === formatDate(startDate) && end === formatDate(today)) {
                     btn.classList.add('active');
                 }
             });
         }
     }
 
-
     form.addEventListener('submit', function(e) {
         e.preventDefault();
-        const formData = new FormData(form);
-        const params = {};
-        for (const [key, value] of formData.entries()) {
-            params[key] = value;
-        }
+        const params = Object.fromEntries(new FormData(form).entries());
         params.page = 'historique';
         history.pushState(null, '', `?${new URLSearchParams(params).toString()}`);
         loadHistoriqueData(params);
@@ -600,12 +526,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (paginationNav) {
         paginationNav.addEventListener('click', function(e) {
+            e.preventDefault();
             const link = e.target.closest('a');
             if (link) {
-                e.preventDefault();
-                const page = link.dataset.page;
                 const urlParams = new URLSearchParams(window.location.search);
-                urlParams.set('p', page);
+                urlParams.set('p', link.dataset.page);
                 history.pushState(null, '', `?${urlParams.toString()}`);
                 loadHistoriqueData(Object.fromEntries(urlParams.entries()));
             }
@@ -614,58 +539,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
     historyGrid.addEventListener('click', function(e) {
         const deleteButton = e.target.closest('.delete-comptage-btn');
-        if (deleteButton) {
-            e.preventDefault();
-            if (confirm('Êtes-vous sûr de vouloir supprimer DÉFINITIVEMENT ce comptage ?')) {
-                const idToDelete = deleteButton.dataset.idToDelete;
-                
-                const formData = new FormData();
-                formData.append('id_a_supprimer', idToDelete);
-                
-                fetch('index.php?action=delete_historique_data', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const cardToRemove = deleteButton.closest('.history-card');
-                        cardToRemove.remove();
-                        loadHistoriqueData(Object.fromEntries(new URLSearchParams(window.location.search).entries()));
-                    } else {
-                        alert(data.message || 'Erreur lors de la suppression.');
-                    }
-                })
-                .catch(error => {
-                    console.error("Erreur de suppression:", error);
-                    alert("Erreur lors de la suppression. Veuillez réessayer.");
-                });
-            }
+        if (deleteButton && confirm('Êtes-vous sûr de vouloir supprimer DÉFINITIVEMENT ce comptage ?')) {
+            const idToDelete = deleteButton.dataset.idToDelete;
+            fetch('index.php?action=delete_historique_data', {
+                method: 'POST',
+                body: new URLSearchParams({ id_a_supprimer: idToDelete })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadHistoriqueData(Object.fromEntries(new URLSearchParams(window.location.search).entries()));
+                } else {
+                    alert(data.message || 'Erreur lors de la suppression.');
+                }
+            });
         }
     });
 
     if (quickFilterBtns) {
         quickFilterBtns.forEach(btn => {
             btn.addEventListener('click', function() {
-                // NOUVELLE LOGIQUE : Réinitialise les autres filtres
-                document.getElementById('date_debut').value = '';
-                document.getElementById('date_fin').value = '';
-
                 const days = parseInt(this.dataset.days);
                 const today = new Date();
                 const startDate = new Date();
-                if (days > 0) { startDate.setDate(today.getDate() - days); }
+                if (days > 0) startDate.setDate(today.getDate() - days);
                 const formatDate = (date) => date.toISOString().split('T')[0];
-                
-                const params = {
-                    page: 'historique',
-                    date_debut: formatDate(startDate),
-                    date_fin: formatDate(today)
-                };
-                
+                const params = { page: 'historique', date_debut: formatDate(startDate), date_fin: formatDate(today) };
                 document.getElementById('date_debut').value = params.date_debut;
                 document.getElementById('date_fin').value = params.date_fin;
-
                 history.pushState(null, '', `?${new URLSearchParams(params).toString()}`);
                 loadHistoriqueData(params);
             });
@@ -675,43 +576,30 @@ document.addEventListener('DOMContentLoaded', function() {
     if (resetBtn) {
         resetBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            document.getElementById('date_debut').value = '';
-            document.getElementById('date_fin').value = '';
-            document.getElementById('recherche').value = '';
+            form.reset();
             history.pushState(null, '', `?page=historique`);
             loadHistoriqueData({ page: 'historique' });
         });
     }
     
-    const exportCsvBtn = document.getElementById('excel-btn');
-    if (exportCsvBtn) {
-        exportCsvBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const urlParams = new URLSearchParams(window.location.search);
-            urlParams.delete('page');
-            const exportUrl = `index.php?action=export_csv&${urlParams.toString()}`;
-            window.location.href = exportUrl;
-        });
-    }
+    document.getElementById('excel-btn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.delete('page');
+        window.location.href = `index.php?action=export_csv&${urlParams.toString()}`;
+    });
 
     const initialParams = Object.fromEntries(new URLSearchParams(window.location.search).entries());
     loadHistoriqueData(initialParams);
     
-    // NOUVEL ÉCOUTEUR D'ÉVÉNEMENT : Redimensionne les graphiques au redimensionnement de la fenêtre
     let resizeTimeout;
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
-            if (globalChart && globalChart.resize) {
-                globalChart.resize();
-            }
+            if (globalChart && globalChart.resize) globalChart.resize();
             document.querySelectorAll('.mini-chart-container').forEach(element => {
-                // Correction : Vérifier que l'élément a bien une instance de graphique
-                if (element.chart && element.chart.resize) {
-                    element.chart.resize();
-                }
+                if (element.chart && element.chart.resize) element.chart.resize();
             });
-        }, 200); // Délai de 200ms pour éviter de surcharger
+        }, 200);
     });
-
 });

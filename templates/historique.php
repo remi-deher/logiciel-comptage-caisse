@@ -1,9 +1,9 @@
 <?php
 // Fichier : templates/historique.php
-// Mise à jour pour retirer le filtre par caisse.
+// Mise à jour pour inclure les éléments nécessaires au mode de comparaison.
 
 $page_js = 'history.js';
-$page_css = 'historique.css'; // Ajout de la feuille de style pour le rendu des graphiques
+$page_css = 'historique.css';
 
 // On récupère le symbole de la devise
 $currency_symbol = defined('APP_CURRENCY_SYMBOL') ? APP_CURRENCY_SYMBOL : '€';
@@ -11,30 +11,25 @@ $currency_symbol = defined('APP_CURRENCY_SYMBOL') ? APP_CURRENCY_SYMBOL : '€';
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
     'denominations' => $denominations ?? [],
-    'currencySymbol' => $currency_symbol // NOUVEAU : On passe le symbole au JavaScript
+    'currencySymbol' => $currency_symbol
 ]);
 
 require 'partials/header.php';
 require 'partials/navbar.php';
 
-// NOUVELLE FONCTION DE PAGINATION "INTELLIGENTE"
 function renderPagination($page_courante, $pages_totales) {
     $params = $_GET;
     unset($params['p']);
     $query_string = http_build_query($params);
-    $window = 1; // Nombre de pages à afficher de chaque côté de la page active
+    $window = 1;
 
     echo '<ul class="pagination">';
-    // Bouton Précédent
     if ($page_courante > 1) {
         echo '<li><a href="?p=' . ($page_courante - 1) . '&' . $query_string . '">« Préc.</a></li>';
     } else {
         echo '<li class="disabled"><span>« Préc.</span></li>';
     }
-
-    // Liens des pages
     for ($i = 1; $i <= $pages_totales; $i++) {
-        // Conditions pour afficher le numéro de page
         if ($i == 1 || $i == $pages_totales || ($i >= $page_courante - $window && $i <= $page_courante + $window)) {
             if ($i == $page_courante) {
                 echo '<li class="active"><span>' . $i . '</span></li>';
@@ -42,13 +37,10 @@ function renderPagination($page_courante, $pages_totales) {
                 echo '<li><a href="?p=' . $i . '&' . $query_string . '">' . $i . '</a></li>';
             }
         } 
-        // Conditions pour afficher les ellipses (...)
         elseif (($i == $page_courante - $window - 1) || ($i == $page_courante + $window + 1)) {
             echo '<li class="disabled"><span>...</span></li>';
         }
     }
-    
-    // Bouton Suivant
     if ($page_courante < $pages_totales) {
         echo '<li><a href="?p=' . ($page_courante + 1) . '&' . $query_string . '">Suiv. »</a></li>';
     } else {
@@ -91,14 +83,11 @@ function renderPagination($page_courante, $pages_totales) {
         </form>
     </div>
 
-    <div class="history-controls">
-        <div class="history-actions">
-            <button id="print-btn" class="action-btn no-export"><i class="fa-solid fa-print"></i> Imprimer</button>
-            <button id="pdf-btn" class="action-btn no-export"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-            <button id="excel-btn" class="action-btn no-export"><i class="fa-solid fa-file-csv"></i> Excel</button>
-        </div>
+    <div id="comparison-toolbar" class="comparison-toolbar">
+        <span id="comparison-counter">0/2 comptages sélectionnés</span>
+        <button id="compare-btn" class="action-btn" disabled><i class="fa-solid fa-scale-balanced"></i> Comparer</button>
     </div>
-    
+
     <div class="global-chart-container">
         <h3>Synthèse de la période filtrée</h3>
         <div id="global-chart-container"></div>
@@ -114,6 +103,13 @@ function renderPagination($page_courante, $pages_totales) {
         <div id="modal-details-content"></div>
     </div>
 </div>
+
+<div id="comparison-modal" class="modal">
+    <div class="modal-content wide">
+        <div id="modal-comparison-content"></div>
+    </div>
+</div>
+
 
 <?php
 require 'partials/footer.php';
