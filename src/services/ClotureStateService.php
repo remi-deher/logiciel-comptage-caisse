@@ -66,7 +66,9 @@ class ClotureStateService {
      * @param int $caisseId L'identifiant de la caisse.
      */
     public function confirmCaisse($caisseId) {
-        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='closed' WHERE caisse_id = ? AND status='locked'");
+        // CORRECTION : On met à jour le statut ET on retire l'ID de verrouillage.
+        // Une caisse clôturée n'est plus verrouillée par personne.
+        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='closed', locked_by_ws_id=NULL WHERE caisse_id = ? AND status='locked'");
         $stmt->execute([$caisseId]);
     }
 
@@ -120,7 +122,7 @@ class ClotureStateService {
      * @param string $connectionId L'identifiant de la connexion WebSocket.
      */
     public function forceUnlockByConnectionId($connectionId) {
-        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='open', locked_by_ws_id=NULL WHERE locked_by_ws_id = ?");
+        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='open', locked_by_ws_id=NULL WHERE locked_by_ws_id = ? AND status = 'locked'");
         $stmt->execute([$connectionId]);
     }
 }
