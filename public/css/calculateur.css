@@ -102,51 +102,66 @@
 .ecart-display.ecart-cloturee .ecart-value { color: #8a2be2; }
 
 
-/* --- Styles pour les onglets de mode de paiement --- */
+/* --- Styles pour les onglets de mode de paiement (Améliorés) --- */
 .payment-method-tabs {
     margin-top: 20px;
     border: 1px solid var(--color-border-light);
     border-radius: 12px;
     overflow: hidden;
+    background-color: var(--color-surface);
 }
+
 .payment-method-selector {
     display: flex;
     background-color: var(--color-surface-alt);
-    border-bottom: 1px solid var(--color-border-light);
+    padding: var(--space-sm); /* Ajout d'un léger espacement intérieur */
+    gap: var(--space-sm); /* Espace entre les boutons */
 }
+
 .payment-tab-link {
     flex: 1;
-    padding: 15px;
-    background: transparent;
+    padding: 12px;
+    background-color: transparent;
     border: none;
-    border-bottom: 3px solid transparent;
+    border-radius: 8px; /* Coins arrondis pour chaque bouton */
     font-size: 1em;
     font-weight: 600;
     color: var(--color-text-secondary);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease-in-out;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
 }
+
 .payment-tab-link:hover {
     background-color: var(--color-surface-alt-hover);
+    color: var(--color-text-primary);
 }
+
 .payment-tab-link.active {
+    background-color: var(--color-surface); /* Fond clair pour le bouton actif */
     color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
-    background-color: var(--color-surface);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* Légère ombre pour le faire ressortir */
+    transform: translateY(-2px); /* Effet de lévitation */
 }
+
+body[data-theme="dark"] .payment-tab-link.active {
+    background-color: var(--color-bg); /* Fond plus sombre en mode nuit */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
 .payment-tab-content {
     display: none;
-    padding: 20px;
-    background-color: var(--color-surface);
+    padding: 25px; /* Augmentation du padding pour plus d'aération */
 }
+
 .payment-tab-content.active {
     display: block;
     animation: fadeIn 0.5s;
 }
+
 .info-message {
     text-align: center;
     padding: 20px;
@@ -154,8 +169,8 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* --- STRUCTURE EN ACCORDÉON --- */
