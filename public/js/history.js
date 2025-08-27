@@ -23,6 +23,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const quickFilterBtns = document.querySelectorAll('.quick-filter-btn');
     const globalChartContainer = document.getElementById('global-chart-container');
     const resetBtn = document.querySelector('a[href*="historique&vue=tout"]');
+    const viewTabs = document.querySelector('.view-tabs');
+    const comptagesView = document.getElementById('comptages-view');
+    const retraitsView = document.getElementById('retraits-view');
+    const withdrawalsSummaryTable = document.getElementById('withdrawals-summary-table');
 
     // Éléments pour la comparaison
     const comparisonToolbar = document.getElementById('comparison-toolbar');
@@ -807,6 +811,45 @@ document.addEventListener('DOMContentLoaded', function() {
         paginationNav.innerHTML = paginationHtml;
     }
 
+    function renderWithdrawalsView(historique) {
+        if (!withdrawalsSummaryTable) return;
+        const allWithdrawals = [];
+        historique.forEach(comptage => {
+            for (const caisseId in comptage.caisses_data) {
+                const caisseData = comptage.caisses_data[caisseId];
+                if (caisseData.retraits && Object.keys(caisseData.retraits).length > 0) {
+                    for (const denomination in caisseData.retraits) {
+                        allWithdrawals.push({
+                            date: comptage.date_comptage,
+                            caisse: globalConfig.nomsCaisses[caisseId],
+                            denomination: denomination,
+                            quantite: caisseData.retraits[denomination]
+                        });
+                    }
+                }
+            }
+        });
+
+        if (allWithdrawals.length === 0) {
+            withdrawalsSummaryTable.innerHTML = '<p>Aucun retrait trouvé pour la période sélectionnée.</p>';
+            return;
+        }
+
+        let tableHtml = '<table class="modal-details-table"><thead><tr><th>Date</th><th>Caisse</th><th>Dénomination</th><th>Quantité Retirée</th><th>Montant</th></tr></thead><tbody>';
+        allWithdrawals.forEach(withdrawal => {
+            let valeur = 0;
+            if (globalConfig.denominations.billets[withdrawal.denomination]) {
+                valeur = globalConfig.denominations.billets[withdrawal.denomination];
+            } else if (globalConfig.denominations.pieces[withdrawal.denomination]) {
+                valeur = globalConfig.denominations.pieces[withdrawal.denomination];
+            }
+            const label = valeur >= 1 ? `${valeur} ${globalConfig.currencySymbol}` : `${valeur * 100} cts`;
+            tableHtml += `<tr><td>${formatDateFr(withdrawal.date)}</td><td>${withdrawal.caisse}</td><td>${label}</td><td>${withdrawal.quantite}</td><td>${formatEuros(withdrawal.quantite * valeur)}</td></tr>`;
+        });
+        tableHtml += '</tbody></table>';
+        withdrawalsSummaryTable.innerHTML = tableHtml;
+    }
+
     function loadHistoriqueData(params) {
         selectedForComparison = [];
         document.querySelectorAll('.history-card.selected').forEach(card => card.classList.remove('selected'));
@@ -819,6 +862,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderHistoriqueCards(data.historique);
                 renderPagination(data.page_courante, data.pages_totales);
                 renderGlobalChart(data.historique_complet);
+                renderWithdrawalsView(data.historique_complet);
                 if (historyGrid) {
                     historyGrid.dataset.allComptages = JSON.stringify(data.historique_complet);
                 }
@@ -844,6 +888,18 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+
+    viewTabs.addEventListener('click', (e) => {
+        e.preventDefault();
+        const link = e.target.closest('.tab-link');
+        if (!link) return;
+
+        document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+
+        document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
+        document.getElementById(`${link.dataset.view}-view`).classList.add('active');
+    });
 
     form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -925,4 +981,3 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 200);
     });
 });
-

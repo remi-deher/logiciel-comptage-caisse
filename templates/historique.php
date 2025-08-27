@@ -55,55 +55,66 @@ function renderPagination($page_courante, $pages_totales) {
 <div class="container" id="history-page">
     <h2><i class="fa-solid fa-clock-rotate-left" style="color: #3498db;"></i> Historique des Comptages</h2>
 
-    <div class="filter-section">
-        <h3>Filtres</h3>
-        <div class="filter-buttons">
-            <button type="button" class="quick-filter-btn" data-days="0">Aujourd'hui</button>
-            <button type="button" class="quick-filter-btn" data-days="1">Hier</button>
-            <button type="button" class="quick-filter-btn" data-days="7">7 derniers jours</button>
-            <button type="button" class="quick-filter-btn" data-days="30">30 derniers jours</button>
+    <div class="view-tabs">
+        <a href="#comptages" class="tab-link active" data-view="comptages">Comptages</a>
+        <a href="#retraits" class="tab-link" data-view="retraits">Synthèse des Retraits</a>
+    </div>
+
+    <div id="comptages-view" class="view-content active">
+        <div class="filter-section">
+            <h3>Filtres</h3>
+            <div class="filter-buttons">
+                <button type="button" class="quick-filter-btn" data-days="0">Aujourd'hui</button>
+                <button type="button" class="quick-filter-btn" data-days="1">Hier</button>
+                <button type="button" class="quick-filter-btn" data-days="7">7 derniers jours</button>
+                <button type="button" class="quick-filter-btn" data-days="30">30 derniers jours</button>
+            </div>
+            <form id="history-filter-form" class="filter-form" action="index.php" method="GET">
+                <input type="hidden" name="page" value="historique">
+                <input type="hidden" name="vue" value="tout">
+                <div class="form-group">
+                    <label for="date_debut">Date de début :</label>
+                    <input type="date" id="date_debut" name="date_debut" value="<?= htmlspecialchars($date_debut ?? '') ?>">
+                </div>
+                <div class="form-group">
+                    <label for="date_fin">Date de fin :</label>
+                    <input type="date" id="date_fin" name="date_fin" value="<?= htmlspecialchars($date_fin ?? '') ?>">
+                </div>
+                <div class="form-group">
+                    <label for="recherche">Recherche :</label>
+                    <input type="text" id="recherche" name="recherche" placeholder="Nom du comptage..." value="<?= htmlspecialchars($recherche ?? '') ?>">
+                </div>
+                <button type="submit" class="new-btn">Filtrer</button>
+                <a href="index.php?page=historique&vue=tout" class="action-btn" style="background-color: #7f8c8d;">Réinitialiser</a>
+            </form>
         </div>
-        <form id="history-filter-form" class="filter-form" action="index.php" method="GET">
-            <input type="hidden" name="page" value="historique">
-            <input type="hidden" name="vue" value="tout">
-            <div class="form-group">
-                <label for="date_debut">Date de début :</label>
-                <input type="date" id="date_debut" name="date_debut" value="<?= htmlspecialchars($date_debut ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label for="date_fin">Date de fin :</label>
-                <input type="date" id="date_fin" name="date_fin" value="<?= htmlspecialchars($date_fin ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label for="recherche">Recherche :</label>
-                <input type="text" id="recherche" name="recherche" placeholder="Nom du comptage..." value="<?= htmlspecialchars($recherche ?? '') ?>">
-            </div>
-            <button type="submit" class="new-btn">Filtrer</button>
-            <a href="index.php?page=historique&vue=tout" class="action-btn" style="background-color: #7f8c8d;">Réinitialiser</a>
-        </form>
-    </div>
 
-    <div class="history-controls">
-        <div class="history-actions">
-            <button id="print-btn" class="action-btn"><i class="fa-solid fa-print"></i> Imprimer la vue</button>
-            <a href="#" id="excel-btn" class="action-btn"><i class="fa-solid fa-file-csv"></i> Exporter en CSV</a>
-            <button id="pdf-btn" class="action-btn"><i class="fa-solid fa-file-pdf"></i> Exporter en PDF</button>
+        <div class="history-controls">
+            <div class="history-actions">
+                <button id="print-btn" class="action-btn"><i class="fa-solid fa-print"></i> Imprimer la vue</button>
+                <a href="#" id="excel-btn" class="action-btn"><i class="fa-solid fa-file-csv"></i> Exporter en CSV</a>
+                <button id="pdf-btn" class="action-btn"><i class="fa-solid fa-file-pdf"></i> Exporter en PDF</a>
+            </div>
         </div>
+
+        <div id="comparison-toolbar" class="comparison-toolbar">
+            <span id="comparison-counter">0/2 comptages sélectionnés</span>
+            <button id="compare-btn" class="action-btn" disabled><i class="fa-solid fa-scale-balanced"></i> Comparer</button>
+        </div>
+
+        <div class="global-chart-container">
+            <h3>Synthèse de la période filtrée</h3>
+            <div id="global-chart-container"></div>
+        </div>
+
+        <div class="history-grid"></div>
+        <nav class="pagination-nav" style="margin-top: 20px;"></nav>
     </div>
 
-    <div id="comparison-toolbar" class="comparison-toolbar">
-        <span id="comparison-counter">0/2 comptages sélectionnés</span>
-        <button id="compare-btn" class="action-btn" disabled><i class="fa-solid fa-scale-balanced"></i> Comparer</button>
+    <div id="retraits-view" class="view-content">
+        <h3>Synthèse des Retraits sur la Période Sélectionnée</h3>
+        <div id="withdrawals-summary-table"></div>
     </div>
-
-    <div class="global-chart-container">
-        <h3>Synthèse de la période filtrée</h3>
-        <div id="global-chart-container"></div>
-    </div>
-
-    <div class="history-grid"></div>
-    <nav class="pagination-nav" style="margin-top: 20px;"></nav>
-
 </div>
 
 <div id="details-modal" class="modal">

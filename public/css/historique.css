@@ -27,6 +27,14 @@
     border-bottom-color: var(--color-primary); 
 }
 
+.view-content {
+    display: none;
+}
+
+.view-content.active {
+    display: block;
+}
+
 /* --- Contrôles (Actions et Filtres) --- */
 .history-controls { 
     background-color: var(--color-surface-alt); 
