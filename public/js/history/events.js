@@ -2,16 +2,56 @@
 // Ce module centralise tous les écouteurs d'événements de la page.
 
 import * as dom from './dom.js';
-import { state } from './state.js'; // Importe l'état partagé
+import { state } from './state.js';
 import { loadHistoriqueData, deleteComptage } from './api.js';
 import { handleSelectionChange } from './comparison.js';
-import { showDetailsModal, closeDetailsModal, showComparisonModal, closeComparisonModal } from './modals.js';
+import { showDetailsModal, closeDetailsModal, showComparisonModal, closeComparisonModal, showWithdrawalDetailsModal, closeWithdrawalDetailsModal } from './modals.js';
+import { calculateResults } from './utils.js';
 
 /**
  * Initialise tous les écouteurs d'événements pour la page d'historique.
  */
 export function initializeEventListeners() {
 
+    // Bouton Imprimer la vue
+    if (dom.printBtn) {
+        dom.printBtn.addEventListener('click', () => window.print());
+    }
+
+    // Bouton Exporter en CSV (vue comptages)
+    if (dom.excelBtn) {
+        dom.excelBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.delete('page');
+            window.location.href = `index.php?action=export_csv&${urlParams.toString()}`;
+        });
+    }
+
+    // Bouton Exporter en PDF (vue comptages)
+    if (dom.pdfBtn) {
+        dom.pdfBtn.addEventListener('click', function() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const tableData = [];
+            const headers = ['ID', 'Nom', 'Date', 'Total Global', 'Ecart Global'];
+            tableData.push(headers);
+            const allComptages = JSON.parse(dom.historyGrid.dataset.allComptages || '[]');
+            allComptages.forEach(comptage => {
+                const calculated = calculateResults(comptage);
+                tableData.push([
+                    comptage.id,
+                    comptage.nom_comptage,
+                    new Date(comptage.date_comptage).toLocaleDateString('fr-FR'),
+                    `${calculated.combines.total_compté.toFixed(2)} €`,
+                    `${calculated.combines.ecart.toFixed(2)} €`
+                ]);
+            });
+            doc.autoTable({ head: [tableData[0]], body: tableData.slice(1) });
+            doc.save('historique_comptages.pdf');
+        });
+    }
+    
     // Gestion du formulaire de filtre
     if (dom.form) {
         dom.form.addEventListener('submit', function(e) {
@@ -59,7 +99,6 @@ export function initializeEventListeners() {
             }
         });
         
-        // Gestion du 'change' pour les checkboxes de comparaison
         dom.historyGrid.addEventListener('change', handleSelectionChange);
     }
     
@@ -97,7 +136,7 @@ export function initializeEventListeners() {
 
     // Bouton pour lancer la comparaison
     if (dom.compareBtn) {
-        dom.compareBtn.addEventListener('click', () => showComparisonModal(state.selectedForComparison)); // Utilise l'état partagé
+        dom.compareBtn.addEventListener('click', () => showComparisonModal(state.selectedForComparison));
     }
 
     // Fermeture des modales
@@ -116,12 +155,35 @@ export function initializeEventListeners() {
         });
     }
     
-    // Redimensionnement de la fenêtre pour les graphiques
+    const withdrawalModal = document.getElementById('withdrawal-details-modal');
+    if (withdrawalModal) {
+        withdrawalModal.addEventListener('click', (event) => {
+            if (event.target === withdrawalModal || event.target.closest('.modal-close')) {
+                closeWithdrawalDetailsModal();
+            }
+        });
+    }
+
+    // (NOUVEAU) Écouteur pour ouvrir la modale des détails de retraits
+    document.body.addEventListener('click', function(event) {
+        const viewDetailsBtn = event.target.closest('.view-day-details-btn');
+        if (viewDetailsBtn) {
+            const dayCard = viewDetailsBtn.closest('.day-card');
+            const dateKey = dayCard.dataset.dateKey;
+            const logContainer = document.getElementById('withdrawals-log-container');
+            const groupedData = JSON.parse(logContainer.dataset.groupedWithdrawals);
+            if (groupedData && groupedData[dateKey]) {
+                showWithdrawalDetailsModal(groupedData[dateKey]);
+            }
+        }
+    });
+
+    // Redimensionnement de la fenêtre
     let resizeTimeout;
     window.addEventListener('resize', () => {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
-            if (state.globalChart && typeof state.globalChart.resize === 'function') { // Utilise l'état partagé
+            if (state.globalChart && typeof state.globalChart.resize === 'function') {
                 state.globalChart.resize();
             }
             document.querySelectorAll('.mini-chart-container').forEach(element => {
@@ -138,10 +200,8 @@ export function initializeEventListeners() {
             e.preventDefault();
             const link = e.target.closest('.tab-link');
             if (!link) return;
-
             document.querySelectorAll('.tab-link').forEach(l => l.classList.remove('active'));
             link.classList.add('active');
-
             document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
             const viewElement = document.getElementById(`${link.dataset.view}-view`);
             if (viewElement) {

@@ -15,9 +15,9 @@ const globalConfig = configElement ? JSON.parse(configElement.dataset.config) : 
  */
 export function renderGlobalChart(historique) {
     if (!dom.globalChartContainer) return;
-    if (dom.globalChart) {
-        dom.globalChart.destroy();
-        dom.globalChart = null;
+    if (state.globalChart) {
+        state.globalChart.destroy();
+        state.globalChart = null;
     }
     if (!historique || historique.length === 0) {
         dom.globalChartContainer.innerHTML = '<p class="no-chart-data">Aucune donnée disponible pour le graphique.</p>';
@@ -43,9 +43,7 @@ export function renderGlobalChart(historique) {
         grid: { borderColor: '#e7e7e7', row: { colors: ['#f3f3f3', 'transparent'], opacity: 0.5 } }
     };
 
-    // Un léger délai pour s'assurer que le conteneur est visible avant de dessiner.
     setTimeout(() => {
-        // CORRIGÉ : On assigne la nouvelle instance du graphique à notre objet d'état
         state.globalChart = new ApexCharts(dom.globalChartContainer, options);
         state.globalChart.render();
     }, 100);
@@ -85,6 +83,56 @@ export function renderMiniChart(element, data) {
     setTimeout(() => {
         const chart = new ApexCharts(element, options);
         chart.render();
-        element.chart = chart; // Stocke la référence au graphique pour le redimensionnement
+        element.chart = chart;
     }, 100);
+}
+
+/**
+ * Crée le graphique de répartition des retraits par caisse.
+ * @param {object} byCaisseData - Données agrégées des retraits par nom de caisse.
+ */
+export function renderWithdrawalsChart(byCaisseData) {
+    const container = document.getElementById('withdrawals-by-caisse-chart');
+    if (!container) return;
+    
+    if (container.chart) {
+        container.chart.destroy();
+    }
+
+    const labels = Object.keys(byCaisseData);
+    const series = Object.values(byCaisseData);
+
+    if (labels.length === 0) {
+        container.innerHTML = '<p class="no-chart-data">Aucune donnée pour le graphique.</p>';
+        return;
+    }
+
+    const options = {
+        chart: { type: 'donut', height: 300 },
+        series: series,
+        labels: labels,
+        legend: { position: 'bottom' },
+        tooltip: { y: { formatter: (val) => utils.formatEuros(val) } },
+        plotOptions: {
+            pie: {
+                donut: {
+                    labels: {
+                        show: true,
+                        total: {
+                            show: true,
+                            label: 'Total Retiré',
+                            formatter: (w) => {
+                                const total = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                                return utils.formatEuros(total);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    const chart = new ApexCharts(container, options);
+    chart.render();
+    container.chart = chart;
 }

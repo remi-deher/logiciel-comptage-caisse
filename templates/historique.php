@@ -1,14 +1,9 @@
 <?php
 // Fichier : templates/historique.php
-// Version finale, épurée après la refactorisation JavaScript.
-
 $page_css = 'historique.css';
 
-// On récupère le symbole de la devise pour l'injecter dans la configuration
 $currency_symbol = defined('APP_CURRENCY_SYMBOL') ? APP_CURRENCY_SYMBOL : '€';
 
-// Les données de configuration sont transmises au JavaScript via un attribut "data-config".
-// Cela inclut les noms des caisses, les dénominations et le symbole monétaire.
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
     'denominations' => $denominations ?? [],
@@ -57,7 +52,6 @@ require 'partials/navbar.php';
                 <a href="index.php?page=historique&vue=tout" class="action-btn" style="background-color: #7f8c8d;">Réinitialiser</a>
             </form>
         </div>
-
         <div class="history-controls">
             <div class="history-actions">
                 <button id="print-btn" class="action-btn"><i class="fa-solid fa-print"></i> Imprimer la vue</button>
@@ -65,25 +59,41 @@ require 'partials/navbar.php';
                 <button id="pdf-btn" class="action-btn"><i class="fa-solid fa-file-pdf"></i> Exporter en PDF</a>
             </div>
         </div>
-
         <div id="comparison-toolbar" class="comparison-toolbar">
             <span id="comparison-counter">0 comptage sélectionné</span>
             <button id="compare-btn" class="action-btn" disabled><i class="fa-solid fa-scale-balanced"></i> Comparer</button>
         </div>
-
         <div class="global-chart-container">
             <h3>Synthèse de la période filtrée</h3>
             <div id="global-chart-container"></div>
         </div>
-
         <div class="history-grid"></div>
-        
         <nav class="pagination-nav" style="margin-top: 20px;"></nav>
     </div>
 
     <div id="retraits-view" class="view-content">
-        <h3>Synthèse des Retraits sur la Période Sélectionnée</h3>
-        <div id="withdrawals-summary-table"></div>
+        <div class="withdrawals-header">
+            <h3><i class="fa-solid fa-chart-line"></i> Tableau de Bord des Retraits</h3>
+            <div class="history-actions">
+                <button id="export-retraits-csv-btn" class="action-btn"><i class="fa-solid fa-file-csv"></i> Exporter en CSV</button>
+                <button id="export-retraits-pdf-btn" class="action-btn"><i class="fa-solid fa-file-pdf"></i> Exporter en PDF</button>
+            </div>
+        </div>
+        <div id="withdrawals-kpi-container" class="kpi-container-retraits"></div>
+        <div class="withdrawals-grid">
+            <div class="card">
+                <h4><i class="fa-solid fa-coins"></i> Synthèse par Dénomination</h4>
+                <div id="withdrawals-by-denomination-table"></div>
+            </div>
+            <div class="card">
+                <h4><i class="fa-solid fa-cash-register"></i> Synthèse par Caisse</h4>
+                <div id="withdrawals-by-caisse-chart"></div>
+            </div>
+        </div>
+        <div class="withdrawals-log-wrapper">
+            <h4><i class="fa-solid fa-calendar-day"></i> Journal Détaillé par Jour</h4>
+            <div id="withdrawals-log-container"></div>
+        </div>
     </div>
 </div>
 
@@ -96,6 +106,12 @@ require 'partials/navbar.php';
 <div id="comparison-modal" class="modal">
     <div class="modal-content wide">
         <div id="modal-comparison-content"></div>
+    </div>
+</div>
+
+<div id="withdrawal-details-modal" class="modal">
+    <div class="modal-content wide">
+        <div id="modal-withdrawal-details-content"></div>
     </div>
 </div>
 

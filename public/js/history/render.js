@@ -3,7 +3,8 @@
 
 import * as dom from './dom.js';
 import * as utils from './utils.js';
-import { renderMiniChart } from './charts.js';
+import { state } from './state.js';
+import { renderMiniChart, renderWithdrawalsChart, renderGlobalChart } from './charts.js';
 
 // Récupère la configuration globale depuis l'élément du DOM.
 const configElement = document.getElementById('history-data');
@@ -101,54 +102,156 @@ export function renderPagination(currentPage, totalPages) {
 }
 
 /**
- * Affiche la vue "Synthèse des retraits".
- * @param {Array<object>} historique - La liste complète des comptages.
+ * Affiche le tableau de bord amélioré de la synthèse des retraits.
+ * @param {Array<object>} historique - La liste complète des comptages de la période.
  */
 export function renderWithdrawalsView(historique) {
-    if (!dom.withdrawalsSummaryTable) return;
+    if (!document.getElementById('retraits-view')) return;
 
+    // --- 1. Calcul des agrégats ---
+    const byDenomination = {};
+    const byCaisse = {};
+    let totalRetire = 0;
     const allWithdrawals = [];
+
     historique.forEach(comptage => {
         for (const caisseId in comptage.caisses_data) {
             const caisseData = comptage.caisses_data[caisseId];
             if (caisseData.retraits && Object.keys(caisseData.retraits).length > 0) {
                 for (const denomination in caisseData.retraits) {
+                    const quantite = parseInt(caisseData.retraits[denomination] || 0);
+                    if (quantite === 0) continue;
+
+                    let valeur = 0;
+                    if (globalConfig.denominations.billets[denomination]) {
+                        valeur = globalConfig.denominations.billets[denomination];
+                    } else if (globalConfig.denominations.pieces[denomination]) {
+                        valeur = globalConfig.denominations.pieces[denomination];
+                    }
+                    
+                    const montant = quantite * valeur;
+                    totalRetire += montant;
+
                     allWithdrawals.push({
                         date: comptage.date_comptage,
                         caisse: globalConfig.nomsCaisses[caisseId],
                         denomination: denomination,
-                        quantite: caisseData.retraits[denomination]
+                        quantite: quantite,
+                        valeurUnitaire: valeur,
                     });
+
+                    if (!byDenomination[denomination]) {
+                        byDenomination[denomination] = { quantite: 0, montant: 0, valeurUnitaire: valeur };
+                    }
+                    byDenomination[denomination].quantite += quantite;
+                    byDenomination[denomination].montant += montant;
+                    
+                    const caisseNom = globalConfig.nomsCaisses[caisseId];
+                    byCaisse[caisseNom] = (byCaisse[caisseNom] || 0) + montant;
                 }
             }
         }
     });
 
-    if (allWithdrawals.length === 0) {
-        dom.withdrawalsSummaryTable.innerHTML = '<p>Aucun retrait trouvé pour la période sélectionnée.</p>';
-        return;
+    // --- 2. Affichage des KPIs ---
+    const kpiContainer = document.getElementById('withdrawals-kpi-container');
+    if (kpiContainer) {
+        kpiContainer.innerHTML = `
+            <div class="kpi-card-retrait">
+                <h3>Montant Total Retiré</h3>
+                <p>${utils.formatEuros(totalRetire)}</p>
+            </div>
+            <div class="kpi-card-retrait">
+                <h3>Nb. Opérations</h3>
+                <p>${allWithdrawals.length}</p>
+            </div>`;
     }
 
-    let tableHtml = '<table class="modal-details-table"><thead><tr><th>Date</th><th>Caisse</th><th>Dénomination</th><th>Quantité Retirée</th><th>Montant</th></tr></thead><tbody>';
-    allWithdrawals.forEach(withdrawal => {
-        let valeur = 0;
-        if (globalConfig.denominations.billets[withdrawal.denomination]) {
-            valeur = globalConfig.denominations.billets[withdrawal.denomination];
-        } else if (globalConfig.denominations.pieces[withdrawal.denomination]) {
-            valeur = globalConfig.denominations.pieces[withdrawal.denomination];
+    // --- 3. Affichage de la synthèse par Dénomination ---
+    const byDenomTableContainer = document.getElementById('withdrawals-by-denomination-table');
+    if (byDenomTableContainer) {
+        let tableHtml = '<table class="info-table"><thead><tr><th>Dénomination</th><th>Quantité Totale</th><th>Montant Total</th></tr></thead><tbody>';
+        if (Object.keys(byDenomination).length > 0) {
+            const sortedDenominations = Object.entries(byDenomination).sort(([, a], [, b]) => b.valeurUnitaire - a.valeurUnitaire);
+            for (const [nom, data] of sortedDenominations) {
+                const label = data.valeurUnitaire >= 1 ? `${data.valeurUnitaire} ${globalConfig.currencySymbol}` : `${data.valeurUnitaire * 100} cts`;
+                tableHtml += `
+                    <tr>
+                        <td>${label}</td>
+                        <td>${data.quantite}</td>
+                        <td>${utils.formatEuros(data.montant)}</td>
+                    </tr>`;
+            }
+        } else {
+            tableHtml += '<tr><td colspan="3">Aucun retrait trouvé.</td></tr>';
         }
-        const label = valeur >= 1 ? `${valeur} ${globalConfig.currencySymbol}` : `${valeur * 100} cts`;
-        tableHtml += `
-            <tr>
-                <td>${utils.formatDateFr(withdrawal.date)}</td>
-                <td>${withdrawal.caisse}</td>
-                <td>${label}</td>
-                <td>${withdrawal.quantite}</td>
-                <td>${utils.formatEuros(withdrawal.quantite * valeur)}</td>
-            </tr>`;
-    });
-    tableHtml += '</tbody></table>';
-    dom.withdrawalsSummaryTable.innerHTML = tableHtml;
+        tableHtml += '</tbody></table>';
+        byDenomTableContainer.innerHTML = tableHtml;
+    }
+    
+    // --- 4. Appel pour le rendu du graphique ---
+    renderWithdrawalsChart(byCaisse);
+
+    // --- 5. Affichage du journal détaillé (Version Cartes Journalières) ---
+    const logContainer = document.getElementById('withdrawals-log-container');
+    if (logContainer) {
+        if (allWithdrawals.length > 0) {
+            // Regrouper les retraits par date
+            const groupedByDate = allWithdrawals.reduce((acc, w) => {
+                const dateKey = new Date(w.date).toISOString().split('T')[0]; // Clé YYYY-MM-DD
+                if (!acc[dateKey]) {
+                    acc[dateKey] = {
+                        total: 0,
+                        operations: 0,
+                        dateDisplay: new Date(w.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }),
+                        withdrawals: []
+                    };
+                }
+                const montant = w.quantite * w.valeurUnitaire;
+                acc[dateKey].total += montant;
+                acc[dateKey].operations++;
+                acc[dateKey].withdrawals.push(w);
+                return acc;
+            }, {});
+
+            // Trier les dates de la plus récente à la plus ancienne
+            const sortedDates = Object.keys(groupedByDate).sort((a, b) => new Date(b) - new Date(a));
+
+            // Générer le HTML des cartes
+            logContainer.innerHTML = sortedDates.map(dateKey => {
+                const dayData = groupedByDate[dateKey];
+                return `
+                    <div class="day-card" data-date-key="${dateKey}">
+                        <div class="day-card-header">
+                            <i class="fa-solid fa-calendar-day"></i>
+                            <span>${dayData.dateDisplay}</span>
+                        </div>
+                        <div class="day-card-body">
+                            <div class="day-kpi">
+                                <span>Total Retiré</span>
+                                <strong>${utils.formatEuros(dayData.total)}</strong>
+                            </div>
+                            <div class="day-kpi">
+                                <span>Opérations</span>
+                                <strong>${dayData.operations}</strong>
+                            </div>
+                        </div>
+                        <div class="day-card-footer">
+                            <button class="action-btn-small view-day-details-btn">
+                                <i class="fa-solid fa-magnifying-glass-chart"></i> Voir le détail
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Stocker les données groupées pour y accéder plus tard
+            logContainer.dataset.groupedWithdrawals = JSON.stringify(groupedByDate);
+
+        } else {
+            logContainer.innerHTML = '<p>Aucun retrait détaillé à afficher.</p>';
+        }
+    }
 }
 
 /**
@@ -156,6 +259,7 @@ export function renderWithdrawalsView(historique) {
  * @param {object} params - Les paramètres de l'URL actuelle.
  */
 export function updateQuickFilterButtons(params) {
+    if (!dom.quickFilterBtns) return;
     dom.quickFilterBtns.forEach(btn => btn.classList.remove('active'));
     if (params.date_debut && params.date_fin) {
         const today = new Date();
