@@ -56,15 +56,54 @@ export function showDetailsModal(comptageData, caisseId = null) {
 
     const generateSummaryHtml = (summaryData) => {
         const ecartClass = summaryData.ecart > 0.01 ? 'ecart-positif' : (summaryData.ecart < -0.01 ? 'ecart-negatif' : 'ecart-ok');
+        const ecartIcon = summaryData.ecart > 0.01 ? 'fa-arrow-trend-up' : (summaryData.ecart < -0.01 ? 'fa-arrow-trend-down' : 'fa-equals');
+
         return `
-            <div class="summary-grid">
-                <div class="summary-box"><span>Fond de Caisse</span><strong>${utils.formatEuros(summaryData.fond_de_caisse)}</strong></div>
-                <div class="summary-box"><span>Ventes Théoriques</span><strong>${utils.formatEuros(summaryData.ventes)}</strong></div>
-                <div class="summary-box"><span>Rétrocessions</span><strong>${utils.formatEuros(summaryData.retrocession)}</strong></div>
-                <div class="summary-box"><span>Total Compté</span><strong>${utils.formatEuros(summaryData.total_compte)}</strong></div>
-                <div class="summary-box"><span>Recette Réelle</span><strong>${utils.formatEuros(summaryData.recette_reelle)}</strong></div>
-                <div class="summary-box ${ecartClass}"><span>Écart Final</span><strong>${utils.formatEuros(summaryData.ecart)}</strong></div>
-            </div>`;
+            <ul class="summary-list">
+                <li>
+                    <i class="fa-solid fa-piggy-bank summary-icon icon-fond-caisse"></i>
+                    <div>
+                        <span>Fond de Caisse</span>
+                        <strong>${utils.formatEuros(summaryData.fond_de_caisse)}</strong>
+                    </div>
+                </li>
+                <li>
+                    <i class="fa-solid fa-cash-register summary-icon icon-ventes"></i>
+                    <div>
+                        <span>Ventes Théoriques</span>
+                        <strong>${utils.formatEuros(summaryData.ventes)}</strong>
+                    </div>
+                </li>
+                 <li>
+                    <i class="fa-solid fa-hand-holding-dollar summary-icon icon-retrocession"></i>
+                    <div>
+                        <span>Rétrocessions</span>
+                        <strong>${utils.formatEuros(summaryData.retrocession)}</strong>
+                    </div>
+                </li>
+                <li>
+                    <i class="fa-solid fa-coins summary-icon icon-compte"></i>
+                    <div>
+                        <span>Total Compté</span>
+                        <strong>${utils.formatEuros(summaryData.total_compte)}</strong>
+                    </div>
+                </li>
+                <li>
+                    <i class="fa-solid fa-sack-dollar summary-icon icon-recette"></i>
+                    <div>
+                        <span>Recette Réelle</span>
+                        <strong>${utils.formatEuros(summaryData.recette_reelle)}</strong>
+                    </div>
+                </li>
+                <li class="${ecartClass}">
+                    <i class="fa-solid ${ecartIcon} summary-icon"></i>
+                    <div>
+                        <span>Écart Final</span>
+                        <strong>${utils.formatEuros(summaryData.ecart)}</strong>
+                    </div>
+                </li>
+            </ul>
+        `;
     };
     
     const getDenominationsSource = (comptage, caisse) => {
