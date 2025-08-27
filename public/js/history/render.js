@@ -196,9 +196,8 @@ export function renderWithdrawalsView(historique) {
     const logContainer = document.getElementById('withdrawals-log-container');
     if (logContainer) {
         if (allWithdrawals.length > 0) {
-            // Regrouper les retraits par date
             const groupedByDate = allWithdrawals.reduce((acc, w) => {
-                const dateKey = new Date(w.date).toISOString().split('T')[0]; // Clé YYYY-MM-DD
+                const dateKey = new Date(w.date).toISOString().split('T')[0];
                 if (!acc[dateKey]) {
                     acc[dateKey] = {
                         total: 0,
@@ -214,14 +213,13 @@ export function renderWithdrawalsView(historique) {
                 return acc;
             }, {});
 
-            // Trier les dates de la plus récente à la plus ancienne
             const sortedDates = Object.keys(groupedByDate).sort((a, b) => new Date(b) - new Date(a));
 
-            // Générer le HTML des cartes
             logContainer.innerHTML = sortedDates.map(dateKey => {
                 const dayData = groupedByDate[dateKey];
                 return `
                     <div class="day-card" data-date-key="${dateKey}">
+                        <input type="checkbox" class="day-card-checkbox" title="Sélectionner ce jour">
                         <div class="day-card-header">
                             <i class="fa-solid fa-calendar-day"></i>
                             <span>${dayData.dateDisplay}</span>
@@ -245,7 +243,6 @@ export function renderWithdrawalsView(historique) {
                 `;
             }).join('');
             
-            // Stocker les données groupées pour y accéder plus tard
             logContainer.dataset.groupedWithdrawals = JSON.stringify(groupedByDate);
 
         } else {

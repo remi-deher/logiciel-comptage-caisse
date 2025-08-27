@@ -72,6 +72,28 @@ require 'partials/navbar.php';
     </div>
 
     <div id="retraits-view" class="view-content">
+        <div class="filter-section">
+            <h3>Filtres</h3>
+            <div class="filter-buttons" id="retraits-quick-filters">
+                <button type="button" class="quick-filter-btn" data-days="0">Aujourd'hui</button>
+                <button type="button" class="quick-filter-btn" data-days="1">Hier</button>
+                <button type="button" class="quick-filter-btn" data-days="7">7 derniers jours</button>
+                <button type="button" class="quick-filter-btn" data-days="30">30 derniers jours</button>
+            </div>
+            <form id="retraits-filter-form" class="filter-form">
+                <div class="form-group">
+                    <label for="retraits-date-debut">Date de début :</label>
+                    <input type="date" id="retraits-date-debut" name="date_debut">
+                </div>
+                <div class="form-group">
+                    <label for="retraits-date-fin">Date de fin :</label>
+                    <input type="date" id="retraits-date-fin" name="date_fin">
+                </div>
+                <button type="submit" class="new-btn">Filtrer</button>
+                <button type="button" id="retraits-reset-btn" class="action-btn" style="background-color: #7f8c8d;">Réinitialiser</button>
+            </form>
+        </div>
+
         <div class="withdrawals-header">
             <h3><i class="fa-solid fa-chart-line"></i> Tableau de Bord des Retraits</h3>
             <div class="history-actions">
@@ -97,18 +119,23 @@ require 'partials/navbar.php';
     </div>
 </div>
 
+<div id="day-selection-toolbar" class="selection-toolbar">
+    <span id="day-selection-counter">0 jour sélectionné</span>
+    <button id="analyze-day-selection-btn" class="action-btn" disabled>
+        <i class="fa-solid fa-magnifying-glass-chart"></i> Analyser la sélection
+    </button>
+</div>
+
 <div id="details-modal" class="modal">
     <div class="modal-content">
         <div id="modal-details-content"></div>
     </div>
 </div>
-
 <div id="comparison-modal" class="modal">
     <div class="modal-content wide">
         <div id="modal-comparison-content"></div>
     </div>
 </div>
-
 <div id="withdrawal-details-modal" class="modal">
     <div class="modal-content wide">
         <div id="modal-withdrawal-details-content"></div>

@@ -415,3 +415,89 @@
         grid-template-columns: 1fr 1.2fr;
     }
 }
+
+/* --- STYLES POUR LE TABLEAU AMÉLIORÉ DANS LA MODALE --- */
+.text-right {
+    text-align: right !important;
+}
+
+/* Styles pour le tri */
+.sortable th[data-sort] {
+    cursor: pointer;
+    position: relative;
+    padding-right: 20px;
+}
+.sortable th[data-sort]::after {
+    content: '\f0dc'; /* fa-sort */
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #ccc;
+    transition: color 0.2s;
+}
+.sortable th[data-sort]:hover::after {
+    color: var(--color-text-primary);
+}
+.sortable th.sort-asc::after {
+    content: '\f0de'; /* fa-sort-up */
+    color: var(--color-primary);
+}
+.sortable th.sort-desc::after {
+    content: '\f0dd'; /* fa-sort-down */
+    color: var(--color-primary);
+}
+
+/* Style pour le pied de tableau */
+.log-table tfoot {
+    background-color: var(--color-surface-alt);
+    font-weight: bold;
+    border-top: 2px solid var(--color-border);
+}
+
+/* --- NOUVEAUX STYLES POUR LA SÉLECTION MULTIPLE DES JOURS --- */
+.day-card {
+    position: relative; /* Nécessaire pour la checkbox */
+}
+
+.day-card-checkbox {
+    position: absolute;
+    top: 12px;
+    right: 15px;
+    transform: scale(1.4);
+    cursor: pointer;
+    accent-color: var(--color-primary);
+}
+
+.day-card.selected {
+    border-color: var(--color-primary);
+    box-shadow: 0 6px 15px var(--shadow-color), 0 0 0 3px var(--color-primary);
+}
+
+.selection-toolbar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translate(-50%, 150%); /* Initialement caché en bas */
+    background-color: var(--color-surface);
+    color: var(--color-text-primary);
+    padding: 15px 25px;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    z-index: 999;
+    transition: transform 0.3s ease-in-out;
+}
+
+.selection-toolbar.visible {
+    transform: translate(-50%, 0); /* Apparaît en glissant vers le haut */
+}
+
+#day-selection-counter {
+    font-weight: bold;
+    min-width: 150px; /* Pour éviter les sauts de taille */
+}

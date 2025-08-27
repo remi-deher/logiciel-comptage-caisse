@@ -42,8 +42,9 @@ export function closeWithdrawalDetailsModal() {
     }
 }
 
+
 /**
- * Affiche la modale de détails pour un comptage (VERSION COMPLÈTE ET CORRIGÉE).
+ * Affiche la modale de détails pour un comptage.
  */
 export function showDetailsModal(comptageData, caisseId = null) {
     const calculatedResults = utils.calculateResults(comptageData);
@@ -99,7 +100,7 @@ export function showDetailsModal(comptageData, caisseId = null) {
                 }
             }
         }
-        if (totalCaisse === 0) return "<p class='info-message'>Aucune espèce comptée.</p>";
+        if (totalCaisse === 0) return "<p class='no-chart-data'>Aucune espèce comptée.</p>";
         tableHtml += '</tbody></table>';
         return tableHtml;
     };
@@ -255,39 +256,67 @@ export function showWithdrawalDetailsModal(dayData) {
             <input type="text" id="modal-denom-filter" class="inline-input" placeholder="Filtrer par dénomination...">
         </div>
         <div id="withdrawal-details-table-container">
-            <table class="modal-details-table log-table">
+            <table class="modal-details-table log-table sortable">
                 <thead>
                     <tr>
-                        <th>Heure</th>
-                        <th>Caisse</th>
-                        <th>Dénomination</th>
-                        <th>Quantité</th>
-                        <th>Montant</th>
+                        <th data-sort="time">Heure</th>
+                        <th data-sort="caisse">Caisse</th>
+                        <th data-sort="denom">Dénomination</th>
+                        <th data-sort="quantite" class="sort-numeric">Quantité</th>
+                        <th data-sort="montant" class="sort-numeric">Montant</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${dayData.withdrawals.map(w => {
                         const label = w.valeurUnitaire >= 1 ? `${w.valeurUnitaire} ${globalConfig.currencySymbol}` : `${w.valeurUnitaire * 100} cts`;
+                        const montant = w.quantite * w.valeurUnitaire;
                         return `
-                            <tr class="withdrawal-detail-row" data-caisse="${w.caisse}" data-denom="${label.toLowerCase()}">
+                            <tr class="withdrawal-detail-row" 
+                                data-caisse="${w.caisse}" 
+                                data-denom="${label.toLowerCase()}"
+                                data-time="${new Date(w.date).getTime()}"
+                                data-quantite="${w.quantite}"
+                                data-montant="${montant}">
                                 <td>${new Date(w.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</td>
                                 <td>${w.caisse}</td>
                                 <td>${label}</td>
-                                <td>${w.quantite}</td>
-                                <td>${utils.formatEuros(w.quantite * w.valeurUnitaire)}</td>
+                                <td class="text-right">${w.quantite}</td>
+                                <td class="text-right">${utils.formatEuros(montant)}</td>
                             </tr>
                         `;
                     }).join('')}
                 </tbody>
+                <tfoot>
+                    <tr id="withdrawal-totals-row">
+                        <td colspan="3">Total (visible)</td>
+                        <td class="text-right" id="total-quantite"></td>
+                        <td class="text-right" id="total-montant"></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     `;
     content.innerHTML = html;
     modal.classList.add('visible');
 
+    const table = content.querySelector('.sortable');
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
     const caisseFilter = document.getElementById('modal-caisse-filter');
     const denomFilter = document.getElementById('modal-denom-filter');
-    const rows = content.querySelectorAll('.withdrawal-detail-row');
+
+    const updateTotalRow = () => {
+        let totalQuantite = 0;
+        let totalMontant = 0;
+        tbody.querySelectorAll('tr').forEach(row => {
+            if (row.style.display !== 'none') {
+                totalQuantite += parseInt(row.dataset.quantite);
+                totalMontant += parseFloat(row.dataset.montant);
+            }
+        });
+        document.getElementById('total-quantite').textContent = totalQuantite;
+        document.getElementById('total-montant').textContent = utils.formatEuros(totalMontant);
+    };
 
     const applyFilters = () => {
         const caisseQuery = caisseFilter.value;
@@ -298,10 +327,42 @@ export function showWithdrawalDetailsModal(dayData) {
             const denomMatch = !denomQuery || row.dataset.denom.includes(denomQuery);
             row.style.display = caisseMatch && denomMatch ? '' : 'none';
         });
+        updateTotalRow();
     };
-
+    
     caisseFilter.addEventListener('change', applyFilters);
     denomFilter.addEventListener('input', applyFilters);
+
+    table.querySelectorAll('th').forEach(header => {
+        header.addEventListener('click', () => {
+            const sortProperty = header.dataset.sort;
+            if (!sortProperty) return;
+
+            const isAsc = header.classList.contains('sort-asc');
+            const sortDirection = isAsc ? -1 : 1;
+
+            const sortedRows = [...rows].sort((a, b) => {
+                let valA = a.dataset[sortProperty];
+                let valB = b.dataset[sortProperty];
+                
+                if (header.classList.contains('sort-numeric')) {
+                    valA = parseFloat(valA);
+                    valB = parseFloat(valB);
+                }
+                
+                return (valA < valB ? -1 : valA > valB ? 1 : 0) * sortDirection;
+            });
+            
+            tbody.innerHTML = '';
+            sortedRows.forEach(row => tbody.appendChild(row));
+
+            table.querySelectorAll('th').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+            header.classList.toggle('sort-asc', !isAsc);
+            header.classList.toggle('sort-desc', isAsc);
+        });
+    });
+
+    updateTotalRow();
 }
 
 /**
