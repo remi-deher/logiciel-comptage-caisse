@@ -36,7 +36,7 @@ function renderPagination($page_courante, $pages_totales) {
             } else {
                 echo '<li><a href="?p=' . $i . '&' . $query_string . '">' . $i . '</a></li>';
             }
-        } 
+        }
         elseif (($i == $page_courante - $window - 1) || ($i == $page_courante + $window + 1)) {
             echo '<li class="disabled"><span>...</span></li>';
         }
@@ -52,7 +52,7 @@ function renderPagination($page_courante, $pages_totales) {
 
 <div id="history-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'></div>
 
-<div class="container" id="history-page"> 
+<div class="container" id="history-page">
     <h2><i class="fa-solid fa-clock-rotate-left" style="color: #3498db;"></i> Historique des Comptages</h2>
 
     <div class="filter-section">
@@ -81,6 +81,14 @@ function renderPagination($page_courante, $pages_totales) {
             <button type="submit" class="new-btn">Filtrer</button>
             <a href="index.php?page=historique&vue=tout" class="action-btn" style="background-color: #7f8c8d;">Réinitialiser</a>
         </form>
+    </div>
+
+    <div class="history-controls">
+        <div class="history-actions">
+            <button id="print-btn" class="action-btn"><i class="fa-solid fa-print"></i> Imprimer la vue</button>
+            <a href="#" id="excel-btn" class="action-btn"><i class="fa-solid fa-file-csv"></i> Exporter en CSV</a>
+            <button id="pdf-btn" class="action-btn"><i class="fa-solid fa-file-pdf"></i> Exporter en PDF</button>
+        </div>
     </div>
 
     <div id="comparison-toolbar" class="comparison-toolbar">

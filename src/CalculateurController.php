@@ -373,6 +373,28 @@ class CalculateurController {
                             }
                         }
                     }
+
+                    // AMÉLIORATION : Calculer et enregistrer les retraits
+                    $total_compte = 0;
+                    $current_counts = [];
+                    foreach ($this->denominations as $type => $denominations_list) {
+                        foreach ($denominations_list as $name => $value) {
+                            $quantite = get_numeric_value($caisse_data, $name);
+                            $current_counts[$name] = $quantite;
+                            $total_compte += $quantite * $value;
+                        }
+                    }
+                    $fond_de_caisse = get_numeric_value($caisse_data, 'fond_de_caisse');
+                    $recette_reelle = $total_compte - $fond_de_caisse;
+                    
+                    $suggestions = $this->generateWithdrawalSuggestion($recette_reelle, $current_counts, $this->denominations, $min_to_keep ?? []);
+
+                    foreach ($suggestions as $name => $quantite_a_retirer) {
+                        if ($quantite_a_retirer > 0) {
+                            $stmt_retrait = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
+                            $stmt_retrait->execute([$comptage_detail_id_final, $name, $quantite_a_retirer]);
+                        }
+                    }
                 }
             }
     

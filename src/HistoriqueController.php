@@ -102,10 +102,12 @@ class HistoriqueController {
                 c.id, c.nom_comptage, c.date_comptage, c.explication,
                 cd.caisse_id, cd.fond_de_caisse, cd.ventes, cd.retrocession,
                 cd.id as comptage_detail_id,
-                GROUP_CONCAT(CONCAT(d.denomination_nom, ':', d.quantite) SEPARATOR ';') as denominations
+                GROUP_CONCAT(DISTINCT CONCAT(d.denomination_nom, ':', d.quantite) SEPARATOR ';') as denominations,
+                GROUP_CONCAT(DISTINCT CONCAT(r.denomination_nom, ':', r.quantite_retiree) SEPARATOR ';') as retraits
             FROM comptages c
             LEFT JOIN comptage_details cd ON c.id = cd.comptage_id
             LEFT JOIN comptage_denominations d ON cd.id = d.comptage_detail_id
+            LEFT JOIN comptage_retraits r ON cd.id = r.comptage_detail_id
             WHERE c.id IN ({$placeholders})
             GROUP BY c.id, cd.caisse_id
             ORDER BY c.date_comptage DESC, cd.caisse_id ASC
@@ -134,11 +136,21 @@ class HistoriqueController {
                 }
             }
             
+            $retraits_array = [];
+            if ($row['retraits']) {
+                $parts = explode(';', $row['retraits']);
+                foreach ($parts as $part) {
+                    list($name, $quantity) = explode(':', $part);
+                    $retraits_array[$name] = $quantity;
+                }
+            }
+            
             $historique[$comptage_id]['caisses_data'][$row['caisse_id']] = [
                 'fond_de_caisse' => $row['fond_de_caisse'],
                 'ventes' => $row['ventes'],
                 'retrocession' => $row['retrocession'],
-                'denominations' => $denominations_array
+                'denominations' => $denominations_array,
+                'retraits' => $retraits_array
             ];
         }
 

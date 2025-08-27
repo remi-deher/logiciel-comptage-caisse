@@ -1,4 +1,4 @@
--- config/schema.sql - Nouvelle version normalisée
+-- config/schema.sql - Nouvelle version normalisée avec table des retraits
 
 CREATE TABLE IF NOT EXISTS `comptages` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -35,6 +35,16 @@ CREATE TABLE IF NOT EXISTS `comptage_denominations` (
   FOREIGN KEY (`comptage_detail_id`) REFERENCES `comptage_details`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- NOUVEAU : Table pour stocker les retraits effectués lors de la clôture
+CREATE TABLE IF NOT EXISTS `comptage_retraits` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `comptage_detail_id` int(11) NOT NULL,
+  `denomination_nom` varchar(255) NOT NULL,
+  `quantite_retiree` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`comptage_detail_id`) REFERENCES `comptage_details`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `admins` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `username` varchar(255) NOT NULL,
@@ -43,16 +53,6 @@ CREATE TABLE IF NOT EXISTS `admins` (
   UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- NOUVEAU: Table pour stocker les clôtures
-CREATE TABLE IF NOT EXISTS `clotures` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `comptage_id` int(11) NOT NULL,
-  `date_cloture` datetime NOT NULL,
-  PRIMARY KEY (`id`),
-  FOREIGN KEY (`comptage_id`) REFERENCES `comptages`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- AJOUT: Table pour gérer l'état de verrouillage des caisses
 CREATE TABLE IF NOT EXISTS `cloture_status` (
   `caisse_id` INT(11) NOT NULL,
   `status` ENUM('open', 'locked', 'closed') NOT NULL DEFAULT 'open',
@@ -60,7 +60,6 @@ CREATE TABLE IF NOT EXISTS `cloture_status` (
   PRIMARY KEY (`caisse_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- NOUVEAU : Table pour gérer les terminaux de paiement
 CREATE TABLE IF NOT EXISTS `terminaux_paiement` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `nom_terminal` VARCHAR(255) NOT NULL,
@@ -69,7 +68,6 @@ CREATE TABLE IF NOT EXISTS `terminaux_paiement` (
   FOREIGN KEY (`caisse_associee`) REFERENCES `caisses`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- NOUVEAU : Table pour stocker les montants des TPE pour chaque comptage
 CREATE TABLE IF NOT EXISTS `comptage_cb` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `comptage_detail_id` INT(11) NOT NULL,
@@ -80,7 +78,6 @@ CREATE TABLE IF NOT EXISTS `comptage_cb` (
   FOREIGN KEY (`terminal_id`) REFERENCES `terminaux_paiement`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- NOUVEAU : Table pour stocker le détail des chèques
 CREATE TABLE IF NOT EXISTS `comptage_cheques` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `comptage_detail_id` INT(11) NOT NULL,
