@@ -1,5 +1,7 @@
 <?php
 // templates/partials/footer.php
+
+// Lecture du numéro de version local à partir du fichier VERSION
 $current_version = 'N/A';
 $version_file = __DIR__ . '/../../VERSION';
 if (file_exists($version_file)) {
@@ -48,14 +50,23 @@ $release_info = 'Information non disponible';
     </footer>
 
     <script src="/js/main.js"></script>
+    
     <?php 
+    // Logique pour charger les scripts spécifiques à la page en cours
     if (!empty($page_js)) {
         if (is_array($page_js)) {
+            // Si $page_js est un tableau de scripts
             foreach ($page_js as $script) {
-                echo '<script src="/js/' . htmlspecialchars($script) . '"></script>';
+                // On ne charge pas history.js ici car il est déjà chargé en tant que module dans son propre template
+                if ($script !== 'history.js') {
+                    echo '<script src="/js/' . htmlspecialchars($script) . '"></script>';
+                }
             }
         } else {
-            echo '<script src="/js/' . htmlspecialchars($page_js) . '"></script>';
+            // Si $page_js est une simple chaîne de caractères
+            if ($page_js !== 'history.js') {
+                echo '<script src="/js/' . htmlspecialchars($page_js) . '"></script>';
+            }
         }
     }
     ?>

@@ -33,7 +33,7 @@ class HistoriqueController {
         $denominations = $this->denominations;
         $nombre_caisses = count($this->noms_caisses);
         $page_css = 'historique.css';
-        
+        $page_js = 'history.js'; // Gardez cette ligne        
         require __DIR__ . '/../templates/historique.php';
     }
 

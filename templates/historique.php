@@ -1,13 +1,14 @@
 <?php
 // Fichier : templates/historique.php
-// Mise à jour pour inclure les éléments nécessaires au mode de comparaison.
+// Version finale, épurée après la refactorisation JavaScript.
 
-$page_js = 'history.js';
 $page_css = 'historique.css';
 
-// On récupère le symbole de la devise
+// On récupère le symbole de la devise pour l'injecter dans la configuration
 $currency_symbol = defined('APP_CURRENCY_SYMBOL') ? APP_CURRENCY_SYMBOL : '€';
 
+// Les données de configuration sont transmises au JavaScript via un attribut "data-config".
+// Cela inclut les noms des caisses, les dénominations et le symbole monétaire.
 $config_data = json_encode([
     'nomsCaisses' => $noms_caisses ?? [],
     'denominations' => $denominations ?? [],
@@ -16,38 +17,6 @@ $config_data = json_encode([
 
 require 'partials/header.php';
 require 'partials/navbar.php';
-
-function renderPagination($page_courante, $pages_totales) {
-    $params = $_GET;
-    unset($params['p']);
-    $query_string = http_build_query($params);
-    $window = 1;
-
-    echo '<ul class="pagination">';
-    if ($page_courante > 1) {
-        echo '<li><a href="?p=' . ($page_courante - 1) . '&' . $query_string . '">« Préc.</a></li>';
-    } else {
-        echo '<li class="disabled"><span>« Préc.</span></li>';
-    }
-    for ($i = 1; $i <= $pages_totales; $i++) {
-        if ($i == 1 || $i == $pages_totales || ($i >= $page_courante - $window && $i <= $page_courante + $window)) {
-            if ($i == $page_courante) {
-                echo '<li class="active"><span>' . $i . '</span></li>';
-            } else {
-                echo '<li><a href="?p=' . $i . '&' . $query_string . '">' . $i . '</a></li>';
-            }
-        }
-        elseif (($i == $page_courante - $window - 1) || ($i == $page_courante + $window + 1)) {
-            echo '<li class="disabled"><span>...</span></li>';
-        }
-    }
-    if ($page_courante < $pages_totales) {
-        echo '<li><a href="?p=' . ($page_courante + 1) . '&' . $query_string . '">Suiv. »</a></li>';
-    } else {
-        echo '<li class="disabled"><span>Suiv. »</span></li>';
-    }
-    echo '</ul>';
-}
 ?>
 
 <div id="history-data" data-config='<?= htmlspecialchars($config_data, ENT_QUOTES, 'UTF-8') ?>'></div>
@@ -74,15 +43,15 @@ function renderPagination($page_courante, $pages_totales) {
                 <input type="hidden" name="vue" value="tout">
                 <div class="form-group">
                     <label for="date_debut">Date de début :</label>
-                    <input type="date" id="date_debut" name="date_debut" value="<?= htmlspecialchars($date_debut ?? '') ?>">
+                    <input type="date" id="date_debut" name="date_debut" value="<?= htmlspecialchars($_GET['date_debut'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="date_fin">Date de fin :</label>
-                    <input type="date" id="date_fin" name="date_fin" value="<?= htmlspecialchars($date_fin ?? '') ?>">
+                    <input type="date" id="date_fin" name="date_fin" value="<?= htmlspecialchars($_GET['date_fin'] ?? '') ?>">
                 </div>
                 <div class="form-group">
                     <label for="recherche">Recherche :</label>
-                    <input type="text" id="recherche" name="recherche" placeholder="Nom du comptage..." value="<?= htmlspecialchars($recherche ?? '') ?>">
+                    <input type="text" id="recherche" name="recherche" placeholder="Nom du comptage..." value="<?= htmlspecialchars($_GET['recherche'] ?? '') ?>">
                 </div>
                 <button type="submit" class="new-btn">Filtrer</button>
                 <a href="index.php?page=historique&vue=tout" class="action-btn" style="background-color: #7f8c8d;">Réinitialiser</a>
@@ -98,7 +67,7 @@ function renderPagination($page_courante, $pages_totales) {
         </div>
 
         <div id="comparison-toolbar" class="comparison-toolbar">
-            <span id="comparison-counter">0/2 comptages sélectionnés</span>
+            <span id="comparison-counter">0 comptage sélectionné</span>
             <button id="compare-btn" class="action-btn" disabled><i class="fa-solid fa-scale-balanced"></i> Comparer</button>
         </div>
 
@@ -108,6 +77,7 @@ function renderPagination($page_courante, $pages_totales) {
         </div>
 
         <div class="history-grid"></div>
+        
         <nav class="pagination-nav" style="margin-top: 20px;"></nav>
     </div>
 
@@ -129,6 +99,7 @@ function renderPagination($page_courante, $pages_totales) {
     </div>
 </div>
 
+<script type="module" src="js/history.js"></script>
 
 <?php
 require 'partials/footer.php';
