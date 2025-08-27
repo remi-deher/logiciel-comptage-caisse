@@ -1,5 +1,5 @@
 <?php
-// src/HistoriqueController.php - Version corrigée pour le chargement des données.
+// src/HistoriqueController.php
 
 require_once 'services/VersionService.php';
 require_once 'Utils.php';
@@ -33,7 +33,7 @@ class HistoriqueController {
         $denominations = $this->denominations;
         $nombre_caisses = count($this->noms_caisses);
         $page_css = 'historique.css';
-        $page_js = 'history.js'; // Gardez cette ligne        
+        
         require __DIR__ . '/../templates/historique.php';
     }
 
@@ -213,14 +213,22 @@ class HistoriqueController {
         foreach ($historique as $comptage) {
             $rowData = [$comptage['id'], $comptage['nom_comptage'], $comptage['date_comptage'], $comptage['explication']];
             foreach ($this->noms_caisses as $caisse_id => $nom_caisse) {
-                $caisse_data = $comptage['caisses_data'][$caisse_id];
-                $rowData[] = $nom_caisse;
-                $rowData[] = str_replace('.', ',', $caisse_data['fond_de_caisse']);
-                $rowData[] = str_replace('.', ',', $caisse_data['ventes']);
-                $rowData[] = str_replace('.', ',', $caisse_data['retrocession']);
-                foreach ($this->denominations as $type => $denoms) {
-                    foreach (array_keys($denoms) as $key) {
-                        $rowData[] = $caisse_data['denominations'][$key] ?? 0;
+                $caisse_data = $comptage['caisses_data'][$caisse_id] ?? null;
+                if ($caisse_data) {
+                    $rowData[] = $nom_caisse;
+                    $rowData[] = str_replace('.', ',', $caisse_data['fond_de_caisse']);
+                    $rowData[] = str_replace('.', ',', $caisse_data['ventes']);
+                    $rowData[] = str_replace('.', ',', $caisse_data['retrocession']);
+                    foreach ($this->denominations as $type => $denoms) {
+                        foreach (array_keys($denoms) as $key) {
+                            $rowData[] = $caisse_data['denominations'][$key] ?? 0;
+                        }
+                    }
+                } else {
+                    // Si pas de données pour cette caisse, remplir avec des champs vides
+                    $columnCount = 4 + count($this->denominations['billets']) + count($this->denominations['pieces']);
+                    for ($i=0; $i < $columnCount; $i++) { 
+                        $rowData[] = '';
                     }
                 }
             }
