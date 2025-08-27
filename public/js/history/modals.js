@@ -1,11 +1,10 @@
 // public/js/history/modals.js
-// Ce module gère l'affichage, le contenu et les interactions des fenêtres modales.
+// Ce module gère l'affichage, le contenu et les interactions de toutes les fenêtres modales.
 
 import * as dom from './dom.js';
 import * as utils from './utils.js';
 import { state } from './state.js';
 import { generateComptagePdf, generateComptageCsv } from './export.js';
-// N.B. : Le graphique de la modale est géré directement ici car il est simple.
 
 // Récupère la configuration globale
 const configElement = document.getElementById('history-data');
@@ -43,7 +42,6 @@ export function closeWithdrawalDetailsModal() {
     }
 }
 
-
 /**
  * Affiche la modale de détails pour un comptage (VERSION COMPLÈTE ET CORRIGÉE).
  */
@@ -60,64 +58,25 @@ export function showDetailsModal(comptageData, caisseId = null) {
 
         return `
             <ul class="summary-list">
-                <li>
-                    <i class="fa-solid fa-piggy-bank summary-icon icon-fond-caisse"></i>
-                    <div>
-                        <span>Fond de Caisse</span>
-                        <strong>${utils.formatEuros(summaryData.fond_de_caisse)}</strong>
-                    </div>
-                </li>
-                <li>
-                    <i class="fa-solid fa-cash-register summary-icon icon-ventes"></i>
-                    <div>
-                        <span>Ventes Théoriques</span>
-                        <strong>${utils.formatEuros(summaryData.ventes)}</strong>
-                    </div>
-                </li>
-                 <li>
-                    <i class="fa-solid fa-hand-holding-dollar summary-icon icon-retrocession"></i>
-                    <div>
-                        <span>Rétrocessions</span>
-                        <strong>${utils.formatEuros(summaryData.retrocession)}</strong>
-                    </div>
-                </li>
-                <li>
-                    <i class="fa-solid fa-coins summary-icon icon-compte"></i>
-                    <div>
-                        <span>Total Compté</span>
-                        <strong>${utils.formatEuros(summaryData.total_compte)}</strong>
-                    </div>
-                </li>
-                <li>
-                    <i class="fa-solid fa-sack-dollar summary-icon icon-recette"></i>
-                    <div>
-                        <span>Recette Réelle</span>
-                        <strong>${utils.formatEuros(summaryData.recette_reelle)}</strong>
-                    </div>
-                </li>
-                <li class="${ecartClass}">
-                    <i class="fa-solid ${ecartIcon} summary-icon"></i>
-                    <div>
-                        <span>Écart Final</span>
-                        <strong>${utils.formatEuros(summaryData.ecart)}</strong>
-                    </div>
-                </li>
-            </ul>
-        `;
+                <li><i class="fa-solid fa-piggy-bank summary-icon icon-fond-caisse"></i><div><span>Fond de Caisse</span><strong>${utils.formatEuros(summaryData.fond_de_caisse)}</strong></div></li>
+                <li><i class="fa-solid fa-cash-register summary-icon icon-ventes"></i><div><span>Ventes Théoriques</span><strong>${utils.formatEuros(summaryData.ventes)}</strong></div></li>
+                <li><i class="fa-solid fa-hand-holding-dollar summary-icon icon-retrocession"></i><div><span>Rétrocessions</span><strong>${utils.formatEuros(summaryData.retrocession)}</strong></div></li>
+                <li><i class="fa-solid fa-coins summary-icon icon-compte"></i><div><span>Total Compté</span><strong>${utils.formatEuros(summaryData.total_compte)}</strong></div></li>
+                <li><i class="fa-solid fa-sack-dollar summary-icon icon-recette"></i><div><span>Recette Réelle</span><strong>${utils.formatEuros(summaryData.recette_reelle)}</strong></div></li>
+                <li class="${ecartClass}"><i class="fa-solid ${ecartIcon} summary-icon"></i><div><span>Écart Final</span><strong>${utils.formatEuros(summaryData.ecart)}</strong></div></li>
+            </ul>`;
     };
-    
+
     const getDenominationsSource = (comptage, caisse) => {
         if (isGlobalView) {
-            const summaryQuantities = {};
-            for (const caisse_id in comptage.caisses_data) {
-                const caisseDetails = comptage.caisses_data[caisse_id];
-                if (caisseDetails.denominations) {
-                    for (const name in caisseDetails.denominations) {
-                         summaryQuantities[name] = (summaryQuantities[name] || 0) + parseInt(caisseDetails.denominations[name] || 0);
+            return Object.values(comptage.caisses_data).reduce((acc, caisseData) => {
+                if (caisseData.denominations) {
+                    for (const name in caisseData.denominations) {
+                        acc[name] = (acc[name] || 0) + parseInt(caisseData.denominations[name] || 0);
                     }
                 }
-            }
-            return summaryQuantities;
+                return acc;
+            }, {});
         }
         return comptage.caisses_data[caisse]?.denominations || {};
     };
@@ -126,26 +85,63 @@ export function showDetailsModal(comptageData, caisseId = null) {
         let tableHtml = '<table class="modal-details-table"><thead><tr><th>Dénomination</th><th>Quantité</th><th>Total</th></tr></thead><tbody>';
         let totalCaisse = 0;
         if (globalConfig.denominations && denominationsSource) {
-            for (const type in globalConfig.denominations) {
-                for (const [name, value] of Object.entries(globalConfig.denominations[type])) {
-                    const quantite = denominationsSource[name] || 0;
-                    if (quantite > 0) {
-                        const totalLigne = quantite * value;
-                        totalCaisse += totalLigne;
-                        const label = value >= 1 ? `${value} ${globalConfig.currencySymbol}` : `${value * 100} cts`;
-                        tableHtml += `<tr><td>${type === 'billets' ? 'Billet' : 'Pièce'} de ${label}</td><td>${quantite}</td><td>${utils.formatEuros(totalLigne)}</td></tr>`;
-                    }
+            const allDenoms = [...Object.entries(globalConfig.denominations.billets), ...Object.entries(globalConfig.denominations.pieces)]
+                .sort(([, valA], [, valB]) => valB - valA);
+
+            for (const [name, value] of allDenoms) {
+                const quantite = denominationsSource[name] || 0;
+                if (quantite > 0) {
+                    const totalLigne = quantite * value;
+                    totalCaisse += totalLigne;
+                    const label = value >= 1 ? `${value} ${globalConfig.currencySymbol}` : `${value * 100} cts`;
+                    const type = globalConfig.denominations.billets[name] ? 'Billet' : 'Pièce';
+                    tableHtml += `<tr><td>${type} de ${label}</td><td>${quantite}</td><td>${utils.formatEuros(totalLigne)}</td></tr>`;
                 }
             }
         }
-        if (totalCaisse === 0) return "<p>Aucune espèce comptée.</p>";
+        if (totalCaisse === 0) return "<p class='info-message'>Aucune espèce comptée.</p>";
         tableHtml += '</tbody></table>';
         return tableHtml;
     };
+    
+    const generateRetraitsTableHtml = () => {
+        const sourceData = isGlobalView ? Object.values(comptageData.caisses_data) : [comptageData.caisses_data[caisseId]];
+        
+        const allRetraits = sourceData.reduce((acc, caisseData) => {
+            if (caisseData && caisseData.retraits) {
+                for(const name in caisseData.retraits) {
+                    acc[name] = (acc[name] || 0) + parseInt(caisseData.retraits[name] || 0);
+                }
+            }
+            return acc;
+        }, {});
 
+        if (Object.keys(allRetraits).length === 0) return '';
+
+        let retraitsHtml = '<h4><i class="fa-solid fa-right-from-bracket"></i> Retraits Effectués</h4>';
+        retraitsHtml += '<table class="modal-details-table retrait-table"><thead><tr><th>Dénomination</th><th>Quantité Retirée</th><th>Montant Retiré</th></tr></thead><tbody>';
+        let totalRetire = 0;
+
+        const allDenoms = [...Object.entries(globalConfig.denominations.billets), ...Object.entries(globalConfig.denominations.pieces)]
+            .sort(([, valA], [, valB]) => valB - valA);
+
+        for (const [name, value] of allDenoms) {
+            const quantite = allRetraits[name] || 0;
+            if (quantite > 0) {
+                const totalLigne = quantite * value;
+                totalRetire += totalLigne;
+                const label = value >= 1 ? `${value} ${globalConfig.currencySymbol}` : `${value * 100} cts`;
+                const type = globalConfig.denominations.billets[name] ? 'Billet' : 'Pièce';
+                retraitsHtml += `<tr><td>${type} de ${label}</td><td>${quantite}</td><td>${utils.formatEuros(totalLigne)}</td></tr>`;
+            }
+        }
+        retraitsHtml += `</tbody><tfoot><tr><td colspan="2">Total Retiré</td><td><strong>${utils.formatEuros(totalRetire)}</strong></td></tr></tfoot></table>`;
+        return retraitsHtml;
+    };
 
     const summaryData = isGlobalView ? calculatedResults.combines : calculatedResults.caisses[caisseId];
     const denominationsSource = getDenominationsSource(comptageData, caisseId);
+    const isComptageFinal = comptageData.nom_comptage.startsWith('Comptage final');
 
     const html = `
         <div class="modal-header">
@@ -155,6 +151,8 @@ export function showDetailsModal(comptageData, caisseId = null) {
         <h4>Résumé Financier</h4>
         ${generateSummaryHtml(summaryData)}
         
+        ${isComptageFinal ? generateRetraitsTableHtml() : ''}
+
         <div class="modal-details-grid">
             <div>
                 <h4>Répartition des Espèces</h4>
@@ -174,10 +172,7 @@ export function showDetailsModal(comptageData, caisseId = null) {
     if (dom.detailsModalContent) {
         dom.detailsModalContent.innerHTML = html;
         dom.detailsModal.classList.add('visible');
-        
-        // Rendu du graphique
         renderModalChart(document.getElementById('modal-chart-container'), denominationsSource);
-        
         const dataForExport = isGlobalView ? { ...comptageData, isGlobal: true } : comptageData;
         document.getElementById('pdf-modal-btn').addEventListener('click', () => generateComptagePdf(dataForExport));
         document.getElementById('csv-modal-btn').addEventListener('click', () => generateComptageCsv(dataForExport));
@@ -228,8 +223,7 @@ export function showComparisonModal(selectedIds) {
 }
 
 /**
- * (NOUVEAU) Affiche la modale interactive pour le détail des retraits d'une journée.
- * @param {object} dayData - Les données de retrait pour une journée spécifique.
+ * Affiche la modale interactive pour le détail des retraits d'une journée.
  */
 export function showWithdrawalDetailsModal(dayData) {
     const modal = document.getElementById('withdrawal-details-modal');
