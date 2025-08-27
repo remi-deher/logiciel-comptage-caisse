@@ -345,68 +345,37 @@ class CalculateurController {
         try {
             $this->pdo->beginTransaction();
     
+            // 1. Sauvegarde du "Comptage final" complet de la journée
             $nom_comptage_final = "Comptage final du " . date('d/m/Y H:i:s');
             $explication_final = "Sauvegarde complète avant la clôture générale.";
             $stmt_final = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt_final->execute([$nom_comptage_final, $explication_final, date('Y-m-d H:i:s')]);
             $comptage_id_final = $this->pdo->lastInsertId();
     
-            foreach ($this->noms_caisses as $caisse_id => $nom) {
-                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
-                if (!empty($caisse_data)) {
-                    $stmt_details_final = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                    $stmt_details_final->execute([
-                        $comptage_id_final,
-                        $caisse_id,
-                        get_numeric_value($caisse_data, 'fond_de_caisse'),
-                        get_numeric_value($caisse_data, 'ventes'),
-                        get_numeric_value($caisse_data, 'retrocession')
-                    ]);
-                    $comptage_detail_id_final = $this->pdo->lastInsertId();
-    
-                    foreach ($this->denominations as $type => $denominations_list) {
-                        foreach ($denominations_list as $name => $value) {
-                            $quantite = get_numeric_value($caisse_data, $name);
-                            if ($quantite > 0) {
-                                $stmt_denom_final = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
-                                $stmt_denom_final->execute([$comptage_detail_id_final, $name, $quantite]);
-                            }
-                        }
-                    }
-
-                    // AMÉLIORATION : Calculer et enregistrer les retraits
-                    $total_compte = 0;
-                    $current_counts = [];
-                    foreach ($this->denominations as $type => $denominations_list) {
-                        foreach ($denominations_list as $name => $value) {
-                            $quantite = get_numeric_value($caisse_data, $name);
-                            $current_counts[$name] = $quantite;
-                            $total_compte += $quantite * $value;
-                        }
-                    }
-                    $fond_de_caisse = get_numeric_value($caisse_data, 'fond_de_caisse');
-                    $recette_reelle = $total_compte - $fond_de_caisse;
-                    
-                    $suggestions = $this->generateWithdrawalSuggestion($recette_reelle, $current_counts, $this->denominations, $min_to_keep ?? []);
-
-                    foreach ($suggestions as $name => $quantite_a_retirer) {
-                        if ($quantite_a_retirer > 0) {
-                            $stmt_retrait = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
-                            $stmt_retrait->execute([$comptage_detail_id_final, $name, $quantite_a_retirer]);
-                        }
-                    }
-                }
-            }
-    
+            // 2. Création de l'enregistrement "Fond de caisse J+1"
             $nom_comptage_j1 = "Fond de caisse J+1 - cloture du " . date('d/m/Y');
             $explication_j1 = "Comptage généré automatiquement après la clôture générale.";
             $stmt_j1 = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt_j1->execute([$nom_comptage_j1, $explication_j1, date('Y-m-d H:i:s')]);
             $comptage_id_j1 = $this->pdo->lastInsertId();
-    
+
             foreach ($this->noms_caisses as $caisse_id => $nom) {
                 $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
+                if (empty($caisse_data)) continue;
+
+                // --- A. Traitement pour le "Comptage final" ---
                 
+                // Sauvegarde des détails (fond de caisse, ventes, etc.)
+                $stmt_details_final = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+                $stmt_details_final->execute([
+                    $comptage_id_final, $caisse_id,
+                    get_numeric_value($caisse_data, 'fond_de_caisse'),
+                    get_numeric_value($caisse_data, 'ventes'),
+                    get_numeric_value($caisse_data, 'retrocession')
+                ]);
+                $comptage_detail_id_final = $this->pdo->lastInsertId();
+
+                // Calculs et sauvegarde des dénominations et retraits
                 $total_compte = 0;
                 $current_counts = [];
                 foreach ($this->denominations as $type => $denominations_list) {
@@ -414,19 +383,34 @@ class CalculateurController {
                         $quantite = get_numeric_value($caisse_data, $name);
                         $current_counts[$name] = $quantite;
                         $total_compte += $quantite * $value;
+                        if ($quantite > 0) {
+                            $stmt_denom_final = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                            $stmt_denom_final->execute([$comptage_detail_id_final, $name, $quantite]);
+                        }
                     }
                 }
+                
                 $fond_de_caisse = get_numeric_value($caisse_data, 'fond_de_caisse');
                 $recette_reelle = $total_compte - $fond_de_caisse;
+                $suggestions_retrait = $this->generateWithdrawalSuggestion($recette_reelle, $current_counts, $this->denominations, $min_to_keep ?? []);
+
+                foreach ($suggestions_retrait as $name => $quantite_a_retirer) {
+                    if ($quantite_a_retirer > 0) {
+                        $stmt_retrait = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
+                        $stmt_retrait->execute([$comptage_detail_id_final, $name, $quantite_a_retirer]);
+                    }
+                }
                 
-                $suggestions = $this->generateWithdrawalSuggestion($recette_reelle, $current_counts, $this->denominations, $min_to_keep ?? []);
-    
+                // --- B. Traitement pour le "Fond de caisse J+1" ---
+                
+                // Le fond de caisse reste le même, les ventes et rétrocessions sont à zéro
                 $stmt_details_j1 = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, 0, 0)");
                 $stmt_details_j1->execute([$comptage_id_j1, $caisse_id, $fond_de_caisse]);
                 $comptage_detail_id_j1 = $this->pdo->lastInsertId();
-    
+
+                // On sauvegarde les dénominations restantes APRES retrait
                 foreach ($current_counts as $name => $quantite) {
-                    $quantite_a_retirer = $suggestions[$name] ?? 0;
+                    $quantite_a_retirer = $suggestions_retrait[$name] ?? 0;
                     $nouvelle_quantite = $quantite - $quantite_a_retirer;
     
                     if ($nouvelle_quantite > 0) {
@@ -438,18 +422,18 @@ class CalculateurController {
     
             $this->pdo->commit();
     
-            $stmt_delete = $this->pdo->prepare(
-                "DELETE FROM comptages WHERE DATE(date_comptage) = CURDATE() AND id NOT IN (?, ?)"
-            );
-            $stmt_delete->execute([$comptage_id_final, $comptage_id_j1]);
+            // 3. Nettoyage des sauvegardes auto de la journée
+            $stmt_delete = $this->pdo->prepare("DELETE FROM comptages WHERE DATE(date_comptage) = CURDATE() AND nom_comptage LIKE 'Sauvegarde auto%'");
+            $stmt_delete->execute();
     
+            // 4. Préparation du nouvel état pour l'interface
             $newState = $this->loadComptageData($comptage_id_j1);
             $newState['nom_comptage'] = '';
             $newState['explication'] = '';
 
             $this->clotureStateService->resetState();
     
-            echo json_encode(['success' => true, 'message' => "Clôture générale réussie. Les sauvegardes finales ont été créées et les sauvegardes intermédiaires nettoyées.", 'newState' => $newState]);
+            echo json_encode(['success' => true, 'message' => "Clôture générale réussie. Le fond de caisse pour demain est prêt.", 'newState' => $newState]);
     
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) {
@@ -469,11 +453,12 @@ class CalculateurController {
         arsort($allDenominations);
 
         foreach ($allDenominations as $name => $value) {
+            $suggestions[$name] = 0; // Initialise pour toutes les dénominations
             $countInCaisse = $currentCounts[$name] ?? 0;
             $toKeep = $minToKeep[$name] ?? 0;
             $availableToRemove = max(0, $countInCaisse - $toKeep);
             
-            if ($value > 0) {
+            if ($value > 0 && $remainingAmount > 0 && $availableToRemove > 0) {
                 $numToRemove = min(floor($remainingAmount / $value), $availableToRemove);
                 if ($numToRemove > 0) {
                     $suggestions[$name] = $numToRemove;
