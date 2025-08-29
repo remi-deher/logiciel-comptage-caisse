@@ -156,7 +156,6 @@ switch ($page) {
         break;
 
     case 'reserve':
-        AuthController::checkAuth();
         $reserveController->index();
         break;
 
