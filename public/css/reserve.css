@@ -1,0 +1,177 @@
+/* public/css/reserve.css */
+
+.reserve-section {
+    margin-bottom: 30px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--color-border-light);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+.section-header h2, .section-header h3 {
+    margin: 0;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.total-value-display {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: var(--color-primary);
+}
+
+/* Grille de l'état de la réserve */
+.denominations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+}
+.denom-card {
+    background-color: var(--color-surface-alt);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid var(--color-border-light);
+}
+.denom-card h4 {
+    margin: 0 0 5px 0;
+    font-size: 1em;
+}
+.denom-card .quantite {
+    font-size: 1.8em;
+    font-weight: bold;
+}
+.denom-card .valeur {
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
+}
+
+/* Panneau d'interaction */
+.interaction-panel {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 30px;
+}
+
+/* Cartes génériques */
+.card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+}
+.card h4 {
+    margin-top: 0;
+}
+
+/* Formulaire de demande */
+#new-demande-form {
+    border-left: 4px solid var(--color-primary);
+}
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 15px;
+}
+.value-display {
+    text-align: right;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+/* Carte de demande en attente */
+.demande-card {
+    border-left: 4px solid var(--color-warning);
+}
+.demande-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.demande-header h5 {
+    margin: 0;
+    font-size: 1.1em;
+}
+.demande-header .date {
+    font-size: 0.8em;
+    color: var(--color-text-muted);
+}
+.demande-body .echange-arrow {
+    font-size: 1.2em;
+    color: var(--color-text-secondary);
+    margin: 5px 0;
+}
+.demande-body .valeur-display {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+.demande-notes {
+    font-style: italic;
+    color: var(--color-text-secondary);
+    background-color: var(--color-surface-alt);
+    padding: 10px;
+    border-radius: 6px;
+    margin: 10px 0;
+}
+.balance-display {
+    text-align: center;
+    padding: 10px;
+    margin: 15px 0;
+    border-radius: 6px;
+    font-weight: bold;
+}
+.balance-display.ok {
+    background-color: rgba(39, 174, 96, 0.1);
+    color: var(--color-success);
+}
+.balance-display.error {
+    background-color: rgba(192, 57, 43, 0.1);
+    color: var(--color-danger);
+}
+
+/* Historique */
+#historique-list .card {
+    border-left: 4px solid var(--color-text-muted);
+}
+.historique-item-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
+    margin-bottom: 10px;
+}
+.historique-item-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: center;
+}
+.historique-item-body .echange-direction {
+    flex-grow: 1;
+}
+.historique-item-body .echange-direction i {
+    font-size: 1.5em;
+    color: var(--color-text-muted);
+}
+.historique-item-body .montant {
+    display: block;
+    font-weight: bold;
+}
+
+.hidden {
+    display: none;
+}
+
+@media (max-width: 992px) {
+    .interaction-panel {
+        grid-template-columns: 1fr;
+    }
+}

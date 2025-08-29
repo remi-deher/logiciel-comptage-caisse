@@ -14,7 +14,10 @@ $page_active = $_GET['page'] ?? 'calculateur';
             <li class="nav-item"><a href="index.php?page=statistiques" class="<?= ($page_active === 'statistiques') ? 'active' : '' ?>"><i class="fa-solid fa-chart-pie"></i> Statistiques</a></li>
             <li class="nav-item"><a href="index.php?page=aide" class="<?= ($page_active === 'aide') ? 'active' : '' ?>"><i class="fa-solid fa-circle-question"></i> Aide</a></li>
             <li class="nav-item"><a href="index.php?page=changelog" class="<?= ($page_active === 'changelog') ? 'active' : '' ?>"><i class="fa-solid fa-rocket"></i> Changelog</a></li>
-            <?php if (!empty($_SESSION['is_admin'])): ?>
+            <li class="nav-item"><a href="index.php?page=calculateur" class="<?= ($page_active === 'calculateur') ? 'active' : '' ?>"><i class="fa-solid fa-calculator"></i> Calculateur</a></li>
+            <li class="nav-item"><a href="index.php?page=historique" class="<?= ($page_active === 'historique') ? 'active' : '' ?>"><i class="fa-solid fa-history"></i> Historique</a></li>
+            <li class="nav-item"><a href="index.php?page=reserve" class="<?= ($page_active === 'reserve') ? 'active' : '' ?>"><i class="fa-solid fa-vault"></i> Réserve</a></li> <li class="nav-item"><a href="index.php?page=statistiques" class="<?= ($page_active === 'statistiques') ? 'active' : '' ?>"><i class="fa-solid fa-chart-pie"></i> Statistiques</a></li>
+<?php if (!empty($_SESSION['is_admin'])): ?>
                 <li class="nav-item"><a href="index.php?page=admin" class="<?= ($page_active === 'admin') ? 'active' : '' ?>"><i class="fa-solid fa-toolbox"></i> Administration</a></li>
                 <li class="nav-item"><a href="index.php?page=logout"><i class="fa-solid fa-sign-out-alt"></i> Déconnexion</a></li>
             <?php else: ?>

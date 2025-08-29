@@ -85,3 +85,34 @@ CREATE TABLE IF NOT EXISTS `comptage_cheques` (
   PRIMARY KEY (`id`),
   FOREIGN KEY (`comptage_detail_id`) REFERENCES `comptage_details`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `reserve_operations_log` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `date_operation` DATETIME NOT NULL,
+  `caisse_id` INT(11) NOT NULL,
+  `denomination_vers_caisse` VARCHAR(255) NOT NULL,
+  `quantite_vers_caisse` INT(11) NOT NULL,
+  `denomination_depuis_caisse` VARCHAR(255) NOT NULL,
+  `quantite_depuis_caisse` INT(11) NOT NULL,
+  `valeur_echange` DECIMAL(10,2) NOT NULL,
+  `notes` TEXT DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`caisse_id`) REFERENCES `caisses`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `reserve_demandes` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `date_demande` DATETIME NOT NULL,
+  `caisse_id` INT(11) NOT NULL,
+  `demandeur_nom` VARCHAR(255) NULL, -- Nom de l'opérateur (si vous avez un système d'utilisateurs)
+  `denomination_demandee` VARCHAR(255) NOT NULL,
+  `quantite_demandee` INT(11) NOT NULL,
+  `valeur_demandee` DECIMAL(10,2) NOT NULL,
+  `statut` ENUM('EN_ATTENTE', 'TRAITEE', 'ANNULEE') NOT NULL DEFAULT 'EN_ATTENTE',
+  `notes_demandeur` TEXT DEFAULT NULL,
+  -- Ces champs seront remplis lors du traitement par le dirigeant
+  `date_traitement` DATETIME NULL,
+  `approbateur_nom` VARCHAR(255) NULL, 
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`caisse_id`) REFERENCES `caisses`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

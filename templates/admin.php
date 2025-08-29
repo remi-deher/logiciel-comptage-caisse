@@ -140,6 +140,39 @@
                 </form>
             </div>
         </div>
+        
+        <div class="admin-card full-width-card">
+            <h3><i class="fa-solid fa-vault"></i>Gestion de la Réserve de Monnaie</h3>
+            <form action="index.php?page=admin" method="POST">
+                <input type="hidden" name="action" value="update_reserve">
+                <div class="admin-card-content">
+                    <p>Modifiez ici les quantités de chaque dénomination présentes dans votre réserve (coffre). La valeur totale est de <strong><?= htmlspecialchars(number_format($reserve_status['total'], 2, ',', ' ')) ?> <?= APP_CURRENCY_SYMBOL ?></strong>.</p>
+                    <div class="reserve-grid">
+                        <div class="reserve-column">
+                            <h4>Billets</h4>
+                            <?php foreach($denominations['billets'] as $name => $valeur): ?>
+                            <div class="form-group-inline">
+                                <label for="reserve_<?= $name ?>"><?= $valeur ?> <?= APP_CURRENCY_SYMBOL ?></label>
+                                <input type="number" class="inline-input" id="reserve_<?= $name ?>" name="quantities[<?= $name ?>]" min="0" value="<?= htmlspecialchars($reserve_status['denominations'][$name] ?? 0) ?>">
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="reserve-column">
+                            <h4>Pièces</h4>
+                             <?php foreach($denominations['pieces'] as $name => $valeur): ?>
+                            <div class="form-group-inline">
+                                <label for="reserve_<?= $name ?>"><?= $valeur >= 1 ? $valeur.' '.APP_CURRENCY_SYMBOL : ($valeur*100).' cts' ?></label>
+                                <input type="number" class="inline-input" id="reserve_<?= $name ?>" name="quantities[<?= $name ?>]" min="0" value="<?= htmlspecialchars($reserve_status['denominations'][$name] ?? 0) ?>">
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="admin-card-footer">
+                    <button type="submit" class="save-btn"><i class="fa-solid fa-save"></i> Enregistrer les modifications de la Réserve</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 <?php require __DIR__ . '/partials/footer.php'; ?>

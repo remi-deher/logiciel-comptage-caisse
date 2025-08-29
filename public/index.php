@@ -58,6 +58,7 @@ require_once __DIR__ . '/../src/AideController.php';
 require_once __DIR__ . '/../src/ChangelogController.php';
 require_once __DIR__ . '/../src/CalculateurController.php';
 require_once __DIR__ . '/../src/HistoriqueController.php';
+require_once __DIR__ . '/../src/ReserveController.php';
 
 
 // Pour la compatibilité ascendante, on s'assure que la variable TPE existe
@@ -73,6 +74,7 @@ $aideController = new AideController();
 $changelogController = new ChangelogController();
 $calculateurController = new CalculateurController($pdo, $noms_caisses, $denominations, $tpe_par_caisse);
 $historiqueController = new HistoriqueController($pdo, $noms_caisses, $denominations, $tpe_par_caisse);
+$reserveController = new ReserveController($pdo, $noms_caisses, $denominations);
 
 
 $page = $_GET['page'] ?? 'calculateur';
@@ -81,8 +83,8 @@ $action = $_REQUEST['action'] ?? null;
 // --- Routes pour les actions AJAX (qui ne chargent pas de page complète) ---
 $ajax_action = $_GET['action'] ?? null;
 if ($ajax_action) {
-    // On désactive les erreurs PHP qui pourraient casser le JSON
-    error_reporting(0);
+    // Commentez la ligne ci-dessous pendant le développement pour voir les erreurs PHP
+    // error_reporting(0); 
     
     switch ($ajax_action) {
         case 'git_release_check':
@@ -115,12 +117,22 @@ if ($ajax_action) {
         case 'cloture_generale':
             $calculateurController->cloture_generale();
             exit;
-        // MODIFIÉ : Remplace l'ancienne route par la nouvelle logique de chargement
         case 'get_initial_data':
             $calculateurController->getInitialData();
             exit;
         case 'get_cloture_state':
             $calculateurController->getClotureState();
+            exit;
+        
+        // CORRECTION : Routes pour la Réserve plus spécifiques pour éviter les conflits
+        case 'get_reserve_data':
+            $reserveController->getReserveDataJson();
+            exit;
+        case 'submit_reserve_demande':
+            $reserveController->submitDemande();
+            exit;
+        case 'process_reserve_demande':
+            $reserveController->processDemande();
             exit;
     }
 }
@@ -143,6 +155,11 @@ switch ($page) {
         $statistiquesController->statistiques();
         break;
 
+    case 'reserve':
+        AuthController::checkAuth();
+        $reserveController->index();
+        break;
+
     case 'login':
         $authController->login();
         break;
@@ -152,6 +169,7 @@ switch ($page) {
         break;
 
     case 'admin':
+        AuthController::checkAuth();
         $adminController->index();
         break;
 

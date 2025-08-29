@@ -3,7 +3,8 @@
 
 require_once __DIR__ . '/Utils.php';
 require_once 'services/CurrencyService.php';
-require_once 'services/TerminalManagementService.php'; // AJOUT
+require_once 'services/TerminalManagementService.php';
+require_once 'services/ReserveService.php'; // AJOUT
 
 class AdminController {
     private $pdo;
@@ -13,9 +14,11 @@ class AdminController {
     private $userService;
     private $caisseManagementService;
     private $currencyService;
-    private $terminalManagementService; // AJOUT
+    private $terminalManagementService;
+    private $reserveService; // AJOUT
 
     public function __construct($pdo) {
+        global $denominations; // On a besoin des dénominations pour le service de réserve
         $this->pdo = $pdo;
         $this->backupService = new BackupService();
         $this->versionService = new VersionService();
@@ -23,7 +26,8 @@ class AdminController {
         $this->userService = new UserService($pdo);
         $this->caisseManagementService = new CaisseManagementService($pdo, $this->configService);
         $this->currencyService = new CurrencyService();
-        $this->terminalManagementService = new TerminalManagementService($pdo, $this->configService); // AJOUT
+        $this->terminalManagementService = new TerminalManagementService($pdo, $this->configService);
+        $this->reserveService = new ReserveService($pdo, $denominations); // AJOUT
     }
 
     public function index() {
@@ -52,7 +56,7 @@ class AdminController {
                 case 'rename_caisse': $this->caisseManagementService->renameCaisse(intval($_POST['caisse_id'] ?? 0), $_POST['caisse_name'] ?? ''); break;
                 case 'delete_caisse': $this->caisseManagementService->deleteCaisse(intval($_POST['caisse_id'] ?? 0)); break;
 
-                // AJOUT : Actions de gestion des terminaux
+                // Actions de gestion des terminaux
                 case 'add_terminal': 
                     $this->terminalManagementService->addTerminal($_POST['terminal_name'] ?? '', $_POST['caisse_associee'] ?? 0); 
                     break;
@@ -61,6 +65,17 @@ class AdminController {
                     break;
                 case 'delete_terminal': 
                     $this->terminalManagementService->deleteTerminal(intval($_POST['terminal_id'] ?? 0)); 
+                    break;
+                
+                // AJOUT : Action pour mettre à jour la réserve
+                case 'update_reserve':
+                    $quantities = $_POST['quantities'] ?? [];
+                    $result = $this->reserveService->updateQuantities($quantities);
+                    if ($result) {
+                        $_SESSION['admin_message'] = "Réserve de monnaie mise à jour avec succès.";
+                    } else {
+                        $_SESSION['admin_error'] = "Une erreur est survenue lors de la mise à jour de la réserve.";
+                    }
                     break;
             }
             header('Location: index.php?page=admin');
@@ -89,12 +104,14 @@ class AdminController {
         $caisses = $noms_caisses;
         $timezones = DateTimeZone::listIdentifiers(DateTimeZone::EUROPE);
 
-        // NOUVEAU: Récupère les terminaux depuis la BDD
         $stmt = $this->pdo->query("SELECT * FROM terminaux_paiement ORDER BY nom_terminal ASC");
         $terminaux = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         $currenciesData = $this->currencyService->getCurrenciesData();
         $current_currency_code = defined('APP_CURRENCY') ? APP_CURRENCY : 'EUR';
+
+        // AJOUT : Récupérer l'état actuel de la réserve pour l'afficher
+        $reserve_status = $this->reserveService->getReserveStatus();
         
         $page_css = 'admin.css';
         require __DIR__ . '/../templates/admin.php';

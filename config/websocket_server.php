@@ -167,6 +167,14 @@ class Caisse implements MessageComponentInterface {
                     // Le contrôleur a déjà fait le travail, on notifie juste les clients
                     $this->broadcast(['type' => 'all_caisses_closed_and_reset']);
                     break;
+                
+                // AJOUT : Gestion des messages pour la Réserve
+                case 'nouvelle_demande_reserve':
+                    $this->broadcast(['type' => 'nouvelle_demande_reserve']);
+                    break;
+                case 'demande_reserve_traitee':
+                    $this->broadcast(['type' => 'demande_reserve_traitee']);
+                    break;
             }
         } catch (\Exception $e) {
             error_log("Erreur dans onMessage: {$e->getMessage()}");
