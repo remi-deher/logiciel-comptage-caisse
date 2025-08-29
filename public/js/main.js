@@ -14,10 +14,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const Global = {
         init: function() {
-            this.initNavbar();
+            this.initNavbar(); // <- MODIFIÉ pour inclure la nouvelle logique
             this.initThemeSwitcher();
             this.initVersionCheck();
-            // NOUVEAU: Appelle les fonctions du module 'cloture' si elles existent
             if (window.initClotureButton) {
                 window.initClotureButton();
             }
@@ -27,11 +26,43 @@ document.addEventListener('DOMContentLoaded', function() {
         },
 
         initNavbar: function() {
-            const navbarToggler = document.getElementById('navbar-toggler');
-            const navbarCollapse = document.getElementById('navbar-collapse');
-            if (navbarToggler && navbarCollapse) {
-                navbarToggler.addEventListener('click', () => navbarCollapse.classList.toggle('show'));
+            // Logique pour le menu utilisateur (dropdown)
+            const userMenuToggler = document.getElementById('user-menu-toggler');
+            const userMenuDropdown = document.getElementById('user-menu-dropdown');
+
+            if (userMenuToggler && userMenuDropdown) {
+                userMenuToggler.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    userMenuDropdown.classList.toggle('show');
+                    userMenuToggler.classList.toggle('active');
+                });
             }
+            
+            // Logique pour le menu mobile (hamburger)
+            const navbarToggler = document.getElementById('navbar-toggler');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const navbarLinks = document.querySelector('.navbar-links'); // Liens du bureau
+
+            if (navbarToggler && mobileMenu && navbarLinks) {
+                // Cloner les liens du bureau vers le menu mobile pour éviter la duplication de code
+                mobileMenu.innerHTML = navbarLinks.innerHTML;
+
+                navbarToggler.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    mobileMenu.classList.toggle('show');
+                });
+            }
+
+            // Fermer les menus si on clique à l'extérieur
+            window.addEventListener('click', () => {
+                if (userMenuDropdown && userMenuDropdown.classList.contains('show')) {
+                    userMenuDropdown.classList.remove('show');
+                    userMenuToggler.classList.remove('active');
+                }
+                if (mobileMenu && mobileMenu.classList.contains('show')) {
+                    mobileMenu.classList.remove('show');
+                }
+            });
         },
 
         initThemeSwitcher: function() {

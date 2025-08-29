@@ -61,7 +61,7 @@ body {
 
 .container {
     width: 100%;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto 20px auto;
     background-color: var(--color-surface);
     padding: var(--space-md);
@@ -173,7 +173,7 @@ body[data-theme="dark"] .error {
 
 /* --- Styles pour le Pied de Page (Footer) --- */
 .main-footer {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 20px auto;
     background-color: #2c3e50; /* Couleur sombre de base */
     color: #bdc3c7; /* Texte clair pour le contraste */

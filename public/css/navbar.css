@@ -1,88 +1,81 @@
 /* ==========================================================================
-   public/css/navbar.css (Avec Thème Sombre Amélioré)
+   public/css/navbar.css (Version Refondue)
    ========================================================================== */
 
+:root {
+    --navbar-height: 70px;
+}
+
 .navbar {
-    max-width: 1200px;
-    margin: 20px auto 0 auto; /* La marge basse est à 0 pour coller au conteneur */
-    box-sizing: border-box;
-    width: 100%;
-    padding: 0 20px;
-    background-color: var(--color-surface); /* Utilise la couleur de surface du thème */
-    border-radius: 12px 12px 0 0; /* Uniquement les coins supérieurs sont arrondis */
+    height: var(--navbar-height);
+    max-width: 1400px;
+    margin: 20px auto 30px auto;
+    width: calc(100% - 40px);
+    padding: 0 30px;
+    background-color: var(--color-surface);
+    border-radius: 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 15px;
-    position: relative;
-    border: 1px solid var(--color-border-light); /* Bordure assortie au thème */
-    border-bottom: none; /* Pas de bordure en bas pour fusionner avec le conteneur */
-    font-family: 'Arial', sans-serif;
+    border: 1px solid var(--color-border-light);
+    box-shadow: 0 4px 20px var(--shadow-color);
+    position: relative; /* Pour le menu mobile */
 }
 
+/* 1. Titre/Logo */
 .navbar-brand {
-    color: var(--color-primary); /* Utilise la couleur primaire du thème */
-    font-size: 1.8em;
+    font-size: 1.5em;
+    font-weight: 600;
+    color: var(--color-text-primary);
     text-decoration: none;
-    padding: 15px 0;
-    transition: transform 0.2s ease-in-out;
-}
-
-.navbar-brand:hover {
-    transform: scale(1.1);
-}
-
-.navbar-collapse {
     display: flex;
     align-items: center;
     gap: 10px;
+    transition: color 0.2s;
+}
+.navbar-brand:hover {
+    color: var(--color-primary);
+}
+.navbar-brand i {
+    color: var(--color-primary);
 }
 
-.navbar-nav {
+/* 2. Navigation Principale (Centre) */
+.navbar-links {
     display: flex;
-    list-style: none;
-    margin: 0;
-    padding: 0;
+    gap: 10px;
 }
-
-.nav-item a {
-    color: var(--color-text-secondary); /* Couleur de texte secondaire */
+.navbar-links a {
+    padding: 10px 18px;
+    border-radius: 8px;
+    color: var(--color-text-secondary);
     text-decoration: none;
-    padding: 20px 15px;
-    display: flex; /* Flex pour aligner icône et texte */
+    font-weight: 500;
+    display: flex;
     align-items: center;
-    gap: 8px; /* Espace entre l'icône et le texte */
-    font-weight: 600;
-    border-bottom: 3px solid transparent;
-    transition: color 0.3s, border-color 0.3s;
+    gap: 8px;
+    transition: background-color 0.2s, color 0.2s;
 }
-
-.nav-item a:hover {
-    color: var(--color-primary);
-}
-
-.nav-item a.active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
-}
-
-.navbar-toggler {
-    display: none;
-    background: none;
-    border: none;
+.navbar-links a:hover {
+    background-color: var(--color-surface-alt-hover);
     color: var(--color-text-primary);
-    font-size: 1.8em;
-    cursor: pointer;
+}
+.navbar-links a.active {
+    background-color: var(--color-primary);
+    color: white;
+}
+.navbar-links a.active i {
+    color: white;
 }
 
+/* 3. Contrôles (Droite) */
 .navbar-controls {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 
-/* --- Indicateur de statut WebSocket (Inchangé mais utilise les variables) --- */
+/* Indicateur de statut (inchangé) */
 .status-indicator {
     display: flex;
     align-items: center;
@@ -94,25 +87,27 @@
     background-color: var(--color-warning);
     transition: background-color 0.5s ease;
 }
-.status-indicator .status-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background-color: white;
-    margin-right: 8px;
-    animation: pulse 2s infinite;
-}
 .status-indicator.connected { background-color: var(--color-success); }
-.status-indicator.connected .status-dot { animation: none; }
 .status-indicator.disconnected { background-color: var(--color-danger); }
-.status-indicator.disconnected .status-dot { animation: none; background-color: rgba(255, 255, 255, 0.7); }
-@keyframes pulse {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
-}
+.status-indicator .status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: white; margin-right: 8px; }
 
-/* --- Bouton de Thème --- */
+/* Bouton de clôture (inchangé) */
+.cloture-btn {
+    background-color: #8a2be2;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.cloture-btn:hover { background-color: #6a0dad; transform: translateY(-2px); }
+
+/* Bouton de thème (inchangé) */
 .theme-switch-btn {
     background-color: var(--color-surface-alt);
     border: 1px solid var(--color-border-light);
@@ -130,64 +125,115 @@
 .theme-switch-btn:hover {
     color: var(--color-primary);
     border-color: var(--color-primary);
-    transform: rotate(15deg);
 }
-.theme-switch-btn .fa-sun { display: none; }
-.theme-switch-btn .fa-moon { display: block; }
+.theme-switch-btn .fa-sun { display: none; } body[data-theme="dark"] .theme-switch-btn .fa-sun { display: block; }
+.theme-switch-btn .fa-moon { display: block; } body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
 
-body[data-theme="dark"] .theme-switch-btn .fa-sun { display: block; }
-body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
+/* 4. Menu utilisateur (Dropdown) */
+.user-menu {
+    position: relative;
+}
+.user-menu-btn {
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border-light);
+    color: var(--color-text-secondary);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+.user-menu-btn:hover, .user-menu-btn.active {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+.user-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    background-color: var(--color-surface);
+    border-radius: 8px;
+    box-shadow: 0 5px 25px var(--shadow-color);
+    border: 1px solid var(--color-border-light);
+    width: 220px;
+    padding: 8px;
+    z-index: 1001;
+    display: none;
+    flex-direction: column;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.user-menu-dropdown.show {
+    display: flex;
+    opacity: 1;
+    transform: translateY(0);
+}
+.user-menu-dropdown a {
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    padding: 10px 15px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.user-menu-dropdown a:hover {
+    background-color: var(--color-surface-alt-hover);
+    color: var(--color-text-primary);
+}
+.user-menu-dropdown a i {
+    width: 20px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+.user-menu-dropdown hr {
+    border: none;
+    border-top: 1px solid var(--color-border-light);
+    margin: 8px 0;
+}
 
+/* 5. Responsive (Mobile) */
+.navbar-toggler { display: none; }
+.mobile-menu { display: none; }
 
-@media (max-width: 1200px) {
-    .navbar {
-        margin-left: 10px;
-        margin-right: 10px;
+@media (max-width: 1400px) {
+    .navbar-links { display: none; }
+    .navbar-toggler {
+        display: block;
+        background: none;
+        border: none;
+        color: var(--color-text-primary);
+        font-size: 1.8em;
+        cursor: pointer;
+        order: 3; /* Placer le hamburger à la fin */
     }
-}
-
-@media (max-width: 992px) {
-    .navbar-toggler { display: block; }
-    .navbar-collapse {
+    .mobile-menu {
         display: none;
         flex-direction: column;
-        align-items: stretch;
-        width: 100%;
+        position: absolute;
+        top: calc(100% + 10px);
+        left: 0;
+        right: 0;
         background-color: var(--color-surface);
-        padding: 10px 0;
+        border: 1px solid var(--color-border-light);
+        box-shadow: 0 5px 25px var(--shadow-color);
+        border-radius: 12px;
+        padding: 10px;
     }
-    .navbar-collapse.show { display: flex; }
-    .navbar-nav { flex-direction: column; width: 100%; }
-    .nav-item a { padding: 15px 20px; border-bottom: 1px solid var(--color-border-light); }
-    .nav-item:last-child a { border-bottom: none; }
-    .navbar-controls { margin: 10px 20px; justify-content: center; }
-}
-
-@media (min-width: 992.01px) {
-    .navbar-collapse { flex-grow: 1; justify-content: flex-end; }
-}
-
-/* --- Styles pour le bouton de clôture --- */
-.cloture-btn {
-    background-color: #8a2be2;
-    color: white;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.2s, transform 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.cloture-btn:hover {
-    background-color: #6a0dad;
-    transform: translateY(-2px);
-}
-
-.status-indicator.cloture {
-    background-color: #8a2be2;
-    color: white;
+    .mobile-menu.show { display: flex; }
+    .mobile-menu a {
+        padding: 12px 15px;
+        border-radius: 8px;
+        color: var(--color-text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 }
