@@ -55,15 +55,15 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                 <?php $is_first = false; endforeach; ?>
         </div>
 
-<div class="ecart-display-container">
-    <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
-    <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
-        <h4 class="active-caisse-title"><?= htmlspecialchars($nom) ?></h4> 
-        Écart Caisse Actuelle : <span class="ecart-value">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
-        <p class="ecart-explanation"></p>
-    </div>
-    <?php $is_first = false; endforeach; ?>
-</div>
+        <div class="ecart-display-container">
+            <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
+            <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
+                Écart Caisse Actuelle : <span class="ecart-value">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
+                <p class="ecart-explanation"></p>
+            </div>
+            <?php $is_first = false; endforeach; ?>
+        </div>
+
         <?php $is_first_caisse = true; foreach ($noms_caisses as $id => $nom): ?>
             <div id="caisse<?= $id ?>" class="caisse-tab-content <?= $is_first_caisse ? 'active' : '' ?>">
                 
@@ -125,11 +125,31 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
 
                     <div id="cb-<?= $id ?>" class="payment-tab-content">
                         <?php if (isset($terminaux_par_caisse[$id]) && !empty($terminaux_par_caisse[$id])): ?>
-                            <div class="grid grid-3">
+                            <div class="tpe-grid">
                                 <?php foreach ($terminaux_par_caisse[$id] as $terminal): ?>
-                                <div class="form-group">
-                                    <label><?= htmlspecialchars($terminal['nom_terminal']) ?> (<?= APP_CURRENCY_SYMBOL ?>)</label>
-                                    <input type="text" class="cb-input" data-caisse-id="<?= $id ?>" name="caisse[<?= $id ?>][cb][<?= $terminal['id'] ?>]" placeholder="0,00" value="<?= htmlspecialchars($loaded_data[$id]['cb'][$terminal['id']] ?? '') ?>" <?= $disabled_attr ?>>
+                                <div class="tpe-card" id="tpe-card-<?= $terminal['id'] ?>">
+                                    <div class="tpe-card-header">
+                                        <h4><i class="fa-solid fa-credit-card"></i> <?= htmlspecialchars($terminal['nom_terminal']) ?></h4>
+                                        <strong class="tpe-total" id="tpe-total-<?= $terminal['id'] ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></strong>
+                                    </div>
+                                    <div class="tpe-releves-container" id="tpe-releves-container-<?= $terminal['id'] ?>">
+                                        <?php 
+                                        $releves = $loaded_data[$id]['cb'][$terminal['id']] ?? [];
+                                        if (empty($releves)) { $releves[] = ''; } // Afficher au moins un champ
+                                        foreach ($releves as $index => $montant):
+                                        ?>
+                                        <div class="form-group-tpe">
+                                            <label>Relevé #<?= $index + 1 ?></label>
+                                            <input type="text" name="caisse[<?= $id ?>][cb][<?= $terminal['id'] ?>][]" class="cb-input" data-terminal-id="<?= $terminal['id'] ?>" placeholder="0,00" value="<?= htmlspecialchars($montant) ?>" <?= $disabled_attr ?>>
+                                            <button type="button" class="btn-remove-tpe" title="Supprimer ce relevé" <?= $disabled_attr ?>><i class="fa-solid fa-trash-can"></i></button>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <div class="tpe-card-footer">
+                                        <button type="button" class="btn-add-tpe" data-caisse-id="<?= $id ?>" data-terminal-id="<?= $terminal['id'] ?>" <?= $disabled_attr ?>>
+                                            <i class="fa-solid fa-plus"></i> Ajouter un relevé
+                                        </button>
+                                    </div>
                                 </div>
                                 <?php endforeach; ?>
                             </div>
@@ -139,7 +159,7 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                                     <input type="text" id="cb_attendu_<?= $id ?>" class="cb-attendu" data-caisse-id="<?= $id ?>" placeholder="0,00" <?= $disabled_attr ?>>
                                 </div>
                                 <div class="form-group">
-                                    <label>Encaissement CB réalisé (<?= APP_CURRENCY_SYMBOL ?>)</label>
+                                    <label>Encaissement CB réalisé (Total des relevés)</label>
                                     <input type="text" id="cb_constate_<?= $id ?>" readonly>
                                 </div>
                                 <div class="form-group">

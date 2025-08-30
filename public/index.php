@@ -123,6 +123,12 @@ if ($ajax_action) {
         case 'get_cloture_state':
             $calculateurController->getClotureState();
             exit;
+	case 'add_cb_log_entry':
+   	    $calculateurController->addCBLogEntry();
+    	    exit;
+	case 'get_cb_log':
+      	    $calculateurController->getCBLog();
+    	    exit;
         
         // CORRECTION : Routes pour la Réserve plus spécifiques pour éviter les conflits
         case 'get_reserve_data':

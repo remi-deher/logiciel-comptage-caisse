@@ -116,3 +116,14 @@ CREATE TABLE IF NOT EXISTS `reserve_demandes` (
   PRIMARY KEY (`id`),
   FOREIGN KEY (`caisse_id`) REFERENCES `caisses`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `comptage_cb_log` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `comptage_detail_id` INT(11) NOT NULL,
+  `terminal_id` INT(11) NOT NULL,
+  `montant_saisi` DECIMAL(10,2) NOT NULL,
+  `date_saisie` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`comptage_detail_id`) REFERENCES `comptage_details`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`terminal_id`) REFERENCES `terminaux_paiement`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

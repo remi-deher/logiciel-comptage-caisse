@@ -178,27 +178,47 @@ document.addEventListener('DOMContentLoaded', function() {
                 allCheques.push({ caisseNom: nomsCaisses[caisseId], cheques: cheques });
             }
 
+            let totalRetraitCaisse = 0;
+            let withdrawalCardsHtml = '';
+            const allDenominationsSorted = [...Object.entries(denominations.billets), ...Object.entries(denominations.pieces)].sort((a, b) => b[1] - a[1]);
+
+            allDenominationsSorted.forEach(([name, value]) => {
+                if (suggestions[name] > 0) {
+                    const isBillet = !!denominations.billets[name];
+                    const label = value >= 1 ? `${value} ${currencySymbol}` : `${value * 100} cts`;
+                    const subTotal = suggestions[name] * value;
+                    totalRetraitCaisse += subTotal;
+
+                    withdrawalCardsHtml += `
+                        <div class="withdrawal-card">
+                            <div class="denomination">
+                                <i class="fa-solid ${isBillet ? 'fa-money-bill-wave' : 'fa-coins'}"></i>
+                                ${label}
+                            </div>
+                            <span class="quantity">x ${suggestions[name]}</span>
+                            <div class="total-value">${formatCurrency(subTotal)}</div>
+                        </div>`;
+                }
+            });
+
             accordionHtml += `
                 <div class="accordion-card">
                     <div class="accordion-header">
                         <i class="fa-solid fa-cash-register"></i>
-                        <h3>${nomsCaisses[caisseId]} : Suggestion de retrait</h3>
+                        <h3>${nomsCaisses[caisseId]} : Retrait Suggéré</h3>
                         <button class="reopen-caisse-btn action-btn-small" data-caisse-id="${caisseId}"><i class="fa-solid fa-lock-open"></i> Réouvrir</button>
                         <i class="fa-solid fa-chevron-down accordion-toggle-icon"></i>
                     </div>
                     <div class="accordion-content">
                         <div class="accordion-content-inner">
-                            <table class="withdrawal-suggestion-table">
-                                <thead><tr><th>Dénomination</th><th>Quantité à retirer</th></tr></thead>
-                                <tbody>`;
-            const allDenominationsSorted = [...Object.entries(denominations.billets), ...Object.entries(denominations.pieces)].sort((a, b) => b[1] - a[1]);
-            allDenominationsSorted.forEach(([name, value]) => {
-                if (suggestions[name] > 0) {
-                    const label = value >= 1 ? `${value} ${currencySymbol}` : `${value * 100} cts`;
-                    accordionHtml += `<tr><td>${label}</td><td>${suggestions[name]}</td></tr>`;
-                }
-            });
-            accordionHtml += `</tbody></table></div></div></div>`;
+                            <div class="withdrawal-summary">
+                                <span>Total à retirer de cette caisse</span>
+                                <strong>${formatCurrency(totalRetraitCaisse)}</strong>
+                            </div>
+                            ${withdrawalCardsHtml ? `<div class="withdrawal-grid">${withdrawalCardsHtml}</div>` : '<p class="info-message">Aucun retrait suggéré pour cette caisse.</p>'}
+                        </div>
+                    </div>
+                </div>`;
         }
 
         const accordionContainer = clotureGeneraleModal.querySelector('.accordion-container');
@@ -220,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 chequesHtml += `</ul><div style="text-align:right; font-weight:bold; margin-top:5px;">Total Général Chèques: ${formatCurrency(totalGlobalCheques)}</div>`;
             } else {
-                chequesHtml += '<p>Aucun chèque enregistré pour cette période.</p>';
+                chequesHtml += '<p class="info-message">Aucun chèque enregistré pour cette période.</p>';
             }
             chequesContainer.innerHTML = chequesHtml;
         }
@@ -442,14 +462,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const suggestions = {};
         const allDenominations = [...Object.entries(denominations.billets), ...Object.entries(denominations.pieces)].sort((a, b) => b[1] - a[1]);
         for (const [name, value] of allDenominations) {
+            suggestions[name] = 0; // Initialisation
             const countInCaisse = currentCounts[name] || 0;
             const toKeep = minToKeep[name] || 0;
             const availableToRemove = Math.max(0, countInCaisse - toKeep);
-            const numToRemove = Math.min(Math.floor(remainingAmount / value), availableToRemove);
-            if (numToRemove > 0) {
-                suggestions[name] = numToRemove;
-                remainingAmount -= numToRemove * value;
-                remainingAmount = parseFloat(remainingAmount.toFixed(2));
+            
+            if (value > 0 && remainingAmount > 0 && availableToRemove > 0) {
+                const numToRemove = Math.min(Math.floor(remainingAmount / value), availableToRemove);
+                if (numToRemove > 0) {
+                    suggestions[name] = numToRemove;
+                    remainingAmount -= numToRemove * value;
+                    remainingAmount = parseFloat(remainingAmount.toFixed(2));
+                }
             }
         }
         return suggestions;

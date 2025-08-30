@@ -41,17 +41,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     
+    // MODIFIÉ : Calcule le total pour chaque terminal individuellement, puis le total pour la caisse
     function calculateCBTotals(caisseId) {
-        let totalConstate = 0;
-        document.querySelectorAll(`.cb-input[data-caisse-id="${caisseId}"]`).forEach(input => {
-            totalConstate += parseLocaleFloat(input.value);
+        let totalCaisseConstate = 0;
+
+        document.querySelectorAll(`#caisse${caisseId} .tpe-card`).forEach(card => {
+            const terminalId = card.id.split('-').pop();
+            let totalTerminal = 0;
+            card.querySelectorAll(`.cb-input[data-terminal-id="${terminalId}"]`).forEach(input => {
+                totalTerminal += parseLocaleFloat(input.value);
+            });
+            
+            const totalTerminalElement = card.querySelector(`#tpe-total-${terminalId}`);
+            if (totalTerminalElement) {
+                totalTerminalElement.textContent = formatCurrency(totalTerminal);
+            }
+            totalCaisseConstate += totalTerminal;
         });
 
         const attenduInput = document.getElementById(`cb_attendu_${caisseId}`);
         const totalAttendu = parseLocaleFloat(attenduInput.value);
-        const ecart = totalConstate - totalAttendu;
+        const ecart = totalCaisseConstate - totalAttendu;
 
-        document.getElementById(`cb_constate_${caisseId}`).value = formatCurrency(totalConstate);
+        document.getElementById(`cb_constate_${caisseId}`).value = formatCurrency(totalCaisseConstate);
         
         const ecartInput = document.getElementById(`cb_ecart_${caisseId}`);
         ecartInput.value = formatCurrency(ecart);
@@ -173,6 +185,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 header.classList.toggle('active');
                 const content = header.nextElementSibling;
                 content.classList.toggle('open');
+            }
+
+            // NOUVEAU : Gère l'ajout et la suppression de relevés CB
+            const addBtn = e.target.closest('.btn-add-tpe');
+            if (addBtn) {
+                const caisseId = addBtn.dataset.caisseId;
+                const terminalId = addBtn.dataset.terminalId;
+                const container = document.getElementById(`tpe-releves-container-${terminalId}`);
+                const releveCount = container.querySelectorAll('.form-group-tpe').length + 1;
+                const newReleveHtml = `
+                    <div class="form-group-tpe">
+                        <label>Relevé #${releveCount}</label>
+                        <input type="text" name="caisse[${caisseId}][cb][${terminalId}][]" class="cb-input" data-terminal-id="${terminalId}" placeholder="0,00">
+                        <button type="button" class="btn-remove-tpe" title="Supprimer ce relevé"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>`;
+                container.insertAdjacentHTML('beforeend', newReleveHtml);
+            }
+
+            const removeBtn = e.target.closest('.btn-remove-tpe');
+            if (removeBtn) {
+                const groupToRemove = removeBtn.closest('.form-group-tpe');
+                const container = groupToRemove.parentElement;
+                if (container.querySelectorAll('.form-group-tpe').length > 1) {
+                    groupToRemove.remove();
+                } else {
+                    // S'il ne reste qu'un champ, on le vide
+                    groupToRemove.querySelector('input').value = '';
+                }
+                // Recalculer les totaux après suppression
+                calculateAllFull();
+                // Renuméroter les labels
+                container.querySelectorAll('label').forEach((label, index) => {
+                    label.textContent = `Relevé #${index + 1}`;
+                });
             }
         });
 

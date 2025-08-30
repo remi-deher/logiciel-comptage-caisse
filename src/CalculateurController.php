@@ -137,10 +137,14 @@ class CalculateurController {
                 $data[$caisse_id]['denominations'][$denom_row['denomination_nom']] = $denom_row['quantite'];
             }
 
+            // MODIFIÉ : Récupère plusieurs montants CB et les groupe par terminal
             $stmt_cb = $this->pdo->prepare("SELECT terminal_id, montant FROM comptage_cb WHERE comptage_detail_id = ?");
             $stmt_cb->execute([$comptage_detail_id]);
             while ($cb_row = $stmt_cb->fetch()) {
-                $data[$caisse_id]['cb'][$cb_row['terminal_id']] = $cb_row['montant'];
+                if (!isset($data[$caisse_id]['cb'][$cb_row['terminal_id']])) {
+                    $data[$caisse_id]['cb'][$cb_row['terminal_id']] = [];
+                }
+                $data[$caisse_id]['cb'][$cb_row['terminal_id']][] = $cb_row['montant'];
             }
             
             $stmt_cheques = $this->pdo->prepare("SELECT montant FROM comptage_cheques WHERE comptage_detail_id = ?");
@@ -236,6 +240,20 @@ class CalculateurController {
                         if ($quantite > 0) {
                             $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
                             $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
+                        }
+                    }
+                }
+
+                // MODIFIÉ : Sauvegarde de chaque relevé CB
+                $cb_data = $caisse_data['cb'] ?? [];
+                foreach ($cb_data as $terminal_id => $montants) {
+                    if (is_array($montants)) {
+                        foreach ($montants as $montant) {
+                            $montant_numeric = get_numeric_value(['montant' => $montant], 'montant');
+                            if ($montant_numeric > 0) {
+                                $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant) VALUES (?, ?, ?)");
+                                $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_numeric]);
+                            }
                         }
                     }
                 }
