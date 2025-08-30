@@ -105,6 +105,40 @@ export function showDetailsModal(comptageData, caisseId = null) {
         return tableHtml;
     };
     
+    // NOUVEAU : Fonction pour générer le tableau des relevés CB
+    const generateCbTableHtml = () => {
+        const sourceData = isGlobalView ? Object.values(comptageData.caisses_data) : [comptageData.caisses_data[caisseId]];
+        
+        let allReleves = [];
+        sourceData.forEach(caisseData => {
+            if (caisseData && caisseData.cb) {
+                for(const terminalId in caisseData.cb) {
+                    caisseData.cb[terminalId].forEach(montant => {
+                        allReleves.push({ terminalId, montant });
+                    });
+                }
+            }
+        });
+
+        if (allReleves.length === 0) return '';
+
+        let cbHtml = '<h4><i class="fa-solid fa-credit-card"></i> Relevés Carte Bancaire</h4>';
+        cbHtml += '<table class="modal-details-table"><thead><tr><th>Terminal</th><th>Montant</th></tr></thead><tbody>';
+        let totalCb = 0;
+
+        // On a besoin d'un moyen de mapper terminalId vers terminalName (à ajouter à globalConfig si besoin)
+        // Pour l'instant, on utilise l'ID.
+        allReleves.forEach(releve => {
+            const montant = parseFloat(releve.montant);
+            totalCb += montant;
+            cbHtml += `<tr><td>Terminal #${releve.terminalId}</td><td>${utils.formatEuros(montant)}</td></tr>`;
+        });
+        
+        cbHtml += `</tbody><tfoot><tr><td><strong>Total CB</strong></td><td><strong>${utils.formatEuros(totalCb)}</strong></td></tr></tfoot></table>`;
+        return cbHtml;
+    };
+
+
     const generateRetraitsTableHtml = () => {
         const sourceData = isGlobalView ? Object.values(comptageData.caisses_data) : [comptageData.caisses_data[caisseId]];
         
@@ -157,6 +191,7 @@ export function showDetailsModal(comptageData, caisseId = null) {
         <h4>Résumé Financier</h4>
         ${generateSummaryHtml(summaryData)}
         
+        ${generateCbTableHtml()}
         ${isComptageFinal ? generateRetraitsTableHtml() : ''}
 
         <div class="modal-details-grid">
