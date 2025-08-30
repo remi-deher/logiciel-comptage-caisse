@@ -188,8 +188,7 @@
 .ecart-positif { color: var(--color-warning); }
 .ecart-negatif { color: var(--color-danger); }
 .mini-chart-container { height: 150px; }
-.history-card-footer { background-color: var(--color-surface-alt); border-top: 1px solid var(--color-border-light); padding: 15px 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;}
-.action-btn-small { padding: 8px 12px; font-size: 0.85em; cursor: pointer; text-decoration: none; border-radius: 6px; }
+.history-card-footer { background-color: var(--color-surface-alt); border-top: 1px solid var(--color-border-light); padding: 15px 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between;}
 
 /* --- Pagination --- */
 .pagination-nav { display: flex; justify-content: center; margin-bottom: 20px; }
@@ -259,6 +258,69 @@
 .modal-header h3 { border-bottom: none; }
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
 .summary-box { background-color: var(--color-surface-alt); padding: 15px; border-radius: 8px; text-align: center; }
+
+/* --- NOUVEAU : Design des boutons d'action --- */
+.action-btn-small {
+    padding: 8px 15px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    border-radius: 20px;
+    border: 2px solid transparent;
+    transition: all 0.2s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1;
+}
+
+/* Boutons primaires (Détails) */
+.details-btn, .details-all-btn {
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-secondary);
+    border-color: var(--color-border-light);
+}
+.details-btn:hover, .details-all-btn:hover {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px var(--shadow-color);
+}
+
+/* Boutons secondaires (Impression, Export, etc.) */
+#print-modal-btn, #pdf-modal-btn, #csv-modal-btn {
+    background-color: transparent;
+    color: var(--color-text-secondary);
+    border-color: var(--color-border-light);
+}
+#print-modal-btn:hover, #pdf-modal-btn:hover, #csv-modal-btn:hover {
+    background-color: var(--color-surface-alt);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+/* --- MODIFICATION : Design des boutons Charger/Supprimer --- */
+.history-card-footer .save-btn {
+    background-color: rgba(39, 174, 96, 0.1); /* Fond vert clair */
+    color: var(--color-success-dark); /* Icône vert foncé */
+    border-color: transparent;
+}
+.history-card-footer .save-btn:hover {
+    background-color: var(--color-success);
+    color: white;
+}
+.history-card-footer .delete-btn {
+    background-color: rgba(192, 57, 43, 0.1); /* Fond rouge clair */
+    color: var(--color-danger-dark); /* Icône rouge foncé */
+    border-color: transparent;
+}
+.history-card-footer .delete-btn:hover {
+    background-color: var(--color-danger);
+    color: white;
+}
+/* --- FIN DES MODIFICATIONS --- */
 
 /* --- Styles pour la vue des retraits --- */
 .withdrawals-header {
