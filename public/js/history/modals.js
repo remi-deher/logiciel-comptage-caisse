@@ -147,7 +147,12 @@ export function showDetailsModal(comptageData, caisseId = null) {
     const html = `
         <div class="modal-header">
             <h3>Détails pour : ${caisseNom}</h3>
-            <span class="modal-close">&times;</span>
+            <div class="modal-actions">
+                <button class="action-btn-small" id="print-modal-btn"><i class="fa-solid fa-print"></i> Imprimer</button>
+                <button class="action-btn-small" id="pdf-modal-btn"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                <button class="action-btn-small" id="csv-modal-btn"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                <span class="modal-close">&times;</span>
+            </div>
         </div>
         <h4>Résumé Financier</h4>
         ${generateSummaryHtml(summaryData)}
@@ -164,10 +169,6 @@ export function showDetailsModal(comptageData, caisseId = null) {
                 ${generateDenominationsTableHtml(denominationsSource)}
             </div>
         </div>
-        <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
-            <button class="action-btn-small" id="pdf-modal-btn"><i class="fa-solid fa-file-pdf"></i> Exporter en PDF</button>
-            <button class="action-btn-small" id="csv-modal-btn"><i class="fa-solid fa-file-csv"></i> Exporter en CSV</button>
-        </div>
     `;
 
     if (dom.detailsModalContent) {
@@ -175,6 +176,17 @@ export function showDetailsModal(comptageData, caisseId = null) {
         dom.detailsModal.classList.add('visible');
         renderModalChart(document.getElementById('modal-chart-container'), denominationsSource);
         const dataForExport = isGlobalView ? { ...comptageData, isGlobal: true } : comptageData;
+        
+        document.getElementById('print-modal-btn').addEventListener('click', () => {
+            const printContents = document.getElementById('modal-details-content').innerHTML;
+            const originalContents = document.body.innerHTML;
+            document.body.innerHTML = `<div class="print-container">${printContents}</div>`;
+            window.print();
+            document.body.innerHTML = originalContents;
+            // Re-initialize event listeners after printing, as innerHTML wipes them
+            location.reload(); 
+        });
+        
         document.getElementById('pdf-modal-btn').addEventListener('click', () => generateComptagePdf(dataForExport));
         document.getElementById('csv-modal-btn').addEventListener('click', () => generateComptageCsv(dataForExport));
     }
