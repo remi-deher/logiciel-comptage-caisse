@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const parseLocaleFloat = (str) => {
         if (typeof str !== 'string') return 0;
-        return parseFloat(str.replace(',', '.')) || 0;
+        return parseFloat(String(str).replace(',', '.')) || 0;
     };
 
 
@@ -41,7 +41,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     
-    // MODIFIÉ : Calcule le total pour chaque terminal individuellement, puis le total pour la caisse
     function calculateCBTotals(caisseId) {
         let totalCaisseConstate = 0;
 
@@ -187,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 content.classList.toggle('open');
             }
 
-            // NOUVEAU : Gère l'ajout et la suppression de relevés CB
+            // Gère l'ajout et la suppression de relevés CB
             const addBtn = e.target.closest('.btn-add-tpe');
             if (addBtn) {
                 const caisseId = addBtn.dataset.caisseId;
@@ -210,12 +209,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (container.querySelectorAll('.form-group-tpe').length > 1) {
                     groupToRemove.remove();
                 } else {
-                    // S'il ne reste qu'un champ, on le vide
                     groupToRemove.querySelector('input').value = '';
                 }
-                // Recalculer les totaux après suppression
                 calculateAllFull();
-                // Renuméroter les labels
                 container.querySelectorAll('label').forEach((label, index) => {
                     label.textContent = `Relevé #${index + 1}`;
                 });
@@ -252,7 +248,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // CORRECTION : La soumission du formulaire est maintenant gérée par fetch pour éviter le rechargement.
         form.addEventListener('submit', (e) => {
             e.preventDefault(); 
             hasUnsavedChanges = false;
@@ -307,6 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.total-line').forEach(el => el.textContent = formatCurrency(0));
     }
 
+    // CORRIGÉ : Cette fonction gère maintenant la recréation des champs CB
     window.loadAndInitFormData = function(data) {
         if (!data) return;
         
@@ -316,7 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('explication').value = data.explication || '';
 
         for (const caisseId in nomsCaisses) {
-             const caisseData = data[caisseId] || {};
+            const caisseData = data[caisseId] || {};
             document.getElementById(`fond_de_caisse_${caisseId}`).value = caisseData.fond_de_caisse || '';
             document.getElementById(`ventes_${caisseId}`).value = caisseData.ventes || '';
             document.getElementById(`retrocession_${caisseId}`).value = caisseData.retrocession || '';
@@ -331,6 +327,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (input) input.value = caisseData.denominations[name] || '';
                 }
             }
+
+            // Logique pour recréer les champs de relevés TPE
+            document.querySelectorAll(`#caisse${caisseId} .tpe-card`).forEach(card => {
+                const terminalId = card.id.split('-').pop();
+                const container = card.querySelector('.tpe-releves-container');
+                container.innerHTML = ''; // On vide le conteneur
+
+                const releves = caisseData.cb && caisseData.cb[terminalId] ? caisseData.cb[terminalId] : [''];
+
+                releves.forEach((montant, index) => {
+                    const newReleveHtml = `
+                        <div class="form-group-tpe">
+                            <label>Relevé #${index + 1}</label>
+                            <input type="text" name="caisse[${caisseId}][cb][${terminalId}][]" class="cb-input" data-terminal-id="${terminalId}" placeholder="0,00" value="${montant}">
+                            <button type="button" class="btn-remove-tpe" title="Supprimer ce relevé"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>`;
+                    container.insertAdjacentHTML('beforeend', newReleveHtml);
+                });
+            });
         }
         calculateAllFull();
     };

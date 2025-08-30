@@ -168,8 +168,16 @@ class CalculateurController {
         $explication = trim($_POST['explication'] ?? '');
         $has_data = false;
         foreach ($_POST['caisse'] ?? [] as $caisse_data) {
-            foreach ($caisse_data as $value) { 
-                if (is_array($value)) {
+            foreach ($caisse_data as $key => $value) { 
+                if ($key === 'cb' && is_array($value)) {
+                    foreach ($value as $terminal_releves) {
+                        if (is_array($terminal_releves)) {
+                            foreach ($terminal_releves as $releve) {
+                                if (!empty($releve)) { $has_data = true; break 4; }
+                            }
+                        }
+                    }
+                } elseif (is_array($value)) {
                     foreach ($value as $sub_value) {
                          if (!empty($sub_value)) { $has_data = true; break 3; }
                     }
@@ -210,8 +218,18 @@ class CalculateurController {
                 $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
                 
                 $has_real_data_for_caisse = false;
-                foreach ($caisse_data as $value) {
-                    if (is_array($value)) {
+                foreach ($caisse_data as $key => $value) {
+                    if ($key === 'cb' && is_array($value)) {
+                        foreach ($value as $terminal_releves) {
+                            if (is_array($terminal_releves)) {
+                                foreach ($terminal_releves as $releve) {
+                                    if (is_numeric(str_replace(',', '.', $releve)) && floatval(str_replace(',', '.', $releve)) != 0) {
+                                        $has_real_data_for_caisse = true; break 4;
+                                    }
+                                }
+                            }
+                        }
+                    } elseif (is_array($value)) {
                         foreach ($value as $sub_value) {
                             if (is_numeric(str_replace(',', '.', $sub_value)) && floatval(str_replace(',', '.', $sub_value)) != 0) {
                                 $has_real_data_for_caisse = true; break 2;
