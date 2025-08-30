@@ -55,15 +55,15 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                 <?php $is_first = false; endforeach; ?>
         </div>
 
-        <div class="ecart-display-container">
-            <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
-            <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
-                Écart Caisse Actuelle : <span class="ecart-value">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
-                <p class="ecart-explanation"></p>
-            </div>
-            <?php $is_first = false; endforeach; ?>
-        </div>
-
+<div class="ecart-display-container">
+    <?php $is_first = true; foreach ($noms_caisses as $id => $nom): ?>
+    <div id="ecart-display-caisse<?= $id ?>" class="ecart-display <?= $is_first ? 'active' : '' ?>">
+        <h4 class="active-caisse-title"><?= htmlspecialchars($nom) ?></h4> 
+        Écart Caisse Actuelle : <span class="ecart-value">0,00 <?= APP_CURRENCY_SYMBOL ?></span>
+        <p class="ecart-explanation"></p>
+    </div>
+    <?php $is_first = false; endforeach; ?>
+</div>
         <?php $is_first_caisse = true; foreach ($noms_caisses as $id => $nom): ?>
             <div id="caisse<?= $id ?>" class="caisse-tab-content <?= $is_first_caisse ? 'active' : '' ?>">
                 
