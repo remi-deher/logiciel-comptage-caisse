@@ -123,56 +123,56 @@ $disabled_attr = ($isLoadedFromHistory ?? false) ? 'disabled' : '';
                         </div>
                     </div>
 
-                    <div id="cb-<?= $id ?>" class="payment-tab-content">
-                        <?php if (isset($terminaux_par_caisse[$id]) && !empty($terminaux_par_caisse[$id])): ?>
-                            <div class="tpe-grid">
-                                <?php foreach ($terminaux_par_caisse[$id] as $terminal): ?>
-                                <div class="tpe-card" id="tpe-card-<?= $terminal['id'] ?>">
-                                    <div class="tpe-card-header">
-                                        <h4><i class="fa-solid fa-credit-card"></i> <?= htmlspecialchars($terminal['nom_terminal']) ?></h4>
-                                        <strong class="tpe-total" id="tpe-total-<?= $terminal['id'] ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></strong>
-                                    </div>
-                                    <div class="tpe-releves-container" id="tpe-releves-container-<?= $terminal['id'] ?>">
-                                        <?php 
-                                        $releves = $loaded_data[$id]['cb'][$terminal['id']] ?? [];
-                                        if (empty($releves)) { $releves[] = ''; } // Afficher au moins un champ
-                                        foreach ($releves as $index => $montant):
-                                        ?>
-                                        <div class="form-group-tpe">
-                                            <label>Relevé #<?= $index + 1 ?></label>
-                                            <input type="text" name="caisse[<?= $id ?>][cb][<?= $terminal['id'] ?>][]" class="cb-input" data-terminal-id="<?= $terminal['id'] ?>" placeholder="0,00" value="<?= htmlspecialchars($montant) ?>" <?= $disabled_attr ?>>
-                                            <button type="button" class="btn-remove-tpe" title="Supprimer ce relevé" <?= $disabled_attr ?>><i class="fa-solid fa-trash-can"></i></button>
-                                        </div>
-                                        <?php endforeach; ?>
-                                    </div>
-                                    <div class="tpe-card-footer">
-                                        <button type="button" class="btn-add-tpe" data-caisse-id="<?= $id ?>" data-terminal-id="<?= $terminal['id'] ?>" <?= $disabled_attr ?>>
-                                            <i class="fa-solid fa-plus"></i> Ajouter un relevé
-                                        </button>
-                                    </div>
-                                </div>
-                                <?php endforeach; ?>
-                            </div>
-                            <div class="cb-summary">
-                                <div class="form-group">
-                                    <label>Total encaissement CB logiciel (<?= APP_CURRENCY_SYMBOL ?>)</label>
-                                    <input type="text" id="cb_attendu_<?= $id ?>" class="cb-attendu" data-caisse-id="<?= $id ?>" placeholder="0,00" <?= $disabled_attr ?>>
-                                </div>
-                                <div class="form-group">
-                                    <label>Encaissement CB réalisé (Total des relevés)</label>
-                                    <input type="text" id="cb_constate_<?= $id ?>" readonly>
-                                </div>
-                                <div class="form-group">
-                                    <label>Écart TPE</label>
-                                    <input type="text" id="cb_ecart_<?= $id ?>" readonly>
-                                    <span class="ecart-message" id="cb_ecart_message_<?= $id ?>"></span>
-                                </div>
-                            </div>
-                        <?php else: ?>
-                            <p class="info-message">Aucun terminal de paiement n'est associé à cette caisse. Vous pouvez en ajouter dans le panneau d'administration.</p>
-                        <?php endif; ?>
+<div id="cb-<?= $id ?>" class="payment-tab-content">
+    <?php if (isset($terminaux_par_caisse[$id]) && !empty($terminaux_par_caisse[$id])): ?>
+        <div class="tpe-grid">
+            <?php foreach ($terminaux_par_caisse[$id] as $terminal): ?>
+            <div class="tpe-card" id="tpe-card-<?= $terminal['id'] ?>">
+                <div class="tpe-card-header">
+                    <h4><i class="fa-solid fa-credit-card"></i> <?= htmlspecialchars($terminal['nom_terminal']) ?></h4>
+                    <strong class="tpe-total" id="tpe-total-<?= $terminal['id'] ?>">0,00 <?= APP_CURRENCY_SYMBOL ?></strong>
+                </div>
+                <div class="tpe-saisie-container">
+                    <div class="form-group-tpe-add">
+                        <input type="text" class="add-releve-input" data-terminal-id="<?= $terminal['id'] ?>" placeholder="Nouveau relevé..." <?= $disabled_attr ?>>
+                        <button type="button" class="btn-add-tpe-from-input" data-terminal-id="<?= $terminal['id'] ?>" <?= $disabled_attr ?>><i class="fa-solid fa-plus"></i> Ajouter</button>
                     </div>
-
+                </div>
+                <div class="tpe-releves-table-container">
+                    <table class="tpe-releves-table">
+                        <thead>
+                            <tr>
+                                <th>Heure</th>
+                                <th>Montant</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tpe-releves-body-<?= $terminal['id'] ?>">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <div class="cb-summary">
+            <div class="form-group">
+                <label>Total encaissement CB logiciel (<?= APP_CURRENCY_SYMBOL ?>)</label>
+                <input type="text" id="cb_attendu_<?= $id ?>" class="cb-attendu" data-caisse-id="<?= $id ?>" placeholder="0,00" <?= $disabled_attr ?>>
+            </div>
+            <div class="form-group">
+                <label>Encaissement CB réalisé (Total des relevés)</label>
+                <input type="text" id="cb_constate_<?= $id ?>" readonly>
+            </div>
+            <div class="form-group">
+                <label>Écart TPE</label>
+                <input type="text" id="cb_ecart_<?= $id ?>" readonly>
+                <span class="ecart-message" id="cb_ecart_message_<?= $id ?>"></span>
+            </div>
+        </div>
+    <?php else: ?>
+        <p class="info-message">Aucun terminal de paiement n'est associé à cette caisse. Vous pouvez en ajouter dans le panneau d'administration.</p>
+    <?php endif; ?>
+</div>
                     <div id="cheques-<?= $id ?>" class="payment-tab-content">
                         <div id="cheques-container-<?= $id ?>">
                             <div class="grid grid-3 cheques-grid">

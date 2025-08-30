@@ -25,10 +25,9 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     const parseLocaleFloat = (str) => {
-        if (typeof str !== 'string') return 0;
+        if (typeof str !== 'string' && typeof str !== 'number') return 0;
         return parseFloat(String(str).replace(',', '.')) || 0;
     };
-
 
     const handleStickyEcart = () => {
         const ecartContainer = document.querySelector('.ecart-display-container');
@@ -40,14 +39,45 @@ document.addEventListener('DOMContentLoaded', function() {
             ecartContainer.classList.remove('compact-sticky');
         }
     };
-    
+
+    // --- Logique Spécifique aux TPE ---
+
+    /**
+     * Ajoute une ligne de relevé au tableau d'un terminal.
+     * @param {string} terminalId - L'ID du terminal.
+     * @param {string} montant - Le montant du relevé.
+     * @param {string|null} heure - L'heure du relevé (optionnel, sinon heure actuelle).
+     */
+    function addReleveRow(terminalId, montant, heure = null) {
+        const tbody = document.getElementById(`tpe-releves-body-${terminalId}`);
+        if (!tbody) return;
+
+        const now = new Date();
+        const heureReleve = heure || now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>${heureReleve}</td>
+            <td>
+                ${formatCurrency(parseLocaleFloat(montant))}
+                <input type="hidden" name="caisse[1][cb][${terminalId}][montant][]" value="${parseLocaleFloat(montant)}">
+                <input type="hidden" name="caisse[1][cb][${terminalId}][heure][]" value="${heureReleve}">
+            </td>
+            <td>
+                <button type="button" class="btn-remove-tpe" title="Supprimer ce relevé"><i class="fa-solid fa-trash-can"></i></button>
+            </td>
+        `;
+        tbody.appendChild(newRow);
+        calculateAllFull();
+    }
+
     function calculateCBTotals(caisseId) {
         let totalCaisseConstate = 0;
 
         document.querySelectorAll(`#caisse${caisseId} .tpe-card`).forEach(card => {
             const terminalId = card.id.split('-').pop();
             let totalTerminal = 0;
-            card.querySelectorAll(`.cb-input[data-terminal-id="${terminalId}"]`).forEach(input => {
+            card.querySelectorAll(`input[name="caisse[${caisseId}][cb][${terminalId}][montant][]"]`).forEach(input => {
                 totalTerminal += parseLocaleFloat(input.value);
             });
             
@@ -68,7 +98,6 @@ document.addEventListener('DOMContentLoaded', function() {
         ecartInput.value = formatCurrency(ecart);
         
         const messageSpan = document.getElementById(`cb_ecart_message_${caisseId}`);
-        
         ecartInput.classList.remove('ecart-ok', 'ecart-positif-alt', 'ecart-negatif');
         messageSpan.classList.remove('ecart-ok', 'ecart-positif-alt', 'ecart-negatif');
         
@@ -79,14 +108,13 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (ecart > 0) {
             ecartInput.classList.add('ecart-positif-alt');
             messageSpan.classList.add('ecart-positif-alt');
-            messageSpan.textContent = "Il y a trop d'argent dans les TPE, vérifier s'il ne vous manque pas des encaissements.";
+            messageSpan.textContent = "Il y a trop d'argent dans les TPE.";
         } else {
             ecartInput.classList.add('ecart-negatif');
             messageSpan.classList.add('ecart-negatif');
-            messageSpan.textContent = "Il manque de l'argent dans le TPE, vérifier si vous n'avez pas des encaissements en trop.";
+            messageSpan.textContent = "Il manque de l'argent dans les TPE.";
         }
     }
-
 
     /**
      * Calcule tous les totaux pour toutes les caisses et met à jour l'affichage.
@@ -186,37 +214,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 content.classList.toggle('open');
             }
 
-            // Gère l'ajout et la suppression de relevés CB
-            const addBtn = e.target.closest('.btn-add-tpe');
+            // Gestion de l'ajout de relevé via le bouton
+            const addBtn = e.target.closest('.btn-add-tpe-from-input');
             if (addBtn) {
-                const caisseId = addBtn.dataset.caisseId;
                 const terminalId = addBtn.dataset.terminalId;
-                const container = document.getElementById(`tpe-releves-container-${terminalId}`);
-                const releveCount = container.querySelectorAll('.form-group-tpe').length + 1;
-                const newReleveHtml = `
-                    <div class="form-group-tpe">
-                        <label>Relevé #${releveCount}</label>
-                        <input type="text" name="caisse[${caisseId}][cb][${terminalId}][]" class="cb-input" data-terminal-id="${terminalId}" placeholder="0,00">
-                        <button type="button" class="btn-remove-tpe" title="Supprimer ce relevé"><i class="fa-solid fa-trash-can"></i></button>
-                    </div>`;
-                container.insertAdjacentHTML('beforeend', newReleveHtml);
+                const input = document.querySelector(`.add-releve-input[data-terminal-id="${terminalId}"]`);
+                if (input && input.value.trim() !== "") {
+                    addReleveRow(terminalId, input.value);
+                    input.value = '';
+                    input.focus();
+                }
             }
 
+            // Gestion de la suppression d'un relevé
             const removeBtn = e.target.closest('.btn-remove-tpe');
             if (removeBtn) {
-                const groupToRemove = removeBtn.closest('.form-group-tpe');
-                const container = groupToRemove.parentElement;
-                if (container.querySelectorAll('.form-group-tpe').length > 1) {
-                    groupToRemove.remove();
-                } else {
-                    groupToRemove.querySelector('input').value = '';
-                }
+                removeBtn.closest('tr').remove();
                 calculateAllFull();
-                container.querySelectorAll('label').forEach((label, index) => {
-                    label.textContent = `Relevé #${index + 1}`;
-                });
             }
         });
+        
+        // Gestion de l'ajout via la touche "Entrée"
+        document.querySelectorAll('.add-releve-input').forEach(input => {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (input.value.trim() !== "") {
+                        addReleveRow(input.dataset.terminalId, input.value);
+                        input.value = '';
+                    }
+                }
+            });
+        });
+
 
         form.addEventListener('input', (e) => {
             if (e.target.matches('input[type="number"], input[type="text"], textarea')) {
@@ -229,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         form.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+            if (e.key === 'Enter' && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') && !e.target.classList.contains('add-releve-input')) {
                 e.preventDefault();
                 const formElements = Array.from(form.querySelectorAll('input, textarea, button, a[href]'));
                 const index = formElements.indexOf(e.target);
@@ -302,7 +332,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.total-line').forEach(el => el.textContent = formatCurrency(0));
     }
 
-    // CORRIGÉ : Cette fonction gère maintenant la recréation des champs CB
     window.loadAndInitFormData = function(data) {
         if (!data) return;
         
@@ -328,23 +357,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            // Logique pour recréer les champs de relevés TPE
+            // Recréation des relevés TPE
             document.querySelectorAll(`#caisse${caisseId} .tpe-card`).forEach(card => {
                 const terminalId = card.id.split('-').pop();
-                const container = card.querySelector('.tpe-releves-container');
-                container.innerHTML = ''; // On vide le conteneur
+                const tbody = document.getElementById(`tpe-releves-body-${terminalId}`);
+                tbody.innerHTML = '';
 
-                const releves = caisseData.cb && caisseData.cb[terminalId] ? caisseData.cb[terminalId] : [''];
-
-                releves.forEach((montant, index) => {
-                    const newReleveHtml = `
-                        <div class="form-group-tpe">
-                            <label>Relevé #${index + 1}</label>
-                            <input type="text" name="caisse[${caisseId}][cb][${terminalId}][]" class="cb-input" data-terminal-id="${terminalId}" placeholder="0,00" value="${montant}">
-                            <button type="button" class="btn-remove-tpe" title="Supprimer ce relevé"><i class="fa-solid fa-trash-can"></i></button>
-                        </div>`;
-                    container.insertAdjacentHTML('beforeend', newReleveHtml);
-                });
+                if (caisseData.cb && caisseData.cb[terminalId]) {
+                    caisseData.cb[terminalId].forEach(releve => {
+                        addReleveRow(terminalId, releve.montant, releve.heure_releve);
+                    });
+                }
             });
         }
         calculateAllFull();
