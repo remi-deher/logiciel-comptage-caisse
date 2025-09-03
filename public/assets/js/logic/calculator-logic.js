@@ -1,33 +1,31 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Complète et Finale)
 
 import { initializeWebSocket, sendWsMessage } from './websocket-service.js';
 import { initializeCloture, updateClotureUI } from './cloture-logic.js';
 
+// --- Variables globales pour la page ---
 let config = {};
 let wsResourceId = null;
+let hasUnsavedChanges = false;
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
-// --- Fonctions Utilitaires (CORRIGÉ) ---
-const formatCurrency = (amount) => {
-    // On utilise maintenant config.currencyCode pour la logique, et on garde 'EUR' comme fallback.
-    const code = config.currencyCode || 'EUR';
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: code }).format(amount);
-};
+// --- Fonctions Utilitaires ---
+const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(amount);
 const parseLocaleFloat = (str) => {
     if (typeof str !== 'string' && typeof str !== 'number') return 0;
     return parseFloat(String(str).replace(',', '.')) || 0;
 };
 
-// --- Le reste du fichier est identique ---
-
+// --- API ---
 async function fetchCalculatorConfig() {
     const response = await fetch('index.php?route=calculateur/config');
-    if (!response.ok) throw new Error('Impossible de charger la configuration.');
+    if (!response.ok) throw new Error('Impossible de charger la configuration du calculateur.');
     const data = await response.json();
-    if (!data.success) throw new Error('Configuration invalide.');
+    if (!data.success) throw new Error('La configuration reçue est invalide.');
     return data;
 }
 
+// --- Rendu dynamique de l'interface ---
 function renderCalculatorUI() {
     const page = calculatorPageElement();
     if (!page) return;
@@ -42,17 +40,9 @@ function renderCalculatorUI() {
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}">${nom}</button>`;
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `
-            <div class="form-group">
-                <label>${v} ${config.currencySymbol}</label>
-                <input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0">
-                <span class="total-line" id="total_${name}_${id}"></span>
-            </div>`).join('');
+            <div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `
-            <div class="form-group">
-                <label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label>
-                <input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0">
-                <span class="total-line" id="total_${name}_${id}"></span>
-            </div>`).join('');
+            <div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
                 <div class="grid grid-3" style="margin-bottom:20px;">
@@ -60,8 +50,7 @@ function renderCalculatorUI() {
                     <div class="form-group"><label>Ventes du Jour</label><input type="text" data-caisse-id="${id}" id="ventes_${id}" name="caisse[${id}][ventes]"></div>
                     <div class="form-group"><label>Rétrocessions</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
                 </div>
-                <h4>Billets</h4><div class="grid">${billets}</div>
-                <h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div>
+                <h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div>
             </div>`;
     });
     tabSelector.innerHTML = tabsHtml;
@@ -69,6 +58,7 @@ function renderCalculatorUI() {
     caissesContainer.innerHTML = contentHtml;
 }
 
+// --- Logique de calcul ---
 function calculateAll() {
     if (!config.nomsCaisses) return;
     Object.keys(config.nomsCaisses).forEach(id => {
@@ -94,37 +84,95 @@ function calculateAll() {
 function updateEcartDisplay(id, ecart) {
     const display = document.getElementById(`ecart-display-caisse${id}`);
     if (!display) return;
-    display.querySelector('.ecart-value').textContent = formatCurrency(ecart);
+    const valueSpan = display.querySelector('.ecart-value');
     const explanation = display.querySelector('.ecart-explanation');
     display.classList.remove('ecart-ok', 'ecart-positif', 'ecart-negatif');
+    if (valueSpan) valueSpan.textContent = formatCurrency(ecart);
     if (Math.abs(ecart) < 0.01) {
         display.classList.add('ecart-ok');
-        explanation.textContent = "La caisse est juste.";
+        if (explanation) explanation.textContent = "La caisse est juste.";
     } else if (ecart > 0) {
         display.classList.add('ecart-positif');
-        explanation.textContent = "Il y a un surplus dans la caisse.";
+        if (explanation) explanation.textContent = "Il y a un surplus dans la caisse.";
     } else {
         display.classList.add('ecart-negatif');
-        explanation.textContent = "Il manque de l'argent dans la caisse.";
+        if (explanation) explanation.textContent = "Il manque de l'argent dans la caisse.";
     }
 }
 
+// --- Gestion des messages WebSocket ---
 function handleWebSocketMessage(event) {
     try {
         const data = JSON.parse(event.data);
         if (data.type === 'welcome') {
             wsResourceId = data.resourceId;
             initializeCloture(config, wsResourceId);
+            sendWsMessage({ type: 'request_state' }); 
         } else if (data.type === 'cloture_locked_caisses') {
             updateClotureUI(data);
+        } else if (data.type === 'send_full_state') {
+            sendFullFormState();
+        } else if (data.type === 'broadcast_state') {
+            loadFormState(data.form_state);
         } else if (data.id && document.activeElement.id !== data.id) {
             const input = document.getElementById(data.id);
             if (input) {
                 input.value = data.value;
-                calculateAll(); // On recalcule TOUT pour mettre à jour l'interface
+                calculateAll();
             }
         }
     } catch (e) { console.error("Erreur WebSocket:", e); }
+}
+
+function loadFormState(state) {
+    let hasChanges = false;
+    for (const id in state) {
+        const input = document.getElementById(id);
+        if (input && input.value !== state[id]) {
+            input.value = state[id];
+            hasChanges = true;
+        }
+    }
+    if (hasChanges) calculateAll();
+}
+
+function sendFullFormState() {
+    const formState = {};
+    document.querySelectorAll('#caisse-form input, #caisse-form textarea').forEach(el => {
+        if (el.id) formState[el.id] = el.value;
+    });
+    sendWsMessage({ type: 'broadcast_state', form_state: formState });
+}
+
+function initializeAutosave() {
+    const autosaveStatus = document.getElementById('autosave-status');
+    const form = document.getElementById('caisse-form');
+    if (!autosaveStatus || !form) return;
+
+    setInterval(async () => {
+        if (hasUnsavedChanges) {
+            autosaveStatus.textContent = 'Sauvegarde auto...';
+            const formData = new FormData(form);
+            try {
+                const response = await fetch('index.php?route=calculateur/autosave', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (result.success) {
+                    hasUnsavedChanges = false;
+                    autosaveStatus.textContent = `Dernière sauvegarde auto à ${new Date().toLocaleTimeString()}`;
+                } else {
+                    autosaveStatus.textContent = 'Erreur sauvegarde auto';
+                }
+            } catch (e) {
+                autosaveStatus.textContent = 'Erreur réseau sauvegarde auto';
+            }
+        }
+    }, 30000);
+
+    window.addEventListener('beforeunload', () => {
+        if (hasUnsavedChanges) {
+            navigator.sendBeacon('index.php?route=calculateur/autosave', new FormData(form));
+        }
+    });
 }
 
 function attachEventListeners() {
@@ -132,7 +180,8 @@ function attachEventListeners() {
     if (!page) return;
 
     page.addEventListener('input', e => {
-        if (e.target.tagName === 'INPUT') {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            hasUnsavedChanges = true;
             calculateAll();
             sendWsMessage({ id: e.target.id, value: e.target.value });
         }
@@ -151,6 +200,28 @@ function attachEventListeners() {
             document.getElementById(`ecart-display-${tabId}`)?.classList.add('active');
         }
     });
+
+    const form = document.getElementById('caisse-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const saveButton = form.querySelector('button[type="submit"]');
+        saveButton.disabled = true;
+        saveButton.textContent = 'Enregistrement...';
+
+        try {
+            const formData = new FormData(form);
+            const response = await fetch('index.php?route=calculateur/save', { method: 'POST', body: formData });
+            const result = await response.json();
+            if (!result.success) throw new Error(result.message);
+            hasUnsavedChanges = false; 
+            alert('Sauvegarde manuelle réussie !');
+        } catch (error) {
+            alert(`Erreur de sauvegarde : ${error.message}`);
+        } finally {
+            saveButton.disabled = false;
+            saveButton.textContent = 'Enregistrer le Comptage';
+        }
+    });
 }
 
 export async function initializeCalculator() {
@@ -158,8 +229,8 @@ export async function initializeCalculator() {
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
         attachEventListeners();
-        calculateAll(); // Calcul initial
-        initializeWebSocket(handleWebSocketMessage);
+        calculateAll();
+        await initializeWebSocket(handleWebSocketMessage);
     } catch (error) {
         const mainContent = document.getElementById('main-content');
         mainContent.innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;
