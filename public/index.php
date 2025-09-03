@@ -150,6 +150,14 @@ $routes = [
     // --- Routes Système & Version ---
     'GET:version/check' => [$adminController, 'gitReleaseCheck'],
     'GET:version/changelog' => [$changelogController, 'index'],
+
+    // --- Routes Pieds de pages ---
+
+    'GET:version/get_local' => function() {
+        $versionService = new VersionService();
+        echo json_encode(['success' => true, 'version' => $versionService->getLocalVersion()]);
+        exit;
+    },
     
     // --- Routes de mise à jour ---
     'GET:update/status' => [$adminController, 'getUpdateStatus'], // Méthode à créer dans AdminController
