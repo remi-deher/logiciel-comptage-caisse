@@ -108,13 +108,14 @@ $route_key = "{$request_method}:{$route}";
 // Tableau associatif des routes pour une meilleure lisibilité
 $routes = [
     // --- Routes Calculateur ---
-    'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $current_currency_symbol) {
+    'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $current_currency_code, $current_currency_symbol) {
         echo json_encode([
             'success' => true,
             'nomsCaisses' => $noms_caisses,
             'denominations' => $denominations,
             'tpeParCaisse' => $tpe_par_caisse ?? [],
             'minToKeep' => $min_to_keep ?? [],
+            'currencyCode' => $current_currency_code, // <--- AJOUTÉ
             'currencySymbol' => $current_currency_symbol
         ]);
     },
