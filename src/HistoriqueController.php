@@ -134,7 +134,7 @@ class HistoriqueController {
                 $parts = explode(';', $row['denominations']);
                 foreach ($parts as $part) {
                     list($name, $quantity) = explode(':', $part);
-                    $denominations_array[$name] = $quantity;
+                    $denominations_array[] = ['denomination_nom' => $name, 'quantite' => $quantity];
                 }
             }
             
@@ -167,6 +167,12 @@ class HistoriqueController {
                 'retraits' => $retraits_array,
                 'cb' => $cb_releves_array
             ];
+        }
+
+        // Ajout du calcul des résultats pour chaque comptage
+        global $denominations;
+        foreach ($historique as &$comptage) {
+            $comptage['results'] = calculate_results_from_data($comptage['caisses_data']);
         }
 
         return array_values($historique);
@@ -236,7 +242,14 @@ class HistoriqueController {
                     $rowData[] = str_replace('.', ',', $caisse_data['retrocession']);
                     foreach ($this->denominations as $type => $denoms) {
                         foreach (array_keys($denoms) as $key) {
-                            $rowData[] = $caisse_data['denominations'][$key] ?? 0;
+                             $denom_value = 0;
+                            foreach($caisse_data['denominations'] as $d){
+                                if($d['denomination_nom'] === $key){
+                                    $denom_value = $d['quantite'];
+                                    break;
+                                }
+                            }
+                            $rowData[] = $denom_value;
                         }
                     }
                 } else {

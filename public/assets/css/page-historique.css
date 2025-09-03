@@ -156,6 +156,7 @@
 .history-card { 
     background-color: var(--color-surface); 
     border: 1px solid var(--color-border-light); 
+    border-left: 5px solid var(--color-border-light);
     box-shadow: 0 4px 25px var(--shadow-color); 
     border-radius: 12px;
     display: flex;
@@ -165,6 +166,11 @@
     position: relative;
 }
 .history-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px var(--shadow-color); }
+
+.history-card.ecart-ok { border-left-color: var(--color-success); }
+.history-card.ecart-positif { border-left-color: var(--color-warning); }
+.history-card.ecart-negatif { border-left-color: var(--color-danger); }
+
 .history-card.selected {
     border-color: var(--color-primary);
     box-shadow: 0 8px 30px var(--shadow-color), 0 0 0 3px var(--color-primary);
@@ -487,7 +493,7 @@
 }
 @media (min-width: 768px) {
     .modal-details-grid {
-        grid-template-columns: 1fr 1.2fr;
+        grid-template-columns: 1fr 1fr;
     }
 }
 
