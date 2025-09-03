@@ -1,0 +1,43 @@
+/* Fichier : public/assets/css/changelog.css */
+/* (Contenu de votre ancien fichier public/css/changelog.css) */
+
+.changelog-main-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+.changelog-timeline {
+    position: relative;
+    padding: 20px 0;
+}
+.changelog-timeline::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20px;
+    height: 100%;
+    width: 4px;
+    background: var(--color-border-light);
+}
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+    padding-left: 60px;
+}
+.timeline-icon {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 40px;
+    height: 40px;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.timeline-content {
+    background: var(--color-surface);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border-light);
+}

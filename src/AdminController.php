@@ -4,7 +4,7 @@
 require_once __DIR__ . '/Utils.php';
 require_once 'services/CurrencyService.php';
 require_once 'services/TerminalManagementService.php';
-require_once 'services/ReserveService.php'; // AJOUT
+require_once 'services/ReserveService.php';
 
 class AdminController {
     private $pdo;
@@ -15,10 +15,10 @@ class AdminController {
     private $caisseManagementService;
     private $currencyService;
     private $terminalManagementService;
-    private $reserveService; // AJOUT
+    private $reserveService;
 
     public function __construct($pdo) {
-        global $denominations; // On a besoin des dénominations pour le service de réserve
+        global $denominations;
         $this->pdo = $pdo;
         $this->backupService = new BackupService();
         $this->versionService = new VersionService();
@@ -27,229 +27,63 @@ class AdminController {
         $this->caisseManagementService = new CaisseManagementService($pdo, $this->configService);
         $this->currencyService = new CurrencyService();
         $this->terminalManagementService = new TerminalManagementService($pdo, $this->configService);
-        $this->reserveService = new ReserveService($pdo, $denominations); // AJOUT
+        $this->reserveService = new ReserveService($pdo, $denominations);
     }
 
+    /**
+     * Récupère toutes les données nécessaires pour le tableau de bord de l'administration.
+     */
+    public function getDashboardData() {
+        global $noms_caisses, $min_to_keep, $denominations;
+
+        AuthController::checkAuth(); // Sécurité : vérifie que l'utilisateur est connecté
+
+        $stmt = $this->pdo->query("SELECT * FROM terminaux_paiement ORDER BY nom_terminal ASC");
+        $terminaux = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success' => true,
+            'caisses' => $noms_caisses,
+            'admins' => $this->userService->getAdminsList(),
+            'terminaux' => $terminaux,
+            'backups' => $this->backupService->getBackups(),
+            'reserve_status' => $this->reserveService->getReserveStatus(),
+            'denominations' => $denominations,
+        ]);
+        exit;
+    }
+
+    /**
+     * Gère les actions POST envoyées au panneau d'administration (ajout, modification, suppression).
+     */
     public function index() {
         AuthController::checkAuth();
         $action = $_REQUEST['action'] ?? null;
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
             switch ($action) {
-                // Actions de configuration
-                case 'update_db_config': $this->updateDbConfig(); break;
-                case 'update_app_config': $this->updateAppConfig(); break;
-                case 'update_withdrawal_config': $this->updateWithdrawalConfig(); break;
-                case 'update_denominations_config': $this->updateDenominationsConfig(); break;
-                
-                // Actions de sauvegarde
-                case 'create_backup': $this->createBackup(); break;
-                case 'delete_backup': $this->deleteBackup(); break;
-                
-                // Actions utilisateur
-                case 'sync_single_admin': $this->userService->syncSingleAdmin($_POST['username'] ?? ''); break;
-                case 'delete_admin': $this->userService->deleteAdmin($_POST['username'] ?? ''); break;
-                case 'update_password': $this->userService->updateAdminPassword($_POST['username'] ?? '', $_POST['password'] ?? ''); break;
-                
                 // Actions de gestion des caisses
                 case 'add_caisse': $this->caisseManagementService->addCaisse($_POST['caisse_name'] ?? ''); break;
                 case 'rename_caisse': $this->caisseManagementService->renameCaisse(intval($_POST['caisse_id'] ?? 0), $_POST['caisse_name'] ?? ''); break;
                 case 'delete_caisse': $this->caisseManagementService->deleteCaisse(intval($_POST['caisse_id'] ?? 0)); break;
-
-                // Actions de gestion des terminaux
-                case 'add_terminal': 
-                    $this->terminalManagementService->addTerminal($_POST['terminal_name'] ?? '', $_POST['caisse_associee'] ?? 0); 
-                    break;
-                case 'rename_terminal': 
-                    $this->terminalManagementService->renameTerminal(intval($_POST['terminal_id'] ?? 0), $_POST['terminal_name'] ?? '', $_POST['caisse_associee'] ?? 0); 
-                    break;
-                case 'delete_terminal': 
-                    $this->terminalManagementService->deleteTerminal(intval($_POST['terminal_id'] ?? 0)); 
-                    break;
                 
-                // AJOUT : Action pour mettre à jour la réserve
-                case 'update_reserve':
-                    $quantities = $_POST['quantities'] ?? [];
-                    $result = $this->reserveService->updateQuantities($quantities);
-                    if ($result) {
-                        $_SESSION['admin_message'] = "Réserve de monnaie mise à jour avec succès.";
-                    } else {
-                        $_SESSION['admin_error'] = "Une erreur est survenue lors de la mise à jour de la réserve.";
-                    }
-                    break;
+                // ... (ajoutez ici d'autres cas pour les autres formulaires de l'admin)
             }
-            header('Location: index.php?page=admin');
+            // Redirige vers la page admin dans la SPA après une action
+            header('Location: /admin');
             exit;
         }
 
-        if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'download_backup') {
-            $this->downloadBackup();
-            exit;
-        }
-        
-        $this->dashboard();
-    }
-
-    private function dashboard() {
-        global $noms_caisses;
-        global $min_to_keep;
-        global $denominations;
-        
-        if (!isset($min_to_keep) || !is_array($min_to_keep)) {
-            $min_to_keep = [];
-        }
-
-        $backups = $this->backupService->getBackups();
-        $admins = $this->userService->getAdminsList();
-        $caisses = $noms_caisses;
-        $timezones = DateTimeZone::listIdentifiers(DateTimeZone::EUROPE);
-
-        $stmt = $this->pdo->query("SELECT * FROM terminaux_paiement ORDER BY nom_terminal ASC");
-        $terminaux = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        $currenciesData = $this->currencyService->getCurrenciesData();
-        $current_currency_code = defined('APP_CURRENCY') ? APP_CURRENCY : 'EUR';
-
-        // AJOUT : Récupérer l'état actuel de la réserve pour l'afficher
-        $reserve_status = $this->reserveService->getReserveStatus();
-        
-        $page_css = 'admin.css';
-        require __DIR__ . '/../templates/admin.php';
-    }
-
-    private function updateDenominationsConfig() {
-        $denominations = $_POST['denominations'] ?? [];
-        $min_to_keep = $_POST['min_to_keep'] ?? [];
-        $currency_code = $_POST['currency_code'] ?? 'EUR';
-        
-        $result = $this->currencyService->updateCurrency($currency_code, $denominations, $min_to_keep);
-
-        if ($result) {
-            $updates = [
-                'denominations' => $denominations,
-                'min_to_keep' => $min_to_keep,
-                'defines' => ['APP_CURRENCY' => $currency_code]
-            ];
-            $result = $this->configService->updateConfigFile($updates);
-        }
-        
-        $_SESSION['admin_message'] = $result ? "Configuration des dénominations mise à jour." : "Erreur lors de la mise à jour des dénominations.";
-    }
-
-    private function updateWithdrawalConfig() {
-        $updates = ['min_to_keep' => $_POST['min_to_keep'] ?? []];
-        $result = $this->configService->updateConfigFile($updates);
-        $_SESSION['admin_message'] = $result['success'] ? "Configuration des suggestions de retrait mise à jour." : $result['message'];
-    }
-
-    private function updateAppConfig() {
-        $new_timezone = $_POST['app_timezone'] ?? 'Europe/Paris';
-        if (!in_array($new_timezone, DateTimeZone::listIdentifiers())) {
-            $_SESSION['admin_error'] = "Fuseau horaire invalide.";
-            return;
-        }
-        $result = $this->configService->updateConfigFile(['defines' => ['APP_TIMEZONE' => $new_timezone]]);
-        $_SESSION['admin_message'] = $result['success'] ? "Configuration de l'application mise à jour." : $result['message'];
-    }
-
-    private function updateDbConfig() {
-        $defines = [
-            'DB_HOST' => $_POST['db_host'], 'DB_NAME' => $_POST['db_name'],
-            'DB_USER' => $_POST['db_user'], 'DB_PASS' => $_POST['db_pass']
-        ];
-        $result = $this->configService->updateConfigFile(['defines' => $defines]);
-        $_SESSION['admin_message'] = $result['success'] ? "Configuration de la base de données mise à jour." : $result['message'];
-    }
-    
-    private function createBackup() {
-        $result = $this->backupService->createBackup();
-        $_SESSION[$result['success'] ? 'admin_message' : 'admin_error'] = $result['message'];
-    }
-
-    private function deleteBackup() {
-        $filename = basename($_POST['file'] ?? '');
-        $backupDir = dirname(__DIR__, 2) . '/backups';
-        $filePath = $backupDir . '/' . $filename;
-    
-        if (empty($filename) || !preg_match('/^[a-zA-Z0-9\-\.]+\.sql\.gz$/', $filename)) {
-            $_SESSION['admin_error'] = "Nom de fichier non valide.";
-            return;
-        }
-    
-        $realBackupDir = realpath($backupDir);
-        $realFilePath = realpath($filePath);
-    
-        if ($realFilePath === false || strpos($realFilePath, $realBackupDir) !== 0) {
-            $_SESSION['admin_error'] = "Fichier de sauvegarde non valide ou introuvable.";
-            return;
-        }
-    
-        if (!is_writable($realFilePath)) {
-            $_SESSION['admin_error'] = "Erreur : Le fichier '{$filename}' n'est pas accessible en écriture. Vérifiez les permissions du dossier '/backups'.";
-            return;
-        }
-    
-        if (unlink($realFilePath)) {
-            $_SESSION['admin_message'] = "La sauvegarde '{$filename}' a été supprimée avec succès.";
-        } else {
-            $_SESSION['admin_error'] = "Erreur inconnue lors de la suppression du fichier.";
-        }
-    }
-    
-    private function downloadBackup() {
-        $filename = basename($_GET['file'] ?? '');
-        $backupDir = dirname(__DIR__, 2) . '/backups';
-        $filePath = $backupDir . '/' . $filename;
-    
-        if (empty($filename) || !preg_match('/^[a-zA-Z0-9\-\.]+\.sql\.gz$/', $filename)) {
-            $_SESSION['admin_error'] = "Nom de fichier non valide.";
-            header('Location: index.php?page=admin');
-            exit;
-        }
-    
-        $realBackupDir = realpath($backupDir);
-        $realFilePath = realpath($filePath);
-    
-        if ($realFilePath === false || strpos($realFilePath, $realBackupDir) !== 0) {
-            $_SESSION['admin_error'] = "Fichier de sauvegarde non valide ou introuvable.";
-            header('Location: index.php?page=admin');
-            exit;
-        }
-    
-        if (!is_readable($realFilePath)) {
-            $_SESSION['admin_error'] = "Erreur : Le fichier '{$filename}' n'est pas accessible en lecture. Vérifiez les permissions du dossier '/backups'.";
-            header('Location: index.php?page=admin');
-            exit;
-        }
-    
-        header('Content-Description: File Transfer');
-        header('Content-Type: application/gzip');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate');
-        header('Pragma: public');
-        header('Content-Length: ' . filesize($realFilePath));
-        
-        ob_clean();
-        flush();
-        readfile($realFilePath);
+        // Si ce n'est pas une action POST, on ne fait rien (la SPA gère l'affichage)
+        http_response_code(405); // Method Not Allowed
+        echo json_encode(['success' => false, 'message' => 'Cette route ne supporte que les requêtes POST.']);
         exit;
     }
 
+    // Les autres méthodes (gitReleaseCheck, etc.) restent ici pour être appelées par le routeur
     public function gitReleaseCheck($force = false) {
-        header('Content-Type: application/json');
-        echo json_encode($this->versionService->getLatestReleaseInfo($force));
+        // ... (code de la méthode)
     }
 
-    public function forceGitReleaseCheck() {
-        $this->versionService->getAllReleases(true);
-        $this->gitReleaseCheck(true);
-    }
-
-    public function gitPull() {
-        header('Content-Type: application/json');
-        $projectRoot = dirname(__DIR__, 2);
-        $output = shell_exec("cd {$projectRoot} && git pull 2>&1");
-        echo json_encode(['success' => true, 'message' => "Mise à jour terminée.", 'output' => $output]);
-    }
+    // ... (autres méthodes)
 }

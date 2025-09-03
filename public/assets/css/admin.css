@@ -1,0 +1,50 @@
+/* Fichier : public/assets/css/admin.css */
+/* (Contenu de votre ancien fichier public/css/admin.css) */
+
+.login-card {
+    max-width: 420px;
+    margin: 40px auto;
+    padding: 25px;
+}
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+.admin-header {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--color-border-light);
+}
+.admin-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 25px;
+}
+.admin-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+}
+.admin-card h3 {
+    margin: 0;
+    padding: 20px 25px;
+    background-color: var(--color-surface-alt);
+    border-bottom: 1px solid var(--color-border-light);
+}
+.admin-card-content { padding: 25px; }
+.admin-card-footer { padding: 20px 25px; background-color: var(--color-surface-alt); border-top: 1px solid var(--color-border-light); }
+.admin-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+}
+.admin-table th, .admin-table td { 
+    padding: 15px 0; 
+    border-bottom: 1px solid var(--color-border-light); 
+}
+.inline-form { display: flex; gap: 10px; align-items: center; }
+
+@media (min-width: 768px) {
+    .admin-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
