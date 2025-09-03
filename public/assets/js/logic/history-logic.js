@@ -9,6 +9,8 @@ const logSuccess = (message, ...details) => console.log(`[Historique Log] %c${me
 let fullHistoryData = [];
 let config = {};
 let withdrawalsByDay = {}; // Pour stocker les données de retraits par jour
+let withdrawalChart = null; // Pour le graphique à barres
+let withdrawalDonutChart = null; // Pour le graphique donut
 
 const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(montant);
 const formatDateFr = (dateString, options = { dateStyle: 'long', timeStyle: 'short' }) => new Intl.DateTimeFormat('fr-FR', options).format(new Date(dateString));
@@ -287,84 +289,118 @@ export async function initializeHistoryLogic() {
         }
     }
     
-    function renderWithdrawalDetailsModal(dateKey, filter = 'all', sort = { by: 'valeur', order: 'desc' }) {
+    function renderWithdrawalDetailsModal(dateKey) {
         const dayData = withdrawalsByDay[dateKey];
         if (!dayData) return;
     
-        const modal = historyPage.querySelector('#modal-withdrawal-details');
-        const content = historyPage.querySelector('#modal-withdrawal-details-content');
-        
-        const caisseOptions = ['<option value="all">Toutes les caisses</option>', ...Object.keys(config.nomsCaisses).map(id => `<option value="${id}" ${filter === id ? 'selected' : ''}>${config.nomsCaisses[id]}</option>`)].join('');
-    
-        let filteredDetails = (filter === 'all') ? dayData.details : dayData.details.filter(d => d.caisse_id.toString() === filter);
+        const modal = document.getElementById('modal-withdrawal-details');
+        const content = document.getElementById('modal-withdrawal-details-content');
     
         const allDenomsValueMap = { ...config.denominations.billets, ...config.denominations.pieces };
-        filteredDetails.sort((a, b) => {
-            let comparison = 0;
-            if (sort.by === 'valeur') comparison = b.valeur - a.valeur;
-            else if (sort.by === 'quantite') comparison = b.quantite - a.quantite;
-            else if (sort.by === 'denomination') comparison = allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination];
-            else if (sort.by === 'caisse') comparison = a.caisse_nom.localeCompare(b.caisse_nom);
-            return sort.order === 'asc' ? -comparison : comparison;
-        });
-    
-        const getSortClass = (column) => (sort.by === column) ? `sort-${sort.order}` : '';
         
-        const rowsHtml = filteredDetails.map(d => {
-            const value = parseFloat(allDenomsValueMap[d.denomination]);
-            const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${(value * 100)} cts`;
-            return `<tr>
-                        <td>${d.caisse_nom}</td>
-                        <td>${label}</td>
-                        <td class="text-right">${d.quantite}</td>
-                        <td class="text-right">${formatEuros(d.valeur)}</td>
-                    </tr>`;
+        const byCaisse = dayData.details.reduce((acc, d) => {
+            acc[d.caisse_nom] = (acc[d.caisse_nom] || 0) + d.valeur;
+            return acc;
+        }, {});
+        const donutLabels = Object.keys(byCaisse);
+        const donutSeries = Object.values(byCaisse);
+    
+        const byDenom = dayData.details.reduce((acc, d) => {
+            acc[d.denomination] = (acc[d.denomination] || 0) + d.valeur;
+            return acc;
+        }, {});
+        const sortedDenoms = Object.entries(byDenom).sort(([denomA], [denomB]) => parseFloat(allDenomsValueMap[denomB]) - parseFloat(allDenomsValueMap[denomA]));
+        const barLabels = sortedDenoms.map(([denom]) => {
+            const value = parseFloat(allDenomsValueMap[denom]);
+            return value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+        });
+        const barSeries = sortedDenoms.map(([, total]) => total);
+    
+        const globalTableRows = sortedDenoms.map(([denom, total]) => {
+             const value = parseFloat(allDenomsValueMap[denom]);
+             const quantite = total / value;
+             const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+             return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(total)}</td></tr>`;
         }).join('');
     
+        const caisseTablesHtml = Object.entries(byCaisse).map(([nomCaisse, totalCaisse]) => {
+            const detailsCaisse = dayData.details.filter(d => d.caisse_nom === nomCaisse)
+                .sort((a,b) => allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination]);
+    
+            const rows = detailsCaisse.map(d => {
+                const value = parseFloat(allDenomsValueMap[d.denomination]);
+                const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+                return `<tr><td>${label}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.valeur)}</td></tr>`;
+            }).join('');
+    
+            return `
+                <div class="card">
+                    <h4>Détail pour ${nomCaisse}</h4>
+                    <div class="table-responsive">
+                        <table class="info-table">
+                            <thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                            <tfoot><tr><td colspan="2">Total Caisse</td><td class="text-right">${formatEuros(totalCaisse)}</td></tr></tfoot>
+                        </table>
+                    </div>
+                </div>`;
+        }).join('');
+        
         content.innerHTML = `
             <div class="modal-header">
-                <h3>Détail des retraits du ${formatDateFr(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
+                <h3>Analyse des retraits du ${formatDateFr(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
                 <span class="modal-close">&times;</span>
             </div>
             <div class="modal-body">
-                <div class="withdrawal-modal-filters">
-                    <label for="caisse-filter">Filtrer par caisse :</label>
-                    <select id="caisse-filter" class="inline-input">${caisseOptions}</select>
+                <div class="charts-grid">
+                    <div class="card chart-card"><h4>Répartition par Caisse</h4><div id="donut-chart-container"></div></div>
+                    <div class="card chart-card"><h4>Valeur par Dénomination</h4><div id="bar-chart-container"></div></div>
                 </div>
-                <div id="withdrawal-details-table-container">
-                    <table class="info-table log-table sortable">
-                        <thead>
-                            <tr>
-                                <th class="sortable ${getSortClass('caisse')}" data-sort="caisse">Caisse</th>
-                                <th class="sortable ${getSortClass('denomination')}" data-sort="denomination">Dénomination</th>
-                                <th class="text-right sortable ${getSortClass('quantite')}" data-sort="quantite">Quantité</th>
-                                <th class="text-right sortable ${getSortClass('valeur')}" data-sort="valeur">Valeur</th>
-                            </tr>
-                        </thead>
-                        <tbody>${rowsHtml}</tbody>
-                        <tfoot><tr><td colspan="3">Total filtré</td><td class="text-right">${formatEuros(filteredDetails.reduce((sum, d) => sum + d.valeur, 0))}</td></tr></tfoot>
-                    </table>
+                <div class="details-grid">
+                    <div class="card">
+                        <h4>Synthèse Globale</h4>
+                        <div class="table-responsive">
+                            <table class="info-table">
+                                <thead><tr><th>Dénomination</th><th class="text-right">Qté. Totale</th><th class="text-right">Valeur Totale</th></tr></thead>
+                                <tbody>${globalTableRows}</tbody>
+                                <tfoot><tr><td colspan="2">Total Général</td><td class="text-right">${formatEuros(dayData.totalValue)}</td></tr></tfoot>
+                            </table>
+                        </div>
+                    </div>
+                    ${caisseTablesHtml}
                 </div>
             </div>`;
             
         modal.classList.add('visible');
-        
-        const newSort = { ...sort };
-        content.querySelectorAll('.sortable th').forEach(th => {
-            th.addEventListener('click', () => {
-                const sortBy = th.dataset.sort;
-                newSort.order = (sort.by === sortBy && sort.order === 'desc') ? 'asc' : 'desc';
-                newSort.by = sortBy;
-                renderWithdrawalDetailsModal(dateKey, filter, newSort);
-            });
-        });
-        
-        content.querySelector('#caisse-filter').addEventListener('change', (e) => {
-            renderWithdrawalDetailsModal(dateKey, e.target.value, sort);
-        });
     
-        modal.querySelector('.modal-close').onclick = () => modal.classList.remove('visible');
-        modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
+        if (withdrawalDonutChart) withdrawalDonutChart.destroy();
+        withdrawalDonutChart = new ApexCharts(document.querySelector("#donut-chart-container"), {
+            series: donutSeries, labels: donutLabels, chart: { type: 'donut', height: 250 },
+            legend: { position: 'bottom' }, dataLabels: { enabled: true, formatter: (val) => `${val.toFixed(1)}%` },
+            tooltip: { y: { formatter: (val) => formatEuros(val) } }
+        });
+        withdrawalDonutChart.render();
+    
+        if (withdrawalChart) withdrawalChart.destroy();
+        withdrawalChart = new ApexCharts(document.querySelector("#bar-chart-container"), {
+            series: [{ name: 'Valeur retirée', data: barSeries }], chart: { type: 'bar', height: 250, toolbar: { show: false } },
+            xaxis: { categories: barLabels }, yaxis: { labels: { formatter: (val) => formatEuros(val) } },
+            dataLabels: { enabled: false }, plotOptions: { bar: { horizontal: true } }
+        });
+        withdrawalChart.render();
+    
+        modal.querySelector('.modal-close').onclick = () => {
+            modal.classList.remove('visible');
+            if (withdrawalChart) withdrawalChart.destroy();
+            if (withdrawalDonutChart) withdrawalDonutChart.destroy();
+        };
+        modal.onclick = (e) => { 
+            if (e.target === modal) {
+                modal.classList.remove('visible');
+                if (withdrawalChart) withdrawalChart.destroy();
+                if (withdrawalDonutChart) withdrawalDonutChart.destroy();
+            }
+        };
     }
     
     function updateComparisonToolbar() {
@@ -376,7 +412,7 @@ export async function initializeHistoryLogic() {
     
         if (checked.length > 0) {
             counter.textContent = `${checked.length} comptage(s) sélectionné(s)`;
-            button.disabled = checked.length < 2; // On ne peut comparer que 2 ou plus
+            button.disabled = checked.length < 2;
             toolbar.classList.add('visible');
         } else {
             toolbar.classList.remove('visible');
@@ -445,7 +481,7 @@ export async function initializeHistoryLogic() {
     const modalContent = historyPage.querySelector('#modal-details-content');
     const viewTabs = historyPage.querySelector('.view-tabs');
     const comptagesView = historyPage.querySelector('#comptages-view');
-    const retraitsView = historyPage.querySelector('#retraits-view'); // Déclaration unique ici
+    const retraitsView = historyPage.querySelector('#retraits-view');
     const retraitsContentContainer = historyPage.querySelector('#retraits-view-content');
     let currentParams = {};
 
@@ -478,7 +514,7 @@ export async function initializeHistoryLogic() {
         viewTabs.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         comptagesView.classList.remove('active');
-        retraitsView.classList.remove('active');
+        retraitsView.classList.add('active');
         document.getElementById(`${viewToShow}-view`).classList.add('active');
     });
     
