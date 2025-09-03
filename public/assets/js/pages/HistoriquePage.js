@@ -9,8 +9,8 @@ export function renderHistoriquePage(element) {
         <h2><i class="fa-solid fa-clock-rotate-left" style="color: #3498db;"></i> Historique des Comptages</h2>
 
         <div class="view-tabs">
-            <a href="#comptages" class="tab-link active" data-view="comptages">Comptages</a>
-            <a href="#retraits" class="tab-link" data-view="retraits">Synthèse des Retraits</a>
+            <button type="button" class="tab-link active" data-view="comptages">Comptages</button>
+            <button type="button" class="tab-link" data-view="retraits">Synthèse des Retraits</button>
         </div>
 
         <div id="comptages-view" class="view-content active">
