@@ -9,6 +9,35 @@ let wsResourceId = null;
 let hasUnsavedChanges = false;
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
+// --- NOUVELLE FONCTION DE SAUVEGARDE ---
+// Cette fonction est asynchrone pour qu'on puisse potentiellement l'attendre.
+async function triggerAutosave() {
+    const form = document.getElementById('caisse-form');
+    if (hasUnsavedChanges && form) {
+        console.log('[Autosave] Détection de changements non sauvegardés. Envoi...');
+        const formData = new FormData(form);
+
+        // On utilise fetch avec keepalive, c'est la méthode moderne et robuste
+        // pour s'assurer que la requête part même si la page change.
+        try {
+            const response = await fetch('index.php?route=calculateur/autosave', {
+                method: 'POST',
+                body: formData,
+                keepalive: true // Très important !
+            });
+            const result = await response.json();
+            if (result.success) {
+                hasUnsavedChanges = false; // On réinitialise le drapeau
+                console.log('[Autosave] Succès.');
+            } else {
+                console.error('[Autosave] Échec de la sauvegarde côté serveur.');
+            }
+        } catch (e) {
+            console.error('[Autosave] Erreur réseau.', e);
+        }
+    }
+}
+
 // --- Fonctions Utilitaires ---
 const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(amount);
 const parseLocaleFloat = (str) => {
@@ -168,9 +197,11 @@ function initializeAutosave() {
         }
     }, 30000);
 
-    window.addEventListener('beforeunload', () => {
+    window.addEventListener('beforeunload', (event) => {
+        // Note: L'appel à triggerAutosave ici n'est pas garanti à 100% de s'exécuter
+        // à cause des restrictions des navigateurs, mais `keepalive` est notre meilleure chance.
         if (hasUnsavedChanges) {
-            navigator.sendBeacon('index.php?route=calculateur/autosave', new FormData(form));
+             triggerAutosave();
         }
     });
 }
@@ -228,9 +259,28 @@ export async function initializeCalculator() {
     try {
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
+
+        // On charge les données initiales depuis la BDD (votre logique existante)
+        const initialDataResponse = await fetch('index.php?route=calculateur/get_initial_data');
+        const initialDataResult = await initialDataResponse.json();
+        if (initialDataResult.success && initialDataResult.data) {
+            // Logique pour remplir le formulaire avec les données de initialDataResult.data
+            // (Assurez-vous que cette partie est bien fonctionnelle)
+        }
+
         attachEventListeners();
         calculateAll();
+        initializeAutosave(); // On initialise le filet de sécurité
         await initializeWebSocket(handleWebSocketMessage);
+
+        // --- NOUVEAU : On attache notre fonction de sauvegarde au routeur ---
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+            // On stocke la fonction de "nettoyage" directement sur l'élément du DOM
+            // pour que le routeur puisse la trouver et l'appeler.
+            mainContent.beforePageChange = triggerAutosave;
+        }
+
     } catch (error) {
         const mainContent = document.getElementById('main-content');
         mainContent.innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;
