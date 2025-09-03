@@ -34,10 +34,22 @@ const routes = {
 };
 
 /**
- * Fonction principale de routage.
- * Elle lit l'URL, charge le CSS et affiche la page correspondante.
+ * Fonction principale de routage (MODIFIÉE).
  */
-export function handleRouting() {
+export async function handleRouting() {
+    if (mainContent) {
+        // --- NOUVELLE LOGIQUE ---
+        // Avant de changer de page, on vérifie si une fonction de "nettoyage"
+        // a été définie par la page précédente (le calculateur).
+        if (typeof mainContent.beforePageChange === 'function') {
+            // On appelle la fonction (triggerAutosave) et on attend qu'elle se termine.
+            await mainContent.beforePageChange();
+            // On la supprime pour qu'elle ne soit pas appelée inutilement par d'autres pages.
+            mainContent.beforePageChange = null;
+        }
+        // --- FIN DE LA NOUVELLE LOGIQUE ---
+    }
+
     let path = window.location.pathname;
 
     // Normalise le chemin pour qu'il corresponde à nos clés de routes
