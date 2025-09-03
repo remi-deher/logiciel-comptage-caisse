@@ -3,7 +3,7 @@
 import { initializeHistoryLogic } from '../logic/history-logic.js';
 
 export function renderHistoriquePage(element) {
-  // On injecte la structure HTML de base de la page (anciennement dans templates/historique.php)
+  // On injecte la structure HTML de base de la page
   element.innerHTML = `
     <div class="container" id="history-page">
         <h2><i class="fa-solid fa-clock-rotate-left" style="color: #3498db;"></i> Historique des Comptages</h2>
@@ -41,7 +41,8 @@ export function renderHistoriquePage(element) {
         </div>
 
         <div id="retraits-view" class="view-content">
-            <p>La vue de la synthèse des retraits sera implémentée ici.</p>
+             <div id="retraits-view-content">
+                </div>
         </div>
 
         <div id="details-modal" class="modal">
@@ -52,6 +53,6 @@ export function renderHistoriquePage(element) {
     </div>
   `;
 
-  // Une fois le HTML en place, on lance la logique JavaScript associée à cette page
+  // Une fois le HTML en place, on lance la logique JavaScript associée
   initializeHistoryLogic();
 }
