@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version Finale Complète et Corrigée)
+// Fichier : public/assets/js/logic/history-logic.js (Version Finale avec Graphiques Améliorés)
 
 // --- Fonctions Utilitaires ---
 const log = (message, ...details) => console.log(`[Historique Log] %c${message}`, 'color: #3498db; font-weight: bold;', ...details);
@@ -8,8 +8,8 @@ const logSuccess = (message, ...details) => console.log(`[Historique Log] %c${me
 let fullHistoryData = [];
 let config = {};
 let withdrawalsByDay = {};
-let withdrawalChart = null; // Pour le graphique à barres
-let withdrawalDonutChart = null; // Pour le graphique donut
+let withdrawalChart = null;
+let withdrawalDonutChart = null;
 
 const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(montant);
 const formatDateFr = (dateString, options = { dateStyle: 'long', timeStyle: 'short' }) => new Intl.DateTimeFormat('fr-FR', options).format(new Date(dateString));
@@ -229,7 +229,12 @@ export async function initializeHistoryLogic() {
     
         const byDenom = dayData.details.reduce((acc, d) => {
             const value = parseFloat(d.valeur);
-            acc[d.denomination] = (acc[d.denomination] || 0) + (isNaN(value) ? 0 : value);
+            const quantite = parseInt(d.quantite, 10);
+            if (!acc[d.denomination]) {
+                acc[d.denomination] = { total: 0, quantite: 0 };
+            }
+            acc[d.denomination].total += isNaN(value) ? 0 : value;
+            acc[d.denomination].quantite += isNaN(quantite) ? 0 : quantite;
             return acc;
         }, {});
     
@@ -238,16 +243,13 @@ export async function initializeHistoryLogic() {
             const value = parseFloat(allDenomsValueMap[denom]);
             return value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
         });
-        const barSeries = sortedDenoms.map(([, total]) => {
-            const numericTotal = parseFloat(total);
-            return isNaN(numericTotal) ? 0 : numericTotal;
-        });
+        const barSeries = sortedDenoms.map(([, data]) => parseFloat(data.total) || 0);
+        const barQuantities = sortedDenoms.map(([, data]) => parseInt(data.quantite, 10) || 0);
     
-        const globalTableRows = sortedDenoms.map(([denom, total]) => {
+        const globalTableRows = sortedDenoms.map(([denom, data]) => {
              const value = parseFloat(allDenomsValueMap[denom]);
-             const quantite = value > 0 ? total / value : 0;
              const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-             return `<tr><td>${label}</td><td class="text-right">${quantite.toFixed(0)}</td><td class="text-right">${formatEuros(total)}</td></tr>`;
+             return `<tr><td>${label}</td><td class="text-right">${data.quantite}</td><td class="text-right">${formatEuros(data.total)}</td></tr>`;
         }).join('');
     
         const caisseTablesHtml = Object.entries(byCaisse).map(([nomCaisse, totalCaisse]) => {
@@ -310,17 +312,37 @@ export async function initializeHistoryLogic() {
             ...theme,
             series: [{ name: 'Valeur retirée', data: barSeries }],
             chart: { type: 'bar', height: 250, toolbar: { show: false } },
-            plotOptions: { bar: { horizontal: true } },
-            dataLabels: { enabled: false },
+            plotOptions: { bar: { horizontal: true, dataLabels: { position: 'center' } } },
+            dataLabels: {
+                enabled: true,
+                formatter: (val, opts) => {
+                    const quantite = barQuantities[opts.dataPointIndex];
+                    return `${quantite}x`;
+                },
+                style: { colors: ['#fff'], fontSize: '12px', fontWeight: 'bold' },
+                textAnchor: 'middle',
+                dropShadow: { enabled: true, top: 1, left: 1, blur: 1, opacity: 0.45 }
+            },
             xaxis: {
-                categories: barLabels, // CORRECTION: Les catégories (labels) sont sur l'axe X pour un bar chart horizontal
+                categories: barLabels,
                 labels: {
                     formatter: (val) => typeof val === 'number' ? formatEuros(val) : val
                 }
             },
             tooltip: {
-                y: { // CORRECTION: Le tooltip de l'axe Y (les barres) doit être formaté
-                    formatter: (val) => formatEuros(val)
+                x: {
+                    formatter: (val, opts) => {
+                         return barLabels[opts.dataPointIndex];
+                    }
+                },
+                y: {
+                    title: {
+                        formatter: (seriesName) => seriesName,
+                    },
+                    formatter: (val, opts) => {
+                        const quantite = barQuantities[opts.dataPointIndex];
+                        return `${formatEuros(val)} (${quantite} articles)`;
+                    }
                 }
             }
         });
@@ -424,6 +446,8 @@ export async function initializeHistoryLogic() {
         attachWithdrawalsEventListeners();
     }
 
+
+    // --- Fin des fonctions de rendu ---
 
     // Injection des éléments qui ne sont pas toujours visibles
     const controlsContainer = historyPage.querySelector('.filter-section');
