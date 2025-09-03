@@ -4,11 +4,10 @@
 const log = (message, ...details) => console.log(`[Historique Log] %c${message}`, 'color: #3498db; font-weight: bold;', ...details);
 const logSuccess = (message, ...details) => console.log(`[Historique Log] %c${message}`, 'color: #27ae60; font-weight: bold;', ...details);
 
-
 // --- Variables globales pour la page ---
 let fullHistoryData = [];
 let config = {};
-let withdrawalsByDay = {}; // Pour stocker les données de retraits par jour
+let withdrawalsByDay = {};
 let withdrawalChart = null; // Pour le graphique à barres
 let withdrawalDonutChart = null; // Pour le graphique donut
 
@@ -19,183 +18,45 @@ const getEcartClass = (ecart) => {
     return ecart > 0 ? 'ecart-positif' : 'ecart-negatif';
 };
 
-
 // --- API ---
 async function fetchHistoriqueData(params) {
     const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
     const historyPromise = fetch(`index.php?route=historique/get_data&${new URLSearchParams(params)}`).then(res => res.json());
-
     const [conf, history] = await Promise.all([configPromise, historyPromise]);
     config = conf;
-
     if (!history.historique) throw new Error(`La réponse de l'API pour l'historique est invalide.`);
     fullHistoryData = history.historique_complet || [];
     return history;
 }
 
-// --- Logique de traitement des données de retraits ---
+// --- Logique de traitement des données ---
 function processWithdrawalData(comptages, denominations) {
-    withdrawalsByDay = {}; // Réinitialise les données
+    withdrawalsByDay = {};
     const allDenomsValueMap = { ...denominations.billets, ...denominations.pieces };
-
     if (!comptages) return;
-
     for (const comptage of comptages) {
         const dateKey = new Date(comptage.date_comptage).toISOString().split('T')[0];
         if (!withdrawalsByDay[dateKey]) {
-            withdrawalsByDay[dateKey] = {
-                totalValue: 0,
-                totalItems: 0,
-                details: []
-            };
+            withdrawalsByDay[dateKey] = { totalValue: 0, totalItems: 0, details: [] };
         }
-
         if (!comptage.caisses_data) continue;
-
         for (const [caisse_id, caisse] of Object.entries(comptage.caisses_data)) {
             if (!caisse.retraits || Object.keys(caisse.retraits).length === 0) continue;
-
             for (const [denom, qtyStr] of Object.entries(caisse.retraits)) {
                 const qty = parseInt(qtyStr, 10);
                 const value = parseFloat(allDenomsValueMap[denom]);
-
                 if (!isNaN(qty) && !isNaN(value) && qty > 0) {
                     const amount = qty * value;
-                    withdrawalsByDay[dateKey].totalValue += amount;
-                    withdrawalsByDay[dateKey].totalItems += qty;
-                    withdrawalsByDay[dateKey].details.push({
-                        caisse_id,
-                        caisse_nom: config.nomsCaisses[caisse_id] || `Caisse ${caisse_id}`,
-                        denomination: denom,
-                        quantite: qty,
-                        valeur: amount
-                    });
+                    if (!isNaN(amount)) {
+                        withdrawalsByDay[dateKey].totalValue += amount;
+                        withdrawalsByDay[dateKey].totalItems += qty;
+                        withdrawalsByDay[dateKey].details.push({ caisse_id, caisse_nom: config.nomsCaisses[caisse_id] || `Caisse ${caisse_id}`, denomination: denom, quantite: qty, valeur: amount });
+                    }
                 }
             }
         }
     }
 }
-
-
-// --- Fonctions de Rendu (Affichage) ---
-function renderCards(container, historique) {
-    if (!historique || historique.length === 0) {
-        container.innerHTML = '<p style="padding: 20px; text-align: center;">Aucun enregistrement trouvé pour ces critères.</p>';
-        return;
-    }
-    container.innerHTML = historique.map(comptage => {
-        const results = comptage.results.combines;
-        const ecart = results.ecart;
-        const cardClass = getEcartClass(ecart);
-
-        return `
-        <div class="history-card ${cardClass}" data-comptage-id="${comptage.id}">
-             <input type="checkbox" class="comparison-checkbox" data-comptage-id="${comptage.id}" title="Sélectionner pour comparer">
-            <div class="history-card-header">
-                <h4>${comptage.nom_comptage}</h4>
-                <div class="date">${formatDateFr(comptage.date_comptage)}</div>
-                ${comptage.explication ? `<p class="explication">${comptage.explication}</p>` : ''}
-            </div>
-            <div class="history-card-body">
-                <div class="summary-line">
-                    <div><i class="fa-solid fa-receipt"></i> Ventes Théoriques</div>
-                    <span>${formatEuros(results.recette_theorique)}</span>
-                </div>
-                <div class="summary-line">
-                    <div><i class="fa-solid fa-money-bill-wave"></i> Recette Réelle</div>
-                    <span>${formatEuros(results.recette_reelle)}</span>
-                </div>
-                <div class="summary-line total-ecart">
-                    <div><strong><i class="fa-solid fa-right-left"></i> Écart Total</strong></div>
-                    <span class="ecart-value">${formatEuros(ecart)}</span>
-                </div>
-            </div>
-            <div class="history-card-footer">
-                <button class="action-btn-small details-btn" data-comptage-id="${comptage.id}"><i class="fa-solid fa-eye"></i> Détails</button>
-                <button class="action-btn-small load-btn" data-comptage-id="${comptage.id}"><i class="fa-solid fa-download"></i> Charger</button>
-                <button class="action-btn-small delete-btn" data-comptage-id="${comptage.id}"><i class="fa-solid fa-trash-can"></i> Supprimer</button>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-
-function renderPagination(container, currentPage, totalPages) {
-    if (totalPages <= 1) { container.innerHTML = ''; return; }
-    let html = '<ul class="pagination">';
-    html += `<li class="${currentPage === 1 ? 'disabled' : ''}"><a href="#" data-page="${currentPage - 1}">&laquo;</a></li>`;
-    for (let i = 1; i <= totalPages; i++) { html += `<li class="${i === currentPage ? 'active' : ''}"><a href="#" data-page="${i}">${i}</a></li>`; }
-    html += `<li class="${currentPage === totalPages ? 'disabled' : ''}"><a href="#" data-page="${currentPage + 1}">&raquo;</a></li>`;
-    html += '</ul>';
-    container.innerHTML = html;
-}
-
-function renderModalContent(container, comptageId) {
-    const comptage = fullHistoryData.find(c => c.id.toString() === comptageId.toString());
-    if (!comptage) { container.innerHTML = "Erreur: détails non trouvés."; return; }
-
-    const { combines, caisses } = comptage.results;
-
-    const summaryHtml = `
-        <ul class="summary-list">
-            <li class="${getEcartClass(combines.ecart)}"><i class="fa-solid fa-right-left summary-icon"></i><div><span>Écart Total</span><strong>${formatEuros(combines.ecart)}</strong></div></li>
-            <li><i class="fa-solid fa-cash-register summary-icon icon-recette"></i><div><span>Recette Réelle Totale</span><strong>${formatEuros(combines.recette_reelle)}</strong></div></li>
-            <li><i class="fa-solid fa-receipt summary-icon icon-ventes"></i><div><span>Ventes Théoriques</span><strong>${formatEuros(combines.recette_theorique)}</strong></div></li>
-             <li><i class="fa-solid fa-landmark summary-icon icon-fond-caisse"></i><div><span>Total Compté</span><strong>${formatEuros(combines.total_compté)}</strong></div></li>
-        </ul>`;
-    
-    const allDenomsMap = { ...config.denominations.billets, ...config.denominations.pieces };
-
-    const caissesHtml = Object.entries(comptage.caisses_data).map(([caisse_id, data]) => {
-        const caisseResult = caisses[caisse_id];
-        
-        const denomsHtml = Object.entries(allDenomsMap)
-            .map(([key, value]) => {
-                const denomData = data.denominations.find(d => d.denomination_nom === key);
-                const quantite = denomData ? parseInt(denomData.quantite, 10) : 0;
-                if (quantite === 0) return '';
-                const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
-            }).join('');
-        
-        const retraitsHtml = Object.entries(data.retraits || {})
-            .map(([key, quantite]) => {
-                const value = parseFloat(allDenomsMap[key]);
-                if (parseInt(quantite, 10) === 0) return '';
-                const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
-            }).join('');
-        const totalRetraits = Object.entries(data.retraits || {}).reduce((sum, [key, qty]) => sum + (parseInt(qty, 10) * allDenomsMap[key]), 0);
-
-        return `
-        <div>
-            <h4 class="modal-table-title">${config.nomsCaisses[caisse_id] || `Caisse ${caisse_id}`}</h4>
-            <table class="modal-details-table">
-                <thead><tr><th>Dénomination Comptée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
-                <tbody>${denomsHtml}</tbody>
-                <tfoot>
-                    <tr><td colspan="2">Total Compté</td><td class="text-right">${formatEuros(caisseResult.total_compte)}</td></tr>
-                    <tr class="${getEcartClass(caisseResult.ecart)}"><td colspan="2"><strong>Écart</strong></td><td class="text-right"><strong>${formatEuros(caisseResult.ecart)}</strong></td></tr>
-                </tfoot>
-            </table>
-            
-            ${retraitsHtml ? `
-            <table class="modal-details-table retrait-table">
-                <thead><tr><th>Dénomination Retirée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
-                <tbody>${retraitsHtml}</tbody>
-                <tfoot><tr><td colspan="2">Total Retiré</td><td class="text-right">${formatEuros(totalRetraits)}</td></tr></tfoot>
-            </table>` : ''}
-        </div>`;
-    }).join('');
-
-    container.innerHTML = `
-        <div class="modal-header">
-            <div><h3>Détails de: ${comptage.nom_comptage}</h3><p>${formatDateFr(comptage.date_comptage)}</p></div>
-            <div class="modal-actions"><button id="print-modal-btn" class="action-btn"><i class="fa-solid fa-print"></i> Imprimer</button><span class="modal-close">&times;</span></div>
-        </div>
-        <div class="modal-body" id="printable-content">${summaryHtml}<div class="modal-details-grid">${caissesHtml}</div></div>`;
-}
-
 
 // --- Point d'entrée de la logique de la page ---
 export async function initializeHistoryLogic() {
@@ -203,50 +64,282 @@ export async function initializeHistoryLogic() {
     const historyPage = document.getElementById('history-page');
     if (!historyPage) return;
 
-    // --- Définition des fonctions de rendu spécifiques à cette page ---
+    // --- Définition de TOUTES les fonctions de rendu et de gestion d'état AVANT de les utiliser ---
 
-    function renderRetraitsView(container) {
-        log('Affichage de la vue "Synthèse des Retraits" avec les données par jour.', withdrawalsByDay);
-        const sortedDays = Object.keys(withdrawalsByDay).sort((a, b) => new Date(b) - new Date(a));
-    
-        if (sortedDays.length === 0) {
-            container.innerHTML = `<div class="withdrawals-header"><h3>Journal des Retraits</h3></div><p>Aucun retrait trouvé pour la période sélectionnée.</p>`;
+    function renderCards(container, historique) {
+        if (!historique || historique.length === 0) {
+            container.innerHTML = `<p style="padding: 20px; text-align: center;">Aucun enregistrement trouvé.</p>`;
             return;
         }
-    
-        const dayCardsHtml = sortedDays.map(dateKey => {
-            const dayData = withdrawalsByDay[dateKey];
-            if (dayData.totalValue === 0) return '';
+        container.innerHTML = historique.map(comptage => {
+            const results = comptage.results.combines;
+            const ecart = results.ecart;
+            const cardClass = getEcartClass(ecart);
             return `
-                <div class="day-card" data-date-key="${dateKey}">
-                    <input type="checkbox" class="day-card-checkbox" data-amount="${dayData.totalValue}" title="Sélectionner ce jour">
-                    <div class="day-card-header"><i class="fa-solid fa-calendar-day"></i>${formatDateFr(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                    <div class="day-card-body">
-                        <div class="day-kpi"><span>Montant Retiré</span><strong>${formatEuros(dayData.totalValue)}</strong></div>
-                        <div class="day-kpi"><span>Articles Retirés</span><strong>${dayData.totalItems}</strong></div>
-                    </div>
-                    <div class="day-card-footer"><button class="action-btn-small details-btn"><i class="fa-solid fa-eye"></i> Voir détails</button></div>
-                </div>`;
+            <div class="history-card ${cardClass}" data-comptage-id="${comptage.id}">
+                <input type="checkbox" class="comparison-checkbox" data-comptage-id="${comptage.id}" title="Sélectionner pour comparer">
+                <div class="history-card-header"><h4>${comptage.nom_comptage}</h4><div class="date">${formatDateFr(comptage.date_comptage)}</div></div>
+                <div class="history-card-body">
+                    <div class="summary-line"><div><i class="fa-solid fa-receipt"></i> Ventes Théoriques</div><span>${formatEuros(results.recette_theorique)}</span></div>
+                    <div class="summary-line"><div><i class="fa-solid fa-money-bill-wave"></i> Recette Réelle</div><span>${formatEuros(results.recette_reelle)}</span></div>
+                    <div class="summary-line total-ecart"><div><strong><i class="fa-solid fa-right-left"></i> Écart Total</strong></div><span class="ecart-value">${formatEuros(ecart)}</span></div>
+                </div>
+                <div class="history-card-footer">
+                    <button class="action-btn-small details-btn" data-comptage-id="${comptage.id}"><i class="fa-solid fa-eye"></i> Détails</button>
+                    <button class="action-btn-small load-btn" data-comptage-id="${comptage.id}"><i class="fa-solid fa-download"></i> Charger</button>
+                    <button class="action-btn-small delete-btn" data-comptage-id="${comptage.id}"><i class="fa-solid fa-trash-can"></i> Supprimer</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderPagination(container, currentPage, totalPages) {
+        if (totalPages <= 1) { container.innerHTML = ''; return; }
+        let html = '<ul class="pagination">';
+        html += `<li class="${currentPage === 1 ? 'disabled' : ''}"><a href="#" data-page="${currentPage - 1}">&laquo;</a></li>`;
+        for (let i = 1; i <= totalPages; i++) { html += `<li class="${i === currentPage ? 'active' : ''}"><a href="#" data-page="${i}">${i}</a></li>`; }
+        html += `<li class="${currentPage === totalPages ? 'disabled' : ''}"><a href="#" data-page="${currentPage + 1}">&raquo;</a></li>`;
+        html += '</ul>';
+        container.innerHTML = html;
+    }
+
+    function renderModalContent(container, comptageId) {
+        const comptage = fullHistoryData.find(c => c.id.toString() === comptageId.toString());
+        if (!comptage) { container.innerHTML = "Erreur: détails non trouvés."; return; }
+    
+        const { combines, caisses } = comptage.results;
+    
+        const summaryHtml = `
+            <ul class="summary-list">
+                <li class="${getEcartClass(combines.ecart)}"><i class="fa-solid fa-right-left summary-icon"></i><div><span>Écart Total</span><strong>${formatEuros(combines.ecart)}</strong></div></li>
+                <li><i class="fa-solid fa-cash-register summary-icon icon-recette"></i><div><span>Recette Réelle Totale</span><strong>${formatEuros(combines.recette_reelle)}</strong></div></li>
+                <li><i class="fa-solid fa-receipt summary-icon icon-ventes"></i><div><span>Ventes Théoriques</span><strong>${formatEuros(combines.recette_theorique)}</strong></div></li>
+                 <li><i class="fa-solid fa-landmark summary-icon icon-fond-caisse"></i><div><span>Total Compté</span><strong>${formatEuros(combines.total_compté)}</strong></div></li>
+            </ul>`;
+        
+        const allDenomsMap = { ...config.denominations.billets, ...config.denominations.pieces };
+    
+        const caissesHtml = Object.entries(comptage.caisses_data).map(([caisse_id, data]) => {
+            const caisseResult = caisses[caisse_id];
+            const denomsHtml = Object.entries(allDenomsMap)
+                .map(([key, value]) => {
+                    const denomData = data.denominations.find(d => d.denomination_nom === key);
+                    const quantite = denomData ? parseInt(denomData.quantite, 10) : 0;
+                    if (quantite === 0) return '';
+                    const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+                    return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
+                }).join('');
+            
+            const retraitsHtml = Object.entries(data.retraits || {})
+                .map(([key, quantite]) => {
+                    const value = parseFloat(allDenomsMap[key]);
+                    if (parseInt(quantite, 10) === 0) return '';
+                    const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+                    return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
+                }).join('');
+            const totalRetraits = Object.entries(data.retraits || {}).reduce((sum, [key, qty]) => sum + (parseInt(qty, 10) * allDenomsMap[key]), 0);
+    
+            return `
+            <div>
+                <h4 class="modal-table-title">${config.nomsCaisses[caisse_id] || `Caisse ${caisse_id}`}</h4>
+                <table class="modal-details-table">
+                    <thead><tr><th>Dénomination Comptée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
+                    <tbody>${denomsHtml}</tbody>
+                    <tfoot>
+                        <tr><td colspan="2">Total Compté</td><td class="text-right">${formatEuros(caisseResult.total_compte)}</td></tr>
+                        <tr class="${getEcartClass(caisseResult.ecart)}"><td colspan="2"><strong>Écart</strong></td><td class="text-right"><strong>${formatEuros(caisseResult.ecart)}</strong></td></tr>
+                    </tfoot>
+                </table>
+                ${retraitsHtml ? `<table class="modal-details-table retrait-table">
+                    <thead><tr><th>Dénomination Retirée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
+                    <tbody>${retraitsHtml}</tbody>
+                    <tfoot><tr><td colspan="2">Total Retiré</td><td class="text-right">${formatEuros(totalRetraits)}</td></tr></tfoot>
+                </table>` : ''}
+            </div>`;
         }).join('');
     
         container.innerHTML = `
-            <div class="withdrawals-header">
-                <h3>Journal des Retraits</h3>
-                <p class="subtitle">Cliquez sur un jour pour le détail, ou cochez plusieurs jours pour les additionner.</p>
+            <div class="modal-header">
+                <div><h3>Détails de: ${comptage.nom_comptage}</h3><p>${formatDateFr(comptage.date_comptage)}</p></div>
+                <div class="modal-actions"><button id="print-modal-btn" class="action-btn"><i class="fa-solid fa-print"></i> Imprimer</button><span class="modal-close">&times;</span></div>
             </div>
-            <div class="withdrawals-log-wrapper">
-                <div id="withdrawals-log-container">${dayCardsHtml}</div>
-            </div>
-            <div class="selection-toolbar" id="day-selection-toolbar">
-                 <span id="day-selection-counter">0 jour(s) sélectionné(s)</span>
-                 <button id="clear-day-selection-btn" class="btn delete-btn">Tout désélectionner</button>
-            </div>
-            <div id="modal-withdrawal-details" class="modal"><div class="modal-content wide" id="modal-withdrawal-details-content"></div></div>
-        `;
-        
-        attachWithdrawalsEventListeners();
+            <div class="modal-body" id="printable-content">${summaryHtml}<div class="modal-details-grid">${caissesHtml}</div></div>`;
     }
     
+    function updateComparisonToolbar() {
+        const toolbar = document.getElementById('comparison-toolbar');
+        if (!toolbar) return;
+        const counter = toolbar.querySelector('#comparison-counter');
+        const button = toolbar.querySelector('#compare-btn');
+        const checked = document.querySelectorAll('.comparison-checkbox:checked');
+    
+        if (checked.length > 0) {
+            counter.textContent = `${checked.length} comptage(s) sélectionné(s)`;
+            button.disabled = checked.length < 2;
+            toolbar.classList.add('visible');
+        } else {
+            toolbar.classList.remove('visible');
+        }
+    }
+
+    function renderComparisonModal() {
+        const modal = document.getElementById('comparison-modal');
+        const content = modal.querySelector('#comparison-modal-content');
+        const checkedIds = [...document.querySelectorAll('.comparison-checkbox:checked')].map(cb => cb.dataset.comptageId);
+        const comptagesToCompare = fullHistoryData.filter(c => checkedIds.includes(c.id.toString())).sort((a,b) => new Date(a.date_comptage) - new Date(b.date_comptage));
+    
+        const headersHtml = comptagesToCompare.map(c => `<th>${c.nom_comptage}<br><small>${formatDateFr(c.date_comptage)}</small></th>`).join('');
+        
+        const rows = [ { label: 'Recette Réelle', key: 'recette_reelle' }, { label: 'Recette Théorique', key: 'recette_theorique' }, { label: 'Écart Total', key: 'ecart' } ];
+        const bodyHtml = rows.map(row => {
+            const cells = comptagesToCompare.map(c => {
+                const value = c.results.combines[row.key];
+                const ecartClass = row.key === 'ecart' ? getEcartClass(value) : '';
+                return `<td class="${ecartClass}">${formatEuros(value)}</td>`;
+            }).join('');
+            return `<tr><td><strong>${row.label}</strong></td>${cells}</tr>`;
+        }).join('');
+    
+        content.innerHTML = `
+            <div class="modal-header"><h3>Comparaison des Comptages</h3><span class="modal-close">&times;</span></div>
+            <div class="modal-body"><div class="table-responsive"><table class="info-table comparison-table">
+                <thead><tr><th>Indicateur</th>${headersHtml}</tr></thead>
+                <tbody>${bodyHtml}</tbody>
+            </table></div></div>`;
+    
+        modal.classList.add('visible');
+    }
+
+    function renderWithdrawalDetailsModal(dateKey) {
+        const dayData = withdrawalsByDay[dateKey];
+        if (!dayData) return;
+    
+        const modal = document.getElementById('modal-withdrawal-details');
+        const content = document.getElementById('modal-withdrawal-details-content');
+    
+        const allDenomsValueMap = { ...config.denominations.billets, ...config.denominations.pieces };
+        
+        const byCaisse = dayData.details.reduce((acc, d) => {
+            const value = parseFloat(d.valeur);
+            acc[d.caisse_nom] = (acc[d.caisse_nom] || 0) + (isNaN(value) ? 0 : value);
+            return acc;
+        }, {});
+        const donutLabels = Object.keys(byCaisse);
+        const donutSeries = Object.values(byCaisse);
+    
+        const byDenom = dayData.details.reduce((acc, d) => {
+            const value = parseFloat(d.valeur);
+            acc[d.denomination] = (acc[d.denomination] || 0) + (isNaN(value) ? 0 : value);
+            return acc;
+        }, {});
+    
+        const sortedDenoms = Object.entries(byDenom).sort(([denomA], [denomB]) => parseFloat(allDenomsValueMap[denomB]) - parseFloat(allDenomsValueMap[denomA]));
+        const barLabels = sortedDenoms.map(([denom]) => {
+            const value = parseFloat(allDenomsValueMap[denom]);
+            return value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+        });
+        const barSeries = sortedDenoms.map(([, total]) => {
+            const numericTotal = parseFloat(total);
+            return isNaN(numericTotal) ? 0 : numericTotal;
+        });
+    
+        const globalTableRows = sortedDenoms.map(([denom, total]) => {
+             const value = parseFloat(allDenomsValueMap[denom]);
+             const quantite = value > 0 ? total / value : 0;
+             const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+             return `<tr><td>${label}</td><td class="text-right">${quantite.toFixed(0)}</td><td class="text-right">${formatEuros(total)}</td></tr>`;
+        }).join('');
+    
+        const caisseTablesHtml = Object.entries(byCaisse).map(([nomCaisse, totalCaisse]) => {
+            const detailsCaisse = dayData.details.filter(d => d.caisse_nom === nomCaisse)
+                .sort((a,b) => allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination]);
+            const rows = detailsCaisse.map(d => {
+                const value = parseFloat(allDenomsValueMap[d.denomination]);
+                const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+                return `<tr><td>${label}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.valeur)}</td></tr>`;
+            }).join('');
+            return `<div class="card">
+                        <h4>Détail pour ${nomCaisse}</h4>
+                        <div class="table-responsive"><table class="info-table">
+                            <thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                            <tfoot><tr><td colspan="2">Total Caisse</td><td class="text-right">${formatEuros(totalCaisse)}</td></tr></tfoot>
+                        </table></div>
+                    </div>`;
+        }).join('');
+        
+        content.innerHTML = `
+            <div class="modal-header">
+                <h3>Analyse des retraits du ${formatDateFr(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="charts-grid">
+                    <div class="card chart-card"><h4>Répartition par Caisse</h4><div id="donut-chart-container"></div></div>
+                    <div class="card chart-card"><h4>Valeur par Dénomination</h4><div id="bar-chart-container"></div></div>
+                </div>
+                <div class="details-grid">
+                    <div class="card">
+                        <h4>Synthèse Globale</h4>
+                        <div class="table-responsive">
+                            <table class="info-table">
+                                <thead><tr><th>Dénomination</th><th class="text-right">Qté. Totale</th><th class="text-right">Valeur Totale</th></tr></thead>
+                                <tbody>${globalTableRows}</tbody>
+                                <tfoot><tr><td colspan="2">Total Général</td><td class="text-right">${formatEuros(dayData.totalValue)}</td></tr></tfoot>
+                            </table>
+                        </div>
+                    </div>
+                    ${caisseTablesHtml}
+                </div>
+            </div>`;
+            
+        modal.classList.add('visible');
+    
+        const theme = { theme: { mode: document.body.dataset.theme === 'dark' ? 'dark' : 'light' } };
+    
+        if (withdrawalDonutChart) withdrawalDonutChart.destroy();
+        withdrawalDonutChart = new ApexCharts(document.querySelector("#donut-chart-container"), {
+            ...theme, series: donutSeries, labels: donutLabels, chart: { type: 'donut', height: 250 },
+            legend: { position: 'bottom' }, dataLabels: { enabled: true, formatter: (val) => `${val.toFixed(1)}%` },
+            tooltip: { y: { formatter: (val) => formatEuros(val) } }
+        });
+        withdrawalDonutChart.render();
+    
+        if (withdrawalChart) withdrawalChart.destroy();
+        withdrawalChart = new ApexCharts(document.querySelector("#bar-chart-container"), {
+            ...theme,
+            series: [{ name: 'Valeur retirée', data: barSeries }],
+            chart: { type: 'bar', height: 250, toolbar: { show: false } },
+            plotOptions: { bar: { horizontal: true } },
+            dataLabels: { enabled: false },
+            xaxis: {
+                categories: barLabels, // CORRECTION: Les catégories (labels) sont sur l'axe X pour un bar chart horizontal
+                labels: {
+                    formatter: (val) => typeof val === 'number' ? formatEuros(val) : val
+                }
+            },
+            tooltip: {
+                y: { // CORRECTION: Le tooltip de l'axe Y (les barres) doit être formaté
+                    formatter: (val) => formatEuros(val)
+                }
+            }
+        });
+        withdrawalChart.render();
+    
+        modal.querySelector('.modal-close').onclick = () => {
+            modal.classList.remove('visible');
+            if (withdrawalChart) withdrawalChart.destroy();
+            if (withdrawalDonutChart) withdrawalDonutChart.destroy();
+        };
+        modal.onclick = (e) => { 
+            if (e.target === modal) {
+                modal.classList.remove('visible');
+                if (withdrawalChart) withdrawalChart.destroy();
+                if (withdrawalDonutChart) withdrawalDonutChart.destroy();
+            }
+        };
+    }
+
     function attachWithdrawalsEventListeners() {
         const container = historyPage.querySelector('#retraits-view');
         if (!container) return;
@@ -289,175 +382,48 @@ export async function initializeHistoryLogic() {
         }
     }
     
-    function renderWithdrawalDetailsModal(dateKey) {
-        const dayData = withdrawalsByDay[dateKey];
-        if (!dayData) return;
+    function renderRetraitsView(container) {
+        log('Affichage de la vue "Synthèse des Retraits" avec les données par jour.', withdrawalsByDay);
+        const sortedDays = Object.keys(withdrawalsByDay).sort((a, b) => new Date(b) - new Date(a));
     
-        const modal = document.getElementById('modal-withdrawal-details');
-        const content = document.getElementById('modal-withdrawal-details-content');
+        if (sortedDays.length === 0) {
+            container.innerHTML = `<div class="withdrawals-header"><h3>Journal des Retraits</h3></div><p>Aucun retrait trouvé pour la période sélectionnée.</p>`;
+            return;
+        }
     
-        const allDenomsValueMap = { ...config.denominations.billets, ...config.denominations.pieces };
-        
-        const byCaisse = dayData.details.reduce((acc, d) => {
-            acc[d.caisse_nom] = (acc[d.caisse_nom] || 0) + d.valeur;
-            return acc;
-        }, {});
-        const donutLabels = Object.keys(byCaisse);
-        const donutSeries = Object.values(byCaisse);
-    
-        const byDenom = dayData.details.reduce((acc, d) => {
-            acc[d.denomination] = (acc[d.denomination] || 0) + d.valeur;
-            return acc;
-        }, {});
-        const sortedDenoms = Object.entries(byDenom).sort(([denomA], [denomB]) => parseFloat(allDenomsValueMap[denomB]) - parseFloat(allDenomsValueMap[denomA]));
-        const barLabels = sortedDenoms.map(([denom]) => {
-            const value = parseFloat(allDenomsValueMap[denom]);
-            return value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-        });
-        const barSeries = sortedDenoms.map(([, total]) => total);
-    
-        const globalTableRows = sortedDenoms.map(([denom, total]) => {
-             const value = parseFloat(allDenomsValueMap[denom]);
-             const quantite = total / value;
-             const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-             return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(total)}</td></tr>`;
-        }).join('');
-    
-        const caisseTablesHtml = Object.entries(byCaisse).map(([nomCaisse, totalCaisse]) => {
-            const detailsCaisse = dayData.details.filter(d => d.caisse_nom === nomCaisse)
-                .sort((a,b) => allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination]);
-    
-            const rows = detailsCaisse.map(d => {
-                const value = parseFloat(allDenomsValueMap[d.denomination]);
-                const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                return `<tr><td>${label}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.valeur)}</td></tr>`;
-            }).join('');
-    
+        const dayCardsHtml = sortedDays.map(dateKey => {
+            const dayData = withdrawalsByDay[dateKey];
+            if (dayData.totalValue === 0) return '';
             return `
-                <div class="card">
-                    <h4>Détail pour ${nomCaisse}</h4>
-                    <div class="table-responsive">
-                        <table class="info-table">
-                            <thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead>
-                            <tbody>${rows}</tbody>
-                            <tfoot><tr><td colspan="2">Total Caisse</td><td class="text-right">${formatEuros(totalCaisse)}</td></tr></tfoot>
-                        </table>
+                <div class="day-card" data-date-key="${dateKey}">
+                    <input type="checkbox" class="day-card-checkbox" data-amount="${dayData.totalValue}" title="Sélectionner ce jour">
+                    <div class="day-card-header"><i class="fa-solid fa-calendar-day"></i>${formatDateFr(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                    <div class="day-card-body">
+                        <div class="day-kpi"><span>Montant Retiré</span><strong>${formatEuros(dayData.totalValue)}</strong></div>
+                        <div class="day-kpi"><span>Articles Retirés</span><strong>${dayData.totalItems}</strong></div>
                     </div>
+                    <div class="day-card-footer"><button class="action-btn-small details-btn"><i class="fa-solid fa-eye"></i> Voir détails</button></div>
                 </div>`;
         }).join('');
-        
-        content.innerHTML = `
-            <div class="modal-header">
-                <h3>Analyse des retraits du ${formatDateFr(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
-                <span class="modal-close">&times;</span>
+    
+        container.innerHTML = `
+            <div class="withdrawals-header">
+                <h3>Journal des Retraits</h3>
+                <p class="subtitle">Cliquez sur un jour pour le détail, ou cochez plusieurs jours pour les additionner.</p>
             </div>
-            <div class="modal-body">
-                <div class="charts-grid">
-                    <div class="card chart-card"><h4>Répartition par Caisse</h4><div id="donut-chart-container"></div></div>
-                    <div class="card chart-card"><h4>Valeur par Dénomination</h4><div id="bar-chart-container"></div></div>
-                </div>
-                <div class="details-grid">
-                    <div class="card">
-                        <h4>Synthèse Globale</h4>
-                        <div class="table-responsive">
-                            <table class="info-table">
-                                <thead><tr><th>Dénomination</th><th class="text-right">Qté. Totale</th><th class="text-right">Valeur Totale</th></tr></thead>
-                                <tbody>${globalTableRows}</tbody>
-                                <tfoot><tr><td colspan="2">Total Général</td><td class="text-right">${formatEuros(dayData.totalValue)}</td></tr></tfoot>
-                            </table>
-                        </div>
-                    </div>
-                    ${caisseTablesHtml}
-                </div>
-            </div>`;
-            
-        modal.classList.add('visible');
-    
-        if (withdrawalDonutChart) withdrawalDonutChart.destroy();
-        withdrawalDonutChart = new ApexCharts(document.querySelector("#donut-chart-container"), {
-            series: donutSeries, labels: donutLabels, chart: { type: 'donut', height: 250 },
-            legend: { position: 'bottom' }, dataLabels: { enabled: true, formatter: (val) => `${val.toFixed(1)}%` },
-            tooltip: { y: { formatter: (val) => formatEuros(val) } }
-        });
-        withdrawalDonutChart.render();
-    
-        if (withdrawalChart) withdrawalChart.destroy();
-        withdrawalChart = new ApexCharts(document.querySelector("#bar-chart-container"), {
-            series: [{ name: 'Valeur retirée', data: barSeries }], chart: { type: 'bar', height: 250, toolbar: { show: false } },
-            xaxis: { categories: barLabels }, yaxis: { labels: { formatter: (val) => formatEuros(val) } },
-            dataLabels: { enabled: false }, plotOptions: { bar: { horizontal: true } }
-        });
-        withdrawalChart.render();
-    
-        modal.querySelector('.modal-close').onclick = () => {
-            modal.classList.remove('visible');
-            if (withdrawalChart) withdrawalChart.destroy();
-            if (withdrawalDonutChart) withdrawalDonutChart.destroy();
-        };
-        modal.onclick = (e) => { 
-            if (e.target === modal) {
-                modal.classList.remove('visible');
-                if (withdrawalChart) withdrawalChart.destroy();
-                if (withdrawalDonutChart) withdrawalDonutChart.destroy();
-            }
-        };
-    }
-    
-    function updateComparisonToolbar() {
-        const toolbar = document.getElementById('comparison-toolbar');
-        if (!toolbar) return;
-        const counter = toolbar.querySelector('#comparison-counter');
-        const button = toolbar.querySelector('#compare-btn');
-        const checked = document.querySelectorAll('.comparison-checkbox:checked');
-    
-        if (checked.length > 0) {
-            counter.textContent = `${checked.length} comptage(s) sélectionné(s)`;
-            button.disabled = checked.length < 2;
-            toolbar.classList.add('visible');
-        } else {
-            toolbar.classList.remove('visible');
-        }
-    }
-    
-    function renderComparisonModal() {
-        const modal = document.getElementById('comparison-modal');
-        const content = modal.querySelector('#comparison-modal-content');
-        const checkedIds = [...document.querySelectorAll('.comparison-checkbox:checked')].map(cb => cb.dataset.comptageId);
-        const comptagesToCompare = fullHistoryData.filter(c => checkedIds.includes(c.id.toString())).sort((a,b) => new Date(a.date_comptage) - new Date(b.date_comptage));
-    
-        const headersHtml = comptagesToCompare.map(c => `<th>${c.nom_comptage}<br><small>${formatDateFr(c.date_comptage)}</small></th>`).join('');
-        
-        const rows = [
-            { label: 'Recette Réelle', key: 'recette_reelle' },
-            { label: 'Recette Théorique', key: 'recette_theorique' },
-            { label: 'Écart Total', key: 'ecart' }
-        ];
-    
-        const bodyHtml = rows.map(row => {
-            const cells = comptagesToCompare.map(c => {
-                const value = c.results.combines[row.key];
-                const ecartClass = row.key === 'ecart' ? getEcartClass(value) : '';
-                return `<td class="${ecartClass}">${formatEuros(value)}</td>`;
-            }).join('');
-            return `<tr><td><strong>${row.label}</strong></td>${cells}</tr>`;
-        }).join('');
-    
-        content.innerHTML = `
-            <div class="modal-header"><h3>Comparaison des Comptages</h3><span class="modal-close">&times;</span></div>
-            <div class="modal-body">
-                <div class="table-responsive">
-                    <table class="info-table comparison-table">
-                        <thead><tr><th>Indicateur</th>${headersHtml}</tr></thead>
-                        <tbody>${bodyHtml}</tbody>
-                    </table>
-                </div>
+            <div class="withdrawals-log-wrapper">
+                <div id="withdrawals-log-container">${dayCardsHtml}</div>
             </div>
+            <div class="selection-toolbar" id="day-selection-toolbar">
+                 <span id="day-selection-counter">0 jour(s) sélectionné(s)</span>
+                 <button id="clear-day-selection-btn" class="btn delete-btn">Tout désélectionner</button>
+            </div>
+            <div id="modal-withdrawal-details" class="modal"><div class="modal-content wide" id="modal-withdrawal-details-content"></div></div>
         `;
-    
-        modal.classList.add('visible');
+        
+        attachWithdrawalsEventListeners();
     }
 
-    // --- Fin des fonctions de rendu ---
 
     // Injection des éléments qui ne sont pas toujours visibles
     const controlsContainer = historyPage.querySelector('.filter-section');
