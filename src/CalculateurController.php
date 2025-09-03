@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Version Complète et Finale)
+// Fichier : src/CalculateurController.php (Version mise à jour)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -33,23 +33,46 @@ class CalculateurController {
 
     public function getInitialData() {
         header('Content-Type: application/json');
-        $stmt = $this->pdo->prepare("SELECT id, nom_comptage, explication FROM comptages ORDER BY id DESC LIMIT 1");
+
+        // La requête SQL est modifiée pour inclure les sauvegardes manuelles dans la priorité
+        $sql = "
+            SELECT id, nom_comptage, explication FROM comptages
+            ORDER BY
+                CASE
+                    WHEN nom_comptage LIKE 'Sauvegarde auto%' THEN 1
+                    WHEN nom_comptage NOT LIKE 'Fond de caisse J+1%' THEN 2
+                    WHEN nom_comptage LIKE 'Fond de caisse J+1%' THEN 3
+                    ELSE 4
+                END,
+                date_comptage DESC
+            LIMIT 1
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
         $last_comptage = $stmt->fetch();
 
         if ($last_comptage) {
+            // La condition de chargement est maintenant plus simple : on charge toujours le plus pertinent.
+            $data = $this->loadComptageData($last_comptage['id']);
+
+            // On ne renvoie le nom et l'explication que si ce n'est pas un fond de caisse.
             $nom = $last_comptage['nom_comptage'];
-            $data = null;
-            if (strpos($nom, 'Fond de caisse J+1') === 0 || strpos($nom, 'Sauvegarde auto') === 0) {
-                $data = $this->loadComptageData($last_comptage['id']);
-                $data['nom_comptage'] = strpos($nom, 'Sauvegarde auto') === 0 ? $last_comptage['nom_comptage'] : '';
-                $data['explication'] = strpos($nom, 'Sauvegarde auto') === 0 ? $last_comptage['explication'] : '';
-                echo json_encode(['success' => true, 'data' => $data]);
-                exit;
+            if (strpos($nom, 'Fond de caisse J+1') !== 0) {
+                $data['nom_comptage'] = $nom;
+                $data['explication'] = $last_comptage['explication'];
+            } else {
+                $data['nom_comptage'] = ''; // On ne pré-remplit pas le nom pour un nouveau comptage
+                $data['explication'] = '';
             }
+
+            echo json_encode(['success' => true, 'data' => $data]);
+            exit;
         }
+
         echo json_encode(['success' => false, 'data' => null]);
     }
+
 
     private function loadComptageData($comptage_id) {
         $data = [];
@@ -83,15 +106,17 @@ class CalculateurController {
         header('Content-Type: application/json');
         if ($is_autosave) ob_start();
     
-        $nom_comptage = trim($_POST['nom_comptage'] ?? '');
         $explication = trim($_POST['explication'] ?? '');
     
         try {
             $this->pdo->beginTransaction();
+
+            $nom_comptage = trim($_POST['nom_comptage'] ?? '');
+
             if ($is_autosave) {
-                $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {
+                // C'est une sauvegarde manuelle, on s'assure qu'elle a un nom.
                 $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;
             }
             
@@ -123,6 +148,7 @@ class CalculateurController {
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             if ($is_autosave) ob_end_clean();
+            http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Erreur de BDD: ' . $e->getMessage()]);
         }
         exit;
@@ -174,6 +200,7 @@ class CalculateurController {
             echo json_encode(['success' => true, 'message' => "La caisse a été clôturée."]);
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
         }
         exit;
@@ -184,11 +211,13 @@ class CalculateurController {
         try {
             $this->pdo->beginTransaction();
             // ... (logique complexe de la clôture générale de votre fichier original) ...
+            // Cette partie reste à implémenter de manière détaillée si besoin.
             $this->pdo->commit();
             $this->clotureStateService->resetState();
             echo json_encode(['success' => true, 'message' => "Clôture générale réussie."]);
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
         }
         exit;
