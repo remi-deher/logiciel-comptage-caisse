@@ -50,13 +50,11 @@ class CaisseServer implements MessageComponentInterface {
         $this->clients->attach($conn);
         echo "Nouvelle connexion ! ({$conn->resourceId})\n";
         
-        // Si c'est le premier client de la session, on charge l'état depuis la BDD.
         if ($this->clotureState === null) {
             echo "Premier client connecté. Chargement de l'état initial depuis la base de données...\n";
             $this->updateAndCacheClotureState();
         }
 
-        // On envoie le message de bienvenue, l'état de clôture ET l'état actuel du formulaire
         $conn->send(json_encode(['type' => 'welcome', 'resourceId' => $conn->resourceId]));
         $conn->send(json_encode($this->clotureState));
         $conn->send(json_encode(['type' => 'full_form_state', 'state' => $this->formState]));
@@ -66,10 +64,9 @@ class CaisseServer implements MessageComponentInterface {
         try {
             $data = json_decode($msg, true);
             
-            // Si c'est une mise à jour de champ, on met à jour notre mémoire d'état
             if (isset($data['id']) && isset($data['value'])) {
                 $this->formState[$data['id']] = $data['value'];
-                $this->broadcast($msg, $from); // Et on diffuse aux autres
+                $this->broadcast($msg, $from);
                 return;
             }
 
@@ -85,7 +82,7 @@ class CaisseServer implements MessageComponentInterface {
                     $this->clotureStateService->unlockCaisse($data['caisse_id']);
                     $actionProcessed = true;
                     break;
-                case 'cloture_force_unlock': // NOUVELLE ACTION
+                case 'cloture_force_unlock':
                     $this->clotureStateService->forceUnlockCaisse($data['caisse_id']);
                     $actionProcessed = true;
                     break;
@@ -99,7 +96,6 @@ class CaisseServer implements MessageComponentInterface {
                     break;
             }
 
-            // Si une action de clôture a eu lieu, on met à jour l'état du serveur et on le diffuse à tous
             if ($actionProcessed) {
                 $this->updateAndCacheClotureState();
                 $this->broadcastClotureStateToAll();
@@ -115,16 +111,20 @@ class CaisseServer implements MessageComponentInterface {
 
     public function onClose(ConnectionInterface $conn) {
         $this->clients->detach($conn);
-        // On libère les verrous potentiels du client qui part
         $this->clotureStateService->forceUnlockByConnectionId((string)$conn->resourceId);
         
-        // S'il ne reste plus personne, on réinitialise l'état en mémoire
         if (count($this->clients) === 0) {
-            echo "Dernier client déconnecté. L'état en mémoire est réinitialisé.\n";
+            echo "Dernier client déconnecté.\n";
+            // CORRECTION : On ne réinitialise l'état du formulaire que si aucune caisse n'a été clôturée.
+            // Cela préserve les données pour la clôture générale.
+            if ($this->clotureState === null || empty($this->clotureState['closed_caisses'])) {
+                echo "Aucune caisse n'était clôturée, l'état du formulaire est réinitialisé.\n";
+                $this->formState = [];
+            } else {
+                echo "Au moins une caisse est clôturée, l'état du formulaire est préservé pour la clôture générale.\n";
+            }
             $this->clotureState = null;
-            $this->formState = []; // On vide aussi la mémoire du formulaire
         } else {
-            // Sinon, on met à jour et on diffuse l'état pour que les autres voient que le verrou a été levé
             $this->updateAndCacheClotureState();
             $this->broadcastClotureStateToAll();
         }
