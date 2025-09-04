@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Version corrigée et complète)
+// Fichier : src/CalculateurController.php (Version avec sauvegarde des retraits)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -22,8 +22,6 @@ class CalculateurController {
         $this->versionService = new VersionService();
         $this->clotureStateService = new ClotureStateService($pdo);
         $this->backupService = new BackupService();
-
-        // Charge les terminaux de paiement depuis la base de données
         $stmt = $this->pdo->query("SELECT id, nom_terminal, caisse_associee FROM terminaux_paiement ORDER BY nom_terminal");
         $terminaux = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($terminaux as $terminal) {
@@ -33,24 +31,10 @@ class CalculateurController {
 
     public function getInitialData() {
         header('Content-Type: application/json');
-
-        $sql = "
-            SELECT id, nom_comptage, explication FROM comptages
-            ORDER BY
-                CASE
-                    WHEN nom_comptage LIKE 'Sauvegarde auto%' THEN 1
-                    WHEN nom_comptage NOT LIKE 'Fond de caisse J+1%' THEN 2
-                    WHEN nom_comptage LIKE 'Fond de caisse J+1%' THEN 3
-                    ELSE 4
-                END,
-                date_comptage DESC
-            LIMIT 1
-        ";
-
+        $sql = "SELECT id, nom_comptage, explication FROM comptages ORDER BY CASE WHEN nom_comptage LIKE 'Sauvegarde auto%' THEN 1 WHEN nom_comptage NOT LIKE 'Fond de caisse J+1%' THEN 2 WHEN nom_comptage LIKE 'Fond de caisse J+1%' THEN 3 ELSE 4 END, date_comptage DESC LIMIT 1";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
         $last_comptage = $stmt->fetch();
-
         if ($last_comptage) {
             $data = $this->loadComptageData($last_comptage['id']);
             $nom = $last_comptage['nom_comptage'];
@@ -62,29 +46,21 @@ class CalculateurController {
                 $data['explication'] = '';
             }
             echo json_encode(['success' => true, 'data' => $data]);
-            exit;
+        } else {
+            echo json_encode(['success' => false, 'data' => null]);
         }
-
-        echo json_encode(['success' => false, 'data' => null]);
+        exit;
     }
-
 
     private function loadComptageData($comptage_id) {
         $data = [];
         $stmt = $this->pdo->prepare("SELECT * FROM comptage_details WHERE comptage_id = ?");
         $stmt->execute([$comptage_id]);
         $details_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
         foreach ($details_data as $row) {
             $caisse_id = $row['caisse_id'];
             $comptage_detail_id = $row['id'];
-            $data[$caisse_id] = [
-                'fond_de_caisse' => $row['fond_de_caisse'],
-                'ventes' => $row['ventes'],
-                'retrocession' => $row['retrocession'],
-                'denominations' => [], 'cb' => [], 'cheques' => []
-            ];
-            
+            $data[$caisse_id] = ['fond_de_caisse' => $row['fond_de_caisse'], 'ventes' => $row['ventes'], 'retrocession' => $row['retrocession'], 'denominations' => []];
             $stmt_denoms = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
             $stmt_denoms->execute([$comptage_detail_id]);
             while ($denom_row = $stmt_denoms->fetch()) {
@@ -100,32 +76,23 @@ class CalculateurController {
     private function handleSave($is_autosave) {
         header('Content-Type: application/json');
         if ($is_autosave) ob_start();
-    
-        $explication = trim($_POST['explication'] ?? '');
-    
         try {
             $this->pdo->beginTransaction();
-
             $nom_comptage = trim($_POST['nom_comptage'] ?? '');
-
             if ($is_autosave) {
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {
                 $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;
             }
-            
             $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-            $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
+            $stmt->execute([$nom_comptage, trim($_POST['explication'] ?? ''), date('Y-m-d H:i:s')]);
             $comptage_id = $this->pdo->lastInsertId();
-    
             foreach ($this->noms_caisses as $caisse_id => $nom) {
                 $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
                 if (empty($caisse_data)) continue;
-
                 $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
                 $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
                 $comptage_detail_id = $this->pdo->lastInsertId();
-    
                 foreach ($this->denominations as $type => $denominations_list) {
                     foreach ($denominations_list as $name => $value) {
                         $quantite = get_numeric_value($caisse_data, $name);
@@ -147,13 +114,11 @@ class CalculateurController {
         }
         exit;
     }
-    
+
     public function getClotureState() {
         header('Content-Type: application/json');
         try {
-            $lockedCaisses = $this->clotureStateService->getLockedCaisses();
-            $closedCaisses = $this->clotureStateService->getClosedCaisses();
-            echo json_encode(['success' => true, 'locked_caisses' => $lockedCaisses, 'closed_caisses' => $closedCaisses]);
+            echo json_encode(['success' => true, 'locked_caisses' => $this->clotureStateService->getLockedCaisses(), 'closed_caisses' => $this->clotureStateService->getClosedCaisses()]);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Erreur serveur.']);
@@ -167,8 +132,8 @@ class CalculateurController {
             $caisse_id_a_cloturer = intval($_POST['caisse_id_a_cloturer'] ?? 0);
             if ($caisse_id_a_cloturer === 0) throw new Exception("ID de caisse invalide.");
 
-            $nom_cloture = "Clôture Caisse " . ($this->noms_caisses[$caisse_id_a_cloturer] ?? $caisse_id_a_cloturer) . " du " . date('Y-m-d H:i:s');
             $this->pdo->beginTransaction();
+            $nom_cloture = "Clôture Caisse " . ($this->noms_caisses[$caisse_id_a_cloturer] ?? $caisse_id_a_cloturer) . " du " . date('Y-m-d H:i:s');
             $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt->execute([$nom_cloture, "Clôture quotidienne.", date('Y-m-d H:i:s')]);
             $comptage_id_cloture = $this->pdo->lastInsertId();
@@ -188,6 +153,15 @@ class CalculateurController {
                         }
                     }
                 }
+                
+                // --- AJOUT : Sauvegarde des retraits pour la caisse unique ---
+                $retraits_data = $_POST['retraits'][$caisse_id_a_cloturer] ?? [];
+                foreach ($retraits_data as $denom_name => $quantity) {
+                    if (intval($quantity) > 0) {
+                        $stmt_retrait = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
+                        $stmt_retrait->execute([$comptage_detail_id, $denom_name, intval($quantity)]);
+                    }
+                }
             }
             $this->pdo->commit();
             $this->clotureStateService->confirmCaisse($caisse_id_a_cloturer);
@@ -202,28 +176,23 @@ class CalculateurController {
 
     public function cloture_generale() {
         header('Content-Type: application/json');
-
-        // Étape 1 : Sauvegarde physique de la base de données.
         $backupResult = $this->backupService->createBackup();
         if (!$backupResult['success']) {
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => $backupResult['message']]);
             exit;
         }
-
         try {
             $this->pdo->beginTransaction();
-
             $nom_comptage = "Clôture Générale du " . date('d/m/Y');
             $explication = "Comptage final consolidé de la journée.";
             $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
             $comptage_id = $this->pdo->lastInsertId();
-
+            
             foreach ($this->noms_caisses as $caisse_id => $nom) {
                 $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
                 if (empty($caisse_data)) continue;
-
                 $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
                 $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
                 $comptage_detail_id = $this->pdo->lastInsertId();
@@ -237,15 +206,20 @@ class CalculateurController {
                         }
                     }
                 }
-            }
 
+                // --- AJOUT : Sauvegarde des retraits pour la clôture générale ---
+                $retraits_data = $_POST['retraits'][$caisse_id] ?? [];
+                foreach ($retraits_data as $denom_name => $quantity) {
+                    if (intval($quantity) > 0) {
+                        $stmt_retrait = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
+                        $stmt_retrait->execute([$comptage_detail_id, $denom_name, intval($quantity)]);
+                    }
+                }
+            }
             $this->clotureStateService->resetState();
             $this->pdo->commit();
             echo json_encode(['success' => true, 'message' => "Clôture générale réussie ! Un enregistrement final a été créé dans l'historique et une sauvegarde a été effectuée."]);
-
         } catch (Exception $e) {
-            // --- CORRECTION ---
-            // On ne tente d'annuler la transaction que si elle est active
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }

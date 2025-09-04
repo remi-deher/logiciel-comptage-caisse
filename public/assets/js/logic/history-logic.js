@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version Finale avec Graphiques Améliorés)
+// Fichier : public/assets/js/logic/history-logic.js (Version avec affichage des retraits)
 
 // --- Fonctions Utilitaires ---
 const log = (message, ...details) => console.log(`[Historique Log] %c${message}`, 'color: #3498db; font-weight: bold;', ...details);
@@ -64,8 +64,6 @@ export async function initializeHistoryLogic() {
     const historyPage = document.getElementById('history-page');
     if (!historyPage) return;
 
-    // --- Définition de TOUTES les fonctions de rendu et de gestion d'état AVANT de les utiliser ---
-
     function renderCards(container, historique) {
         if (!historique || historique.length === 0) {
             container.innerHTML = `<p style="padding: 20px; text-align: center;">Aucun enregistrement trouvé.</p>`;
@@ -130,12 +128,13 @@ export async function initializeHistoryLogic() {
                     return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
                 }).join('');
             
+            // --- MODIFICATION : Préparation de l'affichage des retraits ---
             const retraitsHtml = Object.entries(data.retraits || {})
                 .map(([key, quantite]) => {
                     const value = parseFloat(allDenomsMap[key]);
                     if (parseInt(quantite, 10) === 0) return '';
                     const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                    return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
+                    return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(parseInt(quantite, 10) * value)}</td></tr>`;
                 }).join('');
             const totalRetraits = Object.entries(data.retraits || {}).reduce((sum, [key, qty]) => sum + (parseInt(qty, 10) * allDenomsMap[key]), 0);
     
@@ -150,7 +149,7 @@ export async function initializeHistoryLogic() {
                         <tr class="${getEcartClass(caisseResult.ecart)}"><td colspan="2"><strong>Écart</strong></td><td class="text-right"><strong>${formatEuros(caisseResult.ecart)}</strong></td></tr>
                     </tfoot>
                 </table>
-                ${retraitsHtml ? `<table class="modal-details-table retrait-table">
+                ${retraitsHtml ? `<h4 class="modal-table-title" style="color: var(--color-danger)">Retraits Effectués</h4><table class="modal-details-table retrait-table">
                     <thead><tr><th>Dénomination Retirée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
                     <tbody>${retraitsHtml}</tbody>
                     <tfoot><tr><td colspan="2">Total Retiré</td><td class="text-right">${formatEuros(totalRetraits)}</td></tr></tfoot>
@@ -165,6 +164,8 @@ export async function initializeHistoryLogic() {
             </div>
             <div class="modal-body" id="printable-content">${summaryHtml}<div class="modal-details-grid">${caissesHtml}</div></div>`;
     }
+    
+    // ... (Le reste du fichier reste identique)
     
     function updateComparisonToolbar() {
         const toolbar = document.getElementById('comparison-toolbar');
@@ -449,7 +450,6 @@ export async function initializeHistoryLogic() {
 
     // --- Fin des fonctions de rendu ---
 
-    // Injection des éléments qui ne sont pas toujours visibles
     const controlsContainer = historyPage.querySelector('.filter-section');
     if(controlsContainer && !document.getElementById('comparison-toolbar')) {
         controlsContainer.insertAdjacentHTML('afterend', `
@@ -463,7 +463,6 @@ export async function initializeHistoryLogic() {
         historyPage.insertAdjacentHTML('beforeend', `<div id="comparison-modal" class="modal"><div class="modal-content wide" id="comparison-modal-content"></div></div>`);
     }
 
-    // Sélection des éléments du DOM
     const filterForm = historyPage.querySelector('#history-filter-form');
     const resetBtn = historyPage.querySelector('#reset-filter-btn');
     const paginationNav = historyPage.querySelector('.pagination-nav');
@@ -495,7 +494,6 @@ export async function initializeHistoryLogic() {
         }
     }
 
-    // Attachement des écouteurs d'événements
     viewTabs.addEventListener('click', (e) => {
         e.preventDefault();
         const tab = e.target.closest('.tab-link');
@@ -504,7 +502,7 @@ export async function initializeHistoryLogic() {
         viewTabs.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         comptagesView.classList.remove('active');
-        retraitsView.classList.add('active');
+        retraitsView.classList.remove('active'); // Correction ici
         document.getElementById(`${viewToShow}-view`).classList.add('active');
     });
     
