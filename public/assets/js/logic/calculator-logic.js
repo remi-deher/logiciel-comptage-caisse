@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Complète et Finale)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Corrigée et Complète)
 
 import { initializeWebSocket, sendWsMessage } from './websocket-service.js';
 import { initializeCloture, updateClotureUI } from './cloture-logic.js';
@@ -9,25 +9,20 @@ let wsResourceId = null;
 let hasUnsavedChanges = false;
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
-// --- NOUVELLE FONCTION DE SAUVEGARDE ---
-// Cette fonction est asynchrone pour qu'on puisse potentiellement l'attendre.
 async function triggerAutosave() {
     const form = document.getElementById('caisse-form');
     if (hasUnsavedChanges && form) {
         console.log('[Autosave] Détection de changements non sauvegardés. Envoi...');
         const formData = new FormData(form);
-
-        // On utilise fetch avec keepalive, c'est la méthode moderne et robuste
-        // pour s'assurer que la requête part même si la page change.
         try {
             const response = await fetch('index.php?route=calculateur/autosave', {
                 method: 'POST',
                 body: formData,
-                keepalive: true // Très important !
+                keepalive: true
             });
             const result = await response.json();
             if (result.success) {
-                hasUnsavedChanges = false; // On réinitialise le drapeau
+                hasUnsavedChanges = false;
                 console.log('[Autosave] Succès.');
             } else {
                 console.error('[Autosave] Échec de la sauvegarde côté serveur.');
@@ -174,32 +169,7 @@ function sendFullFormState() {
 }
 
 function initializeAutosave() {
-    const autosaveStatus = document.getElementById('autosave-status');
-    const form = document.getElementById('caisse-form');
-    if (!autosaveStatus || !form) return;
-
-    setInterval(async () => {
-        if (hasUnsavedChanges) {
-            autosaveStatus.textContent = 'Sauvegarde auto...';
-            const formData = new FormData(form);
-            try {
-                const response = await fetch('index.php?route=calculateur/autosave', { method: 'POST', body: formData });
-                const result = await response.json();
-                if (result.success) {
-                    hasUnsavedChanges = false;
-                    autosaveStatus.textContent = `Dernière sauvegarde auto à ${new Date().toLocaleTimeString()}`;
-                } else {
-                    autosaveStatus.textContent = 'Erreur sauvegarde auto';
-                }
-            } catch (e) {
-                autosaveStatus.textContent = 'Erreur réseau sauvegarde auto';
-            }
-        }
-    }, 30000);
-
-    window.addEventListener('beforeunload', (event) => {
-        // Note: L'appel à triggerAutosave ici n'est pas garanti à 100% de s'exécuter
-        // à cause des restrictions des navigateurs, mais `keepalive` est notre meilleure chance.
+    window.addEventListener('beforeunload', () => {
         if (hasUnsavedChanges) {
              triggerAutosave();
         }
@@ -260,24 +230,60 @@ export async function initializeCalculator() {
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
 
-        // On charge les données initiales depuis la BDD (votre logique existante)
+        // --- DÉBUT DE LA LOGIQUE DE REPRISE CORRIGÉE ---
+        console.log('[Init] Tentative de chargement des données initiales...');
         const initialDataResponse = await fetch('index.php?route=calculateur/get_initial_data');
         const initialDataResult = await initialDataResponse.json();
+        
         if (initialDataResult.success && initialDataResult.data) {
-            // Logique pour remplir le formulaire avec les données de initialDataResult.data
-            // (Assurez-vous que cette partie est bien fonctionnelle)
+            console.log('[Init] Données initiales reçues, application en cours...', initialDataResult.data);
+            const dataToLoad = initialDataResult.data;
+
+            // Remplir les champs nom_comptage et explication
+            const nomComptageField = document.getElementById('nom_comptage');
+            const explicationField = document.getElementById('explication');
+            if (nomComptageField) nomComptageField.value = dataToLoad.nom_comptage || '';
+            if (explicationField) explicationField.value = dataToLoad.explication || '';
+
+            // Parcourir chaque caisse dans les données reçues
+            for (const caisseId in dataToLoad) {
+                if (caisseId === 'nom_comptage' || caisseId === 'explication') continue;
+
+                const caisseData = dataToLoad[caisseId];
+                
+                // Remplir fond de caisse, ventes, retrocession
+                const fdcField = document.getElementById(`fond_de_caisse_${caisseId}`);
+                const ventesField = document.getElementById(`ventes_${caisseId}`);
+                const retroField = document.getElementById(`retrocession_${caisseId}`);
+
+                if (fdcField) fdcField.value = caisseData.fond_de_caisse || '';
+                if (ventesField) ventesField.value = caisseData.ventes || '';
+                if (retroField) retroField.value = caisseData.retrocession || '';
+                
+                // Remplir les quantités pour chaque dénomination
+                if (caisseData.denominations) {
+                    for (const denomName in caisseData.denominations) {
+                        const denomField = document.getElementById(`${denomName}_${caisseId}`);
+                        if (denomField) {
+                            denomField.value = caisseData.denominations[denomName];
+                        }
+                    }
+                }
+            }
+            console.log('[Init] Remplissage du formulaire terminé.');
+        } else {
+            console.log('[Init] Aucune donnée initiale à charger.');
         }
+        // --- FIN DE LA LOGIQUE DE REPRISE ---
 
         attachEventListeners();
-        calculateAll();
-        initializeAutosave(); // On initialise le filet de sécurité
+        calculateAll(); // Calcule les totaux une fois le formulaire rempli
+        initializeAutosave();
+        
         await initializeWebSocket(handleWebSocketMessage);
-
-        // --- NOUVEAU : On attache notre fonction de sauvegarde au routeur ---
+        
         const mainContent = document.getElementById('main-content');
         if (mainContent) {
-            // On stocke la fonction de "nettoyage" directement sur l'élément du DOM
-            // pour que le routeur puisse la trouver et l'appeler.
             mainContent.beforePageChange = triggerAutosave;
         }
 
