@@ -213,13 +213,34 @@ function attachModalEventListeners(modalsContainer) {
             document.getElementById('final-confirmation-modal')?.classList.add('visible');
         } else if (target?.id === 'confirm-final-cloture-action-btn') {
             document.getElementById('final-confirmation-modal')?.classList.remove('visible');
+            
+            // --- DEBUT DE LA CORRECTION ---
+            const form = document.getElementById('caisse-form');
+            // 1. On identifie tous les champs qui sont actuellement désactivés
+            const disabledFields = form.querySelectorAll('input:disabled, textarea:disabled');
+            
+            // 2. On les réactive temporairement
+            disabledFields.forEach(field => field.disabled = false);
+
+            // 3. On capture les données du formulaire MAINTENANT qu'elles sont toutes activées
+            const formData = new FormData(form);
+
+            // 4. On désactive à nouveau les champs pour maintenir la cohérence visuelle de l'interface
+            disabledFields.forEach(field => field.disabled = true);
+            // --- FIN DE LA CORRECTION ---
+
             try {
-                const response = await fetch('index.php?route=cloture/confirm_generale', { method: 'POST', body: new FormData(document.getElementById('caisse-form')) });
+                const response = await fetch('index.php?route=cloture/confirm_generale', { 
+                    method: 'POST', 
+                    body: formData // On utilise le formData corrigé qui contient toutes les valeurs
+                });
                 const result = await response.json();
                 if (!result.success) throw new Error(result.message);
                 alert('Clôture générale réussie ! La page va se réinitialiser.');
                 window.location.reload();
-            } catch (error) { alert(`Erreur: ${error.message}`); }
+            } catch (error) { 
+                alert(`Erreur: ${error.message}`); 
+            }
         }
     });
 }
@@ -228,7 +249,7 @@ export function setupGlobalClotureButton() {
     const clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn) return;
 
-    clotureBtn.addEventListener('click', () => {
+    clotureBtn.addEventListener('click', async () => {
         if (!isClotureInitialized) {
             alert("La fonction de clôture est uniquement disponible sur la page du Calculateur.");
             return;
