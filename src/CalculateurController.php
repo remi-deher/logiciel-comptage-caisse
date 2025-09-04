@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Version mise à jour)
+// Fichier : src/CalculateurController.php (Version corrigée et complète)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -34,7 +34,6 @@ class CalculateurController {
     public function getInitialData() {
         header('Content-Type: application/json');
 
-        // La requête SQL est modifiée pour inclure les sauvegardes manuelles dans la priorité
         $sql = "
             SELECT id, nom_comptage, explication FROM comptages
             ORDER BY
@@ -53,19 +52,15 @@ class CalculateurController {
         $last_comptage = $stmt->fetch();
 
         if ($last_comptage) {
-            // La condition de chargement est maintenant plus simple : on charge toujours le plus pertinent.
             $data = $this->loadComptageData($last_comptage['id']);
-
-            // On ne renvoie le nom et l'explication que si ce n'est pas un fond de caisse.
             $nom = $last_comptage['nom_comptage'];
             if (strpos($nom, 'Fond de caisse J+1') !== 0) {
                 $data['nom_comptage'] = $nom;
                 $data['explication'] = $last_comptage['explication'];
             } else {
-                $data['nom_comptage'] = ''; // On ne pré-remplit pas le nom pour un nouveau comptage
+                $data['nom_comptage'] = '';
                 $data['explication'] = '';
             }
-
             echo json_encode(['success' => true, 'data' => $data]);
             exit;
         }
@@ -116,7 +111,6 @@ class CalculateurController {
             if ($is_autosave) {
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {
-                // C'est une sauvegarde manuelle, on s'assure qu'elle a un nom.
                 $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;
             }
             
@@ -208,17 +202,55 @@ class CalculateurController {
 
     public function cloture_generale() {
         header('Content-Type: application/json');
+
+        // Étape 1 : Sauvegarde physique de la base de données.
+        $backupResult = $this->backupService->createBackup();
+        if (!$backupResult['success']) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $backupResult['message']]);
+            exit;
+        }
+
         try {
             $this->pdo->beginTransaction();
-            // ... (logique complexe de la clôture générale de votre fichier original) ...
-            // Cette partie reste à implémenter de manière détaillée si besoin.
-            $this->pdo->commit();
+
+            $nom_comptage = "Clôture Générale du " . date('d/m/Y');
+            $explication = "Comptage final consolidé de la journée.";
+            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
+            $comptage_id = $this->pdo->lastInsertId();
+
+            foreach ($this->noms_caisses as $caisse_id => $nom) {
+                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
+                if (empty($caisse_data)) continue;
+
+                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+                $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
+                $comptage_detail_id = $this->pdo->lastInsertId();
+
+                foreach ($this->denominations as $type => $denominations_list) {
+                    foreach ($denominations_list as $name => $value) {
+                        $quantite = get_numeric_value($caisse_data, $name);
+                        if ($quantite > 0) {
+                            $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                            $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
+                        }
+                    }
+                }
+            }
+
             $this->clotureStateService->resetState();
-            echo json_encode(['success' => true, 'message' => "Clôture générale réussie."]);
+            $this->pdo->commit();
+            echo json_encode(['success' => true, 'message' => "Clôture générale réussie ! Un enregistrement final a été créé dans l'historique et une sauvegarde a été effectuée."]);
+
         } catch (Exception $e) {
-            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            // --- CORRECTION ---
+            // On ne tente d'annuler la transaction que si elle est active
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'message' => 'Erreur lors de la clôture générale : ' . $e->getMessage()]);
         }
         exit;
     }

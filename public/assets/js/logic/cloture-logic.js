@@ -228,22 +228,18 @@ export function setupGlobalClotureButton() {
     const clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn) return;
 
-    clotureBtn.addEventListener('click', async () => {
+    clotureBtn.addEventListener('click', () => {
         if (!isClotureInitialized) {
             alert("La fonction de clôture est uniquement disponible sur la page du Calculateur.");
             return;
         }
         
-        // L'état (lockedCaisses, closedCaisses) est déjà à jour grâce au WebSocket.
-        // On vérifie si toutes les caisses sont clôturées.
         const allCaissesClosed = Object.keys(config.nomsCaisses || {}).length > 0 && 
                                  Object.keys(config.nomsCaisses).every(id => closedCaisses.includes(id));
 
         if (allCaissesClosed) {
-            // Si oui, on affiche directement la modale de clôture générale.
             showClotureGeneraleModal();
         } else {
-            // Sinon, on affiche la modale de sélection.
             updateCaisseSelectionModal();
             document.getElementById('caisse-selection-modal')?.classList.add('visible');
         }

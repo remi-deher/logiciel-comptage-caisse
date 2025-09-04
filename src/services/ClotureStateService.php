@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/services/ClotureStateService.php (Version Finale Complète)
+// Fichier : src/services/ClotureStateService.php (Version Finale Complète et Corrigée)
 
 class ClotureStateService {
     private $pdo;
@@ -64,8 +64,12 @@ class ClotureStateService {
         return $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
     }
     
+    /**
+     * Réinitialise l'état de la clôture.
+     * CORRECTION : Utilise DELETE au lieu de TRUNCATE pour ne pas causer de commit implicite.
+     */
     public function resetState() {
-        $this->pdo->exec("TRUNCATE TABLE cloture_status");
+        $this->pdo->exec("DELETE FROM cloture_status");
     }
 
     public function forceUnlockByConnectionId($connectionId) {
