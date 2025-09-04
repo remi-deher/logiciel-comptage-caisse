@@ -153,11 +153,7 @@ $routes = [
 
     // --- Routes Pieds de pages ---
 
-    'GET:version/get_local' => function() {
-        $versionService = new VersionService();
-        echo json_encode(['success' => true, 'version' => $versionService->getLocalVersion()]);
-        exit;
-    },
+    'GET:version/get_local' => [$adminController, 'getLocalVersion'],
     
     // --- Routes de mise à jour ---
     'GET:update/status' => [$adminController, 'getUpdateStatus'], // Méthode à créer dans AdminController

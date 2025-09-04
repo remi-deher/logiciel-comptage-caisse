@@ -121,3 +121,9 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
     .navbar-toggler { display: block; background: none; border: none; font-size: 1.8em; cursor: pointer; }
     .mobile-menu.show { display: flex; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background-color: var(--color-surface); }
 }
+
+.cloture-btn:disabled {
+    background-color: #7f8c8d; /* Une couleur grise neutre */
+    opacity: 0.6;
+    cursor: not-allowed;
+}

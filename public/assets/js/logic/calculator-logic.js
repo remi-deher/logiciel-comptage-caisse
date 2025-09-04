@@ -1,9 +1,8 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Corrigée et Complète)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Complète et Corrigée)
 
 import { initializeWebSocket, sendWsMessage } from './websocket-service.js';
 import { initializeCloture, updateClotureUI } from './cloture-logic.js';
 
-// --- Variables globales pour la page ---
 let config = {};
 let wsResourceId = null;
 let hasUnsavedChanges = false;
@@ -12,35 +11,26 @@ const calculatorPageElement = () => document.getElementById('calculator-page');
 async function triggerAutosave() {
     const form = document.getElementById('caisse-form');
     if (hasUnsavedChanges && form) {
-        console.log('[Autosave] Détection de changements non sauvegardés. Envoi...');
         const formData = new FormData(form);
         try {
-            const response = await fetch('index.php?route=calculateur/autosave', {
+            await fetch('index.php?route=calculateur/autosave', {
                 method: 'POST',
                 body: formData,
                 keepalive: true
             });
-            const result = await response.json();
-            if (result.success) {
-                hasUnsavedChanges = false;
-                console.log('[Autosave] Succès.');
-            } else {
-                console.error('[Autosave] Échec de la sauvegarde côté serveur.');
-            }
+            hasUnsavedChanges = false;
         } catch (e) {
             console.error('[Autosave] Erreur réseau.', e);
         }
     }
 }
 
-// --- Fonctions Utilitaires ---
 const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(amount);
 const parseLocaleFloat = (str) => {
     if (typeof str !== 'string' && typeof str !== 'number') return 0;
     return parseFloat(String(str).replace(',', '.')) || 0;
 };
 
-// --- API ---
 async function fetchCalculatorConfig() {
     const response = await fetch('index.php?route=calculateur/config');
     if (!response.ok) throw new Error('Impossible de charger la configuration du calculateur.');
@@ -49,19 +39,16 @@ async function fetchCalculatorConfig() {
     return data;
 }
 
-// --- Rendu dynamique de l'interface ---
 function renderCalculatorUI() {
     const page = calculatorPageElement();
     if (!page) return;
-
     const tabSelector = page.querySelector('.tab-selector');
     const ecartContainer = page.querySelector('.ecart-display-container');
     const caissesContainer = page.querySelector('#caisses-content-container');
-
     let tabsHtml = '', contentHtml = '', ecartsHtml = '';
     Object.entries(config.nomsCaisses).forEach(([id, nom], index) => {
         const isActive = index === 0 ? 'active' : '';
-        tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}">${nom}</button>`;
+        tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `
             <div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
@@ -82,7 +69,6 @@ function renderCalculatorUI() {
     caissesContainer.innerHTML = contentHtml;
 }
 
-// --- Logique de calcul ---
 function calculateAll() {
     if (!config.nomsCaisses) return;
     Object.keys(config.nomsCaisses).forEach(id => {
@@ -124,21 +110,35 @@ function updateEcartDisplay(id, ecart) {
     }
 }
 
-// --- Gestion des messages WebSocket ---
 function handleWebSocketMessage(event) {
     try {
         const data = JSON.parse(event.data);
-        if (data.type === 'welcome') {
-            wsResourceId = data.resourceId;
-            initializeCloture(config, wsResourceId);
-            sendWsMessage({ type: 'request_state' }); 
-        } else if (data.type === 'cloture_locked_caisses') {
+        
+        if (data.type === 'cloture_locked_caisses') {
             updateClotureUI(data);
-        } else if (data.type === 'send_full_state') {
-            sendFullFormState();
-        } else if (data.type === 'broadcast_state') {
-            loadFormState(data.form_state);
-        } else if (data.id && document.activeElement.id !== data.id) {
+            return;
+        }
+        
+        if (data.type === 'welcome') {
+            wsResourceId = data.resourceId.toString();
+            initializeCloture(config, wsResourceId);
+            return;
+        }
+
+        if (data.type === 'full_form_state') {
+            if (Object.keys(data.state).length > 0) {
+                for (const id in data.state) {
+                    const field = document.getElementById(id);
+                    if (field) {
+                        field.value = data.state[id];
+                    }
+                }
+                calculateAll();
+            }
+            return;
+        }
+
+        if (data.id && document.activeElement.id !== data.id) {
             const input = document.getElementById(data.id);
             if (input) {
                 input.value = data.value;
@@ -146,26 +146,6 @@ function handleWebSocketMessage(event) {
             }
         }
     } catch (e) { console.error("Erreur WebSocket:", e); }
-}
-
-function loadFormState(state) {
-    let hasChanges = false;
-    for (const id in state) {
-        const input = document.getElementById(id);
-        if (input && input.value !== state[id]) {
-            input.value = state[id];
-            hasChanges = true;
-        }
-    }
-    if (hasChanges) calculateAll();
-}
-
-function sendFullFormState() {
-    const formState = {};
-    document.querySelectorAll('#caisse-form input, #caisse-form textarea').forEach(el => {
-        if (el.id) formState[el.id] = el.value;
-    });
-    sendWsMessage({ type: 'broadcast_state', form_state: formState });
 }
 
 function initializeAutosave() {
@@ -230,54 +210,30 @@ export async function initializeCalculator() {
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
 
-        // --- DÉBUT DE LA LOGIQUE DE REPRISE CORRIGÉE ---
-        console.log('[Init] Tentative de chargement des données initiales...');
         const initialDataResponse = await fetch('index.php?route=calculateur/get_initial_data');
         const initialDataResult = await initialDataResponse.json();
-        
         if (initialDataResult.success && initialDataResult.data) {
-            console.log('[Init] Données initiales reçues, application en cours...', initialDataResult.data);
             const dataToLoad = initialDataResult.data;
+            document.getElementById('nom_comptage').value = dataToLoad.nom_comptage || '';
+            document.getElementById('explication').value = dataToLoad.explication || '';
 
-            // Remplir les champs nom_comptage et explication
-            const nomComptageField = document.getElementById('nom_comptage');
-            const explicationField = document.getElementById('explication');
-            if (nomComptageField) nomComptageField.value = dataToLoad.nom_comptage || '';
-            if (explicationField) explicationField.value = dataToLoad.explication || '';
-
-            // Parcourir chaque caisse dans les données reçues
             for (const caisseId in dataToLoad) {
-                if (caisseId === 'nom_comptage' || caisseId === 'explication') continue;
-
+                if (!config.nomsCaisses[caisseId]) continue;
                 const caisseData = dataToLoad[caisseId];
-                
-                // Remplir fond de caisse, ventes, retrocession
-                const fdcField = document.getElementById(`fond_de_caisse_${caisseId}`);
-                const ventesField = document.getElementById(`ventes_${caisseId}`);
-                const retroField = document.getElementById(`retrocession_${caisseId}`);
-
-                if (fdcField) fdcField.value = caisseData.fond_de_caisse || '';
-                if (ventesField) ventesField.value = caisseData.ventes || '';
-                if (retroField) retroField.value = caisseData.retrocession || '';
-                
-                // Remplir les quantités pour chaque dénomination
+                document.getElementById(`fond_de_caisse_${caisseId}`).value = caisseData.fond_de_caisse || '';
+                document.getElementById(`ventes_${caisseId}`).value = caisseData.ventes || '';
+                document.getElementById(`retrocession_${caisseId}`).value = caisseData.retrocession || '';
                 if (caisseData.denominations) {
                     for (const denomName in caisseData.denominations) {
                         const denomField = document.getElementById(`${denomName}_${caisseId}`);
-                        if (denomField) {
-                            denomField.value = caisseData.denominations[denomName];
-                        }
+                        if (denomField) denomField.value = caisseData.denominations[denomName];
                     }
                 }
             }
-            console.log('[Init] Remplissage du formulaire terminé.');
-        } else {
-            console.log('[Init] Aucune donnée initiale à charger.');
         }
-        // --- FIN DE LA LOGIQUE DE REPRISE ---
 
         attachEventListeners();
-        calculateAll(); // Calcule les totaux une fois le formulaire rempli
+        calculateAll();
         initializeAutosave();
         
         await initializeWebSocket(handleWebSocketMessage);

@@ -1,5 +1,5 @@
 <?php
-// Fichier : config/websocket_server.php (Version Finale pour la SPA)
+// Fichier : config/websocket_server.php (Version Finale Complète et Corrigée)
 
 // Port d'écoute du serveur WebSocket
 $port = '8081'; // Assurez-vous que ce port est correct et ouvert
@@ -11,7 +11,7 @@ require_once __DIR__ . '/../src/services/ClotureStateService.php';
 if (file_exists(__DIR__ . '/config.php')) {
     require_once __DIR__ . '/config.php';
 } else {
-    die("Erreur critique: config.php non trouvé.\n");
+    die("Erreur critique: Le fichier config/config.php est introuvable.\n");
 }
 
 use Ratchet\MessageComponentInterface;
@@ -25,6 +25,10 @@ class CaisseServer implements MessageComponentInterface {
     private $pdo;
     private $clotureStateService;
 
+    // Le serveur mémorise l'état de la clôture ET l'état du formulaire pour la session en cours
+    private $clotureState = null;
+    private $formState = []; // La "mémoire" du formulaire
+
     public function __construct() {
         $this->clients = new \SplObjectStorage;
         
@@ -36,8 +40,9 @@ class CaisseServer implements MessageComponentInterface {
             ]);
             $this->clotureStateService = new ClotureStateService($this->pdo);
             echo "Serveur WebSocket démarré sur le port {$GLOBALS['port']}.\n";
+            echo "Connexion à la base de données '" . DB_NAME . "' réussie.\n";
         } catch (PDOException $e) {
-            die("Erreur de connexion BDD dans le WebSocket : " . $e->getMessage() . "\n");
+            die("Erreur de connexion à la BDD dans le WebSocket : " . $e->getMessage() . "\n");
         }
     }
 
@@ -45,63 +50,92 @@ class CaisseServer implements MessageComponentInterface {
         $this->clients->attach($conn);
         echo "Nouvelle connexion ! ({$conn->resourceId})\n";
         
-        // Envoie un message de bienvenue avec l'ID de connexion, crucial pour la logique de clôture
+        // Si c'est le premier client de la session, on charge l'état depuis la BDD.
+        if ($this->clotureState === null) {
+            echo "Premier client connecté. Chargement de l'état initial depuis la base de données...\n";
+            $this->updateAndCacheClotureState();
+        }
+
+        // On envoie le message de bienvenue, l'état de clôture ET l'état actuel du formulaire
         $conn->send(json_encode(['type' => 'welcome', 'resourceId' => $conn->resourceId]));
+        $conn->send(json_encode($this->clotureState));
+        $conn->send(json_encode(['type' => 'full_form_state', 'state' => $this->formState]));
     }
 
     public function onMessage(ConnectionInterface $from, $msg) {
-        $data = json_decode($msg, true);
-        if (!is_array($data)) return;
+        try {
+            $data = json_decode($msg, true);
+            
+            // Si c'est une mise à jour de champ, on met à jour notre mémoire d'état
+            if (isset($data['id']) && isset($data['value'])) {
+                $this->formState[$data['id']] = $data['value'];
+                $this->broadcast($msg, $from); // Et on diffuse aux autres
+                return;
+            }
 
-        // Diffusion simple des mises à jour des champs du formulaire
-        // C'est le mécanisme principal du temps réel pour le calculateur.
-        if (isset($data['id']) && isset($data['value'])) {
-            $this->broadcast($msg, $from);
-            return;
-        }
+            if (!isset($data['type'])) return;
 
-        // Gestion des messages structurés avec un "type"
-        if (isset($data['type'])) {
+            $actionProcessed = false;
             switch ($data['type']) {
-                // Logique de synchronisation initiale
-                case 'request_state':
-                    $this->broadcast(json_encode(['type' => 'send_full_state']), $from);
-                    break;
-                case 'broadcast_state':
-                    $this->broadcast($msg, $from);
-                    break;
-                
-                // Logique de clôture
                 case 'cloture_lock':
-                    if ($this->clotureStateService->lockCaisse($data['caisse_id'], (string)$from->resourceId)) {
-                        $this->broadcastClotureStateToAll();
-                    }
+                    $this->clotureStateService->lockCaisse($data['caisse_id'], (string)$from->resourceId);
+                    $actionProcessed = true;
                     break;
                 case 'cloture_unlock':
                     $this->clotureStateService->unlockCaisse($data['caisse_id']);
-                    $this->broadcastClotureStateToAll();
+                    $actionProcessed = true;
+                    break;
+                case 'cloture_force_unlock': // NOUVELLE ACTION
+                    $this->clotureStateService->forceUnlockCaisse($data['caisse_id']);
+                    $actionProcessed = true;
+                    break;
+                case 'cloture_reopen':
+                    $this->clotureStateService->reopenCaisse($data['caisse_id']);
+                    $actionProcessed = true;
                     break;
                 case 'cloture_caisse_confirmed':
-                    $this->broadcastClotureStateToAll();
+                    $this->clotureStateService->confirmCaisse($data['caisse_id']);
+                    $actionProcessed = true;
                     break;
             }
+
+            // Si une action de clôture a eu lieu, on met à jour l'état du serveur et on le diffuse à tous
+            if ($actionProcessed) {
+                $this->updateAndCacheClotureState();
+                $this->broadcastClotureStateToAll();
+            }
+        } catch (\Throwable $e) {
+            echo "\n--- ERREUR FATALE DÉTECTÉE ---\n";
+            echo "Message: " . $e->getMessage() . "\n";
+            echo "Fichier: " . $e->getFile() . " à la ligne " . $e->getLine() . "\n";
+            echo "--- FIN DE L'ERREUR ---\n\n";
+            $from->close();
         }
     }
 
     public function onClose(ConnectionInterface $conn) {
         $this->clients->detach($conn);
-        // Nettoie les verrous de l'utilisateur qui s'est déconnecté
+        // On libère les verrous potentiels du client qui part
         $this->clotureStateService->forceUnlockByConnectionId((string)$conn->resourceId);
-        $this->broadcastClotureStateToAll();
+        
+        // S'il ne reste plus personne, on réinitialise l'état en mémoire
+        if (count($this->clients) === 0) {
+            echo "Dernier client déconnecté. L'état en mémoire est réinitialisé.\n";
+            $this->clotureState = null;
+            $this->formState = []; // On vide aussi la mémoire du formulaire
+        } else {
+            // Sinon, on met à jour et on diffuse l'état pour que les autres voient que le verrou a été levé
+            $this->updateAndCacheClotureState();
+            $this->broadcastClotureStateToAll();
+        }
         echo "Connexion {$conn->resourceId} fermée.\n";
     }
 
     public function onError(ConnectionInterface $conn, \Exception $e) {
-        echo "Une erreur est survenue: {$e->getMessage()}\n";
+        echo "Une erreur de connexion est survenue: {$e->getMessage()}\n";
         $conn->close();
     }
 
-    // Diffuse un message à tous les clients SAUF à l'expéditeur
     private function broadcast($message, $exclude) {
         foreach ($this->clients as $client) {
             if ($client !== $exclude) {
@@ -110,14 +144,18 @@ class CaisseServer implements MessageComponentInterface {
         }
     }
     
-    // Diffuse l'état de la clôture à TOUS les clients
-    private function broadcastClotureStateToAll() {
-        $state = [
+    private function updateAndCacheClotureState() {
+        $this->clotureState = [
             'type' => 'cloture_locked_caisses',
             'caisses' => $this->clotureStateService->getLockedCaisses(),
             'closed_caisses' => $this->clotureStateService->getClosedCaisses()
         ];
-        $message = json_encode($state);
+    }
+    
+    public function broadcastClotureStateToAll() {
+        if ($this->clotureState === null) return;
+        
+        $message = json_encode($this->clotureState);
         foreach ($this->clients as $client) {
             $client->send($message);
         }

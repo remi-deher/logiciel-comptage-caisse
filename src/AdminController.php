@@ -30,6 +30,13 @@ class AdminController {
         $this->reserveService = new ReserveService($pdo, $denominations);
     }
 
+    public function getLocalVersion() {
+        // La VersionService est déjà une propriété de ce contrôleur
+        $version = $this->versionService->getLocalVersion();
+        echo json_encode(['success' => true, 'version' => $version]);
+        exit;
+    }
+
     /**
      * Récupère toutes les données nécessaires pour le tableau de bord de l'administration.
      */

@@ -38,28 +38,28 @@ const routes = {
  */
 export async function handleRouting() {
     if (mainContent) {
-        // --- NOUVELLE LOGIQUE ---
-        // Avant de changer de page, on vérifie si une fonction de "nettoyage"
-        // a été définie par la page précédente (le calculateur).
         if (typeof mainContent.beforePageChange === 'function') {
-            // On appelle la fonction (triggerAutosave) et on attend qu'elle se termine.
             await mainContent.beforePageChange();
-            // On la supprime pour qu'elle ne soit pas appelée inutilement par d'autres pages.
             mainContent.beforePageChange = null;
         }
-        // --- FIN DE LA NOUVELLE LOGIQUE ---
     }
 
     let path = window.location.pathname;
-
-    // Normalise le chemin pour qu'il corresponde à nos clés de routes
-    // (utile si l'application n'est pas à la racine du domaine)
-    const basePath = '/'; // À modifier si votre application est dans un sous-dossier
-    if (path.startsWith(basePath) && basePath !== '/') {
-        path = path.substring(basePath.length - 1);
-    }
-    if (path === '' || path === '/index.html') {
+    if (path === '' || path === '/index.html' || path.endsWith('index.php')) { // Gère plusieurs cas pour la racine
         path = '/';
+    }
+    
+    // --- NOUVELLE LOGIQUE POUR GÉRER LE BOUTON CLÔTURE ---
+    const clotureBtn = document.getElementById('cloture-btn');
+    if (clotureBtn) {
+        // On active le bouton seulement si on est sur la page du calculateur
+        if (path === '/' || path === '/calculateur') {
+            clotureBtn.disabled = false;
+            clotureBtn.title = "Lancer le processus de clôture";
+        } else {
+            clotureBtn.disabled = true;
+            clotureBtn.title = "Disponible uniquement sur la page du calculateur";
+        }
     }
 
     // Trouve la route correspondante ou une route 404 par défaut
