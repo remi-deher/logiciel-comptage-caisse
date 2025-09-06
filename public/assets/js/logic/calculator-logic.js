@@ -114,6 +114,7 @@ function handleWebSocketMessage(event) {
     try {
         const data = JSON.parse(event.data);
         
+        // MODIFICATION : On s'assure que updateClotureUI est bien appelée ici
         if (data.type === 'cloture_locked_caisses') {
             updateClotureUI(data);
             return;
@@ -121,6 +122,7 @@ function handleWebSocketMessage(event) {
         
         if (data.type === 'welcome') {
             wsResourceId = data.resourceId.toString();
+            // On passe maintenant l'ID de ressource à l'initialisation de la clôture
             initializeCloture(config, wsResourceId);
             return;
         }
@@ -168,13 +170,16 @@ function attachEventListeners() {
         }
     });
     
+    // MODIFICATION : Cet écouteur devient la clé pour la redirection du wizard
     const tabSelector = page.querySelector('.tab-selector');
     tabSelector.addEventListener('click', e => {
         const btn = e.target.closest('.tab-link');
         if (btn) {
+            // On désactive tous les onglets et contenus
             tabSelector.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
             page.querySelectorAll('.caisse-tab-content, .ecart-display').forEach(el => el.classList.remove('active'));
             
+            // On active l'onglet et le contenu cibles
             btn.classList.add('active');
             const tabId = btn.dataset.tab;
             document.getElementById(tabId)?.classList.add('active');
