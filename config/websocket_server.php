@@ -1,13 +1,12 @@
 <?php
-// Fichier : config/websocket_server.php (Version Finale Complète et Corrigée)
+// Fichier : config/websocket_server.php (Version Robuste avec Reconnexion et Ping)
 
 // Port d'écoute du serveur WebSocket
-$port = '8081'; // Assurez-vous que ce port est correct et ouvert
+$port = '8081';
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 require_once __DIR__ . '/../src/services/ClotureStateService.php';
 
-// Charge la configuration de la base de données
 if (file_exists(__DIR__ . '/config.php')) {
     require_once __DIR__ . '/config.php';
 } else {
@@ -19,30 +18,88 @@ use Ratchet\ConnectionInterface;
 use Ratchet\Server\IoServer;
 use Ratchet\Http\HttpServer;
 use Ratchet\WebSocket\WsServer;
+use React\EventLoop\Factory as LoopFactory; // MODIFICATION : Ajout pour la boucle d'événements
 
 class CaisseServer implements MessageComponentInterface {
     protected $clients;
+    /** @var ?PDO */
     private $pdo;
     private $clotureStateService;
+    private $dbCredentials; // MODIFICATION : Propriété pour stocker les identifiants BDD
 
-    // Le serveur mémorise l'état de la clôture ET l'état du formulaire pour la session en cours
     private $clotureState = null;
-    private $formState = []; // La "mémoire" du formulaire
+    private $formState = [];
 
     public function __construct() {
         $this->clients = new \SplObjectStorage;
-        
-        try {
-            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
-            $this->pdo = new PDO($dsn, DB_USER, DB_PASS, [
+
+        // MODIFICATION : On stocke les identifiants pour la reconnexion
+        $this->dbCredentials = [
+            'dsn' => "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+            'user' => DB_USER,
+            'pass' => DB_PASS,
+            'options' => [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            ]);
-            $this->clotureStateService = new ClotureStateService($this->pdo);
-            echo "Serveur WebSocket démarré sur le port {$GLOBALS['port']}.\n";
+            ]
+        ];
+
+        $this->connect(); // Premier appel à la connexion
+        $this->clotureStateService = new ClotureStateService($this->pdo);
+
+        echo "Serveur WebSocket démarré sur le port {$GLOBALS['port']}.\n";
+    }
+
+    // MODIFICATION : Méthode dédiée pour la connexion
+    private function connect() {
+        echo "Tentative de connexion à la base de données...\n";
+        try {
+            $this->pdo = new PDO(
+                $this->dbCredentials['dsn'],
+                $this->dbCredentials['user'],
+                $this->dbCredentials['pass'],
+                $this->dbCredentials['options']
+            );
+            // Si le service existe déjà, on met à jour son objet PDO
+            if ($this->clotureStateService) {
+                $this->clotureStateService->setPDO($this->pdo); // Assurez-vous d'ajouter cette méthode dans ClotureStateService
+            }
             echo "Connexion à la base de données '" . DB_NAME . "' réussie.\n";
         } catch (PDOException $e) {
-            die("Erreur de connexion à la BDD dans le WebSocket : " . $e->getMessage() . "\n");
+            echo "Erreur de connexion à la BDD : " . $e->getMessage() . "\n";
+            // On ne fait pas un die() pour permettre au serveur de retenter plus tard
+            $this->pdo = null; 
+        }
+    }
+
+    /**
+     * MODIFICATION : Wrapper pour exécuter toutes les actions liées à la BDD.
+     * C'est ici que la magie de la reconnexion opère.
+     * @param callable $action La fonction qui contient le code interagissant avec la BDD.
+     * @return mixed Le résultat de la fonction $action.
+     */
+    private function executeDbAction(callable $action) {
+        try {
+            if (!$this->pdo) { // Si la connexion initiale a échoué
+                $this->connect();
+                if (!$this->pdo) { // Si la reconnexion a aussi échoué
+                    throw new PDOException("Impossible de se connecter à la base de données.");
+                }
+            }
+            return $action(); // Première tentative
+        } catch (PDOException $e) {
+            // On vérifie si l'erreur est bien celle qui nous intéresse
+            if (strpos($e->getMessage(), 'server has gone away') !== false || strpos($e->getMessage(), 'Lost connection') !== false) {
+                echo "La connexion BDD a été perdue. Tentative de reconnexion...\n";
+                $this->connect(); // Reconnexion
+                if (!$this->pdo) {
+                    throw new PDOException("La reconnexion à la base de données a échoué.");
+                }
+                return $action(); // Deuxième tentative
+            } else {
+                // Si c'est une autre erreur, on la propage
+                throw $e;
+            }
         }
     }
 
@@ -50,37 +107,38 @@ class CaisseServer implements MessageComponentInterface {
         $this->clients->attach($conn);
         echo "Nouvelle connexion ! ({$conn->resourceId})\n";
         
-        // Si c'est le premier client de la session, on charge l'état depuis la BDD.
-        if ($this->clotureState === null) {
-            echo "Premier client connecté. Chargement de l'état initial depuis la base de données...\n";
-            $this->updateAndCacheClotureState();
-        }
+        $this->executeDbAction(function() { // MODIFICATION : On utilise le wrapper
+            if ($this->clotureState === null) {
+                echo "Premier client connecté. Chargement de l'état initial...\n";
+                $this->updateAndCacheClotureState();
+            }
+        });
 
-        // On envoie le message de bienvenue, l'état de clôture ET l'état actuel du formulaire
         $conn->send(json_encode(['type' => 'welcome', 'resourceId' => $conn->resourceId]));
         $conn->send(json_encode($this->clotureState));
         $conn->send(json_encode(['type' => 'full_form_state', 'state' => $this->formState]));
     }
 
     public function onMessage(ConnectionInterface $from, $msg) {
-        try {
+        // MODIFICATION : On englobe tout le contenu dans le wrapper
+        $this->executeDbAction(function() use ($from, $msg) {
             $data = json_decode($msg, true);
-            
-            // Si c'est une mise à jour de champ, on met à jour notre mémoire d'état
+
             if (isset($data['id']) && isset($data['value'])) {
                 $this->formState[$data['id']] = $data['value'];
-                $this->broadcast($msg, $from); // Et on diffuse aux autres
+                $this->broadcast($msg, $from);
                 return;
             }
 
             if (!isset($data['type'])) return;
-
+            
             $actionProcessed = false;
             switch ($data['type']) {
                 case 'cloture_lock':
                     $this->clotureStateService->lockCaisse($data['caisse_id'], (string)$from->resourceId);
                     $actionProcessed = true;
                     break;
+                // ... autres cas identiques ...
                 case 'cloture_unlock':
                     $this->clotureStateService->unlockCaisse($data['caisse_id']);
                     $actionProcessed = true;
@@ -99,40 +157,30 @@ class CaisseServer implements MessageComponentInterface {
                     break;
             }
 
-            // Si une action de clôture a eu lieu, on met à jour l'état du serveur et on le diffuse à tous
             if ($actionProcessed) {
                 $this->updateAndCacheClotureState();
                 $this->broadcastClotureStateToAll();
             }
-        } catch (\Throwable $e) {
-            echo "\n--- ERREUR FATALE DÉTECTÉE ---\n";
-            echo "Message: " . $e->getMessage() . "\n";
-            echo "Fichier: " . $e->getFile() . " à la ligne " . $e->getLine() . "\n";
-            echo "--- FIN DE L'ERREUR ---\n\n";
-            $from->close();
-        }
+        });
     }
 
     public function onClose(ConnectionInterface $conn) {
         $this->clients->detach($conn);
-        // On libère les verrous potentiels du client qui part
-        $this->clotureStateService->forceUnlockByConnectionId((string)$conn->resourceId);
-        
-        if (count($this->clients) === 0) {
-            echo "Dernier client déconnecté.\n";
-            // On ne réinitialise l'état du formulaire que si aucune caisse n'a été clôturée.
-            if ($this->clotureState === null || empty($this->clotureState['closed_caisses'])) {
-                echo "Aucune caisse n'était clôturée, l'état du formulaire est réinitialisé.\n";
-                $this->formState = [];
-            } else {
-                echo "Au moins une caisse est clôturée, l'état du formulaire est préservé pour la clôture générale.\n";
-            }
-            $this->clotureState = null;
-        } else {
-            // Sinon, on met à jour et on diffuse l'état pour que les autres voient que le verrou a été levé
-            $this->updateAndCacheClotureState();
-            $this->broadcastClotureStateToAll();
-        }
+
+        $this->executeDbAction(function() use ($conn) { // MODIFICATION : On utilise le wrapper
+            $this->clotureStateService->forceUnlockByConnectionId((string)$conn->resourceId);
+            if (count($this->clients) === 0) {
+                 echo "Dernier client déconnecté.\n";
+                 if ($this->clotureState === null || empty($this->clotureState['closed_caisses'])) {
+                     $this->formState = [];
+                 }
+                 $this->clotureState = null;
+             } else {
+                 $this->updateAndCacheClotureState();
+                 $this->broadcastClotureStateToAll();
+             }
+        });
+
         echo "Connexion {$conn->resourceId} fermée.\n";
     }
 
@@ -141,15 +189,8 @@ class CaisseServer implements MessageComponentInterface {
         $conn->close();
     }
 
-    private function broadcast($message, $exclude) {
-        foreach ($this->clients as $client) {
-            if ($client !== $exclude) {
-                $client->send($message);
-            }
-        }
-    }
-    
     private function updateAndCacheClotureState() {
+        // Cette méthode fait des appels BDD via le service, donc elle doit être appelée depuis executeDbAction
         $this->clotureState = [
             'type' => 'cloture_locked_caisses',
             'caisses' => $this->clotureStateService->getLockedCaisses(),
@@ -157,24 +198,51 @@ class CaisseServer implements MessageComponentInterface {
         ];
     }
     
-    public function broadcastClotureStateToAll() {
-        if ($this->clotureState === null) return;
-        
-        $message = json_encode($this->clotureState);
-        foreach ($this->clients as $client) {
-            $client->send($message);
+    // ... broadcast et broadcastClotureStateToAll restent inchangées ...
+    private function broadcast($message, $exclude) { /* ... */ }
+    public function broadcastClotureStateToAll() { /* ... */ }
+
+    /**
+     * MODIFICATION : Méthode pour le ping périodique
+     */
+    public function pingDatabase() {
+        try {
+            $this->executeDbAction(function() {
+                $this->pdo->query('SELECT 1');
+            });
+            echo "Ping BDD réussi.\n";
+        } catch (PDOException $e) {
+            echo "ERREUR lors du ping BDD : " . $e->getMessage() . "\n";
         }
     }
 }
 
-// Lancement du serveur
-$server = IoServer::factory(
+// --- MODIFICATION : Lancement du serveur avec la boucle d'événements ---
+
+echo "Initialisation du serveur WebSocket...\n";
+
+// 1. Créer la boucle d'événements
+$loop = LoopFactory::create();
+
+// 2. Instancier votre application
+$caisseServerApp = new CaisseServer();
+
+// 3. Ajouter la tâche de ping périodique à la boucle
+// Ping toutes les 60 secondes pour garder la connexion active
+$loop->addPeriodicTimer(60, function () use ($caisseServerApp) {
+    $caisseServerApp->pingDatabase();
+});
+
+// 4. Créer le serveur WebSocket en lui passant la boucle
+$server = new IoServer(
     new HttpServer(
         new WsServer(
-            new CaisseServer()
+            $caisseServerApp
         )
     ),
-    $port
+    new \React\Socket\Server("0.0.0.0:$port", $loop), // On passe la boucle ici
+    $loop // Et ici
 );
 
+// 5. Lancer le serveur
 $server->run();

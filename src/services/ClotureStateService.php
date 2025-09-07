@@ -4,6 +4,14 @@
 class ClotureStateService {
     private $pdo;
 
+    /**
+     * Permet de remplacer l'objet PDO interne après une reconnexion.
+     * @param PDO $pdo Le nouvel objet PDO.
+     */
+    public function setPDO(PDO $pdo) {
+        $this->pdo = $pdo;
+    }
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
     }
