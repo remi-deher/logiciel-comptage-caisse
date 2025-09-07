@@ -1,4 +1,4 @@
-// Fichier: public/assets/js/components/Footer.js (Version améliorée)
+// Fichier: public/assets/js/components/Footer.js (Version finale)
 
 /**
  * Récupère la version de l'application depuis l'API et l'affiche dans le pied de page.
@@ -15,6 +15,8 @@ async function updateVersionInfo() {
         const data = await response.json();
         if (data.success && data.version) {
             versionElement.textContent = `Version ${data.version}`;
+        } else {
+            versionElement.textContent = 'Version inconnue';
         }
     } catch (error) {
         console.error("Impossible de récupérer la version de l'application:", error);

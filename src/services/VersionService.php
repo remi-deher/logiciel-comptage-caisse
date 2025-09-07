@@ -109,7 +109,11 @@ class VersionService {
         ];
     }
 
-    private function getLocalVersion() {
+    //
+    // --- CORRECTION CI-DESSOUS ---
+    // La fonction est maintenant 'public' au lieu de 'private'
+    //
+    public function getLocalVersion() {
         $version_file = dirname(__DIR__, 2) . '/VERSION';
         return file_exists($version_file) ? trim(file_get_contents($version_file)) : '0.0.0';
     }
