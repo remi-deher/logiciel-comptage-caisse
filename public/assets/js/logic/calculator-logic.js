@@ -130,8 +130,6 @@ function handleWebSocketMessage(data) {
         case 'welcome':
             wsResourceId = data.resourceId.toString();
             initializeCloture(config, wsResourceId);
-            // CORRECTION : Le bouton est activé ici, une fois qu'on a la certitude que la connexion est prête.
-            setClotureReady(true); 
             break;
         case 'full_form_state':
             if (Object.keys(data.state).length > 0) {
@@ -213,7 +211,6 @@ function attachEventListeners() {
 export async function initializeCalculator() {
     try {
         // CORRECTION : On s'assure que le bouton est et reste désactivé si on quitte la page
-        setClotureReady(false);
 
         config = await fetchCalculatorConfig();
         renderCalculatorUI();

@@ -22,7 +22,8 @@ export function setClotureReady(isReady) {
             clotureBtn.title = "Lancer le processus de clôture";
         } else {
             clotureBtn.disabled = true;
-            clotureBtn.title = "Disponible uniquement sur la page du calculateur.";
+            // Message plus générique
+            clotureBtn.title = "Nécessite une connexion en temps réel active.";
         }
     }
 }

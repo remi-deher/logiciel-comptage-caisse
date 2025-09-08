@@ -5,6 +5,7 @@ import { renderFooter } from './components/Footer.js';
 import { handleRouting } from './router.js';
 import { setupGlobalClotureButton } from './logic/cloture-logic.js';
 import { initializeWebSocket } from './logic/websocket-service.js';
+import { setClotureReady } from './logic/cloture-logic.js';
 
 // --- Gestionnaire de messages WebSocket Global ---
 // Cette fonction recevra TOUS les messages et les redirigera vers la page active.
@@ -75,10 +76,12 @@ async function initialize() {
     setupGlobalClotureButton();
     
     // 2. NOUVEAU : Initialisation de la connexion WebSocket au niveau global
-    try {
+   try {
         console.log('[Main] Initialisation de la connexion WebSocket globale...');
         await initializeWebSocket(globalWsMessageHandler);
         console.log('[Main] Connexion WebSocket prête.');
+        // On active le bouton de clôture car la connexion est établie
+        setClotureReady(true); 
     } catch (error) {
         console.error("Échec de l'initialisation du WebSocket. La collaboration en temps réel sera désactivée.", error);
     }

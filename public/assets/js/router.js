@@ -48,7 +48,6 @@ export async function handleRouting() {
     
     // CORRECTION : La logique du bouton de clôture est maintenant gérée par les pages elles-mêmes.
     // On s'assure qu'il est désactivé par défaut lors de la navigation.
-    setClotureReady(false);
 
     const route = routes[path] || { 
         render: (element) => {
