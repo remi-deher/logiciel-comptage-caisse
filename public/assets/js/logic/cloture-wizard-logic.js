@@ -1,15 +1,15 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Amélioré avec interface de comptage)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Finalisé avec modes de paiement et synchro temps réel)
 
 import { sendWsMessage } from './websocket-service.js';
 
-// --- Variables d'état de l'assistant ---
+// --- Variables d'état ---
 let config = {};
 let wsResourceId = null;
-let calculatorData = {}; // Stockera les données du formulaire du calculateur
+let calculatorData = {};
 let wizardState = {
     currentStep: 1,
-    selectedCaisses: [], // IDs des caisses à clôturer
-    confirmedData: {},   // Données validées pour chaque caisse
+    selectedCaisses: [],
+    confirmedData: {},
 };
 
 // --- Fonctions Utilitaires ---
@@ -18,58 +18,41 @@ const parseLocaleFloat = (str) => parseFloat(String(str || '0').replace(',', '.'
 
 // --- API ---
 async function fetchInitialData() {
-    const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
-    const [conf] = await Promise.all([configPromise]);
-    
-    config = conf;
-    
+    config = await (await fetch('index.php?route=calculateur/config')).json();
     const savedData = sessionStorage.getItem('calculatorFormData');
-    if (savedData) {
-        calculatorData = JSON.parse(savedData);
-    } else {
-        throw new Error("Les données du calculateur n'ont pas pu être chargées. Veuillez retourner au calculateur.");
+    if (!savedData) {
+        throw new Error("Données du calculateur non trouvées. Veuillez retourner au calculateur.");
     }
+    calculatorData = JSON.parse(savedData);
 }
 
-// --- Logique de calcul (AMÉLIORÉE) ---
+// --- Logique de Calcul ---
 function calculateAllForCaisse(caisseId) {
-    if (!calculatorData.caisse || !calculatorData.caisse[caisseId]) return;
-
+    if (!calculatorData.caisse?.[caisseId]) return;
     let totalCompte = 0;
-    const allDenoms = {...(config.denominations.billets || {}), ...(config.denominations.pieces || {})};
-    
+    const allDenoms = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
     for (const name in allDenoms) {
         const quantite = parseInt(calculatorData.caisse[caisseId][name], 10) || 0;
         const totalLigne = quantite * parseFloat(allDenoms[name]);
         totalCompte += totalLigne;
-        
-        // MISE À JOUR : Afficher le total de la ligne
-        const totalLineElement = document.getElementById(`total_${name}_${caisseId}`);
-        if (totalLineElement) {
-            totalLineElement.textContent = formatCurrency(totalLigne);
-        }
+        const totalLineEl = document.getElementById(`total_${name}_${caisseId}_wizard`);
+        if (totalLineEl) totalLineEl.textContent = formatCurrency(totalLigne);
     }
-
     const fondDeCaisse = parseLocaleFloat(calculatorData.caisse[caisseId].fond_de_caisse);
     const ventes = parseLocaleFloat(calculatorData.caisse[caisseId].ventes);
     const retrocession = parseLocaleFloat(calculatorData.caisse[caisseId].retrocession);
     const ecart = (totalCompte - fondDeCaisse) - (ventes + retrocession);
-
     updateEcartDisplay(caisseId, ecart);
 }
 
 function calculateWithdrawalSuggestion(caisseId) {
-    const suggestions = [];
+    const suggestions = [], caisseData = calculatorData.caisse?.[caisseId] || {};
     let totalToWithdraw = 0;
-    const caisseData = calculatorData.caisse?.[caisseId] || {};
     const allDenoms = { ...(config.denominations?.billets || {}), ...(config.denominations?.pieces || {}) };
     const minToKeep = config.minToKeep || {};
-
     const sortedDenoms = Object.keys(allDenoms).sort((a, b) => allDenoms[b] - allDenoms[a]);
-
     for (const name of sortedDenoms) {
-        const currentQty = parseInt(caisseData[name], 10) || 0;
-        const minQty = minToKeep[name] || 0;
+        const currentQty = parseInt(caisseData[name], 10) || 0, minQty = minToKeep[name] || 0;
         if (currentQty > minQty) {
             const qtyToWithdraw = currentQty - minQty;
             const value = qtyToWithdraw * parseFloat(allDenoms[name]);
@@ -80,55 +63,35 @@ function calculateWithdrawalSuggestion(caisseId) {
     return { suggestions, totalToWithdraw };
 }
 
-// --- Fonctions de Rendu (AMÉLIORÉES) ---
-
+// --- Fonctions de Rendu ---
 function updateEcartDisplay(id, ecart) {
-    const display = document.getElementById(`ecart-display-caisse${id}`);
+    const display = document.getElementById(`ecart-display-caisse${id}_wizard`);
     if (!display) return;
-    const valueSpan = display.querySelector('.ecart-value');
-    const explanation = display.querySelector('.ecart-explanation');
-    
+    const valueSpan = display.querySelector('.ecart-value'), explanation = display.querySelector('.ecart-explanation');
     display.classList.remove('ecart-ok', 'ecart-positif', 'ecart-negatif');
     if (valueSpan) valueSpan.textContent = formatCurrency(ecart);
-
-    // MISE À JOUR : Ajouter le texte explicatif
     if (Math.abs(ecart) < 0.01) {
         display.classList.add('ecart-ok');
         if (explanation) explanation.textContent = "La caisse est juste.";
     } else if (ecart > 0) {
         display.classList.add('ecart-positif');
-        if (explanation) explanation.textContent = "Il y a un surplus dans la caisse.";
+        if (explanation) explanation.textContent = "Il y a un surplus.";
     } else {
         display.classList.add('ecart-negatif');
-        if (explanation) explanation.textContent = "Il manque de l'argent dans la caisse.";
+        if (explanation) explanation.textContent = "Il manque de l'argent.";
     }
 }
 
 function renderSuggestionTable(suggestions, total) {
     if (suggestions.length === 0) return '<p class="status-ok">Aucun retrait nécessaire.</p>';
     const rows = suggestions.map(s => `<tr><td>${s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`}</td><td class="text-right">${s.qty}</td><td class="text-right">${formatCurrency(s.total)}</td></tr>`).join('');
-    return `<div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2"><strong>Total à retirer</strong></td><td class="text-right"><strong>${formatCurrency(total)}</strong></td></tr></tfoot></table></div>`;
+    return `<div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2"><strong>Total</strong></td><td class="text-right"><strong>${formatCurrency(total)}</strong></td></tr></tfoot></table></div>`;
 }
 
 function renderStep1_Selection() {
     const container = document.querySelector('.wizard-content');
-    const availableCaisses = Object.entries(config.nomsCaisses);
-    
-    if (availableCaisses.length === 0) {
-        container.innerHTML = `<div class="wizard-step-content"><p class="status-ok">Aucune caisse n'est configurée.</p></div>`;
-        document.getElementById('wizard-next-btn').disabled = true;
-        return;
-    }
-
-    const caissesHtml = availableCaisses.map(([id, nom]) => `
-        <label class="caisse-selection-item">
-            <input type="checkbox" name="caisseSelection" value="${id}">
-            <div class="caisse-info"><i class="fa-solid fa-cash-register"></i><span>${nom}</span></div>
-        </label>
-    `).join('');
-
-    container.innerHTML = `<div class="wizard-step-content" id="step-1-content"><h3>Sélectionnez les caisses à clôturer</h3><div class="caisse-selection-grid">${caissesHtml}</div></div>`;
-    
+    const caissesHtml = Object.entries(config.nomsCaisses).map(([id, nom]) => `<label class="caisse-selection-item"><input type="checkbox" name="caisseSelection" value="${id}"><div class="caisse-info"><i class="fa-solid fa-cash-register"></i><span>${nom}</span></div></label>`).join('');
+    container.innerHTML = `<div class="wizard-step-content"><h3>Sélectionnez les caisses à clôturer</h3><div class="caisse-selection-grid">${caissesHtml}</div></div>`;
     container.querySelector('.caisse-selection-grid').addEventListener('change', () => {
         document.getElementById('wizard-next-btn').disabled = container.querySelectorAll('input:checked').length === 0;
     });
@@ -137,66 +100,51 @@ function renderStep1_Selection() {
 function renderStep2_Counting() {
     const container = document.querySelector('.wizard-content');
     let tabsHtml = '', contentHtml = '', ecartsHtml = '';
-
     wizardState.selectedCaisses.forEach((id, index) => {
         const nom = config.nomsCaisses[id];
         const isActive = index === 0 ? 'active' : '';
-        tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}">${nom}</button>`;
-        // MISE À JOUR : Ajouter le <p> pour l'explication
-        ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
-        
+        tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}_wizard">${nom}</button>`;
+        ecartsHtml += `<div id="ecart-display-caisse${id}_wizard" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         const caisseData = calculatorData.caisse[id] || {};
-        // MISE À JOUR : Ajouter le <span> pour le total de la ligne
-        const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" name="caisse[${id}][${name}]" value="${caisseData[name] || ''}" min="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
-        const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" name="caisse[${id}][${name}]" value="${caisseData[name] || ''}" min="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
+        const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" id="${name}_${id}" data-caisse-id="${id}" value="${caisseData[name] || ''}" min="0"><span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
+        const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label><input type="number" id="${name}_${id}" data-caisse-id="${id}" value="${caisseData[name] || ''}" min="0"><span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
+        const tpeHtml = (config.tpeParCaisse[id] || []).map(tpe => `<div class="form-group"><label>${tpe.nom_terminal}</label><input type="text" id="tpe_${tpe.id}" data-caisse-id="${id}" value="${caisseData[`tpe_${tpe.id}`] || ''}"></div>`).join('');
 
-        contentHtml += `<div id="caisse${id}" class="caisse-tab-content ${isActive}">
+        contentHtml += `<div id="caisse${id}_wizard" class="caisse-tab-content ${isActive}">
             <div class="grid grid-3" style="margin-bottom:20px;">
-                <div class="form-group"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" name="caisse[${id}][fond_de_caisse]" value="${caisseData.fond_de_caisse || ''}"></div>
-                <div class="form-group"><label>Ventes</label><input type="text" data-caisse-id="${id}" name="caisse[${id}][ventes]" value="${caisseData.ventes || ''}"></div>
-                <div class="form-group"><label>Rétrocessions</label><input type="text" data-caisse-id="${id}" name="caisse[${id}][retrocession]" value="${caisseData.retrocession || ''}"></div>
+                <div class="form-group"><label>Fond de Caisse</label><input type="text" id="fond_de_caisse_${id}" data-caisse-id="${id}" value="${caisseData.fond_de_caisse || ''}"></div>
+                <div class="form-group"><label>Ventes</label><input type="text" id="ventes_${id}" data-caisse-id="${id}" value="${caisseData.ventes || ''}"></div>
+                <div class="form-group"><label>Rétrocessions</label><input type="text" id="retrocession_${id}" data-caisse-id="${id}" value="${caisseData.retrocession || ''}"></div>
             </div>
-            <h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div>
+            <div class="payment-method-tabs">
+                <div class="payment-method-selector">
+                    <button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>
+                    ${tpeHtml ? `<button type="button" class="payment-tab-link" data-payment-tab="cb_${id}"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>` : ''}
+                </div>
+                <div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>
+                ${tpeHtml ? `<div id="cb_${id}" class="payment-tab-content"><div class="grid">${tpeHtml}</div></div>` : ''}
+            </div>
         </div>`;
     });
-
-    container.innerHTML = `<div class="wizard-step-content">
-        <h3>Vérifiez et ajustez les comptages</h3>
-        <div class="tab-selector">${tabsHtml}</div>
-        <div class="ecart-display-container">${ecartsHtml}</div>
-        <div id="caisses-content-container">${contentHtml}</div>
-    </div>`;
-    
+    container.innerHTML = `<div class="wizard-step-content"><h3>Vérifiez et ajustez les comptages</h3><div class="tab-selector">${tabsHtml}</div><div class="ecart-display-container">${ecartsHtml}</div><div id="caisses-content-container">${contentHtml}</div></div>`;
     wizardState.selectedCaisses.forEach(id => calculateAllForCaisse(id));
 }
 
 function renderStep3_Summary() {
     const container = document.querySelector('.wizard-content');
-    let summaryHtml = '';
-
-    wizardState.selectedCaisses.forEach(id => {
+    let summaryHtml = wizardState.selectedCaisses.map(id => {
         const nom = config.nomsCaisses[id];
         const { suggestions, totalToWithdraw } = calculateWithdrawalSuggestion(id);
         wizardState.confirmedData[id] = { withdrawals: suggestions, totalToWithdraw };
-
-        summaryHtml += `<div class="card">
-            <h4>Synthèse pour ${nom}</h4>
-            ${renderSuggestionTable(suggestions, totalToWithdraw)}
-        </div>`;
-    });
-    
+        return `<div class="card"><h4>Synthèse pour ${nom}</h4>${renderSuggestionTable(suggestions, totalToWithdraw)}</div>`;
+    }).join('');
     container.innerHTML = `<div class="wizard-step-content"><h3>Synthèse et Suggestions de Retrait</h3>${summaryHtml}</div>`;
 }
 
 function renderStep4_Finalization() {
     const container = document.querySelector('.wizard-content');
-    container.innerHTML = `<div class="wizard-step-content">
-        <h3>Finalisation</h3>
-        <p>Vous êtes sur le point de clôturer ${wizardState.selectedCaisses.length} caisse(s). Cette action enregistrera les comptages et les retraits dans l'historique.</p>
-        <p class="warning-text" style="text-align:center; font-weight:bold; color: var(--color-danger);">Cette action est irréversible.</p>
-    </div>`;
+    container.innerHTML = `<div class="wizard-step-content"><h3>Finalisation</h3><p>Vous êtes sur le point de clôturer ${wizardState.selectedCaisses.length} caisse(s). Cette action enregistrera les comptages et les retraits dans l'historique.</p><p class="warning-text" style="text-align:center; font-weight:bold; color: var(--color-danger);">Cette action est irréversible.</p></div>`;
 }
-
 
 // --- Gestionnaire Principal ---
 function updateWizardUI() {
@@ -310,13 +258,14 @@ function attachWizardListeners() {
     wizardContent.addEventListener('input', e => {
         if (e.target.tagName === 'INPUT' && wizardState.currentStep === 2) {
             const caisseId = e.target.dataset.caisseId;
-            const name = e.target.name;
-            // Extrait la clé finale (ex: 'b500', 'fond_de_caisse')
-            const match = name.match(/\[(\w+)\]$/);
-            if (match && caisseId) {
-                const key = match[1];
-                if(calculatorData.caisse[caisseId]) {
-                    calculatorData.caisse[caisseId][key] = e.target.value;
+            const inputId = e.target.id;
+            // Extrait la clé (ex: 'b500', 'fond_de_caisse', 'tpe_1') de l'ID
+            const key = inputId.replace(`_${caisseId}`, '');
+            if (caisseId && calculatorData.caisse[caisseId]) {
+                calculatorData.caisse[caisseId][key] = e.target.value;
+                sendWsMessage({ id: inputId, value: e.target.value }); // Envoi temps réel
+                // On ne recalcule l'écart que si ce n'est pas un champ TPE
+                if (!key.startsWith('tpe_')) {
                     calculateAllForCaisse(caisseId);
                 }
             }
@@ -324,25 +273,31 @@ function attachWizardListeners() {
     });
 
     wizardContent.addEventListener('click', e => {
-        const btn = e.target.closest('.tab-link');
-        if (btn && wizardState.currentStep === 2) {
-            // Désactive tous les onglets et contenus
+        const mainTab = e.target.closest('.tab-link');
+        const paymentTab = e.target.closest('.payment-tab-link');
+        
+        if (mainTab) {
             wizardContent.querySelectorAll('.tab-link, .caisse-tab-content, .ecart-display').forEach(el => el.classList.remove('active'));
-            
-            // Active l'onglet cliqué et son contenu associé
-            btn.classList.add('active');
-            const tabId = btn.dataset.tab;
+            mainTab.classList.add('active');
+            const tabId = mainTab.dataset.tab;
             wizardContent.querySelector(`#${tabId}`)?.classList.add('active');
             wizardContent.querySelector(`#ecart-display-${tabId}`)?.classList.add('active');
+        } else if (paymentTab) {
+            const container = paymentTab.closest('.payment-method-tabs');
+            container.querySelectorAll('.payment-tab-link, .payment-tab-content').forEach(el => el.classList.remove('active'));
+            paymentTab.classList.add('active');
+            const tabId = paymentTab.dataset.paymentTab;
+            container.querySelector(`#${tabId}`)?.classList.add('active');
         }
     });
 }
+
 
 // --- Point d'entrée ---
 export async function initializeClotureWizard() {
     try {
         await fetchInitialData();
-        updateWizardUI();
+        updateWizardUI(); // Appelle une version condensée pour la clarté
         attachWizardListeners();
     } catch (error) {
         document.querySelector('.wizard-content').innerHTML = `<p class="error">${error.message}</p>`;
