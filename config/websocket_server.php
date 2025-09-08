@@ -199,8 +199,20 @@ class CaisseServer implements MessageComponentInterface {
     }
     
     // ... broadcast et broadcastClotureStateToAll restent inchangées ...
-    private function broadcast($message, $exclude) { /* ... */ }
-    public function broadcastClotureStateToAll() { /* ... */ }
+    private function broadcast($message, $exclude) {
+        foreach ($this->clients as $client) {
+            if ($exclude !== $client) {
+                $client->send($message);
+            }
+        }
+    }
+    public function broadcastClotureStateToAll() {
+        $message = json_encode($this->clotureState);
+        foreach ($this->clients as $client) {
+            $client->send($message);
+        }
+    }
+
 
     /**
      * MODIFICATION : Méthode pour le ping périodique

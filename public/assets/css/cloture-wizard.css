@@ -1,0 +1,175 @@
+/* Fichier : public/assets/css/cloture-wizard.css */
+
+#cloture-wizard-page {
+    max-width: 900px;
+    margin: auto;
+}
+
+.wizard-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.wizard-header h2 {
+    margin: 0 0 20px 0;
+    font-size: 2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.wizard-steps {
+    display: flex;
+    justify-content: space-around;
+    max-width: 600px;
+    margin: auto;
+}
+
+.step-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--color-text-muted);
+    font-weight: bold;
+    position: relative;
+}
+
+.step-item span {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: var(--color-surface-alt);
+    border: 2px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.step-item.active {
+    color: var(--color-primary);
+}
+
+.step-item.active span {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+.wizard-content {
+    background-color: var(--color-surface-alt);
+    padding: 30px;
+    border-radius: 12px;
+    min-height: 300px;
+}
+
+.wizard-step-content h3 {
+    margin-top: 0;
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.wizard-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border-light);
+}
+
+/* Étape 1: Sélection des caisses */
+.caisse-selection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.caisse-selection-item {
+    position: relative;
+    cursor: pointer;
+}
+
+.caisse-selection-item input[type="checkbox"] {
+    display: none;
+}
+
+.caisse-selection-item .caisse-info {
+    background-color: var(--color-surface);
+    border: 2px solid var(--color-border-light);
+    border-radius: 8px;
+    padding: 25px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.caisse-selection-item .caisse-info i {
+    font-size: 2em;
+    margin-bottom: 10px;
+    color: var(--color-primary);
+}
+
+.caisse-selection-item .caisse-info span {
+    font-size: 1.1em;
+    font-weight: bold;
+    display: block;
+}
+
+.caisse-selection-item input:checked + .caisse-info {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
+    transform: translateY(-5px);
+}
+
+/* Étape 2: Revue */
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.review-header .step-indicator {
+    background-color: var(--color-surface);
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 0.9em;
+    font-weight: bold;
+}
+
+.review-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 25px;
+}
+
+.review-summary .summary-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+/* Étape 3: Synthèse */
+.final-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+}
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+.grand-total {
+    text-align: center;
+    padding: 20px;
+    font-size: 1.2em;
+    background-color: var(--color-success-light);
+    border: 1px solid var(--color-success);
+    color: var(--color-success-dark);
+}
