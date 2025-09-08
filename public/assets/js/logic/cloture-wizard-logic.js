@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Finalisé avec modes de paiement et synchro temps réel)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé et Verbosifié pour le débogage)
 
 import { sendWsMessage } from './websocket-service.js';
 
@@ -18,12 +18,14 @@ const parseLocaleFloat = (str) => parseFloat(String(str || '0').replace(',', '.'
 
 // --- API ---
 async function fetchInitialData() {
+    console.log("[Wizard] Récupération de la configuration initiale...");
     config = await (await fetch('index.php?route=calculateur/config')).json();
     const savedData = sessionStorage.getItem('calculatorFormData');
     if (!savedData) {
         throw new Error("Données du calculateur non trouvées. Veuillez retourner au calculateur.");
     }
     calculatorData = JSON.parse(savedData);
+    console.log("[Wizard] Configuration et données de session chargées.", { config, calculatorData });
 }
 
 // --- Logique de Calcul ---
@@ -89,6 +91,7 @@ function renderSuggestionTable(suggestions, total) {
 }
 
 function renderStep1_Selection() {
+    console.log("[Wizard] Affichage de l'Étape 1 : Sélection des caisses.");
     const container = document.querySelector('.wizard-content');
     const caissesHtml = Object.entries(config.nomsCaisses).map(([id, nom]) => `<label class="caisse-selection-item"><input type="checkbox" name="caisseSelection" value="${id}"><div class="caisse-info"><i class="fa-solid fa-cash-register"></i><span>${nom}</span></div></label>`).join('');
     container.innerHTML = `<div class="wizard-step-content"><h3>Sélectionnez les caisses à clôturer</h3><div class="caisse-selection-grid">${caissesHtml}</div></div>`;
@@ -98,6 +101,7 @@ function renderStep1_Selection() {
 }
 
 function renderStep2_Counting() {
+    console.log("[Wizard] Affichage de l'Étape 2 : Comptage.");
     const container = document.querySelector('.wizard-content');
     let tabsHtml = '', contentHtml = '', ecartsHtml = '';
     wizardState.selectedCaisses.forEach((id, index) => {
@@ -106,24 +110,27 @@ function renderStep2_Counting() {
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}_wizard">${nom}</button>`;
         ecartsHtml += `<div id="ecart-display-caisse${id}_wizard" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         const caisseData = calculatorData.caisse[id] || {};
-        const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" id="${name}_${id}" data-caisse-id="${id}" value="${caisseData[name] || ''}" min="0"><span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
-        const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label><input type="number" id="${name}_${id}" data-caisse-id="${id}" value="${caisseData[name] || ''}" min="0"><span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
+
+        const buildInput = (name, value, caisseId) => `<input type="number" id="${name}_${caisseId}" name="caisse[${caisseId}][${name}]" data-caisse-id="${caisseId}" value="${value || ''}" min="0">`;
+        const buildTextInput = (name, value, caisseId) => `<input type="text" id="${name}_${caisseId}" name="caisse[${caisseId}][${name}]" data-caisse-id="${caisseId}" value="${value || ''}">`;
         
-        // Correction pour récupérer les TPE associés à la caisse
-        const tpePourCaisse = config.terminaux_paiement 
-            ? Object.values(config.terminaux_paiement).filter(tpe => tpe.caisse_id.toString() === id)
-            : [];
+        const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label>${buildInput(name, caisseData[name], id)}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
+        const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label>${buildInput(name, caisseData[name], id)}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
+
+        const tpePourCaisse = config.terminaux_paiement ? Object.entries(config.terminaux_paiement).filter(([, tpe]) => tpe.caisse_id.toString() === id) : [];
         
-        const tpeHtml = tpePourCaisse.map(tpe => {
-            const tpeId = Object.keys(config.terminaux_paiement).find(key => config.terminaux_paiement[key] === tpe);
-            return `<div class="form-group"><label>${tpe.nom}</label><input type="text" id="tpe_${tpeId}" data-caisse-id="${id}" value="${caisseData[`tpe_${tpeId}`] || ''}"></div>`
+        // CORRECTION CLÉ : L'ID doit être identique à celui du calculateur principal
+        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
+            const fieldId = `tpe_${tpeId}_${id}`;
+            const fieldName = `caisse[${id}][${fieldId}]`;
+            return `<div class="form-group"><label>${tpe.nom}</label><input type="text" id="${fieldId}" name="${fieldName}" data-caisse-id="${id}" value="${caisseData[fieldId] || ''}"></div>`;
         }).join('');
         
         contentHtml += `<div id="caisse${id}_wizard" class="caisse-tab-content ${isActive}">
             <div class="grid grid-3" style="margin-bottom:20px;">
-                <div class="form-group"><label>Fond de Caisse</label><input type="text" id="fond_de_caisse_${id}" data-caisse-id="${id}" value="${caisseData.fond_de_caisse || ''}"></div>
-                <div class="form-group"><label>Ventes</label><input type="text" id="ventes_${id}" data-caisse-id="${id}" value="${caisseData.ventes || ''}"></div>
-                <div class="form-group"><label>Rétrocessions</label><input type="text" id="retrocession_${id}" data-caisse-id="${id}" value="${caisseData.retrocession || ''}"></div>
+                <div class="form-group"><label>Fond de Caisse</label>${buildTextInput('fond_de_caisse', caisseData.fond_de_caisse, id)}</div>
+                <div class="form-group"><label>Ventes</label>${buildTextInput('ventes', caisseData.ventes, id)}</div>
+                <div class="form-group"><label>Rétrocessions</label>${buildTextInput('retrocession', caisseData.retrocession, id)}</div>
             </div>
             <div class="payment-method-tabs">
                 <div class="payment-method-selector">
@@ -140,6 +147,7 @@ function renderStep2_Counting() {
 }
 
 function renderStep3_Summary() {
+    console.log("[Wizard] Affichage de l'Étape 3 : Synthèse et Retraits.");
     const container = document.querySelector('.wizard-content');
     let summaryHtml = wizardState.selectedCaisses.map(id => {
         const nom = config.nomsCaisses[id];
@@ -151,6 +159,7 @@ function renderStep3_Summary() {
 }
 
 function renderStep4_Finalization() {
+    console.log("[Wizard] Affichage de l'Étape 4 : Finalisation.");
     const container = document.querySelector('.wizard-content');
     container.innerHTML = `<div class="wizard-step-content"><h3>Finalisation</h3><p>Vous êtes sur le point de clôturer ${wizardState.selectedCaisses.length} caisse(s). Cette action enregistrera les comptages et les retraits dans l'historique.</p><p class="warning-text" style="text-align:center; font-weight:bold; color: var(--color-danger);">Cette action est irréversible.</p></div>`;
 }
@@ -199,9 +208,15 @@ async function handleNextStep() {
     const nextBtn = document.getElementById('wizard-next-btn');
     nextBtn.disabled = true;
 
+    console.log(`[Wizard] Clic sur 'Suivant' depuis l'étape ${wizardState.currentStep}.`);
+
     if (wizardState.currentStep === 1) {
         wizardState.selectedCaisses = Array.from(document.querySelectorAll('input:checked')).map(cb => cb.value);
-        wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
+        console.log("[Wizard] Caisses sélectionnées :", wizardState.selectedCaisses);
+        wizardState.selectedCaisses.forEach(id => {
+            console.log(`[Wizard] Envoi du message de verrouillage pour la caisse ${id}.`);
+            sendWsMessage({ type: 'cloture_lock', caisse_id: id });
+        });
         wizardState.currentStep = 2;
     } 
     else if (wizardState.currentStep === 2) {
@@ -211,6 +226,7 @@ async function handleNextStep() {
         wizardState.currentStep = 4;
     }
     else if (wizardState.currentStep === 4) {
+        console.log("[Wizard] Lancement de la clôture finale.");
         const formData = new FormData();
         formData.append('explication', 'Clôture de journée via l\'assistant.');
 
@@ -234,8 +250,9 @@ async function handleNextStep() {
             window.location.href = '/calculateur';
             return;
         } catch (error) {
+            console.error("[Wizard] Erreur lors de la soumission de la clôture finale :", error);
             alert(`Erreur: ${error.message}`);
-            nextBtn.disabled = false; // Réactiver en cas d'erreur
+            nextBtn.disabled = false;
         }
     }
     
@@ -243,7 +260,9 @@ async function handleNextStep() {
 }
 
 function handlePrevStep() {
+    console.log(`[Wizard] Clic sur 'Précédent' depuis l'étape ${wizardState.currentStep}.`);
     if (wizardState.currentStep === 2) {
+        console.log("[Wizard] Annulation du verrouillage pour les caisses :", wizardState.selectedCaisses);
         wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
         wizardState.selectedCaisses = [];
     }
@@ -256,6 +275,7 @@ function attachWizardListeners() {
     document.getElementById('wizard-prev-btn').addEventListener('click', handlePrevStep);
     document.getElementById('wizard-cancel-btn').addEventListener('click', () => {
         if (confirm("Voulez-vous vraiment annuler ? Le comptage en cours sera perdu.")) {
+            console.log("[Wizard] Annulation de la clôture.");
             wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
             sessionStorage.removeItem('calculatorFormData');
             window.location.href = '/calculateur';
@@ -268,14 +288,20 @@ function attachWizardListeners() {
         if (e.target.tagName === 'INPUT' && wizardState.currentStep === 2) {
             const caisseId = e.target.dataset.caisseId;
             const inputId = e.target.id;
-            const key = inputId.split('_')[0]; // Simplification pour la démo
-            
-            if (caisseId && calculatorData.caisse[caisseId]) {
-                 const name = e.target.id.replace(`_${caisseId}`, '');
-                calculatorData.caisse[caisseId][name] = e.target.value;
-                sendWsMessage({ id: e.target.id, value: e.target.value });
-                if (!name.startsWith('tpe_')) {
-                    calculateAllForCaisse(caisseId);
+            const nameAttr = e.target.name;
+
+            if (caisseId && calculatorData.caisse[caisseId] && nameAttr) {
+                const match = nameAttr.match(/\[(\w+)\]$/);
+                if (match) {
+                    const key = match[1];
+                    calculatorData.caisse[caisseId][key] = e.target.value;
+                    
+                    console.log(`[Wizard] Mise à jour locale et envoi de la modification : ID='${inputId}', Valeur='${e.target.value}'`);
+                    sendWsMessage({ type: 'update', id: inputId, value: e.target.value });
+                    
+                    if (!key.startsWith('tpe_')) {
+                        calculateAllForCaisse(caisseId);
+                    }
                 }
             }
         }
@@ -308,6 +334,7 @@ export async function initializeClotureWizard() {
         updateWizardUI();
         attachWizardListeners();
     } catch (error) {
+        console.error("Erreur critique lors de l'initialisation de l'assistant de clôture :", error);
         document.querySelector('.wizard-content').innerHTML = `<p class="error">${error.message}</p>`;
         document.getElementById('wizard-next-btn').disabled = true;
         document.getElementById('wizard-prev-btn').style.display = 'none';

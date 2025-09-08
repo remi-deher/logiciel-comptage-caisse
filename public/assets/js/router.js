@@ -1,7 +1,8 @@
-// Fichier : public/assets/js/router.js
-// Gère l'affichage des différentes "pages" (composants) de l'application et leur CSS associé.
+// Fichier : public/assets/js/router.js (Corrigé pour une gestion centralisée de l'état)
 
 import { loadPageCSS } from './utils/dom.js';
+import { setActiveMessageHandler } from './main.js';
+import { setClotureReady } from './logic/cloture-logic.js';
 
 // Importation des fonctions qui affichent chaque page de l'application
 import { renderCalculateurPage } from './pages/CalculateurPage.js';
@@ -15,11 +16,8 @@ import { renderLoginPage } from './pages/LoginPage.js';
 import { renderAdminPage } from './pages/AdminPage.js';
 import { renderClotureWizardPage } from './pages/ClotureWizardPage.js';
 
-// Le conteneur principal où le contenu des pages sera injecté
 const mainContent = document.getElementById('main-content');
 
-// Définition des routes de l'application.
-// Chaque route est un objet contenant la fonction de rendu (`render`) et le fichier CSS associé (`css`).
 const routes = {
     '/': { render: renderCalculateurPage, css: 'page-calculateur.css' },
     '/calculateur': { render: renderCalculateurPage, css: 'page-calculateur.css' },
@@ -32,84 +30,61 @@ const routes = {
     '/login': { render: renderLoginPage, css: 'admin.css' },
     '/admin': { render: renderAdminPage, css: 'admin.css' },
     '/cloture-wizard': { render: renderClotureWizardPage, css: 'cloture-wizard.css' }
-    // Ajoutez ici d'autres routes si nécessaire
 };
 
 /**
- * Fonction principale de routage (MODIFIÉE).
+ * Fonction principale de routage.
  */
 export async function handleRouting() {
-    if (mainContent) {
-        if (typeof mainContent.beforePageChange === 'function') {
-            await mainContent.beforePageChange();
-            mainContent.beforePageChange = null;
-        }
+    if (mainContent && typeof mainContent.beforePageChange === 'function') {
+        await mainContent.beforePageChange();
+        mainContent.beforePageChange = null;
     }
 
     let path = window.location.pathname;
-    if (path === '' || path === '/index.html' || path.endsWith('index.php')) { // Gère plusieurs cas pour la racine
+    if (path === '' || path === '/index.html' || path.endsWith('index.php')) {
         path = '/';
     }
     
-    // --- NOUVELLE LOGIQUE POUR GÉRER LE BOUTON CLÔTURE ---
-    const clotureBtn = document.getElementById('cloture-btn');
-    if (clotureBtn) {
-        // On active le bouton seulement si on est sur la page du calculateur
-        if (path === '/' || path === '/calculateur') {
-            clotureBtn.disabled = false;
-            clotureBtn.title = "Lancer le processus de clôture";
-        } else {
-            clotureBtn.disabled = true;
-            clotureBtn.title = "Disponible uniquement sur la page du calculateur";
-        }
-    }
+    // CORRECTION : La logique du bouton de clôture est maintenant gérée par les pages elles-mêmes.
+    // On s'assure qu'il est désactivé par défaut lors de la navigation.
+    setClotureReady(false);
 
-    // Trouve la route correspondante ou une route 404 par défaut
     const route = routes[path] || { 
         render: (element) => {
             element.innerHTML = `<div class="container"><h2>Erreur 404</h2><p>La page que vous cherchez n'existe pas.</p></div>`;
         },
-        css: null // Pas de CSS spécifique pour la page d'erreur
+        css: null
     };
     
     if (mainContent) {
-        // 1. Charge la feuille de style de la page demandée
         loadPageCSS(route.css);
-        
-        // 2. Nettoie le contenu de la page précédente
         mainContent.innerHTML = ''; 
         
-        // 3. Exécute la fonction de rendu pour afficher la nouvelle page
+        // On définit le gestionnaire de messages sur null avant de charger la page.
+        // La page active (ex: calculateur) sera responsable de définir son propre gestionnaire.
+        setActiveMessageHandler(null);
+        
         route.render(mainContent);
-
-        // 4. Met à jour la classe 'active' dans la barre de navigation
         updateActiveNavLink(path);
     }
 }
 
 /**
  * Met à jour le style du lien actif dans la barre de navigation.
- * @param {string} currentPath Le chemin de la page actuellement affichée.
  */
 function updateActiveNavLink(currentPath) {
-    const navLinks = document.querySelectorAll('.navbar-links a');
+    const navLinks = document.querySelectorAll('.navbar-links a, .user-menu-dropdown a');
     navLinks.forEach(link => {
-        // Normalise le href du lien pour la comparaison
         const linkPath = new URL(link.href).pathname;
         
-        // Gère le cas spécial de la racine
-        if (currentPath === '/' || currentPath === '/calculateur') {
-            if (linkPath === '/' || linkPath === '/calculateur') {
-                link.classList.add('active');
-            } else {
-                link.classList.remove('active');
-            }
+        // Gère les cas où plusieurs URL mènent à la même "page" active
+        const isCalculateur = (currentPath === '/' || currentPath === '/calculateur') && (linkPath === '/' || linkPath === '/calculateur');
+        
+        if (linkPath === currentPath || isCalculateur) {
+            link.classList.add('active');
         } else {
-            if (linkPath === currentPath) {
-                link.classList.add('active');
-            } else {
-                link.classList.remove('active');
-            }
+            link.classList.remove('active');
         }
     });
 }

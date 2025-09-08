@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Adapté pour le nouvel assistant)
+// Fichier : public/assets/js/logic/cloture-logic.js (Corrigé pour une activation sécurisée)
 
 import { sendWsMessage } from './websocket-service.js';
 
@@ -6,7 +6,26 @@ let config = {};
 let lockedCaisses = [];
 let closedCaisses = [];
 let resourceId = null;
-let isClotureInitialized = false;
+let isClotureInitialized = false; // Reste faux par défaut
+
+/**
+ * NOUVELLE FONCTION : Active ou désactive l'état de préparation à la clôture.
+ * C'est cette fonction qui sera appelée par le calculateur pour activer le bouton.
+ * @param {boolean} isReady - Indique si la clôture peut être initiée.
+ */
+export function setClotureReady(isReady) {
+    const clotureBtn = document.getElementById('cloture-btn');
+    isClotureInitialized = isReady;
+    if (clotureBtn) {
+        if (isReady) {
+            clotureBtn.disabled = false;
+            clotureBtn.title = "Lancer le processus de clôture";
+        } else {
+            clotureBtn.disabled = true;
+            clotureBtn.title = "Disponible uniquement sur la page du calculateur.";
+        }
+    }
+}
 
 /**
  * Met à jour l'interface utilisateur en fonction de l'état de clôture reçu (caisses verrouillées/fermées).
@@ -16,7 +35,6 @@ export function updateClotureUI(newState) {
     lockedCaisses = newState.caisses || [];
     closedCaisses = (newState.closed_caisses || []).map(String);
 
-    // Mettre à jour les onglets des caisses
     document.querySelectorAll('.tab-link').forEach(tab => {
         const caisseId = tab.dataset.caisseId;
         tab.classList.remove('cloturee', 'cloture-en-cours');
@@ -27,7 +45,6 @@ export function updateClotureUI(newState) {
         }
     });
 
-    // Désactiver les champs des caisses verrouillées ou fermées
     document.querySelectorAll('#caisse-form input, #caisse-form textarea').forEach(field => {
         const fieldCaisseId = field.dataset.caisseId || field.name.match(/caisse\[(\d+)\]/)?.[1];
         if (!fieldCaisseId) return;
@@ -47,7 +64,6 @@ export function updateClotureUI(newState) {
 
 /**
  * Configure le bouton de clôture global dans la barre de navigation.
- * Au clic, il sauvegarde l'état du formulaire du calculateur et redirige vers l'assistant.
  */
 export function setupGlobalClotureButton() {
     const clotureBtn = document.getElementById('cloture-btn');
@@ -55,31 +71,34 @@ export function setupGlobalClotureButton() {
 
     clotureBtn.addEventListener('click', async () => {
         if (!isClotureInitialized) {
-            alert("La fonction de clôture est uniquement disponible sur la page du Calculateur.");
+            alert("La fonction de clôture est uniquement disponible sur la page du Calculateur et nécessite que la connexion en temps réel soit active.");
             return;
         }
 
         const form = document.getElementById('caisse-form');
         if (form) {
             const formData = new FormData(form);
-            const data = {};
+            const data = { caisse: {} };
             for (const [key, value] of formData.entries()) {
-                // Transformer caisse[1][b500] en un objet imbriqué
-                const match = key.match(/(\w+)\[(\d+)\]\[(\w+)\]/);
+                const match = key.match(/caisse\[(\d+)\]\[(\w+)\]/);
                 if (match) {
-                    const [, mainKey, id, subKey] = match;
-                    if (!data[mainKey]) data[mainKey] = {};
-                    if (!data[mainKey][id]) data[mainKey][id] = {};
-                    data[mainKey][id][subKey] = value;
+                    const [, id, subKey] = match;
+                    if (!data.caisse[id]) data.caisse[id] = {};
+                    data.caisse[id][subKey] = value;
                 } else {
-                    data[key] = value;
+                    const tpeMatch = key.match(/(tpe_\d+_\d+)/);
+                     if (tpeMatch) {
+                        const tpeId = tpeMatch[1];
+                        const caisseId = tpeId.split('_')[2];
+                        if (!data.caisse[caisseId]) data.caisse[caisseId] = {};
+                        data.caisse[caisseId][tpeId] = value;
+                     } else {
+                        data[key] = value;
+                     }
                 }
             }
             
-            // Sauvegarde les données dans sessionStorage pour que l'assistant y accède
             sessionStorage.setItem('calculatorFormData', JSON.stringify(data));
-            
-            // Redirige vers la nouvelle page de l'assistant
             window.location.href = '/cloture-wizard';
         }
     });
@@ -87,11 +106,9 @@ export function setupGlobalClotureButton() {
 
 /**
  * Initialise la logique de clôture en stockant la configuration et l'ID de ressource WebSocket.
- * @param {object} appConfig La configuration de l'application.
- * @param {string} wsResourceId L'ID unique de la connexion WebSocket.
  */
 export function initializeCloture(appConfig, wsResourceId) {
     config = appConfig;
     resourceId = wsResourceId;
-    isClotureInitialized = true;
+    // On n'active PAS isClotureInitialized ici directement.
 }

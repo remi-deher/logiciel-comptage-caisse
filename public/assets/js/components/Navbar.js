@@ -20,7 +20,7 @@ export function renderNavbar(element) {
                 <span class="status-dot"></span>
                 <span class="status-text">...</span>
             </div>
-            <button id="cloture-btn" class="cloture-btn"><i class="fa-solid fa-lock"></i> Clôture</button>
+            <button id="cloture-btn" class="cloture-btn" disabled title="Connexion en temps réel en cours..."><i class="fa-solid fa-lock"></i> Clôture</button>
             <button id="theme-switcher" class="theme-switch-btn" title="Changer de thème">
                 <i class="fa-solid fa-sun"></i>
                 <i class="fa-solid fa-moon"></i>

@@ -1,36 +1,36 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version finale avec sauvegarde de session)
+// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé pour une activation sécurisée)
 
-import { initializeWebSocket, sendWsMessage } from './websocket-service.js';
-import { initializeCloture, updateClotureUI } from './cloture-logic.js';
+import { setActiveMessageHandler } from '../main.js';
+import { sendWsMessage } from './websocket-service.js';
+import { initializeCloture, updateClotureUI, setClotureReady } from './cloture-logic.js';
 
 let config = {};
 let wsResourceId = null;
 let hasUnsavedChanges = false;
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
-/**
- * Sauvegarde l'état actuel du formulaire dans le sessionStorage du navigateur.
- * C'est cette fonction qui permet à l'assistant de récupérer les données.
- */
 function saveStateToSession() {
     const form = document.getElementById('caisse-form');
     if (form) {
+        console.log("[Calculator] Sauvegarde de l'état dans la session avant de quitter la page...");
         const formData = new FormData(form);
-        const data = {};
+        const data = { caisse: {} };
+
         for (const [key, value] of formData.entries()) {
-            const match = key.match(/(\w+)\[(\d+)\]\[(\w+)\]/);
+            // Gère les champs comme `caisse[1][b500]`
+            const match = key.match(/caisse\[(\d+)\]\[(\w+)\]/);
             if (match) {
-                const [, mainKey, id, subKey] = match;
-                if (!data[mainKey]) data[mainKey] = {};
-                if (!data[mainKey][id]) data[mainKey][id] = {};
-                data[mainKey][id][subKey] = value;
+                const [, id, subKey] = match;
+                if (!data.caisse[id]) data.caisse[id] = {};
+                data.caisse[id][subKey] = value;
             } else {
-                 const tpeMatch = key.match(/tpe_(\d+)_(\d+)/);
+                // Gère les champs TPE comme `tpe_1_1`
+                const tpeMatch = key.match(/(tpe_\d+_\d+)/);
                  if (tpeMatch) {
-                    const [, tpeId, caisseId] = tpeMatch;
-                    if (!data.caisse) data.caisse = {};
+                    const tpeId = tpeMatch[1];
+                    const caisseId = tpeId.split('_')[2];
                     if (!data.caisse[caisseId]) data.caisse[caisseId] = {};
-                    data.caisse[caisseId][`tpe_${tpeId}`] = value;
+                    data.caisse[caisseId][tpeId] = value;
                  } else {
                     data[key] = value;
                  }
@@ -38,7 +38,6 @@ function saveStateToSession() {
         }
         sessionStorage.setItem('calculatorFormData', JSON.stringify(data));
         hasUnsavedChanges = false;
-        console.log('[Calculator] État sauvegardé dans la session.');
     }
 }
 
@@ -60,48 +59,25 @@ async function fetchCalculatorConfig() {
 function renderCalculatorUI() {
     const page = calculatorPageElement();
     if (!page) return;
-
     const tabSelector = page.querySelector('.tab-selector');
     const ecartContainer = page.querySelector('.ecart-display-container');
     const caissesContainer = page.querySelector('#caisses-content-container');
-    
     let tabsHtml = '', contentHtml = '', ecartsHtml = '';
-
     Object.entries(config.nomsCaisses).forEach(([id, nom], index) => {
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
-        
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
-        
-        const tpePourCaisse = config.terminaux_paiement 
-            ? Object.entries(config.terminaux_paiement).filter(([,tpe]) => tpe.caisse_id.toString() === id)
-            : [];
-
-        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="form-group"><label>${tpe.nom}</label><input type="text" data-caisse-id="${id}" id="tpe_${tpeId}_${id}" name="tpe_${tpeId}_${id}"></div>`).join('');
-
-        contentHtml += `
-            <div id="caisse${id}" class="caisse-tab-content ${isActive}">
-                <div class="grid grid-3" style="margin-bottom:20px;">
-                    <div class="form-group"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div>
-                    <div class="form-group"><label>Ventes du Jour</label><input type="text" data-caisse-id="${id}" id="ventes_${id}" name="caisse[${id}][ventes]"></div>
-                    <div class="form-group"><label>Rétrocessions</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
-                </div>
-                <div class="payment-method-tabs">
-                    <div class="payment-method-selector">
-                        <button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>
-                        ${tpeHtml ? `<button type="button" class="payment-tab-link" data-payment-tab="cb_${id}"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>` : ''}
-                    </div>
-                    <div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>
-                    ${tpeHtml ? `<div id="cb_${id}" class="payment-tab-content"><div class="grid">${tpeHtml}</div></div>` : ''}
-                </div>
-            </div>`;
+        const tpePourCaisse = config.terminaux_paiement ? Object.entries(config.terminaux_paiement).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
+        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
+            const fieldId = `tpe_${tpeId}_${id}`;
+            const fieldName = `caisse[${id}][${fieldId}]`;
+            return `<div class="form-group"><label>${tpe.nom}</label><input type="text" data-caisse-id="${id}" id="${fieldId}" name="${fieldName}"></div>`
+        }).join('');
+        contentHtml += `<div id="caisse${id}" class="caisse-tab-content ${isActive}"><div class="grid grid-3" style="margin-bottom:20px;"><div class="form-group"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div><div class="form-group"><label>Ventes du Jour</label><input type="text" data-caisse-id="${id}" id="ventes_${id}" name="caisse[${id}][ventes]"></div><div class="form-group"><label>Rétrocessions</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div></div><div class="payment-method-tabs"><div class="payment-method-selector"><button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>${tpeHtml ? `<button type="button" class="payment-tab-link" data-payment-tab="cb_${id}"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>` : ''}</div><div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>${tpeHtml ? `<div id="cb_${id}" class="payment-tab-content"><div class="grid">${tpeHtml}</div></div>` : ''}</div></div>`;
     });
-    
-    tabSelector.innerHTML = tabsHtml;
-    ecartContainer.innerHTML = ecartsHtml;
-    caissesContainer.innerHTML = contentHtml;
+    tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
 }
 
 
@@ -146,22 +122,18 @@ function updateEcartDisplay(id, ecart) {
     }
 }
 
-function handleWebSocketMessage(event) {
-    try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'cloture_locked_caisses') {
+function handleWebSocketMessage(data) {
+    switch (data.type) {
+        case 'cloture_locked_caisses':
             updateClotureUI(data);
-            return;
-        }
-        
-        if (data.type === 'welcome') {
+            break;
+        case 'welcome':
             wsResourceId = data.resourceId.toString();
             initializeCloture(config, wsResourceId);
-            return;
-        }
-
-        if (data.type === 'full_form_state') {
+            // CORRECTION : Le bouton est activé ici, une fois qu'on a la certitude que la connexion est prête.
+            setClotureReady(true); 
+            break;
+        case 'full_form_state':
             if (Object.keys(data.state).length > 0) {
                 for (const id in data.state) {
                     const field = document.getElementById(id);
@@ -169,17 +141,17 @@ function handleWebSocketMessage(event) {
                 }
                 calculateAll();
             }
-            return;
-        }
-
-        if (data.id && document.activeElement.id !== data.id) {
-            const input = document.getElementById(data.id);
-            if (input) {
-                input.value = data.value;
-                calculateAll();
+            break;
+        case 'update':
+             if (data.id && document.activeElement.id !== data.id) {
+                const input = document.getElementById(data.id);
+                if (input) {
+                    input.value = data.value;
+                    calculateAll();
+                }
             }
-        }
-    } catch (e) { console.error("Erreur WebSocket:", e); }
+            break;
+    }
 }
 
 function attachEventListeners() {
@@ -190,7 +162,7 @@ function attachEventListeners() {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
             hasUnsavedChanges = true;
             calculateAll();
-            sendWsMessage({ id: e.target.id, value: e.target.value });
+            sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
         }
     });
     
@@ -220,7 +192,7 @@ function attachEventListeners() {
     const form = document.getElementById('caisse-form');
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        saveStateToSession(); // Sauvegarde avant d'envoyer
+        saveStateToSession();
         const saveButton = form.querySelector('button[type="submit"]');
         saveButton.disabled = true;
         saveButton.textContent = 'Enregistrement...';
@@ -240,38 +212,45 @@ function attachEventListeners() {
 
 export async function initializeCalculator() {
     try {
+        // CORRECTION : On s'assure que le bouton est et reste désactivé si on quitte la page
+        setClotureReady(false);
+
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
 
-        const savedData = sessionStorage.getItem('calculatorFormData');
-        const dataToLoad = savedData ? JSON.parse(savedData) : null;
-
-        if (dataToLoad) {
+        const sessionData = sessionStorage.getItem('calculatorFormData');
+        if (sessionData) {
+            const dataToLoad = JSON.parse(sessionData);
             document.getElementById('nom_comptage').value = dataToLoad.nom_comptage || '';
             document.getElementById('explication').value = dataToLoad.explication || '';
             for (const caisseId in dataToLoad.caisse) {
-                if (!config.nomsCaisses[caisseId]) continue;
-                for(const key in dataToLoad.caisse[caisseId]) {
-                    const field = document.getElementById(`${key}_${caisseId}`);
-                    if (field) field.value = dataToLoad.caisse[caisseId][key];
+                if (config.nomsCaisses[caisseId]) {
+                    for (const key in dataToLoad.caisse[caisseId]) {
+                        const field = document.getElementById(key);
+                        if (field) {
+                            field.value = dataToLoad.caisse[caisseId][key];
+                        }
+                    }
                 }
             }
         }
-
-        attachEventListeners();
+        
         calculateAll();
         
-        await initializeWebSocket(handleWebSocketMessage);
+        // La page du calculateur définit son propre gestionnaire de messages pour le WebSocket global
+        setActiveMessageHandler(handleWebSocketMessage);
         
-        // Attache la fonction de sauvegarde au routeur pour qu'elle soit appelée avant de changer de page
+        // Les écouteurs d'événements sont attachés
+        attachEventListeners();
+        
         const mainContent = document.getElementById('main-content');
         if (mainContent) {
             mainContent.beforePageChange = saveStateToSession;
         }
         window.addEventListener('beforeunload', saveStateToSession);
 
-
     } catch (error) {
+        console.error("Erreur critique lors de l'initialisation du calculateur :", error);
         const mainContent = document.getElementById('main-content');
         mainContent.innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;
     }
