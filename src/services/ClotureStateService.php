@@ -24,12 +24,33 @@ class ClotureStateService {
     }
 
     public function lockCaisse($caisseId, $lockedBy) {
-        $status = $this->getCaisseStatus($caisseId);
-        if ($status['status'] !== 'open') {
+        // Première tentative : Mettre à jour la caisse si elle existe et est ouverte.
+        // Cette opération est atomique et empêche les conditions de concurrence.
+        $stmt_update = $this->pdo->prepare(
+            "UPDATE cloture_status SET status='locked', locked_by_ws_id=?
+             WHERE caisse_id = ? AND status = 'open'"
+        );
+        $stmt_update->execute([$lockedBy, $caisseId]);
+
+        // Si la mise à jour a fonctionné (1 ligne affectée), le verrou est posé.
+        if ($stmt_update->rowCount() > 0) {
+            return true;
+        }
+
+        // Si la mise à jour a échoué, soit la caisse n'existe pas dans la table,
+        // soit elle n'était pas ouverte. On tente de l'insérer.
+        try {
+            $stmt_insert = $this->pdo->prepare(
+                "INSERT INTO cloture_status (caisse_id, status, locked_by_ws_id)
+                 VALUES (?, 'locked', ?)"
+            );
+            // L'insertion réussira uniquement si la caisse n'existe pas déjà.
+            return $stmt_insert->execute([$caisseId, $lockedBy]);
+        } catch (PDOException $e) {
+            // Si l'insertion échoue (typiquement à cause d'une clé dupliquée
+            // si un autre processus l'a insérée entre-temps), la prise de verrou échoue.
             return false;
         }
-        $stmt = $this->pdo->prepare("INSERT INTO cloture_status (caisse_id, status, locked_by_ws_id) VALUES (?, 'locked', ?) ON DUPLICATE KEY UPDATE status='locked', locked_by_ws_id=?");
-        return $stmt->execute([$caisseId, $lockedBy, $lockedBy]);
     }
 
     public function unlockCaisse($caisseId) {
