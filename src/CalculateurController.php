@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Version avec sauvegarde des retraits)
+// Fichier : src/CalculateurController.php (Mis à jour pour le nouvel assistant de clôture)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -129,43 +129,48 @@ class CalculateurController {
     public function cloture() {
         header('Content-Type: application/json');
         try {
-            $caisse_id_a_cloturer = intval($_POST['caisse_id_a_cloturer'] ?? 0);
-            if ($caisse_id_a_cloturer === 0) throw new Exception("ID de caisse invalide.");
+            $caisses_a_cloturer = $_POST['caisses_a_cloturer'] ?? [];
+            if (empty($caisses_a_cloturer)) throw new Exception("Aucune caisse sélectionnée pour la clôture.");
 
             $this->pdo->beginTransaction();
-            $nom_cloture = "Clôture Caisse " . ($this->noms_caisses[$caisse_id_a_cloturer] ?? $caisse_id_a_cloturer) . " du " . date('Y-m-d H:i:s');
-            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-            $stmt->execute([$nom_cloture, "Clôture quotidienne.", date('Y-m-d H:i:s')]);
-            $comptage_id_cloture = $this->pdo->lastInsertId();
-            
-            $caisse_data = $_POST['caisse'][$caisse_id_a_cloturer] ?? [];
-            if (!empty($caisse_data)) {
-                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                $stmt_details->execute([$comptage_id_cloture, $caisse_id_a_cloturer, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
-                $comptage_detail_id = $this->pdo->lastInsertId();
 
-                foreach ($this->denominations as $type => $list) {
-                    foreach ($list as $name => $value) {
-                        $quantite = get_numeric_value($caisse_data, $name);
-                        if ($quantite > 0) {
-                            $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
-                            $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
+            foreach($caisses_a_cloturer as $caisse_id) {
+                $caisse_id = intval($caisse_id);
+                $nom_cloture = "Clôture Caisse " . ($this->noms_caisses[$caisse_id] ?? $caisse_id) . " du " . date('Y-m-d H:i:s');
+                $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+                $stmt->execute([$nom_cloture, "Clôture quotidienne.", date('Y-m-d H:i:s')]);
+                $comptage_id_cloture = $this->pdo->lastInsertId();
+                
+                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
+                if (!empty($caisse_data)) {
+                    $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+                    $stmt_details->execute([$comptage_id_cloture, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
+                    $comptage_detail_id = $this->pdo->lastInsertId();
+
+                    foreach ($this->denominations as $type => $list) {
+                        foreach ($list as $name => $value) {
+                            $quantite = get_numeric_value($caisse_data, $name);
+                            if ($quantite > 0) {
+                                $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                                $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
+                            }
+                        }
+                    }
+                    
+                    $retraits_data = $_POST['retraits'][$caisse_id] ?? [];
+                    foreach ($retraits_data as $denom_name => $quantity) {
+                        if (intval($quantity) > 0) {
+                            $stmt_retrait = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
+                            $stmt_retrait->execute([$comptage_detail_id, $denom_name, intval($quantity)]);
                         }
                     }
                 }
-                
-                // --- AJOUT : Sauvegarde des retraits pour la caisse unique ---
-                $retraits_data = $_POST['retraits'][$caisse_id_a_cloturer] ?? [];
-                foreach ($retraits_data as $denom_name => $quantity) {
-                    if (intval($quantity) > 0) {
-                        $stmt_retrait = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
-                        $stmt_retrait->execute([$comptage_detail_id, $denom_name, intval($quantity)]);
-                    }
-                }
+                $this->clotureStateService->confirmCaisse($caisse_id);
             }
+            
             $this->pdo->commit();
-            $this->clotureStateService->confirmCaisse($caisse_id_a_cloturer);
-            echo json_encode(['success' => true, 'message' => "La caisse a été clôturée."]);
+            echo json_encode(['success' => true, 'message' => "La ou les caisses ont été clôturées."]);
+
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             http_response_code(500);
@@ -207,7 +212,6 @@ class CalculateurController {
                     }
                 }
 
-                // --- AJOUT : Sauvegarde des retraits pour la clôture générale ---
                 $retraits_data = $_POST['retraits'][$caisse_id] ?? [];
                 foreach ($retraits_data as $denom_name => $quantity) {
                     if (intval($quantity) > 0) {

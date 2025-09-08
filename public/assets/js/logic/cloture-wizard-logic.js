@@ -1,16 +1,15 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (CORRIGÉ)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Amélioré avec étape de comptage)
 
 import { sendWsMessage } from './websocket-service.js';
 
 // --- Variables d'état de l'assistant ---
 let config = {};
-let closedCaisses = [];
-let calculatorData = {}; // NOUVEAU: Stockera les données du formulaire du calculateur
+let wsResourceId = null;
+let calculatorData = {}; // Stockera les données du formulaire du calculateur
 let wizardState = {
     currentStep: 1,
     selectedCaisses: [], // IDs des caisses à clôturer
     confirmedData: {},   // Données validées pour chaque caisse
-    currentIndex: 0     // Index de la caisse en cours de revue
 };
 
 // --- Fonctions Utilitaires ---
@@ -20,13 +19,10 @@ const parseLocaleFloat = (str) => parseFloat(String(str || '0').replace(',', '.'
 // --- API ---
 async function fetchInitialData() {
     const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
-    const clotureStatePromise = fetch('index.php?route=cloture/get_state').then(res => res.json());
-    const [conf, clotureState] = await Promise.all([configPromise, clotureStatePromise]);
+    const [conf] = await Promise.all([configPromise]);
     
     config = conf;
-    closedCaisses = clotureState.closed_caisses.map(String) || [];
     
-    // NOUVEAU: Charger les données depuis sessionStorage
     const savedData = sessionStorage.getItem('calculatorFormData');
     if (savedData) {
         calculatorData = JSON.parse(savedData);
@@ -35,51 +31,25 @@ async function fetchInitialData() {
     }
 }
 
+// --- Logique de calcul ---
+function calculateAllForCaisse(caisseId) {
+    if (!calculatorData.caisse || !calculatorData.caisse[caisseId]) return;
 
-/**
- * CORRIGÉ : Cette fonction est maintenant définie avant d'être utilisée.
- * Génère le HTML pour afficher la table des suggestions de retrait.
- * @param {array} suggestions Le tableau des suggestions calculées.
- * @param {number} total Le montant total à retirer.
- * @returns {string} Le code HTML de la table.
- */
-function renderSuggestionTable(suggestions, total) {
-    if (suggestions.length === 0) {
-        return '<p class="status-ok" style="text-align:center; padding: 10px;">Aucun retrait nécessaire pour optimiser le fond de caisse.</p>';
+    let totalCompte = 0;
+    const allDenoms = {...(config.denominations.billets || {}), ...(config.denominations.pieces || {})};
+    
+    for (const name in allDenoms) {
+        const quantite = parseInt(calculatorData.caisse[caisseId][name], 10) || 0;
+        totalCompte += quantite * parseFloat(allDenoms[name]);
     }
 
-    const rows = suggestions.map(s => {
-        const label = s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`;
-        return `<tr>
-                    <td>${label}</td>
-                    <td style="text-align: right;">${s.qty}</td>
-                    <td style="text-align: right;">${formatCurrency(s.total)}</td>
-                </tr>`;
-    }).join('');
+    const fondDeCaisse = parseLocaleFloat(calculatorData.caisse[caisseId].fond_de_caisse);
+    const ventes = parseLocaleFloat(calculatorData.caisse[caisseId].ventes);
+    const retrocession = parseLocaleFloat(calculatorData.caisse[caisseId].retrocession);
+    const ecart = (totalCompte - fondDeCaisse) - (ventes + retrocession);
 
-    return `
-        <div class="table-responsive">
-            <table class="modal-details-table">
-                <thead>
-                    <tr>
-                        <th>Dénomination</th>
-                        <th style="text-align: right;">Quantité à retirer</th>
-                        <th style="text-align: right;">Valeur</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="2"><strong>Total à retirer</strong></td>
-                        <td style="text-align: right;"><strong>${formatCurrency(total)}</strong></td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>`;
+    updateEcartDisplay(caisseId, ecart);
 }
-
-
-// --- Logique de calcul (CORRIGÉE pour utiliser les données en mémoire) ---
 
 function calculateWithdrawalSuggestion(caisseId) {
     const suggestions = [];
@@ -103,30 +73,35 @@ function calculateWithdrawalSuggestion(caisseId) {
     return { suggestions, totalToWithdraw };
 }
 
-function calculateCaisseDataForConfirmation(caisseId) {
-    let totalCompte = 0;
-    const caisseData = calculatorData.caisse?.[caisseId] || {};
-    const allDenoms = {...(config.denominations?.billets || {}), ...(config.denominations?.pieces || {})};
-    for (const name in allDenoms) {
-        totalCompte += (parseInt(caisseData[name], 10) || 0) * allDenoms[name];
+// --- Fonctions de Rendu ---
+
+function updateEcartDisplay(id, ecart) {
+    const display = document.getElementById(`ecart-display-caisse${id}`);
+    if (!display) return;
+    const valueSpan = display.querySelector('.ecart-value');
+    display.classList.remove('ecart-ok', 'ecart-positif', 'ecart-negatif');
+    if (valueSpan) valueSpan.textContent = formatCurrency(ecart);
+    if (Math.abs(ecart) < 0.01) {
+        display.classList.add('ecart-ok');
+    } else if (ecart > 0) {
+        display.classList.add('ecart-positif');
+    } else {
+        display.classList.add('ecart-negatif');
     }
-    
-    const fondDeCaisse = parseLocaleFloat(caisseData.fond_de_caisse);
-    const ventes = parseLocaleFloat(caisseData.ventes);
-    const retrocession = parseLocaleFloat(caisseData.retrocession);
-    const recetteReelle = totalCompte - fondDeCaisse;
-    const ecart = recetteReelle - (ventes + retrocession);
-    return { recetteReelle, ecart, totalCompte, fondDeCaisse };
 }
 
-// --- Fonctions de Rendu des Étapes (inchangées, mais utiliseront les fonctions de calcul corrigées) ---
+function renderSuggestionTable(suggestions, total) {
+    if (suggestions.length === 0) return '<p class="status-ok">Aucun retrait nécessaire.</p>';
+    const rows = suggestions.map(s => `<tr><td>${s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`}</td><td class="text-right">${s.qty}</td><td class="text-right">${formatCurrency(s.total)}</td></tr>`).join('');
+    return `<div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2"><strong>Total à retirer</strong></td><td class="text-right"><strong>${formatCurrency(total)}</strong></td></tr></tfoot></table></div>`;
+}
 
 function renderStep1_Selection() {
     const container = document.querySelector('.wizard-content');
-    const availableCaisses = Object.entries(config.nomsCaisses).filter(([id]) => !closedCaisses.includes(id));
+    const availableCaisses = Object.entries(config.nomsCaisses);
     
     if (availableCaisses.length === 0) {
-        container.innerHTML = `<div class="wizard-step-content"><p class="status-ok">Toutes les caisses ont déjà été clôturées pour aujourd'hui.</p></div>`;
+        container.innerHTML = `<div class="wizard-step-content"><p class="status-ok">Aucune caisse n'est configurée.</p></div>`;
         document.getElementById('wizard-next-btn').disabled = true;
         return;
     }
@@ -134,98 +109,80 @@ function renderStep1_Selection() {
     const caissesHtml = availableCaisses.map(([id, nom]) => `
         <label class="caisse-selection-item">
             <input type="checkbox" name="caisseSelection" value="${id}">
-            <div class="caisse-info">
-                <i class="fa-solid fa-cash-register"></i>
-                <span>${nom}</span>
-            </div>
+            <div class="caisse-info"><i></i><span>${nom}</span></div>
         </label>
     `).join('');
 
-    container.innerHTML = `
-        <div class="wizard-step-content" id="step-1-content">
-            <h3>Sélectionnez les caisses à clôturer</h3>
-            <div class="caisse-selection-grid">${caissesHtml}</div>
-        </div>
-    `;
+    container.innerHTML = `<div class="wizard-step-content" id="step-1-content"><h3>Sélectionnez les caisses à clôturer</h3><div class="caisse-selection-grid">${caissesHtml}</div></div>`;
     
     container.querySelector('.caisse-selection-grid').addEventListener('change', () => {
-        const selected = container.querySelectorAll('input[name="caisseSelection"]:checked').length;
-        document.getElementById('wizard-next-btn').disabled = selected === 0;
+        document.getElementById('wizard-next-btn').disabled = container.querySelectorAll('input:checked').length === 0;
     });
 }
 
-function renderStep2_Review() {
+function renderStep2_Counting() {
     const container = document.querySelector('.wizard-content');
-    const caisseId = wizardState.selectedCaisses[wizardState.currentIndex];
-    const caisseNom = config.nomsCaisses[caisseId];
+    let tabsHtml = '', contentHtml = '', ecartsHtml = '';
 
-    const data = calculateCaisseDataForConfirmation(caisseId);
-    const { suggestions, totalToWithdraw } = calculateWithdrawalSuggestion(caisseId);
+    wizardState.selectedCaisses.forEach((id, index) => {
+        const nom = config.nomsCaisses[id];
+        const isActive = index === 0 ? 'active' : '';
+        tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}">${nom}</button>`;
+        ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span></div>`;
+        
+        const caisseData = calculatorData.caisse[id];
+        const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" name="caisse[${id}][${name}]" value="${caisseData[name] || ''}" min="0"></div>`).join('');
+        const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" name="caisse[${id}][${name}]" value="${caisseData[name] || ''}" min="0"></div>`).join('');
 
-    wizardState.confirmedData[caisseId] = {
-        summary: data,
-        withdrawals: suggestions,
-        totalToWithdraw: totalToWithdraw
-    };
-
-    container.innerHTML = `
-        <div class="wizard-step-content" id="step-2-content">
-            <div class="review-header">
-                <h3>Revue de la Caisse : <strong>${caisseNom}</strong></h3>
-                <span class="step-indicator">Caisse ${wizardState.currentIndex + 1} sur ${wizardState.selectedCaisses.length}</span>
+        contentHtml += `<div id="caisse${id}" class="caisse-tab-content ${isActive}">
+            <div class="grid grid-3">
+                <div class="form-group"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" name="caisse[${id}][fond_de_caisse]" value="${caisseData.fond_de_caisse || ''}"></div>
+                <div class="form-group"><label>Ventes</label><input type="text" data-caisse-id="${id}" name="caisse[${id}][ventes]" value="${caisseData.ventes || ''}"></div>
+                <div class="form-group"><label>Rétrocessions</label><input type="text" data-caisse-id="${id}" name="caisse[${id}][retrocession]" value="${caisseData.retrocession || ''}"></div>
             </div>
-            <div class="review-grid">
-                <div class="review-summary card">
-                    <h4>Résumé du comptage</h4>
-                    <div class="summary-line"><span>Recette réelle :</span> <strong>${formatCurrency(data.recetteReelle)}</strong></div>
-                    <div class="summary-line"><span>Écart constaté :</span> <strong>${formatCurrency(data.ecart)}</strong></div>
-                </div>
-                <div class="review-withdrawal card">
-                    <h4>Suggestion de retrait</h4>
-                    ${renderSuggestionTable(suggestions, totalToWithdraw)}
-                </div>
-            </div>
-        </div>
-    `;
-}
+            <h4>Billets</h4><div class="grid">${billets}</div><h4>Pièces</h4><div class="grid">${pieces}</div>
+        </div>`;
+    });
 
-function renderStep3_FinalSummary() {
-    const container = document.querySelector('.wizard-content');
-    let grandTotalCompte = 0;
+    container.innerHTML = `<div class="wizard-step-content">
+        <h3>Vérifiez et ajustez les comptages</h3>
+        <div class="tab-selector">${tabsHtml}</div>
+        <div class="ecart-display-container">${ecartsHtml}</div>
+        <div id="caisses-content-container">${contentHtml}</div>
+    </div>`;
     
-    const summaryHtml = Object.entries(wizardState.confirmedData).map(([id, data]) => {
-        grandTotalCompte += data.summary.totalCompte;
-        const caisseNom = config.nomsCaisses[id];
-        return `<div class="card"><h4>${caisseNom}</h4><p>Total compté: <strong>${formatCurrency(data.summary.totalCompte)}</strong></p></div>`;
-    }).join('');
-
-    const withdrawalsHtml = Object.entries(wizardState.confirmedData)
-        .filter(([, data]) => data.withdrawals.length > 0)
-        .map(([id, data]) => {
-            const caisseNom = config.nomsCaisses[id];
-            return `<div class="card"><h4>Retraits pour ${caisseNom}</h4>${renderSuggestionTable(data.withdrawals, data.totalToWithdraw)}</div>`;
-        }).join('');
-
-    container.innerHTML = `
-        <div class="wizard-step-content" id="step-3-content">
-            <h3>Synthèse de la Clôture</h3>
-            <div class="final-summary-grid">
-                <div>
-                    <h4>Totaux par caisse</h4>
-                    <div class="card-grid">${summaryHtml}</div>
-                    <div class="card grand-total">Total Général en Caisse: <strong>${formatCurrency(grandTotalCompte)}</strong></div>
-                </div>
-                <div>
-                    <h4>Récapitulatif des retraits</h4>
-                    ${withdrawalsHtml || '<p>Aucun retrait suggéré.</p>'}
-                </div>
-            </div>
-        </div>
-    `;
+    wizardState.selectedCaisses.forEach(id => calculateAllForCaisse(id));
 }
 
-// --- Gestionnaire Principal de l'Assistant ---
+function renderStep3_Summary() {
+    const container = document.querySelector('.wizard-content');
+    let summaryHtml = '';
 
+    wizardState.selectedCaisses.forEach(id => {
+        const nom = config.nomsCaisses[id];
+        const { suggestions, totalToWithdraw } = calculateWithdrawalSuggestion(id);
+        wizardState.confirmedData[id] = { withdrawals: suggestions, totalToWithdraw };
+
+        summaryHtml += `<div class="card">
+            <h4>Synthèse pour ${nom}</h4>
+            ${renderSuggestionTable(suggestions, totalToWithdraw)}
+        </div>`;
+    });
+    
+    container.innerHTML = `<div class="wizard-step-content"><h3>Synthèse et Suggestions de Retrait</h3>${summaryHtml}</div>`;
+}
+
+function renderStep4_Finalization() {
+    const container = document.querySelector('.wizard-content');
+    container.innerHTML = `<div class="wizard-step-content">
+        <h3>Finalisation</h3>
+        <p>Vous êtes sur le point de clôturer ${wizardState.selectedCaisses.length} caisse(s). Cette action enregistrera les comptages et les retraits dans l'historique.</p>
+        <p class="warning-text">Cette action est irréversible.</p>
+    </div>`;
+}
+
+
+// --- Gestionnaire Principal ---
 function updateWizardUI() {
     document.querySelectorAll('.step-item').forEach(stepEl => {
         stepEl.classList.remove('active');
@@ -236,27 +193,19 @@ function updateWizardUI() {
 
     switch(wizardState.currentStep) {
         case 1: renderStep1_Selection(); break;
-        case 2: renderStep2_Review(); break;
-        case 3: renderStep3_FinalSummary(); break;
+        case 2: renderStep2_Counting(); break;
+        case 3: renderStep3_Summary(); break;
+        case 4: renderStep4_Finalization(); break;
     }
-
-    const prevBtn = document.getElementById('wizard-prev-btn');
+    
+    document.getElementById('wizard-prev-btn').style.display = wizardState.currentStep > 1 ? 'inline-block' : 'none';
     const nextBtn = document.getElementById('wizard-next-btn');
-    
-    prevBtn.style.display = wizardState.currentStep > 1 ? 'inline-block' : 'none';
-    
-    if (wizardState.currentStep === 1) {
-        const selected = document.querySelectorAll('input[name="caisseSelection"]:checked').length;
-        nextBtn.disabled = selected === 0;
-        nextBtn.textContent = 'Suivant';
-    } else if (wizardState.currentStep === 2) {
-        nextBtn.disabled = false;
-        const isLastCaisse = wizardState.currentIndex === wizardState.selectedCaisses.length - 1;
-        nextBtn.textContent = isLastCaisse ? 'Voir la synthèse' : 'Confirmer et Suivant';
-    } else if (wizardState.currentStep === 3) {
-        nextBtn.disabled = false;
-        nextBtn.textContent = 'Terminer la Journée';
-    }
+    nextBtn.disabled = false;
+
+    if (wizardState.currentStep === 1) nextBtn.textContent = 'Suivant';
+    else if (wizardState.currentStep === 2) nextBtn.textContent = 'Valider les comptages';
+    else if (wizardState.currentStep === 3) nextBtn.textContent = 'Confirmer et Finaliser';
+    else if (wizardState.currentStep === 4) nextBtn.textContent = 'Terminer la Journée';
 }
 
 async function handleNextStep() {
@@ -264,125 +213,97 @@ async function handleNextStep() {
     nextBtn.disabled = true;
 
     if (wizardState.currentStep === 1) {
-        wizardState.selectedCaisses = Array.from(document.querySelectorAll('input[name="caisseSelection"]:checked')).map(cb => cb.value);
+        wizardState.selectedCaisses = Array.from(document.querySelectorAll('input:checked')).map(cb => cb.value);
+        wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
         wizardState.currentStep = 2;
-        wizardState.currentIndex = 0;
-        updateWizardUI();
     } 
     else if (wizardState.currentStep === 2) {
-        const caisseId = wizardState.selectedCaisses[wizardState.currentIndex];
-        
-        // CORRIGÉ: On construit FormData par programmation
+        wizardState.currentStep = 3;
+    }
+    else if (wizardState.currentStep === 3) {
+        wizardState.currentStep = 4;
+    }
+    else if (wizardState.currentStep === 4) {
         const formData = new FormData();
-        formData.append('caisse_id_a_cloturer', caisseId);
-        // On ajoute les données de la caisse concernée
-        for (const [key, value] of Object.entries(calculatorData.caisse[caisseId])) {
-            formData.append(`caisse[${caisseId}][${key}]`, value);
-        }
-        wizardState.confirmedData[caisseId].withdrawals.forEach(s => {
-            formData.append(`retraits[${caisseId}][${s.name}]`, s.qty);
+        wizardState.selectedCaisses.forEach(id => {
+            formData.append('caisses_a_cloturer[]', id);
+            for (const [key, value] of Object.entries(calculatorData.caisse[id])) {
+                formData.append(`caisse[${id}][${key}]`, value);
+            }
+            wizardState.confirmedData[id].withdrawals.forEach(s => {
+                formData.append(`retraits[${id}][${s.name}]`, s.qty);
+            });
         });
-
+        
         try {
             const response = await fetch('index.php?route=cloture/confirm_caisse', { method: 'POST', body: formData });
             const result = await response.json();
             if (!result.success) throw new Error(result.message);
-            
-            sendWsMessage({ type: 'cloture_caisse_confirmed', caisse_id: caisseId });
-            
-            if (wizardState.currentIndex < wizardState.selectedCaisses.length - 1) {
-                wizardState.currentIndex++;
-                updateWizardUI();
-            } else {
-                wizardState.currentStep = 3;
-                updateWizardUI();
-            }
-
-        } catch (error) {
-            alert(`Erreur lors de la confirmation de la caisse: ${error.message}`);
-            nextBtn.disabled = false;
-        }
-    } 
-    else if (wizardState.currentStep === 3) {
-        if (!confirm("Vous êtes sur le point de finaliser tous les comptages et de réinitialiser les caisses pour demain. Cette action est irréversible. Continuer ?")) {
-            nextBtn.disabled = false;
-            return;
-        }
-
-        // CORRIGÉ: On construit FormData par programmation
-        const formData = new FormData();
-        // Ajouter toutes les données de toutes les caisses
-        for (const [caisseId, caisseData] of Object.entries(calculatorData.caisse)) {
-            for (const [key, value] of Object.entries(caisseData)) {
-                formData.append(`caisse[${caisseId}][${key}]`, value);
-            }
-        }
-        // Ajouter tous les retraits
-        Object.entries(wizardState.confirmedData).forEach(([caisseId, data]) => {
-             data.withdrawals.forEach(s => {
-                formData.append(`retraits[${caisseId}][${s.name}]`, s.qty);
-             });
-        });
-
-        try {
-            const response = await fetch('index.php?route=cloture/confirm_generale', { method: 'POST', body: formData });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message);
-            alert('Clôture générale réussie ! La page va être rechargée.');
-            sessionStorage.removeItem('calculatorFormData'); // Nettoyer
+            alert('Clôture réussie !');
+            wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_caisse_confirmed', caisse_id: id }));
+            sessionStorage.removeItem('calculatorFormData');
             window.location.href = '/calculateur';
+            return;
         } catch (error) {
-            alert(`Erreur lors de la clôture générale : ${error.message}`);
-            nextBtn.disabled = false;
+            alert(`Erreur: ${error.message}`);
         }
     }
+    
+    updateWizardUI();
 }
 
 function handlePrevStep() {
     if (wizardState.currentStep === 2) {
-        if (wizardState.currentIndex > 0) {
-            wizardState.currentIndex--;
-        } else {
-            wizardState.currentStep = 1;
-            wizardState.confirmedData = {};
-        }
-        updateWizardUI();
-    } else if (wizardState.currentStep === 3) {
-        wizardState.currentStep = 2;
-        updateWizardUI();
+        wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
+        wizardState.selectedCaisses = [];
     }
+    wizardState.currentStep--;
+    updateWizardUI();
 }
 
-// --- Point d'entrée ---
-export async function initializeClotureWizard() {
+function attachWizardListeners() {
     document.getElementById('wizard-next-btn').addEventListener('click', handleNextStep);
     document.getElementById('wizard-prev-btn').addEventListener('click', handlePrevStep);
     document.getElementById('wizard-cancel-btn').addEventListener('click', () => {
-        if (confirm("Voulez-vous vraiment annuler le processus de clôture ?")) {
-            sessionStorage.removeItem('calculatorFormData'); // Nettoyer
+        if (confirm("Voulez-vous vraiment annuler ?")) {
+            wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
+            sessionStorage.removeItem('calculatorFormData');
             window.location.href = '/calculateur';
         }
     });
 
+    document.querySelector('.wizard-content').addEventListener('input', e => {
+        if (e.target.tagName === 'INPUT' && wizardState.currentStep === 2) {
+            const caisseId = e.target.dataset.caisseId;
+            const name = e.target.name;
+            const match = name.match(/caisse\[\d+\]\[(\w+)\]/);
+            if (match) {
+                calculatorData.caisse[caisseId][match[1]] = e.target.value;
+                calculateAllForCaisse(caisseId);
+            }
+        }
+    });
+
+    document.querySelector('.wizard-content').addEventListener('click', e => {
+        const btn = e.target.closest('.tab-link');
+        if (btn && wizardState.currentStep === 2) {
+            document.querySelectorAll('.tab-link, .caisse-tab-content, .ecart-display').forEach(el => el.classList.remove('active'));
+            btn.classList.add('active');
+            const tabId = btn.dataset.tab;
+            document.getElementById(tabId)?.classList.add('active');
+            document.getElementById(`ecart-display-${tabId}`)?.classList.add('active');
+        }
+    });
+}
+
+// --- Point d'entrée ---
+export async function initializeClotureWizard() {
     try {
         await fetchInitialData();
         updateWizardUI();
+        attachWizardListeners();
     } catch (error) {
-        document.querySelector('.wizard-content').innerHTML = `<p class="error">Erreur critique : ${error.message}</p>`;
+        document.querySelector('.wizard-content').innerHTML = `<p class="error">${error.message}</p>`;
         document.getElementById('wizard-next-btn').disabled = true;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

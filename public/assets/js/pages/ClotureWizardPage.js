@@ -10,9 +10,10 @@ export function renderClotureWizardPage(element) {
         <div class="wizard-header">
             <h2><i class="fa-solid fa-flag-checkered"></i> Assistant de Clôture de Journée</h2>
             <div class="wizard-steps">
-                <div class="step-item active" data-step="1"><span>1</span> Sélection des Caisses</div>
-                <div class="step-item" data-step="2"><span>2</span> Revue & Confirmation</div>
-                <div class="step-item" data-step="3"><span>3</span> Synthèse Finale</div>
+                <div class="step-item active" data-step="1"><span>1</span> Sélection</div>
+                <div class="step-item" data-step="2"><span>2</span> Comptage</div>
+                <div class="step-item" data-step="3"><span>3</span> Synthèse & Retraits</div>
+                <div class="step-item" data-step="4"><span>4</span> Finalisation</div>
             </div>
         </div>
 
