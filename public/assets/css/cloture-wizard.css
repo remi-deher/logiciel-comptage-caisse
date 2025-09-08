@@ -3,6 +3,10 @@
 #cloture-wizard-page {
     max-width: 900px;
     margin: auto;
+    background-color: var(--color-surface);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px var(--shadow-color);
 }
 
 .wizard-header {
@@ -23,9 +27,9 @@
 
 .wizard-steps {
     display: flex;
-    justify-content: space-around;
-    max-width: 600px;
-    margin: auto;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
 }
 
 .step-item {
@@ -35,6 +39,7 @@
     color: var(--color-text-muted);
     font-weight: bold;
     position: relative;
+    padding: 10px;
 }
 
 .step-item span {
@@ -61,15 +66,19 @@
 
 .wizard-content {
     background-color: var(--color-surface-alt);
-    padding: 30px;
+    padding: 20px;
     border-radius: 12px;
     min-height: 300px;
+    margin-bottom: 20px;
 }
 
 .wizard-step-content h3 {
     margin-top: 0;
     text-align: center;
     margin-bottom: 25px;
+    font-size: 1.5em;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border-light);
 }
 
 .wizard-navigation {
@@ -81,22 +90,15 @@
     border-top: 1px solid var(--color-border-light);
 }
 
-/* Étape 1: Sélection des caisses */
+
+/* --- Étape 1: Sélection --- */
 .caisse-selection-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 20px;
 }
-
-.caisse-selection-item {
-    position: relative;
-    cursor: pointer;
-}
-
-.caisse-selection-item input[type="checkbox"] {
-    display: none;
-}
-
+.caisse-selection-item { position: relative; cursor: pointer; }
+.caisse-selection-item input[type="checkbox"] { display: none; }
 .caisse-selection-item .caisse-info {
     background-color: var(--color-surface);
     border: 2px solid var(--color-border-light);
@@ -104,72 +106,59 @@
     padding: 25px;
     text-align: center;
     transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
 }
-
-.caisse-selection-item .caisse-info i {
-    font-size: 2em;
-    margin-bottom: 10px;
-    color: var(--color-primary);
-}
-
-.caisse-selection-item .caisse-info span {
-    font-size: 1.1em;
-    font-weight: bold;
-    display: block;
-}
-
+.caisse-selection-item .caisse-info i { font-size: 2em; color: var(--color-primary); }
+.caisse-selection-item .caisse-info span { font-size: 1.1em; font-weight: bold; }
 .caisse-selection-item input:checked + .caisse-info {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--color-primary-light);
+    box-shadow: 0 4px 15px var(--shadow-color);
     transform: translateY(-5px);
 }
 
-/* Étape 2: Revue */
-.review-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
+/* --- Étape 2: Comptage (Styles du calculateur) --- */
+.tab-selector { border-bottom: 2px solid var(--color-border-light); margin-bottom: 20px; display: flex; flex-wrap: wrap; }
+.tab-link { background: transparent; border: none; border-bottom: 3px solid transparent; padding: 12px 18px; cursor: pointer; font-size: 1.1em; color: var(--color-text-secondary); transition: all 0.2s; }
+.tab-link.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+.caisse-tab-content { display: none; }
+.caisse-tab-content.active { display: block; }
+.ecart-display-container { text-align: center; margin-bottom: 20px; }
+.ecart-display { display: none; padding: 15px; border-radius: 8px; font-size: 1.1em; }
+.ecart-display.active { display: block; }
+.ecart-display .ecart-value { font-size: 1.5em; display: block; margin-bottom: 5px; font-weight: bold; }
+.ecart-explanation { font-size: 0.9em; font-style: italic; color: var(--color-text-secondary); }
+.ecart-ok { background-color: rgba(39, 174, 96, 0.1); color: #27ae60; }
+.ecart-positif { background-color: rgba(243, 156, 18, 0.1); color: #f39c12; }
+.ecart-negatif { background-color: rgba(192, 57, 43, 0.1); color: #c0392b; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.total-line { display: block; text-align: right; margin-top: 5px; font-size: 0.9em; color: var(--color-text-secondary); min-height: 1.2em; }
 
-.review-header .step-indicator {
-    background-color: var(--color-surface);
-    padding: 5px 10px;
-    border-radius: 15px;
-    font-size: 0.9em;
-    font-weight: bold;
-}
 
-.review-grid {
-    display: grid;
-    grid-template-columns: 1fr 1.5fr;
-    gap: 25px;
-}
-
-.review-summary .summary-line {
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--color-border-light);
-}
-
-/* Étape 3: Synthèse */
+/* --- Étape 3 & 4 --- */
 .final-summary-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 30px;
 }
-.card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 15px;
+.card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    padding: 20px;
     margin-bottom: 15px;
 }
-.grand-total {
-    text-align: center;
-    padding: 20px;
-    font-size: 1.2em;
-    background-color: var(--color-success-light);
-    border: 1px solid var(--color-success);
-    color: var(--color-success-dark);
+.card h4 {
+    margin-top: 0;
+    border-bottom: 1px solid var(--color-border-light);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+@media (min-width: 768px) {
+    .final-summary-grid {
+        grid-template-columns: 1fr 1fr;
+    }
 }
