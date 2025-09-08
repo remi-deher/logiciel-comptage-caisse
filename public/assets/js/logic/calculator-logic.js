@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Complète et Corrigée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version finale avec sauvegarde de session)
 
 import { initializeWebSocket, sendWsMessage } from './websocket-service.js';
 import { initializeCloture, updateClotureUI } from './cloture-logic.js';
@@ -8,22 +8,40 @@ let wsResourceId = null;
 let hasUnsavedChanges = false;
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
-async function triggerAutosave() {
+/**
+ * Sauvegarde l'état actuel du formulaire dans le sessionStorage du navigateur.
+ * C'est cette fonction qui permet à l'assistant de récupérer les données.
+ */
+function saveStateToSession() {
     const form = document.getElementById('caisse-form');
-    if (hasUnsavedChanges && form) {
+    if (form) {
         const formData = new FormData(form);
-        try {
-            await fetch('index.php?route=calculateur/autosave', {
-                method: 'POST',
-                body: formData,
-                keepalive: true
-            });
-            hasUnsavedChanges = false;
-        } catch (e) {
-            console.error('[Autosave] Erreur réseau.', e);
+        const data = {};
+        for (const [key, value] of formData.entries()) {
+            const match = key.match(/(\w+)\[(\d+)\]\[(\w+)\]/);
+            if (match) {
+                const [, mainKey, id, subKey] = match;
+                if (!data[mainKey]) data[mainKey] = {};
+                if (!data[mainKey][id]) data[mainKey][id] = {};
+                data[mainKey][id][subKey] = value;
+            } else {
+                 const tpeMatch = key.match(/tpe_(\d+)_(\d+)/);
+                 if (tpeMatch) {
+                    const [, tpeId, caisseId] = tpeMatch;
+                    if (!data.caisse) data.caisse = {};
+                    if (!data.caisse[caisseId]) data.caisse[caisseId] = {};
+                    data.caisse[caisseId][`tpe_${tpeId}`] = value;
+                 } else {
+                    data[key] = value;
+                 }
+            }
         }
+        sessionStorage.setItem('calculatorFormData', JSON.stringify(data));
+        hasUnsavedChanges = false;
+        console.log('[Calculator] État sauvegardé dans la session.');
     }
 }
+
 
 const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(amount);
 const parseLocaleFloat = (str) => {
@@ -42,18 +60,27 @@ async function fetchCalculatorConfig() {
 function renderCalculatorUI() {
     const page = calculatorPageElement();
     if (!page) return;
+
     const tabSelector = page.querySelector('.tab-selector');
     const ecartContainer = page.querySelector('.ecart-display-container');
     const caissesContainer = page.querySelector('#caisses-content-container');
+    
     let tabsHtml = '', contentHtml = '', ecartsHtml = '';
+
     Object.entries(config.nomsCaisses).forEach(([id, nom], index) => {
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
-        const billets = Object.entries(config.denominations.billets).map(([name, v]) => `
-            <div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
-        const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `
-            <div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
+        
+        const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
+        const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
+        
+        const tpePourCaisse = config.terminaux_paiement 
+            ? Object.entries(config.terminaux_paiement).filter(([,tpe]) => tpe.caisse_id.toString() === id)
+            : [];
+
+        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="form-group"><label>${tpe.nom}</label><input type="text" data-caisse-id="${id}" id="tpe_${tpeId}_${id}" name="tpe_${tpeId}_${id}"></div>`).join('');
+
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
                 <div class="grid grid-3" style="margin-bottom:20px;">
@@ -61,13 +88,22 @@ function renderCalculatorUI() {
                     <div class="form-group"><label>Ventes du Jour</label><input type="text" data-caisse-id="${id}" id="ventes_${id}" name="caisse[${id}][ventes]"></div>
                     <div class="form-group"><label>Rétrocessions</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
                 </div>
-                <h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div>
+                <div class="payment-method-tabs">
+                    <div class="payment-method-selector">
+                        <button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>
+                        ${tpeHtml ? `<button type="button" class="payment-tab-link" data-payment-tab="cb_${id}"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>` : ''}
+                    </div>
+                    <div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>
+                    ${tpeHtml ? `<div id="cb_${id}" class="payment-tab-content"><div class="grid">${tpeHtml}</div></div>` : ''}
+                </div>
             </div>`;
     });
+    
     tabSelector.innerHTML = tabsHtml;
     ecartContainer.innerHTML = ecartsHtml;
     caissesContainer.innerHTML = contentHtml;
 }
+
 
 function calculateAll() {
     if (!config.nomsCaisses) return;
@@ -129,9 +165,7 @@ function handleWebSocketMessage(event) {
             if (Object.keys(data.state).length > 0) {
                 for (const id in data.state) {
                     const field = document.getElementById(id);
-                    if (field) {
-                        field.value = data.state[id];
-                    }
+                    if (field) field.value = data.state[id];
                 }
                 calculateAll();
             }
@@ -146,14 +180,6 @@ function handleWebSocketMessage(event) {
             }
         }
     } catch (e) { console.error("Erreur WebSocket:", e); }
-}
-
-function initializeAutosave() {
-    window.addEventListener('beforeunload', () => {
-        if (hasUnsavedChanges) {
-             triggerAutosave();
-        }
-    });
 }
 
 function attachEventListeners() {
@@ -172,9 +198,7 @@ function attachEventListeners() {
     tabSelector.addEventListener('click', e => {
         const btn = e.target.closest('.tab-link');
         if (btn) {
-            tabSelector.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
-            page.querySelectorAll('.caisse-tab-content, .ecart-display').forEach(el => el.classList.remove('active'));
-            
+            tabSelector.querySelectorAll('.tab-link, .caisse-tab-content, .ecart-display').forEach(el => el.classList.remove('active'));
             btn.classList.add('active');
             const tabId = btn.dataset.tab;
             document.getElementById(tabId)?.classList.add('active');
@@ -182,19 +206,28 @@ function attachEventListeners() {
         }
     });
 
+    page.addEventListener('click', e => {
+        const paymentTab = e.target.closest('.payment-tab-link');
+        if(paymentTab) {
+            const container = paymentTab.closest('.payment-method-tabs');
+            container.querySelectorAll('.payment-tab-link, .payment-tab-content').forEach(el => el.classList.remove('active'));
+            paymentTab.classList.add('active');
+            const tabId = paymentTab.dataset.paymentTab;
+            container.querySelector(`#${tabId}`)?.classList.add('active');
+        }
+    });
+
     const form = document.getElementById('caisse-form');
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        saveStateToSession(); // Sauvegarde avant d'envoyer
         const saveButton = form.querySelector('button[type="submit"]');
         saveButton.disabled = true;
         saveButton.textContent = 'Enregistrement...';
-
         try {
-            const formData = new FormData(form);
-            const response = await fetch('index.php?route=calculateur/save', { method: 'POST', body: formData });
+            const response = await fetch('index.php?route=calculateur/save', { method: 'POST', body: new FormData(form) });
             const result = await response.json();
             if (!result.success) throw new Error(result.message);
-            hasUnsavedChanges = false; 
             alert('Sauvegarde manuelle réussie !');
         } catch (error) {
             alert(`Erreur de sauvegarde : ${error.message}`);
@@ -210,38 +243,33 @@ export async function initializeCalculator() {
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
 
-        const initialDataResponse = await fetch('index.php?route=calculateur/get_initial_data');
-        const initialDataResult = await initialDataResponse.json();
-        if (initialDataResult.success && initialDataResult.data) {
-            const dataToLoad = initialDataResult.data;
+        const savedData = sessionStorage.getItem('calculatorFormData');
+        const dataToLoad = savedData ? JSON.parse(savedData) : null;
+
+        if (dataToLoad) {
             document.getElementById('nom_comptage').value = dataToLoad.nom_comptage || '';
             document.getElementById('explication').value = dataToLoad.explication || '';
-
-            for (const caisseId in dataToLoad) {
+            for (const caisseId in dataToLoad.caisse) {
                 if (!config.nomsCaisses[caisseId]) continue;
-                const caisseData = dataToLoad[caisseId];
-                document.getElementById(`fond_de_caisse_${caisseId}`).value = caisseData.fond_de_caisse || '';
-                document.getElementById(`ventes_${caisseId}`).value = caisseData.ventes || '';
-                document.getElementById(`retrocession_${caisseId}`).value = caisseData.retrocession || '';
-                if (caisseData.denominations) {
-                    for (const denomName in caisseData.denominations) {
-                        const denomField = document.getElementById(`${denomName}_${caisseId}`);
-                        if (denomField) denomField.value = caisseData.denominations[denomName];
-                    }
+                for(const key in dataToLoad.caisse[caisseId]) {
+                    const field = document.getElementById(`${key}_${caisseId}`);
+                    if (field) field.value = dataToLoad.caisse[caisseId][key];
                 }
             }
         }
 
         attachEventListeners();
         calculateAll();
-        initializeAutosave();
         
         await initializeWebSocket(handleWebSocketMessage);
         
+        // Attache la fonction de sauvegarde au routeur pour qu'elle soit appelée avant de changer de page
         const mainContent = document.getElementById('main-content');
         if (mainContent) {
-            mainContent.beforePageChange = triggerAutosave;
+            mainContent.beforePageChange = saveStateToSession;
         }
+        window.addEventListener('beforeunload', saveStateToSession);
+
 
     } catch (error) {
         const mainContent = document.getElementById('main-content');

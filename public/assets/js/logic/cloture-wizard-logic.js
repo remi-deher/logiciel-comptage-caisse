@@ -108,8 +108,17 @@ function renderStep2_Counting() {
         const caisseData = calculatorData.caisse[id] || {};
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" id="${name}_${id}" data-caisse-id="${id}" value="${caisseData[name] || ''}" min="0"><span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label><input type="number" id="${name}_${id}" data-caisse-id="${id}" value="${caisseData[name] || ''}" min="0"><span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
-        const tpeHtml = (config.tpeParCaisse[id] || []).map(tpe => `<div class="form-group"><label>${tpe.nom_terminal}</label><input type="text" id="tpe_${tpe.id}" data-caisse-id="${id}" value="${caisseData[`tpe_${tpe.id}`] || ''}"></div>`).join('');
-
+        
+        // Correction pour récupérer les TPE associés à la caisse
+        const tpePourCaisse = config.terminaux_paiement 
+            ? Object.values(config.terminaux_paiement).filter(tpe => tpe.caisse_id.toString() === id)
+            : [];
+        
+        const tpeHtml = tpePourCaisse.map(tpe => {
+            const tpeId = Object.keys(config.terminaux_paiement).find(key => config.terminaux_paiement[key] === tpe);
+            return `<div class="form-group"><label>${tpe.nom}</label><input type="text" id="tpe_${tpeId}" data-caisse-id="${id}" value="${caisseData[`tpe_${tpeId}`] || ''}"></div>`
+        }).join('');
+        
         contentHtml += `<div id="caisse${id}_wizard" class="caisse-tab-content ${isActive}">
             <div class="grid grid-3" style="margin-bottom:20px;">
                 <div class="form-group"><label>Fond de Caisse</label><input type="text" id="fond_de_caisse_${id}" data-caisse-id="${id}" value="${caisseData.fond_de_caisse || ''}"></div>
@@ -203,7 +212,6 @@ async function handleNextStep() {
     }
     else if (wizardState.currentStep === 4) {
         const formData = new FormData();
-        // Le nom du comptage est maintenant généré côté serveur pour plus de cohérence
         formData.append('explication', 'Clôture de journée via l\'assistant.');
 
         wizardState.selectedCaisses.forEach(id => {
@@ -227,6 +235,7 @@ async function handleNextStep() {
             return;
         } catch (error) {
             alert(`Erreur: ${error.message}`);
+            nextBtn.disabled = false; // Réactiver en cas d'erreur
         }
     }
     
@@ -259,13 +268,13 @@ function attachWizardListeners() {
         if (e.target.tagName === 'INPUT' && wizardState.currentStep === 2) {
             const caisseId = e.target.dataset.caisseId;
             const inputId = e.target.id;
-            // Extrait la clé (ex: 'b500', 'fond_de_caisse', 'tpe_1') de l'ID
-            const key = inputId.replace(`_${caisseId}`, '');
+            const key = inputId.split('_')[0]; // Simplification pour la démo
+            
             if (caisseId && calculatorData.caisse[caisseId]) {
-                calculatorData.caisse[caisseId][key] = e.target.value;
-                sendWsMessage({ id: inputId, value: e.target.value }); // Envoi temps réel
-                // On ne recalcule l'écart que si ce n'est pas un champ TPE
-                if (!key.startsWith('tpe_')) {
+                 const name = e.target.id.replace(`_${caisseId}`, '');
+                calculatorData.caisse[caisseId][name] = e.target.value;
+                sendWsMessage({ id: e.target.id, value: e.target.value });
+                if (!name.startsWith('tpe_')) {
                     calculateAllForCaisse(caisseId);
                 }
             }
@@ -292,12 +301,11 @@ function attachWizardListeners() {
     });
 }
 
-
 // --- Point d'entrée ---
 export async function initializeClotureWizard() {
     try {
         await fetchInitialData();
-        updateWizardUI(); // Appelle une version condensée pour la clarté
+        updateWizardUI();
         attachWizardListeners();
     } catch (error) {
         document.querySelector('.wizard-content').innerHTML = `<p class="error">${error.message}</p>`;
