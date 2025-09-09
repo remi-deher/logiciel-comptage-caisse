@@ -47,6 +47,10 @@
     text-align: center;
     margin-bottom: 20px;
     transition: all 0.3s ease;
+    position: sticky;
+    top: 80px; /* Positionné sous la navbar */
+    z-index: 99;
+    background-color: var(--color-surface);
 }
 .ecart-display {
     display: none;

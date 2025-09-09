@@ -125,7 +125,15 @@
 .tab-link.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 .caisse-tab-content { display: none; }
 .caisse-tab-content.active { display: block; }
-.ecart-display-container { text-align: center; margin-bottom: 20px; }
+.ecart-display-container { 
+    text-align: center; 
+    margin-bottom: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 99;
+    background-color: var(--color-surface-alt);
+    padding: 10px 0;
+}
 .ecart-display { display: none; padding: 15px; border-radius: 8px; font-size: 1.1em; }
 .ecart-display.active { display: block; }
 .ecart-display .ecart-value { font-size: 1.5em; display: block; margin-bottom: 5px; font-weight: bold; }
@@ -161,4 +169,58 @@
     .final-summary-grid {
         grid-template-columns: 1fr 1fr;
     }
+}
+
+/* --- AJOUT : Styles pour les sous-onglets des modes de paiement --- */
+.payment-method-tabs {
+    margin-top: 20px;
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: var(--color-surface);
+}
+
+.payment-method-selector {
+    display: flex;
+    background-color: var(--color-surface-alt);
+    padding: var(--space-sm);
+    gap: var(--space-sm);
+}
+
+.payment-tab-link {
+    flex: 1;
+    padding: 12px;
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.payment-tab-link.active {
+    background-color: var(--color-surface);
+    color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.payment-tab-content {
+    display: none;
+    padding: 25px;
+}
+
+.payment-tab-content.active {
+    display: block;
+    animation: fadeIn 0.5s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
