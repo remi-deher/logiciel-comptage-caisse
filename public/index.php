@@ -118,6 +118,7 @@ $routes = [
     'GET:calculateur/get_initial_data' => [$calculateurController, 'getInitialData'],
     'POST:calculateur/save' => [$calculateurController, 'save'],
     'POST:calculateur/autosave' => [$calculateurController, 'autosave'],
+    'POST:calculateur/load_from_history' => [$calculateurController, 'loadFromHistory'], // CORRECTION : Ajout de la nouvelle route
     'GET:historique/get_data' => [$historiqueController, 'getHistoriqueDataJson'],
     'POST:historique/delete' => [$historiqueController, 'delete'],
     'GET:historique/export_csv' => [$historiqueController, 'exportCsv'],

@@ -538,30 +538,31 @@ export async function initializeHistoryLogic() {
             const comptageId = target.closest('.history-card').dataset.comptageId;
             const comptageData = fullHistoryData.find(c => c.id.toString() === comptageId);
             if(comptageData && confirm(`Voulez-vous charger le comptage "${comptageData.nom_comptage}" dans le calculateur ? Le contenu non sauvegardé sera perdu.`)) {
-                // CORRECTION: Remplacement de sessionStorage par un appel backend
-                // Il est attendu que le backend ait une route `calculateur/load_from_history` qui prend un `comptage_id`,
-                // supprime l'ancienne sauvegarde auto, et en crée une nouvelle en copiant les données de l'historique.
                 const loadButton = target.closest('.load-btn');
                 loadButton.disabled = true;
                 loadButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Chargement...';
+
                 try {
                     const formData = new FormData();
                     formData.append('comptage_id', comptageId);
-                    // Idéalement, le backend gère cette logique.
-                    // await fetch('index.php?route=calculateur/load_from_history', { method: 'POST', body: formData });
                     
-                    // Pour le moment, nous allons simplement rediriger. La page du calculateur chargera la
-                    // dernière sauvegarde, qui, après une modification du backend, sera celle que nous voulons.
+                    const response = await fetch('index.php?route=calculateur/load_from_history', { method: 'POST', body: formData });
+                    const result = await response.json();
+                    
+                    if (!result.success) {
+                        throw new Error(result.message || 'Erreur inconnue lors de la préparation des données.');
+                    }
+                    
                     window.location.href = '/calculateur';
 
                 } catch (error) {
-                    alert(`Erreur lors de la préparation du chargement : ${error.message}`);
+                    alert(`Erreur lors du chargement : ${error.message}`);
                     loadButton.disabled = false;
                     loadButton.innerHTML = '<i class="fa-solid fa-download"></i> Charger';
                 }
             }
         }
-
+        
         if(target.closest('#compare-btn')) {
             renderComparisonModal();
         }
