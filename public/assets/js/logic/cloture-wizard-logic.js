@@ -257,6 +257,12 @@ function attachWizardListeners() {
         if (e.target.tagName === 'INPUT' && wizardState.currentStep === 2) {
             const caisseId = e.target.dataset.caisseId;
             const nameAttr = e.target.name;
+
+            // --- DEBUT DE LA CORRECTION ---
+            // Envoyer la mise à jour aux autres clients via WebSocket
+            sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
+            // --- FIN DE LA CORRECTION ---
+
             if (caisseId && calculatorData.caisse[caisseId] && nameAttr) {
                 const match = nameAttr.match(/\[(\w+)\]$/);
                 if (match) {
