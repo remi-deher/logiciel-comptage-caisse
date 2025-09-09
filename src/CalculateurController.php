@@ -263,20 +263,24 @@ class CalculateurController {
         try {
             $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
 
+            // CORRECTION : Une seule transaction pour toute l'opération
             $this->pdo->beginTransaction();
-            $nom_comptage = "Clôture Générale du " . date('d/m/Y');
-            $explication = "Comptage final consolidé de la journée.";
-            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-            $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
+
+            // Étape 1 : Création de l'enregistrement "Clôture Générale"
+            $nom_comptage_cg = "Clôture Générale du " . date('d/m/Y');
+            $explication_cg = "Comptage final consolidé de la journée.";
+            $stmt_cg = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt_cg->execute([$nom_comptage_cg, $explication_cg, date('Y-m-d H:i:s')]);
             $comptage_id_cloture_generale = $this->pdo->lastInsertId();
 
-            $this->pdo->beginTransaction();
+            // Étape 2 : Création de l'enregistrement "Fond de caisse J+1"
             $nom_comptage_j1 = "Fond de caisse J+1 du " . date('d/m/Y');
             $stmt_j1 = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt_j1->execute([$nom_comptage_j1, "Préparation pour la journée suivante.", date('Y-m-d H:i:s')]);
             $comptage_id_j1 = $this->pdo->lastInsertId();
 
             foreach ($this->noms_caisses as $caisse_id => $nom) {
+                // On récupère les données de la dernière clôture individuelle de la caisse
                 $stmt_latest_cloture = $this->pdo->prepare(
                     "SELECT cd.*, 
                            (SELECT GROUP_CONCAT(CONCAT(denomination_nom, ':', quantite) SEPARATOR ';') FROM comptage_denominations WHERE comptage_detail_id = cd.id) as denominations_str,
@@ -291,19 +295,21 @@ class CalculateurController {
 
                 if (!$latest_cloture_data) continue;
 
-                $stmt_details_cloture_generale = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                $stmt_details_cloture_generale->execute([$comptage_id_cloture_generale, $caisse_id, $latest_cloture_data['fond_de_caisse'], $latest_cloture_data['ventes'], $latest_cloture_data['retrocession']]);
-                $comptage_detail_id_cloture_generale = $this->pdo->lastInsertId();
+                // On remplit les détails de la "Clôture Générale"
+                $stmt_details_cg = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+                $stmt_details_cg->execute([$comptage_id_cloture_generale, $caisse_id, $latest_cloture_data['fond_de_caisse'], $latest_cloture_data['ventes'], $latest_cloture_data['retrocession']]);
+                $detail_id_cg = $this->pdo->lastInsertId();
                 
                 $denominations_array = explode(';', $latest_cloture_data['denominations_str']);
                 foreach ($denominations_array as $denom_pair) {
                     if (strpos($denom_pair, ':') !== false) {
                         list($name, $quantity) = explode(':', $denom_pair);
                         $stmt_denom_cg = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
-                        $stmt_denom_cg->execute([$comptage_detail_id_cloture_generale, $name, $quantity]);
+                        $stmt_denom_cg->execute([$detail_id_cg, $name, $quantity]);
                     }
                 }
                 
+                // On prépare les données pour J+1
                 $retraits_array = [];
                 if ($latest_cloture_data['retraits_str']) {
                     foreach (explode(';', $latest_cloture_data['retraits_str']) as $retrait_pair) {
@@ -341,15 +347,14 @@ class CalculateurController {
             }
             
             $this->clotureStateService->resetState();
-            $this->pdo->commit();
+            
+            // On valide toute la transaction
             $this->pdo->commit();
             
             echo json_encode(['success' => true, 'message' => "Clôture générale réussie ! Le fond de caisse pour le jour suivant a été préparé."]);
 
         } catch (Exception $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
+            // S'il y a une erreur, on annule tout
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
