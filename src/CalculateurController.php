@@ -32,7 +32,6 @@ class CalculateurController {
     public function getInitialData() {
         header('Content-Type: application/json');
 
-        // CORRECTION FINALE : Logique de chargement basée sur la sauvegarde la plus récente (ID le plus élevé)
         $stmt_auto = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
         $autosave = $stmt_auto->fetch();
 
@@ -42,14 +41,12 @@ class CalculateurController {
         $last_comptage = null;
 
         if ($autosave && $fond_j1) {
-            // Si les deux existent, on prend celui avec l'ID le plus grand (le plus récent)
             $last_comptage = ($autosave['id'] > $fond_j1['id']) ? $autosave : $fond_j1;
         } else if ($autosave) {
             $last_comptage = $autosave;
         } else if ($fond_j1) {
             $last_comptage = $fond_j1;
         } else {
-            // Fallback : si aucun des deux n'existe, on prend le dernier comptage manuel
             $stmt_last = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages ORDER BY id DESC LIMIT 1");
             $last_comptage = $stmt_last->fetch();
         }
@@ -206,7 +203,6 @@ class CalculateurController {
             exit;
         }
         try {
-            // CORRECTION : On supprime la sauvegarde auto AVANT toute chose
             $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
 
             $this->pdo->beginTransaction();
@@ -214,16 +210,7 @@ class CalculateurController {
             $explication = "Comptage final consolidé de la journée.";
             $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
-            $comptage_id = $this->pdo->lastInsertId();
-            
-            foreach ($this->noms_caisses as $caisse_id => $nom) {
-                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
-                if (empty($caisse_data)) continue;
-                
-                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
-            }
-            $this->pdo->commit();
+            $comptage_id_cloture_generale = $this->pdo->lastInsertId();
 
             $this->pdo->beginTransaction();
             $nom_comptage_j1 = "Fond de caisse J+1 du " . date('d/m/Y');
@@ -232,21 +219,59 @@ class CalculateurController {
             $comptage_id_j1 = $this->pdo->lastInsertId();
 
             foreach ($this->noms_caisses as $caisse_id => $nom) {
-                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
-                $retraits_data = $_POST['retraits'][$caisse_id] ?? [];
-                if (empty($caisse_data)) continue;
+                // CORRECTION : On va chercher les dernières données de clôture de la caisse dans la BDD
+                $stmt_latest_cloture = $this->pdo->prepare(
+                    "SELECT cd.*, 
+                           (SELECT GROUP_CONCAT(CONCAT(denomination_nom, ':', quantite) SEPARATOR ';') FROM comptage_denominations WHERE comptage_detail_id = cd.id) as denominations_str,
+                           (SELECT GROUP_CONCAT(CONCAT(denomination_nom, ':', quantite_retiree) SEPARATOR ';') FROM comptage_retraits WHERE comptage_detail_id = cd.id) as retraits_str
+                     FROM comptage_details cd 
+                     JOIN comptages c ON cd.comptage_id = c.id 
+                     WHERE cd.caisse_id = ? AND c.nom_comptage LIKE 'Clôture Caisse%' 
+                     ORDER BY c.id DESC LIMIT 1"
+                );
+                $stmt_latest_cloture->execute([$caisse_id]);
+                $latest_cloture_data = $stmt_latest_cloture->fetch(PDO::FETCH_ASSOC);
+
+                if (!$latest_cloture_data) continue; // Si pas de clôture pour cette caisse, on passe
+
+                // Enregistrement de la "Clôture Générale"
+                $stmt_details_cloture_generale = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+                $stmt_details_cloture_generale->execute([$comptage_id_cloture_generale, $caisse_id, $latest_cloture_data['fond_de_caisse'], $latest_cloture_data['ventes'], $latest_cloture_data['retrocession']]);
+                $comptage_detail_id_cloture_generale = $this->pdo->lastInsertId();
+                
+                $denominations_array = explode(';', $latest_cloture_data['denominations_str']);
+                foreach ($denominations_array as $denom_pair) {
+                    if (strpos($denom_pair, ':') !== false) {
+                        list($name, $quantity) = explode(':', $denom_pair);
+                        $stmt_denom_cg = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                        $stmt_denom_cg->execute([$comptage_detail_id_cloture_generale, $name, $quantity]);
+                    }
+                }
+                
+                // Préparation du "Fond de caisse J+1"
+                $retraits_array = [];
+                if ($latest_cloture_data['retraits_str']) {
+                    foreach (explode(';', $latest_cloture_data['retraits_str']) as $retrait_pair) {
+                         if (strpos($retrait_pair, ':') !== false) {
+                            list($name, $quantity) = explode(':', $retrait_pair);
+                            $retraits_array[$name] = $quantity;
+                         }
+                    }
+                }
 
                 $nouveau_fond_de_caisse = 0;
                 $nouvelles_quantites = [];
                 $all_denoms = array_merge($this->denominations['billets'], $this->denominations['pieces']);
-
-                foreach ($all_denoms as $name => $value) {
-                    $qte_initiale = intval(get_numeric_value($caisse_data, $name));
-                    $qte_retiree = intval($retraits_data[$name] ?? 0);
-                    $qte_finale = $qte_initiale - $qte_retiree;
-                    if ($qte_finale > 0) {
-                        $nouvelles_quantites[$name] = $qte_finale;
-                        $nouveau_fond_de_caisse += $qte_finale * $value;
+                
+                foreach ($denominations_array as $denom_pair) {
+                    if (strpos($denom_pair, ':') !== false) {
+                        list($name, $qte_initiale) = explode(':', $denom_pair);
+                        $qte_retiree = intval($retraits_array[$name] ?? 0);
+                        $qte_finale = intval($qte_initiale) - $qte_retiree;
+                        if ($qte_finale > 0) {
+                            $nouvelles_quantites[$name] = $qte_finale;
+                            $nouveau_fond_de_caisse += $qte_finale * floatval($all_denoms[$name]);
+                        }
                     }
                 }
                 
@@ -262,10 +287,14 @@ class CalculateurController {
             
             $this->clotureStateService->resetState();
             $this->pdo->commit();
+            $this->pdo->commit(); // Un pour chaque transaction
             
             echo json_encode(['success' => true, 'message' => "Clôture générale réussie ! Le fond de caisse pour le jour suivant a été préparé."]);
 
         } catch (Exception $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }

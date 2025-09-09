@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé pour supprimer sessionStorage)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version avec Autosave en BDD)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -246,7 +246,13 @@ async function performFinalCloture() {
 
     try {
         const form = document.getElementById('caisse-form');
-        const formData = new FormData(form);
+        const formData = new FormData();
+        // CORRECTION : On collecte manuellement les données pour inclure les champs désactivés.
+        form.querySelectorAll('input, textarea').forEach(field => {
+            if (field.name) {
+                formData.append(field.name, field.value);
+            }
+        });
 
         const response = await fetch('index.php?route=cloture/confirm_generale', {
             method: 'POST',
@@ -270,8 +276,6 @@ export async function initializeCalculator() {
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
 
-        // Le chargement se fait maintenant uniquement et toujours depuis la BDD.
-        // La logique sessionStorage a été complètement supprimée.
         try {
             const response = await fetch('index.php?route=calculateur/get_initial_data');
             const result = await response.json();
