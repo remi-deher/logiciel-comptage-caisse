@@ -162,10 +162,47 @@ function updateEcartDisplay(id, ecart) {
     else { display.classList.add('ecart-negatif'); if (explanation) explanation.textContent = "Il manque de l'argent."; }
 }
 
-function renderSuggestionTable(suggestions, total) {
-    if (suggestions.length === 0) return '<p class="status-ok">Aucun retrait nécessaire.</p>';
-    const rows = suggestions.map(s => `<tr><td>${s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`}</td><td class="text-right">${s.qty}</td><td class="text-right">${formatCurrency(s.total)}</td></tr>`).join('');
-    return `<div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2"><strong>Total</strong></td><td class="text-right"><strong>${formatCurrency(total)}</strong></td></tr></tfoot></table></div>`;
+function renderSuggestionTable(suggestions) {
+    if (!suggestions || suggestions.withdrawals.length === 0) {
+        return `
+            <div class="withdrawal-summary-card">
+                <div class="withdrawal-total-header status-ok">
+                    <div class="total-amount">0,00 €</div>
+                    <div class="total-label">Aucun retrait nécessaire</div>
+                </div>
+                <div class="withdrawal-details-list">
+                    <div class="detail-item-empty">
+                        Le fond de caisse correspond à la cible.
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    const detailRows = suggestions.withdrawals.map(s => {
+        const label = s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`;
+        return `
+            <div class="detail-item">
+                <span class="detail-item-label">
+                    <i class="fa-solid fa-money-bill-wave item-icon"></i>
+                    Retirer ${s.qty} x ${label}
+                </span>
+                <span class="detail-item-value">${formatCurrency(s.total)}</span>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="withdrawal-summary-card">
+            <div class="withdrawal-total-header">
+                <div class="total-amount">${formatCurrency(suggestions.totalToWithdraw)}</div>
+                <div class="total-label">Total à retirer de la caisse</div>
+            </div>
+            <div class="withdrawal-details-list">
+                ${detailRows}
+            </div>
+        </div>
+    `;
 }
 
 function renderStep1_Selection() {
