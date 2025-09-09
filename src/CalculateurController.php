@@ -31,20 +31,18 @@ class CalculateurController {
 
     public function getInitialData() {
         header('Content-Type: application/json');
-        $sql = "SELECT id, nom_comptage, explication FROM comptages ORDER BY CASE WHEN nom_comptage LIKE 'Sauvegarde auto%' THEN 1 WHEN nom_comptage NOT LIKE 'Fond de caisse J+1%' THEN 2 WHEN nom_comptage LIKE 'Fond de caisse J+1%' THEN 3 ELSE 4 END, date_comptage DESC LIMIT 1";
+        // REQUETE CORRIGÉE : 'Fond de caisse J+1' a la priorité absolue.
+        $sql = "SELECT id, nom_comptage, explication FROM comptages ORDER BY CASE WHEN nom_comptage LIKE 'Fond de caisse J+1%' THEN 1 WHEN nom_comptage LIKE 'Sauvegarde auto%' THEN 2 ELSE 3 END, date_comptage DESC LIMIT 1";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
         $last_comptage = $stmt->fetch();
+        
         if ($last_comptage) {
             $data = $this->loadComptageData($last_comptage['id']);
-            $nom = $last_comptage['nom_comptage'];
-            if (strpos($nom, 'Fond de caisse J+1') !== 0) {
-                $data['nom_comptage'] = $nom;
-                $data['explication'] = $last_comptage['explication'];
-            } else {
-                $data['nom_comptage'] = '';
-                $data['explication'] = '';
-            }
+            // On ajoute toujours le nom et l'explication au tableau de données
+            $data['nom_comptage'] = $last_comptage['nom_comptage'];
+            $data['explication'] = $last_comptage['explication'];
+            
             echo json_encode(['success' => true, 'data' => $data]);
         } else {
             echo json_encode(['success' => false, 'data' => null]);
@@ -130,11 +128,13 @@ class CalculateurController {
         header('Content-Type: application/json');
         try {
             $caisses_a_cloturer = $_POST['caisses_a_cloturer'] ?? [];
-            if (empty($caisses_a_cloturer)) throw new Exception("Aucune caisse sélectionnée pour la clôture.");
+            if (empty($caisses_a_cloturer)) {
+                throw new Exception("Aucune caisse sélectionnée pour la clôture.");
+            }
 
             $this->pdo->beginTransaction();
 
-            foreach($caisses_a_cloturer as $caisse_id) {
+            foreach ($caisses_a_cloturer as $caisse_id) {
                 $caisse_id = intval($caisse_id);
                 $nom_cloture = "Clôture Caisse " . ($this->noms_caisses[$caisse_id] ?? $caisse_id) . " du " . date('Y-m-d H:i:s');
                 $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
@@ -157,7 +157,7 @@ class CalculateurController {
                         }
                     }
                     
-                    $retraits_data = $_POST['retraits'][$caisse_id] ?? [];
+                    $retraits_data = isset($_POST['retraits'][$caisse_id]) && is_array($_POST['retraits'][$caisse_id]) ? $_POST['retraits'][$caisse_id] : [];
                     foreach ($retraits_data as $denom_name => $quantity) {
                         if (intval($quantity) > 0) {
                             $stmt_retrait = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
@@ -172,7 +172,9 @@ class CalculateurController {
             echo json_encode(['success' => true, 'message' => "La ou les caisses ont été clôturées."]);
 
         } catch (Exception $e) {
-            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
         }
@@ -213,30 +215,16 @@ class CalculateurController {
             $comptage_id_j1 = $this->pdo->lastInsertId();
 
             foreach ($this->noms_caisses as $caisse_id => $nom) {
-                // On récupère les données de la dernière clôture de cette caisse
-                $stmt_last = $this->pdo->prepare(
-                    "SELECT cd.id FROM comptages c JOIN comptage_details cd ON c.id = cd.comptage_id
-                     WHERE cd.caisse_id = ? AND c.nom_comptage LIKE 'Clôture Caisse%' ORDER BY c.date_comptage DESC LIMIT 1"
-                );
-                $stmt_last->execute([$caisse_id]);
-                $last_detail_id = $stmt_last->fetchColumn();
+                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
+                $retraits_data = $_POST['retraits'][$caisse_id] ?? [];
+                if (empty($caisse_data)) continue;
 
-                if (!$last_detail_id) continue;
-
-                $stmt_denoms = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
-                $stmt_denoms->execute([$last_detail_id]);
-                $denoms_data = $stmt_denoms->fetchAll(PDO::FETCH_KEY_PAIR);
-
-                $stmt_retraits = $this->pdo->prepare("SELECT denomination_nom, quantite_retiree FROM comptage_retraits WHERE comptage_detail_id = ?");
-                $stmt_retraits->execute([$last_detail_id]);
-                $retraits_data = $stmt_retraits->fetchAll(PDO::FETCH_KEY_PAIR);
-                
                 $nouveau_fond_de_caisse = 0;
                 $nouvelles_quantites = [];
                 $all_denoms = array_merge($this->denominations['billets'], $this->denominations['pieces']);
 
                 foreach ($all_denoms as $name => $value) {
-                    $qte_initiale = intval($denoms_data[$name] ?? 0);
+                    $qte_initiale = intval(get_numeric_value($caisse_data, $name));
                     $qte_retiree = intval($retraits_data[$name] ?? 0);
                     $qte_finale = $qte_initiale - $qte_retiree;
                     if ($qte_finale > 0) {

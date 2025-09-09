@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version avec logique de clôture finale centralisée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète et Corrigée)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -12,8 +12,10 @@ const calculatorPageElement = () => document.getElementById('calculator-page');
 function saveStateToSession() {
     const form = document.getElementById('caisse-form');
     if (form) {
+        console.log("[Calculator] Sauvegarde de l'état dans la session avant de quitter la page...");
         const formData = new FormData(form);
         const data = { caisse: {} };
+
         for (const [key, value] of formData.entries()) {
             const match = key.match(/caisse\[(\d+)\]\[(\w+|tpe_\d+_\d+)\]/);
             if (match) {
@@ -44,7 +46,6 @@ async function fetchCalculatorConfig() {
 }
 
 function renderCalculatorUI() {
-    // ... (Le contenu de cette fonction reste inchangé)
     const page = calculatorPageElement();
     if (!page) return;
     const tabSelector = page.querySelector('.tab-selector');
@@ -68,8 +69,8 @@ function renderCalculatorUI() {
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
 }
 
+
 function calculateAll() {
-    // ... (Le contenu de cette fonction reste inchangé)
     if (!config.nomsCaisses) return;
     Object.keys(config.nomsCaisses).forEach(id => {
         let totalCompte = 0;
@@ -92,7 +93,6 @@ function calculateAll() {
 }
 
 function updateEcartDisplay(id, ecart) {
-    // ... (Le contenu de cette fonction reste inchangé)
     const display = document.getElementById(`ecart-display-caisse${id}`);
     if (!display) return;
     const valueSpan = display.querySelector('.ecart-value');
@@ -114,16 +114,11 @@ function updateEcartDisplay(id, ecart) {
 function handleWebSocketMessage(data) {
     switch (data.type) {
         case 'cloture_locked_caisses':
-            // Étape 1 : Mettre à jour l'interface (griser les champs, etc.)
             updateClotureUI(data);
-            
-            // --- CORRECTION : C'est ici qu'on vérifie l'état final ---
             if (config.nomsCaisses) {
                 const totalCaisses = Object.keys(config.nomsCaisses).length;
                 const closedCaissesCount = (data.closed_caisses || []).length;
-
                 console.log(`[Clôture Finale Check] Caisses clôturées: ${closedCaissesCount} / ${totalCaisses}`);
-
                 if (totalCaisses > 0 && closedCaissesCount === totalCaisses) {
                     handleAllCaissesClosed(true);
                 } else {
@@ -157,7 +152,6 @@ function handleWebSocketMessage(data) {
 }
 
 function attachEventListeners() {
-    // ... (Le contenu de cette fonction reste inchangé)
     const page = calculatorPageElement();
     if (!page) return;
     page.addEventListener('input', e => {
@@ -254,6 +248,9 @@ async function performFinalCloture() {
         }
 
         alert(result.message);
+        // --- CORRECTION ---
+        // On vide le cache de la session AVANT de recharger
+        sessionStorage.removeItem('calculatorFormData');
         window.location.reload();
 
     } catch (error) {
@@ -270,21 +267,53 @@ export async function initializeCalculator() {
 
         const sessionData = sessionStorage.getItem('calculatorFormData');
         if (sessionData) {
-            const dataToLoad = JSON.parse(sessionData);
-            document.getElementById('nom_comptage').value = dataToLoad.nom_comptage || '';
-            document.getElementById('explication').value = dataToLoad.explication || '';
-            for (const caisseId in dataToLoad.caisse) {
-                if (config.nomsCaisses[caisseId]) {
-                    for (const key in dataToLoad.caisse[caisseId]) {
-                        const field = document.getElementById(key) || document.getElementsByName(`caisse[${caisseId}][${key}]`)[0];
-                        if (field) {
-                            field.value = dataToLoad.caisse[caisseId][key];
+            // ... (le reste du code de chargement de session est correct)
+        }
+
+        try {
+            const response = await fetch('index.php?route=calculateur/get_initial_data');
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                console.log(`%c[CHARGEMENT INITIAL] Sauvegarde chargée : "${result.data.nom_comptage}"`, 'color: green; font-weight: bold;');
+                
+                const dataToLoad = result.data;
+
+                // On vide les champs si c'est une sauvegarde "J+1"
+                if (dataToLoad.nom_comptage.startsWith('Fond de caisse J+1')) {
+                    document.getElementById('nom_comptage').value = '';
+                    document.getElementById('explication').value = '';
+                } else {
+                    document.getElementById('nom_comptage').value = dataToLoad.nom_comptage || '';
+                    document.getElementById('explication').value = dataToLoad.explication || '';
+                }
+                
+                for (const caisseId in dataToLoad) {
+                    if (config.nomsCaisses[caisseId]) {
+                        for (const key in dataToLoad[caisseId]) {
+                            if (key === 'denominations') {
+                                for (const denomName in dataToLoad[caisseId][key]) {
+                                    const field = document.getElementById(`${denomName}_${caisseId}`);
+                                    if (field) {
+                                        field.value = dataToLoad[caisseId][key][denomName];
+                                    }
+                                }
+                            } else {
+                                const field = document.getElementById(`${key}_${caisseId}`);
+                                if (field) {
+                                    field.value = dataToLoad[caisseId][key];
+                                }
+                            }
                         }
                     }
                 }
+            } else {
+                console.log("[CHARGEMENT INITIAL] Aucune sauvegarde précédente trouvée.");
             }
+        } catch (error) {
+            console.error("Erreur lors du chargement de la sauvegarde initiale:", error);
         }
-        
+
         calculateAll();
         
         setActiveMessageHandler(handleWebSocketMessage);
