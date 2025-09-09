@@ -68,61 +68,86 @@ function calculateAllForCaisse(caisseId) {
 }
 
 function calculateWithdrawalSuggestion(caisseId) {
-    const suggestions = [];
     const caisseData = calculatorData.caisse?.[caisseId] || {};
+    if (!caisseData) return { suggestions: [], totalToWithdraw: 0 };
+
     const denominationsData = caisseData.denominations || {};
     const allDenoms = { ...(config.denominations?.billets || {}), ...(config.denominations?.pieces || {}) };
-    const minToKeep = config.minToKeep || {};
+    const minToKeepRules = config.minToKeep || {};
 
-    // 1. Calculer la valeur cible du fond de caisse à partir de min_to_keep
-    let targetValue = 0;
-    for (const name in minToKeep) {
-        if (allDenoms[name]) {
-            targetValue += (parseInt(minToKeep[name], 10) || 0) * parseFloat(allDenoms[name]);
+    // 1. Définir la VALEUR CIBLE à atteindre, à partir du champ "Fond de Caisse"
+    const targetFundValue = parseLocaleFloat(caisseData.fond_de_caisse);
+
+    // 2. Créer un inventaire des quantités actuelles pour chaque dénomination
+    const currentQuantities = {};
+    let currentTotalValue = 0;
+    for (const name in allDenoms) {
+        const qty = parseInt(denominationsData[name], 10) || 0;
+        if (qty > 0) {
+            currentQuantities[name] = qty;
+            currentTotalValue += qty * parseFloat(allDenoms[name]);
         }
     }
 
-    // 2. Calculer la valeur actuelle totale en caisse
-    let currentValue = 0;
-    for (const name in denominationsData) {
-        if (allDenoms[name]) {
-            currentValue += (parseInt(denominationsData[name], 10) || 0) * parseFloat(allDenoms[name]);
-        }
-    }
-
-    // 3. Déterminer le montant total à retirer
-    let amountToWithdraw = currentValue - targetValue;
-    let totalWithdrawnValue = 0;
-
-    if (amountToWithdraw <= 0) {
+    // Si la caisse est vide ou si le fond de caisse cible est supérieur à ce qu'on a, on ne peut rien retirer.
+    if (currentTotalValue <= targetFundValue) {
         return { suggestions: [], totalToWithdraw: 0 };
     }
 
-    // 4. Algorithme glouton pour suggérer les retraits, des plus grosses coupures aux plus petites
-    const sortedDenoms = Object.keys(allDenoms).sort((a, b) => allDenoms[b] - allDenoms[a]);
+    // 3. Construire le "Fonds de Caisse Idéal" à conserver pour demain
+    const fundToKeep = {};
+    let fundToKeepValue = 0;
+    
+    // Trier les dénominations de la plus grande à la plus petite pour une logique cohérente
+    const sortedDenoms = Object.keys(allDenoms).sort((a, b) => parseFloat(allDenoms[b]) - parseFloat(allDenoms[a]));
 
+    // Étape A : Mettre de côté les coupures prioritaires définies dans min_to_keep
     for (const name of sortedDenoms) {
-        const value = parseFloat(allDenoms[name]);
-        const currentQty = parseInt(denominationsData[name], 10) || 0;
+        const targetQty = parseInt(minToKeepRules[name], 10) || 0;
+        if (targetQty > 0 && currentQuantities[name]) {
+            const qtyToReserve = Math.min(currentQuantities[name], targetQty);
+            const valueReserved = qtyToReserve * parseFloat(allDenoms[name]);
 
-        if (currentQty > 0 && amountToWithdraw >= value) {
-            // Combien de cette dénomination peut-on retirer ?
-            let qtyToWithdraw = Math.floor(amountToWithdraw / value);
-            
-            // On ne peut pas retirer plus que ce qu'on a
-            qtyToWithdraw = Math.min(qtyToWithdraw, currentQty);
-
-            if (qtyToWithdraw > 0) {
-                const withdrawnAmount = qtyToWithdraw * value;
-                suggestions.push({ name, value: value, qty: qtyToWithdraw, total: withdrawnAmount });
-                
-                amountToWithdraw -= withdrawnAmount;
-                totalWithdrawnValue += withdrawnAmount;
+            // On ne dépasse pas la valeur cible totale
+            if (fundToKeepValue + valueReserved <= targetFundValue) {
+                fundToKeep[name] = (fundToKeep[name] || 0) + qtyToReserve;
+                fundToKeepValue += valueReserved;
             }
         }
     }
 
-    return { suggestions, totalToWithdraw: totalWithdrawnValue };
+    // Étape B : Compléter avec d'autres coupures pour atteindre la valeur cible exacte
+    for (const name of sortedDenoms) {
+        const availableQty = (currentQuantities[name] || 0) - (fundToKeep[name] || 0);
+        if (availableQty > 0) {
+            const value = parseFloat(allDenoms[name]);
+            const remainingValueNeeded = targetFundValue - fundToKeepValue;
+            
+            if (remainingValueNeeded > 0) {
+                // Combien de cette coupure peut-on ajouter ?
+                const qtyToAdd = Math.min(availableQty, Math.floor(remainingValueNeeded / value));
+                if (qtyToAdd > 0) {
+                    fundToKeep[name] = (fundToKeep[name] || 0) + qtyToAdd;
+                    fundToKeepValue += qtyToAdd * value;
+                }
+            }
+        }
+    }
+
+    // 4. Calculer le retrait : c'est tout ce qui n'a pas été mis dans "fundToKeep"
+    const suggestions = [];
+    let totalToWithdraw = 0;
+    for (const name in currentQuantities) {
+        const qtyToWithdraw = currentQuantities[name] - (fundToKeep[name] || 0);
+        if (qtyToWithdraw > 0) {
+            const value = parseFloat(allDenoms[name]);
+            const withdrawnAmount = qtyToWithdraw * value;
+            suggestions.push({ name, value, qty: qtyToWithdraw, total: withdrawnAmount });
+            totalToWithdraw += withdrawnAmount;
+        }
+    }
+    
+    return { suggestions, totalToWithdraw };
 }
 
 // --- Fonctions de Rendu ---
