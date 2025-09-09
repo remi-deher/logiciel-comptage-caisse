@@ -68,23 +68,61 @@ function calculateAllForCaisse(caisseId) {
 }
 
 function calculateWithdrawalSuggestion(caisseId) {
-    const suggestions = [], caisseData = calculatorData.caisse?.[caisseId] || {};
+    const suggestions = [];
+    const caisseData = calculatorData.caisse?.[caisseId] || {};
     const denominationsData = caisseData.denominations || {};
-    let totalToWithdraw = 0;
     const allDenoms = { ...(config.denominations?.billets || {}), ...(config.denominations?.pieces || {}) };
     const minToKeep = config.minToKeep || {};
-    const sortedDenoms = Object.keys(allDenoms).sort((a, b) => allDenoms[b] - allDenoms[a]);
-    for (const name of sortedDenoms) {
-        const currentQty = parseInt(denominationsData[name], 10) || 0;
-        const minQty = minToKeep[name] || 0;
-        if (currentQty > minQty) {
-            const qtyToWithdraw = currentQty - minQty;
-            const value = qtyToWithdraw * parseFloat(allDenoms[name]);
-            totalToWithdraw += value;
-            suggestions.push({ name, value: allDenoms[name], qty: qtyToWithdraw, total: value });
+
+    // 1. Calculer la valeur cible du fond de caisse à partir de min_to_keep
+    let targetValue = 0;
+    for (const name in minToKeep) {
+        if (allDenoms[name]) {
+            targetValue += (parseInt(minToKeep[name], 10) || 0) * parseFloat(allDenoms[name]);
         }
     }
-    return { suggestions, totalToWithdraw };
+
+    // 2. Calculer la valeur actuelle totale en caisse
+    let currentValue = 0;
+    for (const name in denominationsData) {
+        if (allDenoms[name]) {
+            currentValue += (parseInt(denominationsData[name], 10) || 0) * parseFloat(allDenoms[name]);
+        }
+    }
+
+    // 3. Déterminer le montant total à retirer
+    let amountToWithdraw = currentValue - targetValue;
+    let totalWithdrawnValue = 0;
+
+    if (amountToWithdraw <= 0) {
+        return { suggestions: [], totalToWithdraw: 0 };
+    }
+
+    // 4. Algorithme glouton pour suggérer les retraits, des plus grosses coupures aux plus petites
+    const sortedDenoms = Object.keys(allDenoms).sort((a, b) => allDenoms[b] - allDenoms[a]);
+
+    for (const name of sortedDenoms) {
+        const value = parseFloat(allDenoms[name]);
+        const currentQty = parseInt(denominationsData[name], 10) || 0;
+
+        if (currentQty > 0 && amountToWithdraw >= value) {
+            // Combien de cette dénomination peut-on retirer ?
+            let qtyToWithdraw = Math.floor(amountToWithdraw / value);
+            
+            // On ne peut pas retirer plus que ce qu'on a
+            qtyToWithdraw = Math.min(qtyToWithdraw, currentQty);
+
+            if (qtyToWithdraw > 0) {
+                const withdrawnAmount = qtyToWithdraw * value;
+                suggestions.push({ name, value: value, qty: qtyToWithdraw, total: withdrawnAmount });
+                
+                amountToWithdraw -= withdrawnAmount;
+                totalWithdrawnValue += withdrawnAmount;
+            }
+        }
+    }
+
+    return { suggestions, totalToWithdraw: totalWithdrawnValue };
 }
 
 // --- Fonctions de Rendu ---
