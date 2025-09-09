@@ -260,13 +260,26 @@ function renderStep2_Counting() {
 
 function renderStep3_Summary() {
     const container = document.querySelector('.wizard-content');
+    
+    // La logique de génération du HTML reste la même
     let summaryHtml = wizardState.selectedCaisses.map(id => {
         const nom = config.nomsCaisses[id];
-        const { suggestions, totalToWithdraw } = calculateWithdrawalSuggestion(id);
-        wizardState.confirmedData[id] = { withdrawals: suggestions, totalToWithdraw };
-        return `<div class="card"><h4>Synthèse pour ${nom}</h4>${renderSuggestionTable(suggestions, totalToWithdraw)}</div>`;
+        
+        // 1. On calcule les suggestions comme avant
+        const suggestions = calculateWithdrawalSuggestion(id);
+        
+        // 2. CORRECTION : On sauvegarde les suggestions calculées dans l'état du wizard
+        //    C'est cette ligne qui corrige le problème.
+        wizardState.confirmedData[id] = { 
+            withdrawals: suggestions.suggestions, 
+            totalToWithdraw: suggestions.totalToWithdraw 
+        };
+
+        // 3. On génère le HTML pour l'affichage
+        return `<div class="card"><h4>Synthèse pour ${nom}</h4>${renderSuggestionTable(suggestions)}</div>`;
     }).join('');
-    container.innerHTML = `<div class="wizard-step-content"><h3>Synthèse et Suggestions de Retrait</h3>${summaryHtml}</div>`;
+
+    container.innerHTML = `<div class="wizard-step-content"><h3>Synthèse des Opérations</h3>${summaryHtml}</div>`;
 }
 
 function renderStep4_Finalization() {
