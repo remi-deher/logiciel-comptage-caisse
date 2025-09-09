@@ -284,8 +284,81 @@ function renderStep3_Summary() {
 
 function renderStep4_Finalization() {
     const container = document.querySelector('.wizard-content');
-    container.innerHTML = `<div class="wizard-step-content"><h3>Finalisation</h3><p>Vous êtes sur le point de clôturer ${wizardState.selectedCaisses.length} caisse(s).</p><p class="warning-text" style="text-align:center; font-weight:bold; color: var(--color-danger);">Cette action est irréversible.</p></div>`;
+
+    // Calculer les totaux pour toutes les caisses sélectionnées
+    let grandTotalVentes = 0;
+    let grandTotalCompte = 0;
+    let grandTotalRetraits = 0;
+
+    wizardState.selectedCaisses.forEach(id => {
+        const caisseData = calculatorData.caisse[id] || {};
+        const confirmedData = wizardState.confirmedData[id] || {};
+
+        grandTotalVentes += parseLocaleFloat(caisseData.ventes) + parseLocaleFloat(caisseData.retrocession);
+        grandTotalRetraits += confirmedData.totalToWithdraw || 0;
+
+        // Recalculer le total compté pour cette caisse
+        const allDenoms = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
+        for (const name in caisseData.denominations) {
+            grandTotalCompte += (parseInt(caisseData.denominations[name], 10) || 0) * parseFloat(allDenoms[name]);
+        }
+    });
+
+    const grandTotalEcart = grandTotalCompte - grandTotalVentes;
+    const fondDeCaisseFinal = grandTotalCompte - grandTotalRetraits;
+
+    container.innerHTML = `
+        <div class="wizard-step-content">
+            <h3><i class="fa-solid fa-flag-checkered"></i> Synthèse Finale</h3>
+            <p class="subtitle" style="text-align:center; margin-top:-20px; margin-bottom: 30px;">Veuillez vérifier les totaux avant de finaliser la journée.</p>
+            
+            <div class="final-summary-grid">
+                <div class="summary-kpi">
+                    <span>Total des Ventes</span>
+                    <strong>${formatCurrency(grandTotalVentes)}</strong>
+                </div>
+                <div class="summary-kpi">
+                    <span>Total Compté</span>
+                    <strong>${formatCurrency(grandTotalCompte)}</strong>
+                </div>
+                <div class="summary-kpi ecart-${grandTotalEcart >= 0 ? 'ok' : 'negatif'}">
+                    <span>Écart Final</span>
+                    <strong>${formatCurrency(grandTotalEcart)}</strong>
+                </div>
+            </div>
+
+            <div class="final-summary-flow">
+                <div class="summary-kpi">
+                    <span><i class="fa-solid fa-arrow-down"></i> Total des Retraits</span>
+                    <strong class="text-danger">${formatCurrency(grandTotalRetraits)}</strong>
+                </div>
+                <div class="summary-kpi">
+                    <span><i class="fa-solid fa-arrow-right"></i> Fond de Caisse J+1</span>
+                    <strong class="text-success">${formatCurrency(fondDeCaisseFinal)}</strong>
+                </div>
+            </div>
+
+            <div class="confirmation-box">
+                <label>
+                    <input type="checkbox" id="final-confirmation-checkbox">
+                    Je confirme avoir vérifié les montants et je souhaite clôturer la journée.
+                </label>
+            </div>
+        </div>
+    `;
+
+    // Logique pour activer/désactiver le bouton final
+    const checkbox = document.getElementById('final-confirmation-checkbox');
+    const nextBtn = document.getElementById('wizard-next-btn');
+    
+    // Assurer que le bouton est désactivé au départ
+    nextBtn.disabled = true;
+
+    checkbox.addEventListener('change', () => {
+        nextBtn.disabled = !checkbox.checked;
+    });
 }
+
 
 // --- Gestionnaire Principal ---
 function updateWizardUI() {
