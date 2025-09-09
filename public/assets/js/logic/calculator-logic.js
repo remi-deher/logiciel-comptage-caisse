@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète et Corrigée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version avec logique de clôture finale centralisée)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -12,10 +12,8 @@ const calculatorPageElement = () => document.getElementById('calculator-page');
 function saveStateToSession() {
     const form = document.getElementById('caisse-form');
     if (form) {
-        console.log("[Calculator] Sauvegarde de l'état dans la session avant de quitter la page...");
         const formData = new FormData(form);
         const data = { caisse: {} };
-
         for (const [key, value] of formData.entries()) {
             const match = key.match(/caisse\[(\d+)\]\[(\w+|tpe_\d+_\d+)\]/);
             if (match) {
@@ -46,6 +44,7 @@ async function fetchCalculatorConfig() {
 }
 
 function renderCalculatorUI() {
+    // ... (Le contenu de cette fonction reste inchangé)
     const page = calculatorPageElement();
     if (!page) return;
     const tabSelector = page.querySelector('.tab-selector');
@@ -69,8 +68,8 @@ function renderCalculatorUI() {
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
 }
 
-
 function calculateAll() {
+    // ... (Le contenu de cette fonction reste inchangé)
     if (!config.nomsCaisses) return;
     Object.keys(config.nomsCaisses).forEach(id => {
         let totalCompte = 0;
@@ -93,6 +92,7 @@ function calculateAll() {
 }
 
 function updateEcartDisplay(id, ecart) {
+    // ... (Le contenu de cette fonction reste inchangé)
     const display = document.getElementById(`ecart-display-caisse${id}`);
     if (!display) return;
     const valueSpan = display.querySelector('.ecart-value');
@@ -114,7 +114,22 @@ function updateEcartDisplay(id, ecart) {
 function handleWebSocketMessage(data) {
     switch (data.type) {
         case 'cloture_locked_caisses':
+            // Étape 1 : Mettre à jour l'interface (griser les champs, etc.)
             updateClotureUI(data);
+            
+            // --- CORRECTION : C'est ici qu'on vérifie l'état final ---
+            if (config.nomsCaisses) {
+                const totalCaisses = Object.keys(config.nomsCaisses).length;
+                const closedCaissesCount = (data.closed_caisses || []).length;
+
+                console.log(`[Clôture Finale Check] Caisses clôturées: ${closedCaissesCount} / ${totalCaisses}`);
+
+                if (totalCaisses > 0 && closedCaissesCount === totalCaisses) {
+                    handleAllCaissesClosed(true);
+                } else {
+                    handleAllCaissesClosed(false);
+                }
+            }
             break;
         case 'welcome':
             wsResourceId = data.resourceId.toString();
@@ -142,9 +157,9 @@ function handleWebSocketMessage(data) {
 }
 
 function attachEventListeners() {
+    // ... (Le contenu de cette fonction reste inchangé)
     const page = calculatorPageElement();
     if (!page) return;
-
     page.addEventListener('input', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
             hasUnsavedChanges = true;
@@ -152,7 +167,6 @@ function attachEventListeners() {
             sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
         }
     });
-    
     const tabSelector = page.querySelector('.tab-selector');
     tabSelector.addEventListener('click', e => {
         const btn = e.target.closest('.tab-link');
@@ -164,7 +178,6 @@ function attachEventListeners() {
             document.getElementById(`ecart-display-${tabId}`)?.classList.add('active');
         }
     });
-
     page.addEventListener('click', e => {
         const paymentTab = e.target.closest('.payment-tab-link');
         if(paymentTab) {
@@ -175,7 +188,6 @@ function attachEventListeners() {
             container.querySelector(`#${tabId}`)?.classList.add('active');
         }
     });
-
     const form = document.getElementById('caisse-form');
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
