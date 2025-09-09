@@ -128,6 +128,7 @@ function handleWebSocketMessage(data) {
             updateClotureUI(data);
             break;
         case 'welcome':
+            console.log(`%c[CALCULATEUR DEBUG] Message 'welcome' reçu. Mon ID client est : ${data.resourceId}`, 'color: blue; font-weight: bold;');
             wsResourceId = data.resourceId.toString();
             initializeCloture(config, wsResourceId);
             break;
@@ -210,8 +211,6 @@ function attachEventListeners() {
 
 export async function initializeCalculator() {
     try {
-        // CORRECTION : On s'assure que le bouton est et reste désactivé si on quitte la page
-
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
 

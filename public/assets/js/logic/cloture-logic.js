@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Corrigé pour une activation sécurisée)
+// Fichier : public/assets/js/logic/cloture-logic.js (Corrigé pour la race condition)
 
 import { sendWsMessage } from './websocket-service.js';
 
@@ -6,13 +6,8 @@ let config = {};
 let lockedCaisses = [];
 let closedCaisses = [];
 let resourceId = null;
-let isClotureInitialized = false; // Reste faux par défaut
+let isClotureInitialized = false;
 
-/**
- * NOUVELLE FONCTION : Active ou désactive l'état de préparation à la clôture.
- * C'est cette fonction qui sera appelée par le calculateur pour activer le bouton.
- * @param {boolean} isReady - Indique si la clôture peut être initiée.
- */
 export function setClotureReady(isReady) {
     const clotureBtn = document.getElementById('cloture-btn');
     isClotureInitialized = isReady;
@@ -22,16 +17,11 @@ export function setClotureReady(isReady) {
             clotureBtn.title = "Lancer le processus de clôture";
         } else {
             clotureBtn.disabled = true;
-            // Message plus générique
             clotureBtn.title = "Nécessite une connexion en temps réel active.";
         }
     }
 }
 
-/**
- * Met à jour l'interface utilisateur en fonction de l'état de clôture reçu (caisses verrouillées/fermées).
- * @param {object} newState L'objet d'état reçu via WebSocket.
- */
 export function updateClotureUI(newState) {
     lockedCaisses = newState.caisses || [];
     closedCaisses = (newState.closed_caisses || []).map(String);
@@ -52,30 +42,31 @@ export function updateClotureUI(newState) {
 
         const isClosed = closedCaisses.includes(fieldCaisseId);
         const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === fieldCaisseId);
-        const isLockedByOther = lockInfo && lockInfo.locked_by.toString() !== resourceId.toString();
+
+        // --- CORRECTION CI-DESSOUS ---
+        // On utilise String() pour éviter l'erreur si resourceId est null.
+        const isLockedByOther = lockInfo && lockInfo.locked_by && String(lockInfo.locked_by) !== String(resourceId);
         
         field.disabled = isClosed || isLockedByOther;
         const parentFormGroup = field.closest('.form-group');
         if (parentFormGroup) {
             parentFormGroup.style.opacity = (isClosed || isLockedByOther) ? '0.7' : '1';
-            parentFormGroup.title = isClosed ? 'Cette caisse est clôturée.' : (isLockedByOther ? 'Cette caisse est en cours de modification par un autre utilisateur.' : '');
+            parentFormGroup.title = isClosed ? 'Cette caisse est clôturée.' : (isLockedByOther ? `Cette caisse est en cours de modification par un autre utilisateur.` : '');
         }
     });
 }
 
-/**
- * Configure le bouton de clôture global dans la barre de navigation.
- */
 export function setupGlobalClotureButton() {
     const clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn) return;
 
     clotureBtn.addEventListener('click', async () => {
         if (!isClotureInitialized) {
-            alert("La fonction de clôture est uniquement disponible sur la page du Calculateur et nécessite que la connexion en temps réel soit active.");
+            alert("La fonction de clôture nécessite que la connexion en temps réel soit active.");
             return;
         }
 
+        // Le reste de la logique pour lancer l'assistant de clôture
         const form = document.getElementById('caisse-form');
         if (form) {
             const formData = new FormData(form);
@@ -105,11 +96,7 @@ export function setupGlobalClotureButton() {
     });
 }
 
-/**
- * Initialise la logique de clôture en stockant la configuration et l'ID de ressource WebSocket.
- */
 export function initializeCloture(appConfig, wsResourceId) {
     config = appConfig;
     resourceId = wsResourceId;
-    // On n'active PAS isClotureInitialized ici directement.
 }

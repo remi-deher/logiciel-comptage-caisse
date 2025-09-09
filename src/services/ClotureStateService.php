@@ -16,7 +16,7 @@ class ClotureStateService {
         $this->pdo = $pdo;
     }
 
-    private function getCaisseStatus($caisseId) {
+    public function getCaisseStatus($caisseId) {
         $stmt = $this->pdo->prepare("SELECT status, locked_by_ws_id FROM cloture_status WHERE caisse_id = ?");
         $stmt->execute([$caisseId]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
