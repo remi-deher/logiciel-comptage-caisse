@@ -1,8 +1,8 @@
 <?php
 // src/StatistiquesController.php - Version mise à jour pour le schéma normalisé.
-require_once 'Bdd.php';
-require_once 'Utils.php';
-require_once 'services/FilterService.php';
+require_once __DIR__ . '/Bdd.php';
+require_once __DIR__ . '/Utils.php';
+require_once __DIR__ . '/services/FilterService.php';
 
 class StatistiquesController {
     private $pdo;
@@ -79,7 +79,7 @@ class StatistiquesController {
         $evolution_sql = "SELECT DATE(c.date_comptage) as date, SUM(cd.ventes) as total_ventes, SUM(cd.retrocession) as total_retrocession FROM comptages c JOIN comptage_details cd ON c.id = cd.comptage_id " . $sql_where . " GROUP BY DATE(c.date_comptage) ORDER BY date ASC";
         $evolution_stmt = $this->pdo->prepare($evolution_sql);
         $evolution_stmt->execute($bind_values);
-        $evolution_results = $evolution_stmt->fetchAll(PDO::FETCH_ASSOC);
+        $evolution_results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         $evolution_dates = [];
         $evolution_ventes = [];

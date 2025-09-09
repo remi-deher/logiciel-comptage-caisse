@@ -1,7 +1,7 @@
 <?php
 // src/ChangelogController.php
 
-require_once 'services/VersionService.php';
+require_once __DIR__ . '/services/VersionService.php';
 
 class ChangelogController {
     private $versionService;

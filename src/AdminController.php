@@ -2,9 +2,9 @@
 // src/AdminController.php
 
 require_once __DIR__ . '/Utils.php';
-require_once 'services/CurrencyService.php';
-require_once 'services/TerminalManagementService.php';
-require_once 'services/ReserveService.php';
+require_once __DIR__ . '/services/CurrencyService.php';
+require_once __DIR__ . '/services/TerminalManagementService.php';
+require_once __DIR__ . '/services/ReserveService.php';
 
 class AdminController {
     private $pdo;

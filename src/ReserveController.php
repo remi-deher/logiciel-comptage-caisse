@@ -1,7 +1,7 @@
 <?php
 // src/ReserveController.php
 
-require_once 'services/ReserveService.php';
+require_once __DIR__ . '/services/ReserveService.php';
 
 class ReserveController {
     private $pdo;
