@@ -254,6 +254,11 @@ class CalculateurController {
 
     public function cloture_generale() {
         header('Content-Type: application/json');
+        
+        // --- DEBUT DU DEBUG VERBOSE ---
+        error_log("--- LANCEMENT DE LA CLOTURE GENERALE ---");
+        // --- FIN DU DEBUG VERBOSE ---
+
         $backupResult = $this->backupService->createBackup();
         if (!$backupResult['success']) {
             http_response_code(500);
@@ -263,24 +268,29 @@ class CalculateurController {
         try {
             $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
 
-            // CORRECTION : Une seule transaction pour toute l'opération
             $this->pdo->beginTransaction();
 
-            // Étape 1 : Création de l'enregistrement "Clôture Générale"
             $nom_comptage_cg = "Clôture Générale du " . date('d/m/Y');
             $explication_cg = "Comptage final consolidé de la journée.";
             $stmt_cg = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt_cg->execute([$nom_comptage_cg, $explication_cg, date('Y-m-d H:i:s')]);
             $comptage_id_cloture_generale = $this->pdo->lastInsertId();
 
-            // Étape 2 : Création de l'enregistrement "Fond de caisse J+1"
             $nom_comptage_j1 = "Fond de caisse J+1 du " . date('d/m/Y');
             $stmt_j1 = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt_j1->execute([$nom_comptage_j1, "Préparation pour la journée suivante.", date('Y-m-d H:i:s')]);
             $comptage_id_j1 = $this->pdo->lastInsertId();
+            
+            // --- DEBUT DU DEBUG VERBOSE ---
+            error_log("[CLOTURE] ID Clôture Générale créé: " . $comptage_id_cloture_generale);
+            error_log("[CLOTURE] ID Fond de caisse J+1 créé: " . $comptage_id_j1);
+            // --- FIN DU DEBUG VERBOSE ---
 
             foreach ($this->noms_caisses as $caisse_id => $nom) {
-                // On récupère les données de la dernière clôture individuelle de la caisse
+                // --- DEBUT DU DEBUG VERBOSE ---
+                error_log("--- Traitement de la caisse ID: {$caisse_id} ({$nom}) ---");
+                // --- FIN DU DEBUG VERBOSE ---
+
                 $stmt_latest_cloture = $this->pdo->prepare(
                     "SELECT cd.*, 
                            (SELECT GROUP_CONCAT(CONCAT(denomination_nom, ':', quantite) SEPARATOR ';') FROM comptage_denominations WHERE comptage_detail_id = cd.id) as denominations_str,
@@ -292,19 +302,31 @@ class CalculateurController {
                 );
                 $stmt_latest_cloture->execute([$caisse_id]);
                 $latest_cloture_data = $stmt_latest_cloture->fetch(PDO::FETCH_ASSOC);
+                
+                // --- DEBUT DU DEBUG VERBOSE ---
+                error_log("[CLOTURE] Données brutes de la dernière clôture pour la caisse {$caisse_id}: " . print_r($latest_cloture_data, true));
+                // --- FIN DU DEBUG VERBOSE ---
 
-                if (!$latest_cloture_data) continue;
+                if (!$latest_cloture_data) {
+                    // --- DEBUT DU DEBUG VERBOSE ---
+                    error_log("[CLOTURE] AVERTISSEMENT: Aucune donnée de clôture individuelle trouvée pour la caisse {$caisse_id}. Cette caisse est ignorée.");
+                    // --- FIN DU DEBUG VERBOSE ---
+                    continue;
+                }
 
-                // On remplit les détails de la "Clôture Générale"
                 $stmt_details_cg = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
                 $stmt_details_cg->execute([$comptage_id_cloture_generale, $caisse_id, $latest_cloture_data['fond_de_caisse'], $latest_cloture_data['ventes'], $latest_cloture_data['retrocession']]);
                 $detail_id_cg = $this->pdo->lastInsertId();
-
-                // CORRECTION : S'assurer que la chaîne n'est pas vide avant de l'exploser
+                
                 $denominations_array = [];
                 if (!empty($latest_cloture_data['denominations_str'])) {
                     $denominations_array = explode(';', $latest_cloture_data['denominations_str']);
                 }
+                
+                // --- DEBUT DU DEBUG VERBOSE ---
+                error_log("[CLOTURE] Dénominations de la clôture (brut): " . $latest_cloture_data['denominations_str']);
+                error_log("[CLOTURE] Dénominations de la clôture (traité): " . print_r($denominations_array, true));
+                // --- FIN DU DEBUG VERBOSE ---
                 
                 foreach ($denominations_array as $denom_pair) {
                     if (strpos($denom_pair, ':') !== false) {
@@ -314,9 +336,8 @@ class CalculateurController {
                     }
                 }
                 
-                // On prépare les données pour J+1
                 $retraits_array = [];
-                if ($latest_cloture_data['retraits_str']) {
+                if (!empty($latest_cloture_data['retraits_str'])) {
                     foreach (explode(';', $latest_cloture_data['retraits_str']) as $retrait_pair) {
                          if (strpos($retrait_pair, ':') !== false) {
                             list($name, $quantity) = explode(':', $retrait_pair);
@@ -324,6 +345,11 @@ class CalculateurController {
                          }
                     }
                 }
+                
+                // --- DEBUT DU DEBUG VERBOSE ---
+                error_log("[CLOTURE] Retraits de la clôture (brut): " . $latest_cloture_data['retraits_str']);
+                error_log("[CLOTURE] Retraits de la clôture (traité): " . print_r($retraits_array, true));
+                // --- FIN DU DEBUG VERBOSE ---
 
                 $nouveau_fond_de_caisse = 0;
                 $nouvelles_quantites = [];
@@ -338,8 +364,16 @@ class CalculateurController {
                             $nouvelles_quantites[$name] = $qte_finale;
                             $nouveau_fond_de_caisse += $qte_finale * floatval($all_denoms[$name]);
                         }
+                        // --- DEBUT DU DEBUG VERBOSE ---
+                        error_log("[CLOTURE] Calcul J+1 pour '{$name}': qte_initiale={$qte_initiale}, qte_retiree={$qte_retiree} => qte_finale={$qte_finale}");
+                        // --- FIN DU DEBUG VERBOSE ---
                     }
                 }
+                
+                // --- DEBUT DU DEBUG VERBOSE ---
+                error_log("[CLOTURE] Nouvelles quantités pour J+1: " . print_r($nouvelles_quantites, true));
+                error_log("[CLOTURE] Nouveau fond de caisse calculé pour J+1: " . $nouveau_fond_de_caisse);
+                // --- FIN DU DEBUG VERBOSE ---
                 
                 $stmt_details_j1 = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, 0, 0)");
                 $stmt_details_j1->execute([$comptage_id_j1, $caisse_id, $nouveau_fond_de_caisse]);
@@ -353,19 +387,23 @@ class CalculateurController {
             
             $this->clotureStateService->resetState();
             
-            // On valide toute la transaction
             $this->pdo->commit();
+            
+            // --- DEBUT DU DEBUG VERBOSE ---
+            error_log("[CLOTURE] --- CLOTURE GENERALE TERMINEE AVEC SUCCES ---");
+            // --- FIN DU DEBUG VERBOSE ---
             
             echo json_encode(['success' => true, 'message' => "Clôture générale réussie ! Le fond de caisse pour le jour suivant a été préparé."]);
 
         } catch (Exception $e) {
-            // S'il y a une erreur, on annule tout
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
+            // --- DEBUT DU DEBUG VERBOSE ---
+            error_log("[CLOTURE] ERREUR CRITIQUE: " . $e->getMessage());
+            // --- FIN DU DEBUG VERBOSE ---
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Erreur lors de la clôture générale : ' . $e->getMessage()]);
         }
         exit;
     }
-}
