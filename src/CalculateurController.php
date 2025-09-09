@@ -31,12 +31,29 @@ class CalculateurController {
 
     public function getInitialData() {
         header('Content-Type: application/json');
-        // CORRECTION : La priorité est maintenant donnée à la sauvegarde automatique.
-        $sql = "SELECT id, nom_comptage, explication FROM comptages ORDER BY CASE WHEN nom_comptage LIKE 'Sauvegarde auto%' THEN 1 WHEN nom_comptage LIKE 'Fond de caisse J+1%' THEN 2 ELSE 3 END, date_comptage DESC LIMIT 1";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute();
-        $last_comptage = $stmt->fetch();
+
+        // CORRECTION FINALE : Logique de chargement basée sur la sauvegarde la plus récente (ID le plus élevé)
+        $stmt_auto = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
+        $autosave = $stmt_auto->fetch();
+
+        $stmt_j1 = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Fond de caisse J+1%' ORDER BY id DESC LIMIT 1");
+        $fond_j1 = $stmt_j1->fetch();
         
+        $last_comptage = null;
+
+        if ($autosave && $fond_j1) {
+            // Si les deux existent, on prend celui avec l'ID le plus grand (le plus récent)
+            $last_comptage = ($autosave['id'] > $fond_j1['id']) ? $autosave : $fond_j1;
+        } else if ($autosave) {
+            $last_comptage = $autosave;
+        } else if ($fond_j1) {
+            $last_comptage = $fond_j1;
+        } else {
+            // Fallback : si aucun des deux n'existe, on prend le dernier comptage manuel
+            $stmt_last = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages ORDER BY id DESC LIMIT 1");
+            $last_comptage = $stmt_last->fetch();
+        }
+
         if ($last_comptage) {
             $data = $this->loadComptageData($last_comptage['id']);
             $data['nom_comptage'] = $last_comptage['nom_comptage'];
@@ -189,6 +206,9 @@ class CalculateurController {
             exit;
         }
         try {
+            // CORRECTION : On supprime la sauvegarde auto AVANT toute chose
+            $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
+
             $this->pdo->beginTransaction();
             $nom_comptage = "Clôture Générale du " . date('d/m/Y');
             $explication = "Comptage final consolidé de la journée.";
