@@ -22,10 +22,10 @@ export function renderClotureWizardPage(element) {
         </div>
 
         <div class="wizard-navigation">
-            <button id="wizard-cancel-btn" class="btn delete-btn">Annuler</button>
+            <button id="wizard-cancel-btn" class="btn delete-btn"><i class="fa-solid fa-xmark"></i> Annuler</button>
             <div>
-                <button id="wizard-prev-btn" class="btn" style="background-color: #7f8c8d; display: none;">Précédent</button>
-                <button id="wizard-next-btn" class="btn save-btn" disabled>Suivant</button>
+                <button id="wizard-prev-btn" class="btn" style="display: none;"><i class="fa-solid fa-arrow-left"></i> Précédent</button>
+                <button id="wizard-next-btn" class="btn save-btn" disabled>Suivant <i class="fa-solid fa-arrow-right"></i></button>
             </div>
         </div>
     </div>
