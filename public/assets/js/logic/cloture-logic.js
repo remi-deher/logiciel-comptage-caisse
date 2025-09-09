@@ -68,7 +68,6 @@ export function setupGlobalClotureButton() {
 
         const form = document.getElementById('caisse-form');
         if (form) {
-            saveStateToSession(); // Assurez-vous que cette fonction est définie ou importée si nécessaire
             window.location.href = '/cloture-wizard';
         }
     });
