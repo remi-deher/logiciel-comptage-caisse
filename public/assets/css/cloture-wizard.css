@@ -273,3 +273,78 @@
     from { opacity: 0; }
     to { opacity: 1; }
 }
+
+/* === STYLES POUR LA NOUVELLE CARTE DE SYNTHÈSE DES RETRAITS === */
+
+.withdrawal-summary-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 15px;
+    box-shadow: 0 4px 15px var(--shadow-color);
+}
+
+.withdrawal-total-header {
+    background-color: rgba(231, 76, 60, 0.1); /* Rouge clair pour les retraits */
+    color: var(--color-danger);
+    padding: 25px 20px;
+    text-align: center;
+}
+
+.withdrawal-total-header.status-ok {
+    background-color: rgba(39, 174, 96, 0.1);
+    color: var(--color-success);
+}
+
+.withdrawal-total-header .total-amount {
+    font-size: 2.5em;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.withdrawal-total-header .total-label {
+    font-size: 1em;
+    font-weight: 500;
+    opacity: 0.9;
+}
+
+.withdrawal-details-list {
+    padding: 10px;
+}
+
+.detail-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.detail-item:last-child {
+    border-bottom: none;
+}
+
+.detail-item-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+}
+
+.detail-item-label .item-icon {
+    color: var(--color-text-muted);
+}
+
+.detail-item-value {
+    font-weight: 600;
+    font-family: monospace;
+    font-size: 1.1em;
+}
+
+.detail-item-empty {
+    text-align: center;
+    padding: 20px;
+    color: var(--color-text-secondary);
+    font-style: italic;
+}
