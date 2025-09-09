@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète et Corrigée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version avec Autosave en BDD)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -6,29 +6,38 @@ import { initializeCloture, updateClotureUI } from './cloture-logic.js';
 
 let config = {};
 let wsResourceId = null;
-let hasUnsavedChanges = false;
+let autosaveTimer = null; // Timer pour la fonction d'autosave
+
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
-function saveStateToSession() {
-    const form = document.getElementById('caisse-form');
-    if (form) {
-        console.log("[Calculator] Sauvegarde de l'état dans la session avant de quitter la page...");
-        const formData = new FormData(form);
-        const data = { caisse: {} };
-
-        for (const [key, value] of formData.entries()) {
-            const match = key.match(/caisse\[(\d+)\]\[(\w+|tpe_\d+_\d+)\]/);
-            if (match) {
-                const [, id, subKey] = match;
-                if (!data.caisse[id]) data.caisse[id] = {};
-                data.caisse[id][subKey] = value;
-            } else {
-                data[key] = value;
-            }
-        }
-        sessionStorage.setItem('calculatorFormData', JSON.stringify(data));
-        hasUnsavedChanges = false;
+// --- FONCTION AUTOSAVE ---
+// Enregistre le formulaire en BDD après un délai d'inactivité
+function triggerAutosave() {
+    clearTimeout(autosaveTimer); // Annule la sauvegarde précédente si l'utilisateur tape encore
+    const statusElement = document.getElementById('autosave-status');
+    if (statusElement) {
+        statusElement.textContent = 'Modifications en attente...';
     }
+
+    autosaveTimer = setTimeout(async () => {
+        const form = document.getElementById('caisse-form');
+        if (!form) return;
+
+        if (statusElement) statusElement.textContent = 'Sauvegarde...';
+        try {
+            const formData = new FormData(form);
+            const response = await fetch('index.php?route=calculateur/autosave', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            if (!result.success) throw new Error(result.message);
+            if (statusElement) statusElement.textContent = `Dernière sauvegarde à ${new Date().toLocaleTimeString()}`;
+        } catch (error) {
+            if (statusElement) statusElement.textContent = 'Erreur de sauvegarde auto.';
+            console.error("Erreur d'autosave:", error);
+        }
+    }, 2000); // Délai de 2 secondes
 }
 
 const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(amount);
@@ -118,7 +127,6 @@ function handleWebSocketMessage(data) {
             if (config.nomsCaisses) {
                 const totalCaisses = Object.keys(config.nomsCaisses).length;
                 const closedCaissesCount = (data.closed_caisses || []).length;
-                console.log(`[Clôture Finale Check] Caisses clôturées: ${closedCaissesCount} / ${totalCaisses}`);
                 if (totalCaisses > 0 && closedCaissesCount === totalCaisses) {
                     handleAllCaissesClosed(true);
                 } else {
@@ -154,13 +162,15 @@ function handleWebSocketMessage(data) {
 function attachEventListeners() {
     const page = calculatorPageElement();
     if (!page) return;
+
     page.addEventListener('input', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            hasUnsavedChanges = true;
             calculateAll();
+            triggerAutosave();
             sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
         }
     });
+    
     const tabSelector = page.querySelector('.tab-selector');
     tabSelector.addEventListener('click', e => {
         const btn = e.target.closest('.tab-link');
@@ -172,6 +182,7 @@ function attachEventListeners() {
             document.getElementById(`ecart-display-${tabId}`)?.classList.add('active');
         }
     });
+
     page.addEventListener('click', e => {
         const paymentTab = e.target.closest('.payment-tab-link');
         if(paymentTab) {
@@ -182,10 +193,10 @@ function attachEventListeners() {
             container.querySelector(`#${tabId}`)?.classList.add('active');
         }
     });
+
     const form = document.getElementById('caisse-form');
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        saveStateToSession();
         const saveButton = form.querySelector('button[type="submit"]');
         saveButton.disabled = true;
         saveButton.textContent = 'Enregistrement...';
@@ -242,15 +253,9 @@ async function performFinalCloture() {
             body: formData
         });
         const result = await response.json();
-
-        if (!result.success) {
-            throw new Error(result.message);
-        }
+        if (!result.success) throw new Error(result.message);
 
         alert(result.message);
-        // --- CORRECTION ---
-        // On vide le cache de la session AVANT de recharger
-        sessionStorage.removeItem('calculatorFormData');
         window.location.reload();
 
     } catch (error) {
@@ -265,22 +270,16 @@ export async function initializeCalculator() {
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
 
-        const sessionData = sessionStorage.getItem('calculatorFormData');
-        if (sessionData) {
-            // ... (le reste du code de chargement de session est correct)
-        }
-
+        // Le chargement se fait maintenant uniquement depuis la BDD.
         try {
             const response = await fetch('index.php?route=calculateur/get_initial_data');
             const result = await response.json();
-
             if (result.success && result.data) {
-                console.log(`%c[CHARGEMENT INITIAL] Sauvegarde chargée : "${result.data.nom_comptage}"`, 'color: green; font-weight: bold;');
+                console.log(`%c[CHARGEMENT INITIAL] Sauvegarde BDD chargée : "${result.data.nom_comptage}"`, 'color: green; font-weight: bold;');
                 
                 const dataToLoad = result.data;
 
-                // On vide les champs si c'est une sauvegarde "J+1"
-                if (dataToLoad.nom_comptage.startsWith('Fond de caisse J+1')) {
+                if (dataToLoad.nom_comptage.startsWith('Fond de caisse J+1') || dataToLoad.nom_comptage.startsWith('Sauvegarde auto')) {
                     document.getElementById('nom_comptage').value = '';
                     document.getElementById('explication').value = '';
                 } else {
@@ -294,44 +293,31 @@ export async function initializeCalculator() {
                             if (key === 'denominations') {
                                 for (const denomName in dataToLoad[caisseId][key]) {
                                     const field = document.getElementById(`${denomName}_${caisseId}`);
-                                    if (field) {
-                                        field.value = dataToLoad[caisseId][key][denomName];
-                                    }
+                                    if (field) field.value = dataToLoad[caisseId][key][denomName];
                                 }
                             } else {
                                 const field = document.getElementById(`${key}_${caisseId}`);
-                                if (field) {
-                                    field.value = dataToLoad[caisseId][key];
-                                }
+                                if (field) field.value = dataToLoad[caisseId][key];
                             }
                         }
                     }
                 }
             } else {
-                console.log("[CHARGEMENT INITIAL] Aucune sauvegarde précédente trouvée.");
+                console.log("[CHARGEMENT INITIAL] Aucune sauvegarde BDD trouvée.");
             }
         } catch (error) {
             console.error("Erreur lors du chargement de la sauvegarde initiale:", error);
         }
 
         calculateAll();
-        
         setActiveMessageHandler(handleWebSocketMessage);
-        
         attachEventListeners();
         
-        const mainContent = document.getElementById('main-content');
-        if (mainContent) {
-            mainContent.beforePageChange = saveStateToSession;
-        }
-        window.addEventListener('beforeunload', saveStateToSession);
-
         console.log("[Calculator] Prêt. Demande de l'état complet au serveur WebSocket.");
         sendWsMessage({ type: 'get_full_state' });
 
     } catch (error) {
         console.error("Erreur critique lors de l'initialisation du calculateur :", error);
-        const mainContent = document.getElementById('main-content');
-        mainContent.innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;
+        document.getElementById('main-content').innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;
     }
 }

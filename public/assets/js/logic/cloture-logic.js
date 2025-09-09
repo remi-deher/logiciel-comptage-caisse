@@ -1,6 +1,7 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Version simplifiée et corrigée)
+// Fichier : public/assets/js/logic/cloture-logic.js (Version Finale Complète et Corrigée)
 
 import { sendWsMessage } from './websocket-service.js';
+import { handleAllCaissesClosed } from './calculator-logic.js';
 
 let config = {};
 let lockedCaisses = [];
@@ -54,22 +55,30 @@ export function updateClotureUI(newState) {
             parentFormGroup.title = isClosed ? 'Cette caisse est clôturée.' : (isLockedByOther ? `Cette caisse est en cours de modification par un autre utilisateur.` : '');
         }
     });
+
+    if (config.nomsCaisses) {
+        const totalCaisses = Object.keys(config.nomsCaisses).length;
+        if (totalCaisses > 0 && closedCaisses.length === totalCaisses) {
+            handleAllCaissesClosed(true);
+        } else {
+            handleAllCaissesClosed(false);
+        }
+    }
 }
 
 export function setupGlobalClotureButton() {
     const clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn) return;
 
-    clotureBtn.addEventListener('click', async () => {
+    clotureBtn.addEventListener('click', () => {
         if (!isClotureInitialized) {
             alert("La fonction de clôture nécessite que la connexion en temps réel soit active.");
             return;
         }
 
-        const form = document.getElementById('caisse-form');
-        if (form) {
-            window.location.href = '/cloture-wizard';
-        }
+        // On n'a plus besoin de sauvegarder manuellement la session,
+        // l'autosave en BDD s'en est déjà chargé.
+        window.location.href = '/cloture-wizard';
     });
 }
 

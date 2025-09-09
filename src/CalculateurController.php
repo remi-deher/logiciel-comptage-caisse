@@ -31,7 +31,7 @@ class CalculateurController {
 
     public function getInitialData() {
         header('Content-Type: application/json');
-        // REQUETE CORRIGÉE : 'Fond de caisse J+1' a la priorité absolue.
+        // REQUETE CORRIGÉE : 1. Fond de caisse J+1, 2. Sauvegarde auto, 3. Le reste
         $sql = "SELECT id, nom_comptage, explication FROM comptages ORDER BY CASE WHEN nom_comptage LIKE 'Fond de caisse J+1%' THEN 1 WHEN nom_comptage LIKE 'Sauvegarde auto%' THEN 2 ELSE 3 END, date_comptage DESC LIMIT 1";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
@@ -39,10 +39,8 @@ class CalculateurController {
         
         if ($last_comptage) {
             $data = $this->loadComptageData($last_comptage['id']);
-            // On ajoute toujours le nom et l'explication au tableau de données
             $data['nom_comptage'] = $last_comptage['nom_comptage'];
             $data['explication'] = $last_comptage['explication'];
-            
             echo json_encode(['success' => true, 'data' => $data]);
         } else {
             echo json_encode(['success' => false, 'data' => null]);
@@ -78,6 +76,8 @@ class CalculateurController {
             $this->pdo->beginTransaction();
             $nom_comptage = trim($_POST['nom_comptage'] ?? '');
             if ($is_autosave) {
+                // Pour l'autosave, on supprime d'abord l'ancienne sauvegarde auto pour n'en garder qu'une.
+                $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {
                 $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;
@@ -190,7 +190,6 @@ class CalculateurController {
             exit;
         }
         try {
-            // --- Étape 1: Sauvegarde de l'état final de la journée ---
             $this->pdo->beginTransaction();
             $nom_comptage = "Clôture Générale du " . date('d/m/Y');
             $explication = "Comptage final consolidé de la journée.";
@@ -207,7 +206,6 @@ class CalculateurController {
             }
             $this->pdo->commit();
 
-            // --- Étape 2: Calcul et création du fond de caisse pour J+1 ---
             $this->pdo->beginTransaction();
             $nom_comptage_j1 = "Fond de caisse J+1 du " . date('d/m/Y');
             $stmt_j1 = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
@@ -243,7 +241,6 @@ class CalculateurController {
                 }
             }
             
-            // --- Étape 3: Réinitialisation de l'état de clôture ---
             $this->clotureStateService->resetState();
             $this->pdo->commit();
             
