@@ -162,8 +162,10 @@ function updateEcartDisplay(id, ecart) {
     else { display.classList.add('ecart-negatif'); if (explanation) explanation.textContent = "Il manque de l'argent."; }
 }
 
-function renderSuggestionTable(suggestions) {
-    if (!suggestions || suggestions.withdrawals.length === 0) {
+function renderSuggestionTable(suggestionData) {
+    // La variable est renommée en suggestionData pour plus de clarté
+    // CORRECTION : On vérifie suggestionData.suggestions, qui est bien l'array retourné par la fonction de calcul.
+    if (!suggestionData || !suggestionData.suggestions || suggestionData.suggestions.length === 0) {
         return `
             <div class="withdrawal-summary-card">
                 <div class="withdrawal-total-header status-ok">
@@ -179,7 +181,8 @@ function renderSuggestionTable(suggestions) {
         `;
     }
 
-    const detailRows = suggestions.withdrawals.map(s => {
+    // CORRECTION : On utilise suggestionData.suggestions pour la boucle .map()
+    const detailRows = suggestionData.suggestions.map(s => {
         const label = s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`;
         return `
             <div class="detail-item">
@@ -195,7 +198,7 @@ function renderSuggestionTable(suggestions) {
     return `
         <div class="withdrawal-summary-card">
             <div class="withdrawal-total-header">
-                <div class="total-amount">${formatCurrency(suggestions.totalToWithdraw)}</div>
+                <div class="total-amount">${formatCurrency(suggestionData.totalToWithdraw)}</div>
                 <div class="total-label">Total à retirer de la caisse</div>
             </div>
             <div class="withdrawal-details-list">
