@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version avec Autosave en BDD)
+// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé pour supprimer sessionStorage)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -270,7 +270,8 @@ export async function initializeCalculator() {
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
 
-        // Le chargement se fait maintenant uniquement depuis la BDD.
+        // Le chargement se fait maintenant uniquement et toujours depuis la BDD.
+        // La logique sessionStorage a été complètement supprimée.
         try {
             const response = await fetch('index.php?route=calculateur/get_initial_data');
             const result = await response.json();

@@ -31,8 +31,8 @@ class CalculateurController {
 
     public function getInitialData() {
         header('Content-Type: application/json');
-        // REQUETE CORRIGÉE : 1. Fond de caisse J+1, 2. Sauvegarde auto, 3. Le reste
-        $sql = "SELECT id, nom_comptage, explication FROM comptages ORDER BY CASE WHEN nom_comptage LIKE 'Fond de caisse J+1%' THEN 1 WHEN nom_comptage LIKE 'Sauvegarde auto%' THEN 2 ELSE 3 END, date_comptage DESC LIMIT 1";
+        // CORRECTION : La priorité est maintenant donnée à la sauvegarde automatique.
+        $sql = "SELECT id, nom_comptage, explication FROM comptages ORDER BY CASE WHEN nom_comptage LIKE 'Sauvegarde auto%' THEN 1 WHEN nom_comptage LIKE 'Fond de caisse J+1%' THEN 2 ELSE 3 END, date_comptage DESC LIMIT 1";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
         $last_comptage = $stmt->fetch();
@@ -76,7 +76,6 @@ class CalculateurController {
             $this->pdo->beginTransaction();
             $nom_comptage = trim($_POST['nom_comptage'] ?? '');
             if ($is_autosave) {
-                // Pour l'autosave, on supprime d'abord l'ancienne sauvegarde auto pour n'en garder qu'une.
                 $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {

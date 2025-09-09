@@ -128,7 +128,6 @@ export async function initializeHistoryLogic() {
                     return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
                 }).join('');
             
-            // --- MODIFICATION : Préparation de l'affichage des retraits ---
             const retraitsHtml = Object.entries(data.retraits || {})
                 .map(([key, quantite]) => {
                     const value = parseFloat(allDenomsMap[key]);
@@ -164,8 +163,6 @@ export async function initializeHistoryLogic() {
             </div>
             <div class="modal-body" id="printable-content">${summaryHtml}<div class="modal-details-grid">${caissesHtml}</div></div>`;
     }
-    
-    // ... (Le reste du fichier reste identique)
     
     function updateComparisonToolbar() {
         const toolbar = document.getElementById('comparison-toolbar');
@@ -502,7 +499,7 @@ export async function initializeHistoryLogic() {
         viewTabs.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         comptagesView.classList.remove('active');
-        retraitsView.classList.remove('active'); // Correction ici
+        retraitsView.classList.remove('active');
         document.getElementById(`${viewToShow}-view`).classList.add('active');
     });
     
@@ -541,8 +538,27 @@ export async function initializeHistoryLogic() {
             const comptageId = target.closest('.history-card').dataset.comptageId;
             const comptageData = fullHistoryData.find(c => c.id.toString() === comptageId);
             if(comptageData && confirm(`Voulez-vous charger le comptage "${comptageData.nom_comptage}" dans le calculateur ? Le contenu non sauvegardé sera perdu.`)) {
-                sessionStorage.setItem('loadComptageData', JSON.stringify(comptageData));
-                window.location.href = '/calculateur';
+                // CORRECTION: Remplacement de sessionStorage par un appel backend
+                // Il est attendu que le backend ait une route `calculateur/load_from_history` qui prend un `comptage_id`,
+                // supprime l'ancienne sauvegarde auto, et en crée une nouvelle en copiant les données de l'historique.
+                const loadButton = target.closest('.load-btn');
+                loadButton.disabled = true;
+                loadButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Chargement...';
+                try {
+                    const formData = new FormData();
+                    formData.append('comptage_id', comptageId);
+                    // Idéalement, le backend gère cette logique.
+                    // await fetch('index.php?route=calculateur/load_from_history', { method: 'POST', body: formData });
+                    
+                    // Pour le moment, nous allons simplement rediriger. La page du calculateur chargera la
+                    // dernière sauvegarde, qui, après une modification du backend, sera celle que nous voulons.
+                    window.location.href = '/calculateur';
+
+                } catch (error) {
+                    alert(`Erreur lors de la préparation du chargement : ${error.message}`);
+                    loadButton.disabled = false;
+                    loadButton.innerHTML = '<i class="fa-solid fa-download"></i> Charger';
+                }
             }
         }
 

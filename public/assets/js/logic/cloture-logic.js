@@ -70,15 +70,37 @@ export function setupGlobalClotureButton() {
     const clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn) return;
 
-    clotureBtn.addEventListener('click', () => {
+    clotureBtn.addEventListener('click', async () => {
         if (!isClotureInitialized) {
             alert("La fonction de clôture nécessite que la connexion en temps réel soit active.");
             return;
         }
+        
+        // CORRECTION : Forcer une sauvegarde avant de passer à la clôture
+        clotureBtn.disabled = true;
+        clotureBtn.innerHTML = '<i class="fa-solid fa-save"></i> Sauvegarde...';
+        
+        try {
+            const form = document.getElementById('caisse-form');
+            if (form) {
+                const formData = new FormData(form);
+                const response = await fetch('index.php?route=calculateur/autosave', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.message || 'La sauvegarde a échoué.');
+                }
+            }
+            // Redirection uniquement si la sauvegarde a réussi
+            window.location.href = '/cloture-wizard';
 
-        // On n'a plus besoin de sauvegarder manuellement la session,
-        // l'autosave en BDD s'en est déjà chargé.
-        window.location.href = '/cloture-wizard';
+        } catch (error) {
+            alert(`Erreur: Impossible de sauvegarder les données avant la clôture. ${error.message}`);
+            clotureBtn.disabled = false;
+            clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
+        }
     });
 }
 
