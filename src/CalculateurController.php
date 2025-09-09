@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Mis à jour pour le nouvel assistant de clôture)
+// Fichier : src/CalculateurController.php (Version Finale Complète et Corrigée)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -179,94 +179,95 @@ class CalculateurController {
         exit;
     }
 
-public function cloture_generale() {
-    header('Content-Type: application/json');
-    $backupResult = $this->backupService->createBackup();
-    if (!$backupResult['success']) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => $backupResult['message']]);
-        exit;
-    }
-    try {
-        // --- Étape 1: Sauvegarde de l'état final de la journée ---
-        $this->pdo->beginTransaction();
-        $nom_comptage = "Clôture Générale du " . date('d/m/Y');
-        $explication = "Comptage final consolidé de la journée.";
-        $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-        $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
-        $comptage_id = $this->pdo->lastInsertId();
-        
-        foreach ($this->noms_caisses as $caisse_id => $nom) {
-            $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
-            if (empty($caisse_data)) continue;
-            
-            $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-            $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
+    public function cloture_generale() {
+        header('Content-Type: application/json');
+        $backupResult = $this->backupService->createBackup();
+        if (!$backupResult['success']) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $backupResult['message']]);
+            exit;
         }
-        $this->pdo->commit();
-
-        // --- Étape 2: Calcul et création du fond de caisse pour J+1 ---
-        $this->pdo->beginTransaction();
-        $nom_comptage_j1 = "Fond de caisse J+1 du " . date('d/m/Y');
-        $stmt_j1 = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-        $stmt_j1->execute([$nom_comptage_j1, "Préparation pour la journée suivante.", date('Y-m-d H:i:s')]);
-        $comptage_id_j1 = $this->pdo->lastInsertId();
-
-        foreach ($this->noms_caisses as $caisse_id => $nom) {
-            // On récupère les données de la dernière clôture de cette caisse
-            $stmt_last = $this->pdo->prepare(
-                "SELECT cd.id FROM comptages c JOIN comptage_details cd ON c.id = cd.comptage_id
-                 WHERE cd.caisse_id = ? AND c.nom_comptage LIKE 'Clôture Caisse%' ORDER BY c.date_comptage DESC LIMIT 1"
-            );
-            $stmt_last->execute([$caisse_id]);
-            $last_detail_id = $stmt_last->fetchColumn();
-
-            if (!$last_detail_id) continue;
-
-            $stmt_denoms = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
-            $stmt_denoms->execute([$last_detail_id]);
-            $denoms_data = $stmt_denoms->fetchAll(PDO::FETCH_KEY_PAIR);
-
-            $stmt_retraits = $this->pdo->prepare("SELECT denomination_nom, quantite_retiree FROM comptage_retraits WHERE comptage_detail_id = ?");
-            $stmt_retraits->execute([$last_detail_id]);
-            $retraits_data = $stmt_retraits->fetchAll(PDO::FETCH_KEY_PAIR);
+        try {
+            // --- Étape 1: Sauvegarde de l'état final de la journée ---
+            $this->pdo->beginTransaction();
+            $nom_comptage = "Clôture Générale du " . date('d/m/Y');
+            $explication = "Comptage final consolidé de la journée.";
+            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt->execute([$nom_comptage, $explication, date('Y-m-d H:i:s')]);
+            $comptage_id = $this->pdo->lastInsertId();
             
-            $nouveau_fond_de_caisse = 0;
-            $nouvelles_quantites = [];
-            $all_denoms = array_merge($this->denominations['billets'], $this->denominations['pieces']);
+            foreach ($this->noms_caisses as $caisse_id => $nom) {
+                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
+                if (empty($caisse_data)) continue;
+                
+                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+                $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
+            }
+            $this->pdo->commit();
 
-            foreach ($all_denoms as $name => $value) {
-                $qte_initiale = intval($denoms_data[$name] ?? 0);
-                $qte_retiree = intval($retraits_data[$name] ?? 0);
-                $qte_finale = $qte_initiale - $qte_retiree;
-                if ($qte_finale > 0) {
-                    $nouvelles_quantites[$name] = $qte_finale;
-                    $nouveau_fond_de_caisse += $qte_finale * $value;
+            // --- Étape 2: Calcul et création du fond de caisse pour J+1 ---
+            $this->pdo->beginTransaction();
+            $nom_comptage_j1 = "Fond de caisse J+1 du " . date('d/m/Y');
+            $stmt_j1 = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt_j1->execute([$nom_comptage_j1, "Préparation pour la journée suivante.", date('Y-m-d H:i:s')]);
+            $comptage_id_j1 = $this->pdo->lastInsertId();
+
+            foreach ($this->noms_caisses as $caisse_id => $nom) {
+                // On récupère les données de la dernière clôture de cette caisse
+                $stmt_last = $this->pdo->prepare(
+                    "SELECT cd.id FROM comptages c JOIN comptage_details cd ON c.id = cd.comptage_id
+                     WHERE cd.caisse_id = ? AND c.nom_comptage LIKE 'Clôture Caisse%' ORDER BY c.date_comptage DESC LIMIT 1"
+                );
+                $stmt_last->execute([$caisse_id]);
+                $last_detail_id = $stmt_last->fetchColumn();
+
+                if (!$last_detail_id) continue;
+
+                $stmt_denoms = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
+                $stmt_denoms->execute([$last_detail_id]);
+                $denoms_data = $stmt_denoms->fetchAll(PDO::FETCH_KEY_PAIR);
+
+                $stmt_retraits = $this->pdo->prepare("SELECT denomination_nom, quantite_retiree FROM comptage_retraits WHERE comptage_detail_id = ?");
+                $stmt_retraits->execute([$last_detail_id]);
+                $retraits_data = $stmt_retraits->fetchAll(PDO::FETCH_KEY_PAIR);
+                
+                $nouveau_fond_de_caisse = 0;
+                $nouvelles_quantites = [];
+                $all_denoms = array_merge($this->denominations['billets'], $this->denominations['pieces']);
+
+                foreach ($all_denoms as $name => $value) {
+                    $qte_initiale = intval($denoms_data[$name] ?? 0);
+                    $qte_retiree = intval($retraits_data[$name] ?? 0);
+                    $qte_finale = $qte_initiale - $qte_retiree;
+                    if ($qte_finale > 0) {
+                        $nouvelles_quantites[$name] = $qte_finale;
+                        $nouveau_fond_de_caisse += $qte_finale * $value;
+                    }
+                }
+                
+                $stmt_details_j1 = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, 0, 0)");
+                $stmt_details_j1->execute([$comptage_id_j1, $caisse_id, $nouveau_fond_de_caisse]);
+                $comptage_detail_id_j1 = $this->pdo->lastInsertId();
+
+                foreach ($nouvelles_quantites as $name => $qte) {
+                    $stmt_denom_j1 = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                    $stmt_denom_j1->execute([$comptage_detail_id_j1, $name, $qte]);
                 }
             }
             
-            $stmt_details_j1 = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, 0, 0)");
-            $stmt_details_j1->execute([$comptage_id_j1, $caisse_id, $nouveau_fond_de_caisse]);
-            $comptage_detail_id_j1 = $this->pdo->lastInsertId();
+            // --- Étape 3: Réinitialisation de l'état de clôture ---
+            $this->clotureStateService->resetState();
+            $this->pdo->commit();
+            
+            echo json_encode(['success' => true, 'message' => "Clôture générale réussie ! Le fond de caisse pour le jour suivant a été préparé."]);
 
-            foreach ($nouvelles_quantites as $name => $qte) {
-                $stmt_denom_j1 = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
-                $stmt_denom_j1->execute([$comptage_detail_id_j1, $name, $qte]);
+        } catch (Exception $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
             }
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Erreur lors de la clôture générale : ' . $e->getMessage()]);
         }
-        
-        // --- Étape 3: Réinitialisation de l'état de clôture ---
-        $this->clotureStateService->resetState();
-        $this->pdo->commit();
-        
-        echo json_encode(['success' => true, 'message' => "Clôture générale réussie ! Le fond de caisse pour le jour suivant a été préparé."]);
-
-    } catch (Exception $e) {
-        if ($this->pdo->inTransaction()) {
-            $this->pdo->rollBack();
-        }
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Erreur lors de la clôture générale : ' . $e->getMessage()]);
+        exit;
     }
-    exit;
 }

@@ -1,8 +1,8 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé pour une activation sécurisée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète et Corrigée)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
-import { initializeCloture, updateClotureUI, setClotureReady } from './cloture-logic.js';
+import { initializeCloture, updateClotureUI } from './cloture-logic.js';
 
 let config = {};
 let wsResourceId = null;
@@ -17,30 +17,19 @@ function saveStateToSession() {
         const data = { caisse: {} };
 
         for (const [key, value] of formData.entries()) {
-            // Gère les champs comme `caisse[1][b500]`
-            const match = key.match(/caisse\[(\d+)\]\[(\w+)\]/);
+            const match = key.match(/caisse\[(\d+)\]\[(\w+|tpe_\d+_\d+)\]/);
             if (match) {
                 const [, id, subKey] = match;
                 if (!data.caisse[id]) data.caisse[id] = {};
                 data.caisse[id][subKey] = value;
             } else {
-                // Gère les champs TPE comme `tpe_1_1`
-                const tpeMatch = key.match(/(tpe_\d+_\d+)/);
-                 if (tpeMatch) {
-                    const tpeId = tpeMatch[1];
-                    const caisseId = tpeId.split('_')[2];
-                    if (!data.caisse[caisseId]) data.caisse[caisseId] = {};
-                    data.caisse[caisseId][tpeId] = value;
-                 } else {
-                    data[key] = value;
-                 }
+                data[key] = value;
             }
         }
         sessionStorage.setItem('calculatorFormData', JSON.stringify(data));
         hasUnsavedChanges = false;
     }
 }
-
 
 const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(amount);
 const parseLocaleFloat = (str) => {
@@ -69,7 +58,7 @@ function renderCalculatorUI() {
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
-        const tpePourCaisse = config.terminaux_paiement ? Object.entries(config.terminaux_paiement).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
+        const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
             const fieldId = `tpe_${tpeId}_${id}`;
             const fieldName = `caisse[${id}][${fieldId}]`;
@@ -128,12 +117,11 @@ function handleWebSocketMessage(data) {
             updateClotureUI(data);
             break;
         case 'welcome':
-            console.log(`%c[CALCULATEUR DEBUG] Message 'welcome' reçu. Mon ID client est : ${data.resourceId}`, 'color: blue; font-weight: bold;');
             wsResourceId = data.resourceId.toString();
             initializeCloture(config, wsResourceId);
             break;
         case 'full_form_state':
-            if (Object.keys(data.state).length > 0) {
+            if (data.state && Object.keys(data.state).length > 0) {
                 for (const id in data.state) {
                     const field = document.getElementById(id);
                     if (field) field.value = data.state[id];
@@ -169,7 +157,7 @@ function attachEventListeners() {
     tabSelector.addEventListener('click', e => {
         const btn = e.target.closest('.tab-link');
         if (btn) {
-            tabSelector.querySelectorAll('.tab-link, .caisse-tab-content, .ecart-display').forEach(el => el.classList.remove('active'));
+            page.querySelectorAll('.tab-link, .caisse-tab-content, .ecart-display').forEach(el => el.classList.remove('active'));
             btn.classList.add('active');
             const tabId = btn.dataset.tab;
             document.getElementById(tabId)?.classList.add('active');
@@ -209,6 +197,60 @@ function attachEventListeners() {
     });
 }
 
+export function handleAllCaissesClosed(isAllClosed) {
+    const existingBanner = document.getElementById('final-cloture-banner');
+    const container = document.getElementById('history-view-banner-container');
+    
+    if (isAllClosed && !existingBanner && container) {
+        const bannerHtml = `
+            <div id="final-cloture-banner" class="history-view-banner" style="background-color: rgba(39, 174, 96, 0.1); border-color: var(--color-success);">
+                <i class="fa-solid fa-flag-checkered" style="color: var(--color-success);"></i>
+                <div>
+                    <strong style="color: var(--color-success);">Toutes les caisses sont clôturées !</strong>
+                    <p>Vous pouvez maintenant finaliser la journée. Cette action créera un rapport final et préparera les fonds de caisse pour demain.</p>
+                </div>
+                <button id="trigger-final-cloture" class="btn save-btn">Finaliser la journée</button>
+            </div>`;
+        container.innerHTML = bannerHtml;
+        document.getElementById('trigger-final-cloture').addEventListener('click', performFinalCloture);
+    } else if (!isAllClosed && existingBanner) {
+        existingBanner.remove();
+    }
+}
+
+async function performFinalCloture() {
+    if (!confirm("Êtes-vous sûr de vouloir finaliser la journée ? Cette action est irréversible et réinitialisera les caisses pour demain.")) {
+        return;
+    }
+
+    const button = document.getElementById('trigger-final-cloture');
+    button.disabled = true;
+    button.textContent = 'Finalisation...';
+
+    try {
+        const form = document.getElementById('caisse-form');
+        const formData = new FormData(form);
+
+        const response = await fetch('index.php?route=cloture/confirm_generale', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+
+        if (!result.success) {
+            throw new Error(result.message);
+        }
+
+        alert(result.message);
+        window.location.reload();
+
+    } catch (error) {
+        alert(`Erreur lors de la finalisation : ${error.message}`);
+        button.disabled = false;
+        button.textContent = 'Finaliser la journée';
+    }
+}
+
 export async function initializeCalculator() {
     try {
         config = await fetchCalculatorConfig();
@@ -222,7 +264,7 @@ export async function initializeCalculator() {
             for (const caisseId in dataToLoad.caisse) {
                 if (config.nomsCaisses[caisseId]) {
                     for (const key in dataToLoad.caisse[caisseId]) {
-                        const field = document.getElementById(key);
+                        const field = document.getElementById(key) || document.getElementsByName(`caisse[${caisseId}][${key}]`)[0];
                         if (field) {
                             field.value = dataToLoad.caisse[caisseId][key];
                         }
@@ -233,10 +275,8 @@ export async function initializeCalculator() {
         
         calculateAll();
         
-        // La page du calculateur définit son propre gestionnaire de messages pour le WebSocket global
         setActiveMessageHandler(handleWebSocketMessage);
         
-        // Les écouteurs d'événements sont attachés
         attachEventListeners();
         
         const mainContent = document.getElementById('main-content');
@@ -245,7 +285,6 @@ export async function initializeCalculator() {
         }
         window.addEventListener('beforeunload', saveStateToSession);
 
-        // NOUVEAU : Demander l'état complet au serveur maintenant que nous sommes prêts à l'écouter
         console.log("[Calculator] Prêt. Demande de l'état complet au serveur WebSocket.");
         sendWsMessage({ type: 'get_full_state' });
 

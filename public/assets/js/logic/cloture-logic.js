@@ -1,6 +1,7 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Corrigé pour la race condition)
+// Fichier : public/assets/js/logic/cloture-logic.js (Version Finale Complète et Corrigée)
 
 import { sendWsMessage } from './websocket-service.js';
+import { handleAllCaissesClosed } from './calculator-logic.js';
 
 let config = {};
 let lockedCaisses = [];
@@ -23,6 +24,8 @@ export function setClotureReady(isReady) {
 }
 
 export function updateClotureUI(newState) {
+    if (!newState) return;
+
     lockedCaisses = newState.caisses || [];
     closedCaisses = (newState.closed_caisses || []).map(String);
 
@@ -42,9 +45,8 @@ export function updateClotureUI(newState) {
 
         const isClosed = closedCaisses.includes(fieldCaisseId);
         const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === fieldCaisseId);
-
-        // --- CORRECTION CI-DESSOUS ---
-        // On utilise String() pour éviter l'erreur si resourceId est null.
+        
+        // Correction pour la "race condition" où resourceId peut être null au début
         const isLockedByOther = lockInfo && lockInfo.locked_by && String(lockInfo.locked_by) !== String(resourceId);
         
         field.disabled = isClosed || isLockedByOther;
@@ -54,6 +56,16 @@ export function updateClotureUI(newState) {
             parentFormGroup.title = isClosed ? 'Cette caisse est clôturée.' : (isLockedByOther ? `Cette caisse est en cours de modification par un autre utilisateur.` : '');
         }
     });
+
+    // Logique pour déclencher la bannière de clôture finale
+    if (config.nomsCaisses) {
+        const totalCaisses = Object.keys(config.nomsCaisses).length;
+        if (totalCaisses > 0 && closedCaisses.length === totalCaisses) {
+            handleAllCaissesClosed(true);
+        } else {
+            handleAllCaissesClosed(false);
+        }
+    }
 }
 
 export function setupGlobalClotureButton() {
@@ -66,27 +78,18 @@ export function setupGlobalClotureButton() {
             return;
         }
 
-        // Le reste de la logique pour lancer l'assistant de clôture
         const form = document.getElementById('caisse-form');
         if (form) {
             const formData = new FormData(form);
             const data = { caisse: {} };
             for (const [key, value] of formData.entries()) {
-                const match = key.match(/caisse\[(\d+)\]\[(\w+)\]/);
+                const match = key.match(/caisse\[(\d+)\]\[(\w+|tpe_\d+_\d+)\]/);
                 if (match) {
                     const [, id, subKey] = match;
                     if (!data.caisse[id]) data.caisse[id] = {};
                     data.caisse[id][subKey] = value;
                 } else {
-                    const tpeMatch = key.match(/(tpe_\d+_\d+)/);
-                     if (tpeMatch) {
-                        const tpeId = tpeMatch[1];
-                        const caisseId = tpeId.split('_')[2];
-                        if (!data.caisse[caisseId]) data.caisse[caisseId] = {};
-                        data.caisse[caisseId][tpeId] = value;
-                     } else {
-                        data[key] = value;
-                     }
+                    data[key] = value;
                 }
             }
             
