@@ -245,6 +245,10 @@ export async function initializeCalculator() {
         }
         window.addEventListener('beforeunload', saveStateToSession);
 
+        // NOUVEAU : Demander l'état complet au serveur maintenant que nous sommes prêts à l'écouter
+        console.log("[Calculator] Prêt. Demande de l'état complet au serveur WebSocket.");
+        sendWsMessage({ type: 'get_full_state' });
+
     } catch (error) {
         console.error("Erreur critique lors de l'initialisation du calculateur :", error);
         const mainContent = document.getElementById('main-content');

@@ -1,5 +1,5 @@
 <?php
-// Fichier : config/websocket_server.php (Version Finale Corrigée et Verbosifiée)
+// Fichier : config/websocket_server.php (Version Finale Complète et Corrigée)
 
 // Port d'écoute du serveur WebSocket
 $port = '8081';
@@ -102,9 +102,8 @@ class CaisseServer implements MessageComponentInterface {
             }
         });
 
+        // On n'envoie que le message de bienvenue. Le client demandera l'état complet.
         $conn->send(json_encode(['type' => 'welcome', 'resourceId' => $conn->resourceId]));
-        $conn->send(json_encode($this->clotureState));
-        $conn->send(json_encode(['type' => 'full_form_state', 'state' => $this->formState]));
     }
 
     public function onMessage(ConnectionInterface $from, $msg) {
@@ -112,9 +111,8 @@ class CaisseServer implements MessageComponentInterface {
         $this->executeDbAction(function() use ($from, $msg) {
             $data = json_decode($msg, true);
 
- if (isset($data['id']) && isset($data['value'])) {
+            if (isset($data['id']) && isset($data['value'])) {
                 // --- DEBUT DE LA CORRECTION DE SÉCURITÉ ---
-                // On extrait l'ID de la caisse depuis l'ID du champ (ex: "b200_1" -> "1")
                 $parts = explode('_', $data['id']);
                 $caisseId = end($parts);
 
@@ -122,10 +120,7 @@ class CaisseServer implements MessageComponentInterface {
                     $caisseId = intval($caisseId);
                     $status = $this->clotureStateService->getCaisseStatus($caisseId);
 
-                    // Si la caisse a un statut, qu'elle est verrouillée, ET que l'expéditeur
-                    // n'est PAS celui qui a posé le verrou...
                     if ($status && $status['status'] === 'locked' && $status['locked_by_ws_id'] != (string)$from->resourceId) {
-                        // ... alors on refuse l'action et on arrête le traitement.
                         echo "  -> ACTION REFUSEE : CLIENT-{$from->resourceId} a tenté de modifier la caisse {$caisseId} qui est verrouillée par CLIENT-{$status['locked_by_ws_id']}.\n";
                         return;
                     }
@@ -141,6 +136,11 @@ class CaisseServer implements MessageComponentInterface {
             
             $actionProcessed = false;
             switch ($data['type']) {
+                case 'get_full_state':
+                    echo "ACTION: CLIENT-{$from->resourceId} demande l'état complet.\n";
+                    $from->send(json_encode($this->clotureState));
+                    $from->send(json_encode(['type' => 'full_form_state', 'state' => $this->formState]));
+                    break;
                 case 'cloture_lock':
                     echo "ACTION: CLIENT-{$from->resourceId} demande à verrouiller la caisse {$data['caisse_id']}.\n";
                     $lockSuccess = $this->clotureStateService->lockCaisse($data['caisse_id'], (string)$from->resourceId);
