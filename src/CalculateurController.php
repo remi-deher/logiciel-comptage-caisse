@@ -299,8 +299,13 @@ class CalculateurController {
                 $stmt_details_cg = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
                 $stmt_details_cg->execute([$comptage_id_cloture_generale, $caisse_id, $latest_cloture_data['fond_de_caisse'], $latest_cloture_data['ventes'], $latest_cloture_data['retrocession']]);
                 $detail_id_cg = $this->pdo->lastInsertId();
+
+                // CORRECTION : S'assurer que la chaîne n'est pas vide avant de l'exploser
+                $denominations_array = [];
+                if (!empty($latest_cloture_data['denominations_str'])) {
+                    $denominations_array = explode(';', $latest_cloture_data['denominations_str']);
+                }
                 
-                $denominations_array = explode(';', $latest_cloture_data['denominations_str']);
                 foreach ($denominations_array as $denom_pair) {
                     if (strpos($denom_pair, ':') !== false) {
                         list($name, $quantity) = explode(':', $denom_pair);
