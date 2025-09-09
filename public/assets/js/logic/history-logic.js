@@ -64,6 +64,8 @@ export async function initializeHistoryLogic() {
     const historyPage = document.getElementById('history-page');
     if (!historyPage) return;
 
+    // CORRECTION : Toutes les fonctions de rendu et de logique sont maintenant dans le scope de l'initialisation.
+    
     function renderCards(container, historique) {
         if (!historique || historique.length === 0) {
             container.innerHTML = `<p style="padding: 20px; text-align: center;">Aucun enregistrement trouvé.</p>`;
@@ -163,7 +165,7 @@ export async function initializeHistoryLogic() {
             </div>
             <div class="modal-body" id="printable-content">${summaryHtml}<div class="modal-details-grid">${caissesHtml}</div></div>`;
     }
-    
+
     function updateComparisonToolbar() {
         const toolbar = document.getElementById('comparison-toolbar');
         if (!toolbar) return;
