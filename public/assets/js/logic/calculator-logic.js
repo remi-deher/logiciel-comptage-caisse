@@ -73,7 +73,28 @@ function renderCalculatorUI() {
             const fieldName = `caisse[${id}][${fieldId}]`;
             return `<div class="form-group"><label>${tpe.nom}</label><input type="text" data-caisse-id="${id}" id="${fieldId}" name="${fieldName}"></div>`
         }).join('');
-        contentHtml += `<div id="caisse${id}" class="caisse-tab-content ${isActive}"><div class="grid grid-3" style="margin-bottom:20px;"><div class="form-group"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div><div class="form-group"><label>Ventes du Jour</label><input type="text" data-caisse-id="${id}" id="ventes_${id}" name="caisse[${id}][ventes]"></div><div class="form-group"><label>Rétrocessions</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div></div><div class="payment-method-tabs"><div class="payment-method-selector"><button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>${tpeHtml ? `<button type="button" class="payment-tab-link" data-payment-tab="cb_${id}"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>` : ''}</div><div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>${tpeHtml ? `<div id="cb_${id}" class="payment-tab-content"><div class="grid">${tpeHtml}</div></div>` : ''}</div></div>`;
+        
+        // --- DÉBUT DES MODIFICATIONS ---
+        contentHtml += `
+            <div id="caisse${id}" class="caisse-tab-content ${isActive}">
+                <div class="grid grid-3" style="margin-bottom:20px;">
+                    <div class="form-group"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div>
+                    <div class="form-group"><label>Ventes du Jour</label><input type="text" data-caisse-id="${id}" id="ventes_${id}" name="caisse[${id}][ventes]"></div>
+                    <div class="form-group"><label>Rétrocessions</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
+                </div>
+                <div class="payment-method-tabs">
+                    <div class="payment-method-selector">
+                        <button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>
+                        ${tpeHtml ? `<button type="button" class="payment-tab-link" data-payment-tab="cb_${id}"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>` : ''}
+                        <button type="button" class="payment-tab-link" data-payment-tab="reserve_${id}"><i class="fa-solid fa-vault"></i> Réserve</button>
+                    </div>
+                    <div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>
+                    ${tpeHtml ? `<div id="cb_${id}" class="payment-tab-content"><div class="grid">${tpeHtml}</div></div>` : ''}
+                    <div id="reserve_${id}" class="payment-tab-content">
+                        <p>Chargement des informations de la réserve...</p>
+                    </div>
+                </div>
+            </div>`;
     });
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
 }
