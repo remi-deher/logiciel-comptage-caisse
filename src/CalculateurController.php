@@ -141,48 +141,73 @@ class CalculateurController {
         exit;
     }
 
-    private function handleSave($is_autosave) {
-        header('Content-Type: application/json');
-        if ($is_autosave) ob_start();
-        try {
-            $this->pdo->beginTransaction();
-            $nom_comptage = trim($_POST['nom_comptage'] ?? '');
-            if ($is_autosave) {
-                $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
-                $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
-            } else {
-                $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;
-            }
-            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-            $stmt->execute([$nom_comptage, trim($_POST['explication'] ?? ''), date('Y-m-d H:i:s')]);
-            $comptage_id = $this->pdo->lastInsertId();
-            foreach ($this->noms_caisses as $caisse_id => $nom) {
-                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
-                if (empty($caisse_data)) continue;
-                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
-                $comptage_detail_id = $this->pdo->lastInsertId();
-                foreach ($this->denominations as $type => $denominations_list) {
-                    foreach ($denominations_list as $name => $value) {
-                        $quantite = get_numeric_value($caisse_data, $name);
-                        if ($quantite > 0) {
-                            $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
-                            $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
-                        }
+private function handleSave($is_autosave) {
+    header('Content-Type: application/json');
+    if ($is_autosave) ob_start();
+    try {
+        $this->pdo->beginTransaction();
+        $nom_comptage = trim($_POST['nom_comptage'] ?? '');
+        if ($is_autosave) {
+            $this.pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
+            $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
+        } else {
+            $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;
+        }
+        $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+        $stmt->execute([$nom_comptage, trim($_POST['explication'] ?? ''), date('Y-m-d H:i:s')]);
+        $comptage_id = $this->pdo->lastInsertId();
+
+        foreach ($this->noms_caisses as $caisse_id => $nom) {
+            $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
+            if (empty($caisse_data)) continue;
+
+            $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
+            $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
+            $comptage_detail_id = $this->pdo->lastInsertId();
+
+            // Enregistrement des dénominations (espèces)
+            foreach ($this->denominations as $type => $denominations_list) {
+                foreach ($denominations_list as $name => $value) {
+                    $quantite = get_numeric_value($caisse_data, $name);
+                    if ($quantite > 0) {
+                        $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                        $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
                     }
                 }
             }
-            $this->pdo->commit();
-            if ($is_autosave) ob_end_clean();
-            echo json_encode(['success' => true, 'message' => "Sauvegarde réussie !"]);
-        } catch (Exception $e) {
-            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
-            if ($is_autosave) ob_end_clean();
-            http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Erreur de BDD: ' . $e->getMessage()]);
+            
+            // --- DÉBUT DES AJOUTS ---
+            // Enregistrement des relevés TPE (Carte Bancaire)
+            if (isset($caisse_data['tpe']) && is_array($caisse_data['tpe'])) {
+                foreach ($caisse_data['tpe'] as $terminal_id => $montant) {
+                    $montant_val = get_numeric_value($caisse_data['tpe'], $terminal_id);
+                    if ($montant_val > 0) {
+                        $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant) VALUES (?, ?, ?)");
+                        $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val]);
+                    }
+                }
+            }
+
+            // Enregistrement des chèques
+            $cheques_total = get_numeric_value($caisse_data, 'cheques_total');
+            if ($cheques_total > 0) {
+                // On enregistre une seule entrée pour le total des chèques
+                $stmt_cheque = $this->pdo->prepare("INSERT INTO comptage_cheques (comptage_detail_id, montant) VALUES (?, ?)");
+                $stmt_cheque->execute([$comptage_detail_id, $cheques_total]);
+            }
+            // --- FIN DES AJOUTS ---
         }
-        exit;
+        $this->pdo->commit();
+        if ($is_autosave) ob_end_clean();
+        echo json_encode(['success' => true, 'message' => "Sauvegarde réussie !"]);
+    } catch (Exception $e) {
+        if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+        if ($is_autosave) ob_end_clean();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Erreur de BDD: ' . $e->getMessage()]);
     }
+    exit;
+}
 
     public function getClotureState() {
         header('Content-Type: application/json');
