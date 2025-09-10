@@ -68,7 +68,7 @@ class TerminalManagementService {
     }
 
     /**
-     * Met à jour la variable $terminaux_paiement dans le fichier config.php.
+     * Met à jour la variable $tpe_par_caisse dans le fichier config.php.
      */
     private function updateTerminalsInConfig() {
         $stmt = $this->pdo->query("SELECT id, nom_terminal, caisse_associee FROM terminaux_paiement ORDER BY id");
@@ -82,6 +82,9 @@ class TerminalManagementService {
             ];
         }
 
-        $this->configService->updateConfigFile(['terminaux_paiement' => $terminalsForConfig]);
+        // --- CORRECTION CI-DESSOUS ---
+        // L'ancien nom de variable 'terminaux_paiement' a été remplacé par 'tpe_par_caisse'
+        // pour correspondre à ce que le service de configuration attend.
+        $this->configService->updateConfigFile(['tpe_par_caisse' => $terminalsForConfig]);
     }
 }
