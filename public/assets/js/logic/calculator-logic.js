@@ -67,28 +67,39 @@ function renderCalculatorUI() {
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
+        
+        // Logique pour les terminaux de paiement (TPE)
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
-            const fieldId = `tpe_${tpeId}_${id}`;
-            const fieldName = `caisse[${id}][${fieldId}]`;
-            return `<div class="form-group"><label>${tpe.nom}</label><input type="text" data-caisse-id="${id}" id="${fieldId}" name="${fieldName}"></div>`
+            // Le nom du champ est simplifié pour être plus facile à traiter côté serveur
+            const fieldName = `caisse[${id}][tpe][${tpeId}]`;
+            return `<div class="form-group"><label>${tpe.nom}</label><input type="text" data-caisse-id="${id}" name="${fieldName}"></div>`
         }).join('');
         
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
                 <div class="grid grid-3" style="margin-bottom:20px;">
                     <div class="form-group"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div>
-                    <div class="form-group"><label>Ventes du Jour</label><input type="text" data-caisse-id="${id}" id="ventes_${id}" name="caisse[${id}][ventes]"></div>
+                    <div class="form-group"><label>Ventes du Jour (Total TPE + Chèques + Espèces attendu)</label><input type="text" data-caisse-id="${id}" id="ventes_${id}" name="caisse[${id}][ventes]"></div>
                     <div class="form-group"><label>Rétrocessions</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
                 </div>
                 <div class="payment-method-tabs">
                     <div class="payment-method-selector">
                         <button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>
-                        ${tpeHtml ? `<button type="button" class="payment-tab-link" data-payment-tab="cb_${id}"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>` : ''}
+                        <button type="button" class="payment-tab-link" data-payment-tab="cb_${id}"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>
+                        <button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button>
                         <button type="button" class="payment-tab-link" data-payment-tab="reserve_${id}"><i class="fa-solid fa-vault"></i> Réserve</button>
                     </div>
                     <div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>
-                    ${tpeHtml ? `<div id="cb_${id}" class="payment-tab-content"><div class="grid">${tpeHtml}</div></div>` : ''}
+                    <div id="cb_${id}" class="payment-tab-content">
+                        ${tpeHtml || '<p>Aucun terminal de paiement configuré pour cette caisse.</p>'}
+                    </div>
+                    <div id="cheques_${id}" class="payment-tab-content">
+                        <div class="form-group">
+                            <label>Montant total des chèques</label>
+                            <input type="text" name="caisse[${id}][cheques_total]" placeholder="0,00">
+                        </div>
+                    </div>
                     <div id="reserve_${id}" class="payment-tab-content">
                         <p>Chargement des informations de la réserve...</p>
                     </div>
@@ -98,25 +109,29 @@ function renderCalculatorUI() {
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
 }
 
-
+// Dans la fonction calculateAll(), nous devons inclure les nouveaux montants.
+// Remplacez la fonction calculateAll existante par celle-ci.
 function calculateAll() {
     if (!config.nomsCaisses) return;
     Object.keys(config.nomsCaisses).forEach(id => {
-        let totalCompte = 0;
+        let totalCompteEspeces = 0;
         const allDenoms = {...config.denominations.billets, ...config.denominations.pieces};
         for (const name in allDenoms) {
             const input = document.getElementById(`${name}_${id}`);
             if (input) {
                 const quantite = parseInt(input.value, 10) || 0;
                 const totalLigne = quantite * parseFloat(allDenoms[name]);
-                totalCompte += totalLigne;
+                totalCompteEspeces += totalLigne;
                 document.getElementById(`total_${name}_${id}`).textContent = formatCurrency(totalLigne);
             }
         }
+        
         const fondDeCaisse = parseLocaleFloat(document.getElementById(`fond_de_caisse_${id}`).value);
         const ventes = parseLocaleFloat(document.getElementById(`ventes_${id}`).value);
         const retrocession = parseLocaleFloat(document.getElementById(`retrocession_${id}`).value);
-        const ecart = (totalCompte - fondDeCaisse) - (ventes + retrocession);
+        
+        // L'écart ne concerne que les espèces.
+        const ecart = (totalCompteEspeces - fondDeCaisse) - (ventes + retrocession);
         updateEcartDisplay(id, ecart);
     });
 }
