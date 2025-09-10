@@ -422,3 +422,75 @@
     height: 20px;
     cursor: pointer;
 }
+
+.final-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: right;
+}
+
+.final-summary-table th,
+.final-summary-table td {
+    padding: 15px;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.final-summary-table thead th {
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-secondary);
+    text-align: right;
+}
+
+.final-summary-table th:first-child,
+.final-summary-table td:first-child {
+    text-align: left;
+}
+
+.final-summary-table tbody tr:hover {
+    background-color: var(--color-surface-alt-hover);
+}
+
+.final-summary-table tfoot {
+    background-color: var(--color-surface-alt);
+    border-top: 2px solid var(--color-border);
+    font-size: 1.1em;
+}
+
+.final-summary-table .text-danger {
+    color: var(--color-danger);
+    font-weight: bold;
+}
+.final-summary-table .text-success {
+    color: var(--color-success);
+    font-weight: bold;
+}
+
+.next-steps-info {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-left: 4px solid var(--color-primary);
+    border-radius: 8px;
+}
+.next-steps-info h4 {
+    margin-top: 0;
+    color: var(--color-primary);
+}
+.next-steps-info ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+.next-steps-info li {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.next-steps-info li i {
+    color: var(--color-success);
+}
+.next-steps-info li:last-child {
+    margin-bottom: 0;
+}
