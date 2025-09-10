@@ -270,7 +270,7 @@ class CalculateurController {
 
             $this->pdo->beginTransaction();
 
-            $nom_comptage_cg = "Clôture Générale du " . date('d/m/Y');
+            $nom_comptage_cg = "Clôture Générale du " . date('d/m/Y H:i:s');
             $explication_cg = "Comptage final consolidé de la journée.";
             $stmt_cg = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt_cg->execute([$nom_comptage_cg, $explication_cg, date('Y-m-d H:i:s')]);
