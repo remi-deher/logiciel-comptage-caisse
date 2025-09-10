@@ -67,13 +67,13 @@ function renderCalculatorUI() {
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
-
+        
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
             const fieldName = `caisse[${id}][tpe][${tpeId}]`;
             return `<div class="form-group"><label>${tpe.nom}</label><input type="text" data-caisse-id="${id}" name="${fieldName}"></div>`
         }).join('');
-
+        
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
                 <div class="grid grid-4" style="margin-bottom:20px;">
@@ -109,8 +109,6 @@ function renderCalculatorUI() {
 }
 
 
-// Dans la fonction calculateAll(), nous devons inclure les nouveaux montants.
-// Remplacez la fonction calculateAll existante par celle-ci.
 function calculateAll() {
     if (!config.nomsCaisses) return;
     Object.keys(config.nomsCaisses).forEach(id => {
@@ -127,11 +125,11 @@ function calculateAll() {
         }
         
         const fondDeCaisse = parseLocaleFloat(document.getElementById(`fond_de_caisse_${id}`).value);
-        const ventes = parseLocaleFloat(document.getElementById(`ventes_${id}`).value);
-        const retrocession = parseLocaleFloat(document.getElementById(`retrocession_${id}`).value);
+        const ventesEspeces = parseLocaleFloat(document.getElementById(`ventes_especes_${id}`).value);
         
-        // L'écart ne concerne que les espèces.
-        const ecart = (totalCompteEspeces - fondDeCaisse) - (ventes + retrocession);
+        const recetteReelleEspeces = totalCompteEspeces - fondDeCaisse;
+        const ecart = recetteReelleEspeces - ventesEspeces;
+        
         updateEcartDisplay(id, ecart);
     });
 }
@@ -145,13 +143,13 @@ function updateEcartDisplay(id, ecart) {
     if (valueSpan) valueSpan.textContent = formatCurrency(ecart);
     if (Math.abs(ecart) < 0.01) {
         display.classList.add('ecart-ok');
-        if (explanation) explanation.textContent = "La caisse est juste.";
+        if (explanation) explanation.textContent = "L'écart en espèces est de 0.";
     } else if (ecart > 0) {
         display.classList.add('ecart-positif');
-        if (explanation) explanation.textContent = "Il y a un surplus dans la caisse.";
+        if (explanation) explanation.textContent = "Il y a un surplus d'espèces dans la caisse.";
     } else {
         display.classList.add('ecart-negatif');
-        if (explanation) explanation.textContent = "Il manque de l'argent dans la caisse.";
+        if (explanation) explanation.textContent = "Il manque des espèces dans la caisse.";
     }
 }
 
