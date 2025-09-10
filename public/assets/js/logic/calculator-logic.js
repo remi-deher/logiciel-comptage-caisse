@@ -279,21 +279,37 @@ function attachEventListeners() {
             const tabId = paymentTab.dataset.paymentTab;
             container.querySelector(`#${tabId}`)?.classList.add('active');
 
-            // NOUVEAU : Logique pour afficher/cacher les champs dynamiques
             const caisseId = paymentTab.closest('.caisse-tab-content').id.replace('caisse', '');
             const methodKey = paymentTab.dataset.methodKey;
+            
             const dynamicInputsContainer = document.getElementById(`dynamic-inputs-container-${caisseId}`);
-            dynamicInputsContainer.querySelectorAll('.form-group').forEach(group => {
+            const titleElement = document.getElementById(`theoretical-title-${caisseId}`);
+
+            // Mise à jour du titre du panneau
+            const titles = {
+                especes: '<i class="fa-solid fa-cash-register"></i> Saisie Théorique - Espèces',
+                cb: '<i class="fa-solid fa-credit-card"></i> Saisie Théorique - Carte Bancaire',
+                cheques: '<i class="fa-solid fa-money-check-dollar"></i> Saisie Théorique - Chèques',
+            };
+            if (titles[methodKey]) {
+                titleElement.innerHTML = titles[methodKey];
+            }
+
+            // Affichage/masquage des champs de saisie
+            dynamicInputsContainer.querySelectorAll('.compact-input-group').forEach(group => {
                 if (group.dataset.method.includes(methodKey)) {
-                    group.style.display = 'block';
+                    group.style.display = 'flex'; // On utilise flex pour un affichage compact
                 } else {
                     group.style.display = 'none';
                 }
             });
+
+            // On masque tout le panneau pour l'onglet Réserve
+            const panel = document.querySelector('.theoretical-inputs-panel');
             if (methodKey === 'reserve') {
-                dynamicInputsContainer.style.display = 'none';
+                panel.style.display = 'none';
             } else {
-                dynamicInputsContainer.style.display = 'grid';
+                panel.style.display = 'block';
             }
         }
     });
