@@ -48,7 +48,6 @@ async function fetchCalculatorConfig() {
     return data;
 }
 
-// --- MODIFICATION MAJEURE DE L'INTERFACE ---
 function renderCalculatorUI() {
     const page = calculatorPageElement();
     if (!page) return;
@@ -67,26 +66,31 @@ function renderCalculatorUI() {
         
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
-                <div id="dynamic-inputs-container-${id}" class="dynamic-inputs-grid">
-                    <div class="form-group" data-method="especes">
-                        <label>Fond de Caisse (Espèces)</label>
-                        <input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]">
-                    </div>
-                    <div class="form-group" data-method="especes">
-                        <label>Ventes Espèces (Théorique)</label>
-                        <input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]">
-                    </div>
-                    <div class="form-group" data-method="cb" style="display: none;">
-                        <label>Ventes CB (Théorique)</label>
-                        <input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]">
-                    </div>
-                    <div class="form-group" data-method="cheques" style="display: none;">
-                        <label>Ventes Chèques (Théorique)</label>
-                        <input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]">
-                    </div>
-                    <div class="form-group" data-method="especes cb cheques">
-                        <label>Rétrocessions</label>
-                        <input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]">
+                <div class="theoretical-inputs-panel">
+                    <h3 class="panel-title" id="theoretical-title-${id}">
+                        <i class="fa-solid fa-cash-register"></i> Saisie Théorique - Espèces
+                    </h3>
+                    <div class="panel-inputs" id="dynamic-inputs-container-${id}">
+                        <div class="compact-input-group" data-method="especes">
+                            <label for="fond_de_caisse_${id}">Fond de Caisse</label>
+                            <input type="text" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]">
+                        </div>
+                        <div class="compact-input-group" data-method="especes">
+                            <label for="ventes_especes_${id}">Ventes Espèces</label>
+                            <input type="text" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]">
+                        </div>
+                        <div class="compact-input-group" data-method="cb" style="display: none;">
+                            <label for="ventes_cb_${id}">Ventes CB</label>
+                            <input type="text" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]">
+                        </div>
+                        <div class="compact-input-group" data-method="cheques" style="display: none;">
+                            <label for="ventes_cheques_${id}">Ventes Chèques</label>
+                            <input type="text" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]">
+                        </div>
+                         <div class="compact-input-group" data-method="especes cb cheques">
+                            <label for="retrocession_${id}">Rétrocessions</label>
+                            <input type="text" id="retrocession_${id}" name="caisse[${id}][retrocession]">
+                        </div>
                     </div>
                 </div>
 
@@ -107,7 +111,6 @@ function renderCalculatorUI() {
     });
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
 }
-
 // --- LOGIQUE DE CALCUL MISE À JOUR ---
 function calculateAll() {
     if (!config.nomsCaisses) return;
