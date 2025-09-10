@@ -374,7 +374,7 @@ function updateWizardUI() {
         case 1: renderStep1_Selection(); prevBtn.style.display = 'none'; nextBtn.textContent = 'Suivant'; nextBtn.disabled = document.querySelectorAll('input[name="caisseSelection"]:checked').length === 0; break;
         case 2: renderStep2_Counting(); prevBtn.style.display = 'inline-block'; nextBtn.textContent = 'Valider les comptages'; nextBtn.disabled = false; break;
         case 3: renderStep3_Summary(); prevBtn.style.display = 'inline-block'; nextBtn.textContent = 'Confirmer et Finaliser'; nextBtn.disabled = false; break;
-        case 4: renderStep4_Finalization(); prevBtn.style.display = 'inline-block'; nextBtn.textContent = 'Terminer la Journée'; nextBtn.disabled = false; break;
+        case 4: renderStep4_Finalization(); prevBtn.style.display = 'inline-block'; nextBtn.textContent = 'Terminer la Journée'; nextBtn.disabled = true; break;
     }
 }
 
