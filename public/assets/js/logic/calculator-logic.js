@@ -67,21 +67,20 @@ function renderCalculatorUI() {
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
-        
-        // Logique pour les terminaux de paiement (TPE)
+
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
-            // Le nom du champ est simplifié pour être plus facile à traiter côté serveur
             const fieldName = `caisse[${id}][tpe][${tpeId}]`;
             return `<div class="form-group"><label>${tpe.nom}</label><input type="text" data-caisse-id="${id}" name="${fieldName}"></div>`
         }).join('');
-        
+
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
-                <div class="grid grid-3" style="margin-bottom:20px;">
+                <div class="grid grid-4" style="margin-bottom:20px;">
                     <div class="form-group"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div>
-                    <div class="form-group"><label>Ventes du Jour (Total TPE + Chèques + Espèces attendu)</label><input type="text" data-caisse-id="${id}" id="ventes_${id}" name="caisse[${id}][ventes]"></div>
-                    <div class="form-group"><label>Rétrocessions</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
+                    <div class="form-group"><label>Ventes Espèces (Théorique)</label><input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]"></div>
+                    <div class="form-group"><label>Ventes CB (Théorique)</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div>
+                    <div class="form-group"><label>Ventes Chèques (Théorique)</label><input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]"></div>
                 </div>
                 <div class="payment-method-tabs">
                     <div class="payment-method-selector">
@@ -108,6 +107,7 @@ function renderCalculatorUI() {
     });
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
 }
+
 
 // Dans la fonction calculateAll(), nous devons inclure les nouveaux montants.
 // Remplacez la fonction calculateAll existante par celle-ci.
