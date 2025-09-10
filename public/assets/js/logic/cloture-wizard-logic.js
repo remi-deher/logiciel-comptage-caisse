@@ -206,8 +206,12 @@ function renderStep2_Counting() {
         const tpeData = caisseData.tpe || {};
 
         const buildTextInput = (name, value) => `<input type="text" id="${name}_${id}" name="caisse[${id}][${name}]" data-caisse-id="${id}" value="${value || ''}">`;
-        const buildDenomInput = (name, value) => `<input type="number" id="denominations_${name}_${id}" name="caisse[${id}][denominations][${name}]" data-caisse-id="${id}" value="${value || ''}" min="0">`;
         
+        // ----- DEBUT DE LA CORRECTION -----
+        // On s'assure que l'ID généré ici est IDENTIQUE à celui du calculateur
+        const buildDenomInput = (name, value) => `<input type="number" id="${name}_${id}" name="caisse[${id}][denominations][${name}]" data-caisse-id="${id}" value="${value || ''}" min="0">`;
+        // ----- FIN DE LA CORRECTION -----
+
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
         
@@ -321,7 +325,16 @@ async function handleNextStep() {
         wizardState.selectedCaisses = Array.from(document.querySelectorAll('input:checked')).map(cb => cb.value);
         wizardState.selectedCaisses.forEach(id => {
             if (!calculatorData.caisse[id]) {
-                calculatorData.caisse[id] = { denominations: {}, tpe: {}, fond_de_caisse: '0', ventes_especes: '0', ventes_cb: '0', ventes_cheques: '0', retrocession: '0', cheques_total: '0' };
+                calculatorData.caisse[id] = { 
+                    denominations: {}, 
+                    tpe: {}, 
+                    fond_de_caisse: '0', 
+                    ventes_especes: '0', 
+                    ventes_cb: '0', 
+                    ventes_cheques: '0', 
+                    retrocession: '0', 
+                    cheques_total: '0' 
+                };
             }
             sendWsMessage({ type: 'cloture_lock', caisse_id: id });
         });
@@ -386,39 +399,32 @@ function attachWizardListeners() {
     
     const wizardContent = document.querySelector('.wizard-content');
     
-    // --- DÉBUT DU BLOC CORRIGÉ ---
     wizardContent.addEventListener('input', e => {
         if (e.target.tagName === 'INPUT' && wizardState.currentStep === 2) {
             const nameAttr = e.target.name;
             const caisseId = e.target.dataset.caisseId;
             
-            // On envoie la mise à jour aux autres clients
             sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
 
             if (!caisseId || !calculatorData.caisse[caisseId] || !nameAttr) return;
 
-            // On utilise une expression régulière pour extraire les clés du nom du champ
             const keys = nameAttr.match(/\[([^\]]+)\]/g).map(key => key.slice(1, -1));
-            // Pour "caisse[1][denominations][b500]", keys -> ["1", "denominations", "b500"]
-            // Pour "caisse[1][fond_de_caisse]", keys -> ["1", "fond_de_caisse"]
 
-            if (keys.length === 3) { // Cas imbriqué (denominations, tpe)
+            if (keys.length === 3) { 
                 const [id, mainKey, subKey] = keys;
                 if (!calculatorData.caisse[id][mainKey]) calculatorData.caisse[id][mainKey] = {};
                 calculatorData.caisse[id][mainKey][subKey] = e.target.value;
-            } else if (keys.length === 2) { // Cas direct (fond_de_caisse, etc.)
+            } else if (keys.length === 2) {
                 const [id, mainKey] = keys;
                 calculatorData.caisse[id][mainKey] = e.target.value;
             }
 
-            // On recalcule l'écart uniquement si un champ lié aux espèces est modifié
             const mainKey = keys[1];
             if (mainKey === 'denominations' || mainKey === 'fond_de_caisse' || mainKey === 'ventes_especes' || mainKey === 'retrocession') {
                 calculateAllForCaisse(caisseId);
             }
         }
     });
-    // --- FIN DU BLOC CORRIGÉ ---
     
     wizardContent.addEventListener('click', e => {
         const mainTab = e.target.closest('.tab-link');

@@ -185,13 +185,22 @@ function handleWebSocketMessage(data) {
             }
             break;
         case 'update':
-             if (data.id && document.activeElement.id !== data.id) {
-                const input = document.getElementById(data.id);
+            // ----- DEBUT DE LA CORRECTION FINALE -----
+            let targetId = data.id;
+            // Si l'ID vient de l'assistant de clôture pour une dénomination, on le nettoie
+            if (targetId.startsWith('denominations_')) {
+                targetId = targetId.replace('denominations_', '');
+            }
+
+            // On s'assure de ne pas mettre à jour le champ qui est activement en cours de modification
+            if (targetId && document.activeElement.id !== targetId) {
+                const input = document.getElementById(targetId);
                 if (input) {
                     input.value = data.value;
-                    calculateAll();
+                    calculateAll(); // On recalcule tout pour mettre à jour les totaux
                 }
             }
+            // ----- FIN DE LA CORRECTION FINALE -----
             break;
         case 'reload_page':
             alert("Les données ont été mises à jour par un autre utilisateur. La page va être actualisée pour afficher les dernières informations.");
