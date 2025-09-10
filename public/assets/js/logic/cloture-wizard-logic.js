@@ -285,57 +285,92 @@ function renderStep3_Summary() {
 function renderStep4_Finalization() {
     const container = document.querySelector('.wizard-content');
 
-    // Calculer les totaux pour toutes les caisses sélectionnées
+    // --- Début du calcul ---
     let grandTotalVentes = 0;
     let grandTotalCompte = 0;
     let grandTotalRetraits = 0;
+    let grandTotalEcart = 0;
+    let rowsHtml = '';
 
     wizardState.selectedCaisses.forEach(id => {
+        const nomCaisse = config.nomsCaisses[id] || `Caisse ${id}`;
         const caisseData = calculatorData.caisse[id] || {};
         const confirmedData = wizardState.confirmedData[id] || {};
 
-        grandTotalVentes += parseLocaleFloat(caisseData.ventes) + parseLocaleFloat(caisseData.retrocession);
-        grandTotalRetraits += confirmedData.totalToWithdraw || 0;
-
-        // Recalculer le total compté pour cette caisse
+        const ventes = parseLocaleFloat(caisseData.ventes) + parseLocaleFloat(caisseData.retrocession);
+        const retrait = confirmedData.totalToWithdraw || 0;
+        
+        let totalCompte = 0;
         const allDenoms = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
         for (const name in caisseData.denominations) {
-            grandTotalCompte += (parseInt(caisseData.denominations[name], 10) || 0) * parseFloat(allDenoms[name]);
+            totalCompte += (parseInt(caisseData.denominations[name], 10) || 0) * parseFloat(allDenoms[name]);
         }
+
+        const ecart = totalCompte - ventes;
+        const fondDeCaisseJ1 = totalCompte - retrait;
+
+        // Mise à jour des totaux généraux
+        grandTotalVentes += ventes;
+        grandTotalCompte += totalCompte;
+        grandTotalRetraits += retrait;
+        grandTotalEcart += ecart;
+
+        // Création de la ligne HTML pour le tableau de cette caisse
+        rowsHtml += `
+            <tr>
+                <td><strong>${nomCaisse}</strong></td>
+                <td>${formatCurrency(ventes)}</td>
+                <td>${formatCurrency(totalCompte)}</td>
+                <td class="ecart-${Math.abs(ecart) < 0.01 ? 'ok' : (ecart > 0 ? 'positif' : 'negatif')}">${formatCurrency(ecart)}</td>
+                <td class="text-danger">${formatCurrency(retrait)}</td>
+                <td class="text-success">${formatCurrency(fondDeCaisseJ1)}</td>
+            </tr>
+        `;
     });
+    // --- Fin du calcul ---
 
-    const grandTotalEcart = grandTotalCompte - grandTotalVentes;
-    const fondDeCaisseFinal = grandTotalCompte - grandTotalRetraits;
 
+    // --- Début du rendu HTML ---
     container.innerHTML = `
         <div class="wizard-step-content">
             <h3><i class="fa-solid fa-flag-checkered"></i> Synthèse Finale</h3>
             <p class="subtitle" style="text-align:center; margin-top:-20px; margin-bottom: 30px;">Veuillez vérifier les totaux avant de finaliser la journée.</p>
             
-            <div class="final-summary-grid">
-                <div class="summary-kpi">
-                    <span>Total des Ventes</span>
-                    <strong>${formatCurrency(grandTotalVentes)}</strong>
-                </div>
-                <div class="summary-kpi">
-                    <span>Total Compté</span>
-                    <strong>${formatCurrency(grandTotalCompte)}</strong>
-                </div>
-                <div class="summary-kpi ecart-${grandTotalEcart >= 0 ? 'ok' : 'negatif'}">
-                    <span>Écart Final</span>
-                    <strong>${formatCurrency(grandTotalEcart)}</strong>
-                </div>
+            <div class="card" style="padding:0;">
+                <table class="final-summary-table">
+                    <thead>
+                        <tr>
+                            <th>Caisse</th>
+                            <th>Ventes Théoriques</th>
+                            <th>Total Compté</th>
+                            <th>Écart</th>
+                            <th>Retrait</th>
+                            <th>Fond de Caisse J+1</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td><strong>TOTAL GÉNÉRAL</strong></td>
+                            <td><strong>${formatCurrency(grandTotalVentes)}</strong></td>
+                            <td><strong>${formatCurrency(grandTotalCompte)}</strong></td>
+                            <td class="ecart-${Math.abs(grandTotalEcart) < 0.01 ? 'ok' : (grandTotalEcart > 0 ? 'positif' : 'negatif')}"><strong>${formatCurrency(grandTotalEcart)}</strong></td>
+                            <td class="text-danger"><strong>${formatCurrency(grandTotalRetraits)}</strong></td>
+                            <td class="text-success"><strong>${formatCurrency(grandTotalCompte - grandTotalRetraits)}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
 
-            <div class="final-summary-flow">
-                <div class="summary-kpi">
-                    <span><i class="fa-solid fa-arrow-down"></i> Total des Retraits</span>
-                    <strong class="text-danger">${formatCurrency(grandTotalRetraits)}</strong>
-                </div>
-                <div class="summary-kpi">
-                    <span><i class="fa-solid fa-arrow-right"></i> Fond de Caisse J+1</span>
-                    <strong class="text-success">${formatCurrency(fondDeCaisseFinal)}</strong>
-                </div>
+            <div class="next-steps-info">
+                <h4>Que se passe-t-il après avoir finalisé ?</h4>
+                <ul>
+                    <li><i class="fa-solid fa-check-circle"></i> Un comptage "Clôture Générale" sera créé dans l'historique avec les chiffres de ce tableau.</li>
+                    <li><i class="fa-solid fa-check-circle"></i> Un nouveau comptage "Fond de caisse J+1" sera automatiquement généré pour démarrer la journée de demain.</li>
+                    <li><i class="fa-solid fa-check-circle"></i> L'état des caisses sera réinitialisé.</li>
+                </ul>
             </div>
 
             <div class="confirmation-box">
@@ -346,6 +381,7 @@ function renderStep4_Finalization() {
             </div>
         </div>
     `;
+    // --- Fin du rendu HTML ---
 
     // Logique pour activer/désactiver le bouton final
     const checkbox = document.getElementById('final-confirmation-checkbox');
