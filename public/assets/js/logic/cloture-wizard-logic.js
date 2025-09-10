@@ -489,7 +489,12 @@ function updateWizardUI() {
     const nextBtn = document.getElementById('wizard-next-btn');
     const prevBtn = document.getElementById('wizard-prev-btn');
     switch(wizardState.currentStep) {
-        case 1: renderStep1_Selection(); prevBtn.style.display = 'none'; nextBtn.textContent = 'Suivant'; nextBtn.disabled = document.querySelectorAll('input[name="caisseSelection"]:checked').length === 0; break;
+        case 1: 
+            renderStep1_Selection(); // On appelle la nouvelle fonction
+            prevBtn.style.display = 'none'; 
+            nextBtn.textContent = 'Suivant'; 
+            nextBtn.disabled = true; // On désactive par défaut, la fonction s'occupe du reste
+            break;
         case 2: renderStep2_Counting(); prevBtn.style.display = 'inline-block'; nextBtn.textContent = 'Valider les comptages'; nextBtn.disabled = false; break;
         case 3: renderStep3_Summary(); prevBtn.style.display = 'inline-block'; nextBtn.textContent = 'Confirmer et Finaliser'; nextBtn.disabled = false; break;
         case 4: renderStep4_Finalization(); prevBtn.style.display = 'inline-block'; nextBtn.textContent = 'Terminer la Journée'; nextBtn.disabled = true; break;
