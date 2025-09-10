@@ -55,7 +55,8 @@ export function updateClotureUI(newState) {
             parentFormGroup.title = isClosed ? 'Cette caisse est clôturée.' : (isLockedByOther ? `Cette caisse est en cours de modification par un autre utilisateur.` : '');
         }
     });
-    
+}
+
 export function setupGlobalClotureButton() {
     const clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn) return;
@@ -66,7 +67,6 @@ export function setupGlobalClotureButton() {
             return;
         }
         
-        // CORRECTION : Forcer une sauvegarde avant de passer à la clôture
         clotureBtn.disabled = true;
         clotureBtn.innerHTML = '<i class="fa-solid fa-save"></i> Sauvegarde...';
         
@@ -83,7 +83,6 @@ export function setupGlobalClotureButton() {
                     throw new Error(result.message || 'La sauvegarde a échoué.');
                 }
             }
-            // Redirection uniquement si la sauvegarde a réussi
             window.location.href = '/cloture-wizard';
 
         } catch (error) {

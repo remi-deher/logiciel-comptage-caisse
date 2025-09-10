@@ -63,7 +63,7 @@ function renderCalculatorUI() {
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="form-group"><label>Relevé TPE : ${tpe.nom}</label><input type="text" data-caisse-id="${id}" name="caisse[${id}][tpe][${tpeId}]"></div>`).join('');
-
+        
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
                 <div class="theoretical-inputs-panel">
@@ -73,23 +73,23 @@ function renderCalculatorUI() {
                     <div class="panel-inputs" id="dynamic-inputs-container-${id}">
                         <div class="compact-input-group" data-method="especes">
                             <label for="fond_de_caisse_${id}">Fond de Caisse</label>
-                            <input type="text" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]">
+                            <input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]">
                         </div>
                         <div class="compact-input-group" data-method="especes">
                             <label for="ventes_especes_${id}">Encaissement Espèces</label>
-                            <input type="text" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]">
+                            <input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]">
                         </div>
                         <div class="compact-input-group" data-method="cb" style="display: none;">
                             <label for="ventes_cb_${id}">Encaissement CB</label>
-                            <input type="text" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]">
+                            <input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]">
                         </div>
                         <div class="compact-input-group" data-method="cheques" style="display: none;">
                             <label for="ventes_cheques_${id}">Encaissement Chèques</label>
-                            <input type="text" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]">
+                            <input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]">
                         </div>
-                        <div class="compact-input-group" data-method="especes cb cheques">
+                         <div class="compact-input-group" data-method="especes cb cheques">
                             <label for="retrocession_${id}" id="retrocession-label-${id}">Rétrocessions en Espèces</label>
-                            <input type="text" id="retrocession_${id}" name="caisse[${id}][retrocession]">
+                            <input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]">
                         </div>
                     </div>
                 </div>
@@ -112,7 +112,6 @@ function renderCalculatorUI() {
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
 }
 
-// --- LOGIQUE DE CALCUL MISE À JOUR ---
 function calculateAll() {
     if (!config.nomsCaisses) return;
     Object.keys(config.nomsCaisses).forEach(id => {
@@ -132,7 +131,6 @@ function calculateAll() {
         const ventesEspeces = parseLocaleFloat(document.getElementById(`ventes_especes_${id}`).value);
         const retrocession = parseLocaleFloat(document.getElementById(`retrocession_${id}`).value);
         
-        // L'écart est calculé sur la base des espèces et des rétrocessions en espèces.
         const recetteReelleEspeces = totalCompteEspeces - fondDeCaisse;
         const ecart = recetteReelleEspeces - (ventesEspeces + retrocession);
         
@@ -166,8 +164,11 @@ function handleWebSocketMessage(data) {
             if (config.nomsCaisses) {
                 const totalCaisses = Object.keys(config.nomsCaisses).length;
                 const closedCaissesCount = (data.closed_caisses || []).length;
-                if (totalCaisses > 0 && closedCaissesCount === totalCaisses) handleAllCaissesClosed(true);
-                else handleAllCaissesClosed(false);
+                if (totalCaisses > 0 && closedCaissesCount === totalCaisses) {
+                    handleAllCaissesClosed(true);
+                } else {
+                    handleAllCaissesClosed(false);
+                }
             }
             break;
         case 'welcome':
@@ -193,11 +194,11 @@ function handleWebSocketMessage(data) {
             }
             break;
         case 'reload_page':
-            alert("Les données ont été mises à jour par un autre utilisateur. La page va être actualisée.");
+            alert("Les données ont été mises à jour par un autre utilisateur. La page va être actualisée pour afficher les dernières informations.");
             window.location.reload();
             break;
         case 'nouvelle_demande_reserve':
-            console.log('[WebSocket] Mise à jour de la réserve, rafraîchissement des données.');
+            console.log('[WebSocket] Une mise à jour de la réserve a eu lieu, rafraîchissement des données.');
             updateAllReserveTabs();
             break;
     }
@@ -210,7 +211,7 @@ async function fetchReserveData() {
         const data = await response.json();
         return data.success ? data : null;
     } catch (error) {
-        console.error("Erreur de récupération des données de la réserve:", error);
+        console.error("Erreur lors de la récupération des données de la réserve:", error);
         return null;
     }
 }
@@ -246,7 +247,6 @@ async function updateAllReserveTabs() {
     }
 }
 
-// --- LOGIQUE D'ÉVÉNEMENTS MISE À JOUR ---
 function attachEventListeners() {
     const page = calculatorPageElement();
     if (!page) return;
@@ -282,12 +282,11 @@ function attachEventListeners() {
 
             const caisseId = paymentTab.closest('.caisse-tab-content').id.replace('caisse', '');
             const methodKey = paymentTab.dataset.methodKey;
-
+            
             const dynamicInputsContainer = document.getElementById(`dynamic-inputs-container-${caisseId}`);
             const titleElement = document.getElementById(`theoretical-title-${caisseId}`);
             const retrocessionLabel = document.getElementById(`retrocession-label-${caisseId}`);
 
-            // Dictionnaire des titres et labels
             const labels = {
                 especes: { title: 'Saisie des encaissements en Espèces', icon: 'fa-cash-register', retro: 'Rétrocessions en Espèces' },
                 cb: { title: 'Saisie des encaissements en CB', icon: 'fa-credit-card', retro: 'Rétrocessions en CB' },
@@ -319,23 +318,108 @@ function attachEventListeners() {
     const form = document.getElementById('caisse-form');
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        // Le reste de la logique de soumission du formulaire principal reste inchangé...
+        const saveButton = form.querySelector('button[type="submit"]');
+        saveButton.disabled = true;
+        saveButton.textContent = 'Enregistrement...';
+        try {
+            const response = await fetch('index.php?route=calculateur/save', { method: 'POST', body: new FormData(form) });
+            const result = await response.json();
+            if (!result.success) throw new Error(result.message);
+            alert('Sauvegarde manuelle réussie !');
+        } catch (error) {
+            alert(`Erreur de sauvegarde : ${error.message}`);
+        } finally {
+            saveButton.disabled = false;
+            saveButton.textContent = 'Enregistrer le Comptage';
+        }
     });
 
     page.addEventListener('submit', async (e) => {
         if (e.target.classList.contains('reserve-demande-form')) {
             e.preventDefault();
-            // Le reste de la logique de soumission du formulaire de réserve reste inchangé...
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Envoi...';
+
+            try {
+                const response = await fetch('index.php?route=reserve/submit_demande', {
+                    method: 'POST',
+                    body: new FormData(form)
+                });
+                const result = await response.json();
+                if (!result.success) throw new Error(result.message);
+
+                alert('Demande envoyée avec succès !');
+                sendWsMessage({ type: 'nouvelle_demande_reserve' });
+                form.reset();
+                updateAllReserveTabs();
+            } catch (error) {
+                alert(`Erreur: ${error.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Envoyer la demande';
+            }
         }
     });
 }
 
 export function handleAllCaissesClosed(isAllClosed) {
-    // ... (Cette fonction reste inchangée)
+    const existingBanner = document.getElementById('final-cloture-banner');
+    const container = document.getElementById('history-view-banner-container');
+    
+    if (isAllClosed && !existingBanner && container) {
+        const bannerHtml = `
+            <div id="final-cloture-banner" class="history-view-banner" style="background-color: rgba(39, 174, 96, 0.1); border-color: var(--color-success);">
+                <i class="fa-solid fa-flag-checkered" style="color: var(--color-success);"></i>
+                <div>
+                    <strong style="color: var(--color-success);">Toutes les caisses sont clôturées !</strong>
+                    <p>Vous pouvez maintenant finaliser la journée. Cette action créera un rapport final et préparera les fonds de caisse pour demain.</p>
+                </div>
+                <button id="trigger-final-cloture" class="btn save-btn">Finaliser la journée</button>
+            </div>`;
+        container.innerHTML = bannerHtml;
+        document.getElementById('trigger-final-cloture').addEventListener('click', performFinalCloture);
+    } else if (!isAllClosed && existingBanner) {
+        existingBanner.remove();
+    }
 }
 
 async function performFinalCloture() {
-    // ... (Cette fonction reste inchangée)
+    if (!confirm("Êtes-vous sûr de vouloir finaliser la journée ? Cette action est irréversible et réinitialisera les caisses pour demain.")) {
+        return;
+    }
+
+    const button = document.getElementById('trigger-final-cloture');
+    button.disabled = true;
+    button.textContent = 'Finalisation...';
+
+    try {
+        const form = document.getElementById('caisse-form');
+        const formData = new FormData();
+        form.querySelectorAll('input, textarea').forEach(field => {
+            if (field.name) {
+                formData.append(field.name, field.value);
+            }
+        });
+
+        const response = await fetch('index.php?route=cloture/confirm_generale', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        if (!result.success) throw new Error(result.message);
+        
+        sendWsMessage({ type: 'force_reload_all' });
+
+        alert(result.message);
+        window.location.reload();
+
+    } catch (error) {
+        alert(`Erreur lors de la finalisation : ${error.message}`);
+        button.disabled = false;
+        button.textContent = 'Finaliser la journée';
+    }
 }
 
 export async function initializeCalculator() {
@@ -348,7 +432,9 @@ export async function initializeCalculator() {
             const result = await response.json();
             if (result.success && result.data) {
                 console.log(`%c[CHARGEMENT INITIAL] Sauvegarde BDD chargée : "${result.data.nom_comptage}"`, 'color: green; font-weight: bold;');
+                
                 const dataToLoad = result.data;
+
                 if (dataToLoad.nom_comptage.startsWith('Fond de caisse J+1') || dataToLoad.nom_comptage.startsWith('Sauvegarde auto')) {
                     document.getElementById('nom_comptage').value = '';
                     document.getElementById('explication').value = '';
@@ -356,10 +442,11 @@ export async function initializeCalculator() {
                     document.getElementById('nom_comptage').value = dataToLoad.nom_comptage || '';
                     document.getElementById('explication').value = dataToLoad.explication || '';
                 }
+                
                 for (const caisseId in dataToLoad) {
                     if (config.nomsCaisses[caisseId]) {
                         for (const key in dataToLoad[caisseId]) {
-                            if (key === 'denominations' || key === 'tpe') {
+                             if (key === 'denominations' || key === 'tpe') {
                                 for (const subKey in dataToLoad[caisseId][key]) {
                                     const fieldName = key === 'tpe' ? `caisse[${caisseId}][tpe][${subKey}]` : `${subKey}_${caisseId}`;
                                     const field = document.querySelector(`[name="${fieldName}"]`) || document.getElementById(fieldName);
