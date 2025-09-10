@@ -63,12 +63,12 @@ function renderCalculatorUI() {
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="form-group"><label>Relevé TPE : ${tpe.nom}</label><input type="text" data-caisse-id="${id}" name="caisse[${id}][tpe][${tpeId}]"></div>`).join('');
-        
+
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
                 <div class="theoretical-inputs-panel">
                     <h3 class="panel-title" id="theoretical-title-${id}">
-                        <i class="fa-solid fa-cash-register"></i> Saisie Théorique - Espèces
+                        <i class="fa-solid fa-cash-register"></i> Saisie des encaissements en Espèces
                     </h3>
                     <div class="panel-inputs" id="dynamic-inputs-container-${id}">
                         <div class="compact-input-group" data-method="especes">
@@ -76,19 +76,19 @@ function renderCalculatorUI() {
                             <input type="text" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]">
                         </div>
                         <div class="compact-input-group" data-method="especes">
-                            <label for="ventes_especes_${id}">Ventes Espèces</label>
+                            <label for="ventes_especes_${id}">Encaissement Espèces</label>
                             <input type="text" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]">
                         </div>
                         <div class="compact-input-group" data-method="cb" style="display: none;">
-                            <label for="ventes_cb_${id}">Ventes CB</label>
+                            <label for="ventes_cb_${id}">Encaissement CB</label>
                             <input type="text" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]">
                         </div>
                         <div class="compact-input-group" data-method="cheques" style="display: none;">
-                            <label for="ventes_cheques_${id}">Ventes Chèques</label>
+                            <label for="ventes_cheques_${id}">Encaissement Chèques</label>
                             <input type="text" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]">
                         </div>
-                         <div class="compact-input-group" data-method="especes cb cheques">
-                            <label for="retrocession_${id}">Rétrocessions</label>
+                        <div class="compact-input-group" data-method="especes cb cheques">
+                            <label for="retrocession_${id}" id="retrocession-label-${id}">Rétrocessions en Espèces</label>
                             <input type="text" id="retrocession_${id}" name="caisse[${id}][retrocession]">
                         </div>
                     </div>
@@ -111,6 +111,7 @@ function renderCalculatorUI() {
     });
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
 }
+
 // --- LOGIQUE DE CALCUL MISE À JOUR ---
 function calculateAll() {
     if (!config.nomsCaisses) return;
@@ -281,31 +282,32 @@ function attachEventListeners() {
 
             const caisseId = paymentTab.closest('.caisse-tab-content').id.replace('caisse', '');
             const methodKey = paymentTab.dataset.methodKey;
-            
+
             const dynamicInputsContainer = document.getElementById(`dynamic-inputs-container-${caisseId}`);
             const titleElement = document.getElementById(`theoretical-title-${caisseId}`);
+            const retrocessionLabel = document.getElementById(`retrocession-label-${caisseId}`);
 
-            // Mise à jour du titre du panneau
-            const titles = {
-                especes: '<i class="fa-solid fa-cash-register"></i> Saisie Théorique - Espèces',
-                cb: '<i class="fa-solid fa-credit-card"></i> Saisie Théorique - Carte Bancaire',
-                cheques: '<i class="fa-solid fa-money-check-dollar"></i> Saisie Théorique - Chèques',
+            // Dictionnaire des titres et labels
+            const labels = {
+                especes: { title: 'Saisie des encaissements en Espèces', icon: 'fa-cash-register', retro: 'Rétrocessions en Espèces' },
+                cb: { title: 'Saisie des encaissements en CB', icon: 'fa-credit-card', retro: 'Rétrocessions en CB' },
+                cheques: { title: 'Saisie des encaissements en Chèques', icon: 'fa-money-check-dollar', retro: 'Rétrocessions en Chèques' }
             };
-            if (titles[methodKey]) {
-                titleElement.innerHTML = titles[methodKey];
+
+            if (labels[methodKey]) {
+                titleElement.innerHTML = `<i class="fa-solid ${labels[methodKey].icon}"></i> ${labels[methodKey].title}`;
+                retrocessionLabel.textContent = labels[methodKey].retro;
             }
 
-            // Affichage/masquage des champs de saisie
             dynamicInputsContainer.querySelectorAll('.compact-input-group').forEach(group => {
                 if (group.dataset.method.includes(methodKey)) {
-                    group.style.display = 'flex'; // On utilise flex pour un affichage compact
+                    group.style.display = 'flex';
                 } else {
                     group.style.display = 'none';
                 }
             });
 
-            // On masque tout le panneau pour l'onglet Réserve
-            const panel = document.querySelector('.theoretical-inputs-panel');
+            const panel = dynamicInputsContainer.closest('.theoretical-inputs-panel');
             if (methodKey === 'reserve') {
                 panel.style.display = 'none';
             } else {
