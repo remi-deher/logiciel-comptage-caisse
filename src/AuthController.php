@@ -11,12 +11,18 @@ class AuthController {
     }
 
     /**
-     * Vérifie si un administrateur est connecté. Si non, redirige vers la page de connexion.
+     * Vérifie si un administrateur est connecté. Si non, renvoie une erreur 401.
      * C'est une méthode statique pour être facilement appelable depuis n'importe où.
      */
     public static function checkAuth() {
         if (empty($_SESSION['is_admin'])) {
-            header('Location: index.php?page=login');
+            // On ne redirige plus. On envoie une réponse d'erreur que le JS va intercepter.
+            header('Content-Type: application/json');
+            http_response_code(401); // 401 Unauthorized
+            echo json_encode([
+                'success' => false, 
+                'message' => 'Accès non autorisé. Session invalide ou expirée.'
+            ]);
             exit;
         }
     }
@@ -26,7 +32,8 @@ class AuthController {
      */
     public function login() {
         if (!empty($_SESSION['is_admin'])) {
-            header('Location: index.php?page=admin');
+            // Si déjà connecté, on le signale au client
+            echo json_encode(['success' => true, 'message' => 'Déjà authentifié.']);
             exit;
         }
 
@@ -35,6 +42,8 @@ class AuthController {
             $username = $_POST['username'] ?? '';
             $password = $_POST['password'] ?? '';
             
+            $user_verified = false;
+
             try {
                 if ($this->pdo) {
                     $stmt = $this->pdo->prepare("SELECT * FROM admins WHERE username = ?");
@@ -45,29 +54,31 @@ class AuthController {
                         $_SESSION['is_admin'] = true;
                         $_SESSION['admin_username'] = $user_from_db['username'];
                         $this->userService->syncFallbackAdmin($username, $user_from_db['password_hash']);
-                        header('Location: index.php?page=admin');
-                        exit;
+                        $user_verified = true;
                     }
                 }
-            } catch (\PDOException $e) { /* BDD inaccessible */ }
+            } catch (\PDOException $e) { /* BDD inaccessible, on passe au secours */ }
 
-            $fallback_file = __DIR__ . '/../config/admins.php';
-            if (file_exists($fallback_file)) {
-                $fallback_admins = require $fallback_file;
-                if (isset($fallback_admins[$username]) && password_verify($password, $fallback_admins[$username])) {
-                    $_SESSION['is_admin'] = true;
-                    $_SESSION['admin_username'] = $username . ' (Secours)';
-                    header('Location: index.php?page=admin');
-                    exit;
+            if (!$user_verified) {
+                $fallback_file = __DIR__ . '/../config/admins.php';
+                if (file_exists($fallback_file)) {
+                    $fallback_admins = require $fallback_file;
+                    if (isset($fallback_admins[$username]) && password_verify($password, $fallback_admins[$username])) {
+                        $_SESSION['is_admin'] = true;
+                        $_SESSION['admin_username'] = $username . ' (Secours)';
+                        $user_verified = true;
+                    }
                 }
             }
             
-            $error = "Identifiants incorrects.";
+            if ($user_verified) {
+                echo json_encode(['success' => true, 'message' => 'Connexion réussie.']);
+            } else {
+                http_response_code(401);
+                echo json_encode(['success' => false, 'message' => 'Identifiants incorrects.']);
+            }
+            exit;
         }
-
-        $body_class = 'login-page-body';
-        $page_css = 'admin.css';
-        require __DIR__ . '/../templates/login.php';
     }
 
     /**
@@ -75,7 +86,7 @@ class AuthController {
      */
     public function logout() {
         session_destroy();
-        header('Location: index.php?page=login');
+        echo json_encode(['success' => true, 'message' => 'Déconnexion réussie.']);
         exit;
     }
 }

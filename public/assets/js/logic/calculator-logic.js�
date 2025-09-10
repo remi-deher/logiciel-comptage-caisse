@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version à utiliser pour le test)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète et Corrigée)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -7,7 +7,7 @@ import { initializeCloture, updateClotureUI } from './cloture-logic.js';
 let config = {};
 let wsResourceId = null;
 let autosaveTimer = null; // Timer pour la fonction d'autosave
-let chequesState = {}; // Pour gérer l'état des chèques
+let chequesState = {}; // NOUVEAU: Pour gérer l'état des chèques
 
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
@@ -57,7 +57,7 @@ function renderCalculatorUI() {
     const caissesContainer = page.querySelector('#caisses-content-container');
     let tabsHtml = '', contentHtml = '', ecartsHtml = '';
     Object.entries(config.nomsCaisses).forEach(([id, nom], index) => {
-        chequesState[id] = [];
+        chequesState[id] = []; // Initialisation de l'état des chèques pour chaque caisse
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
@@ -69,15 +69,33 @@ function renderCalculatorUI() {
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
                 <div class="theoretical-inputs-panel">
-                    <h3 class="panel-title" id="theoretical-title-${id}"><i class="fa-solid fa-cash-register"></i> Saisie des encaissements en Espèces</h3>
+                    <h3 class="panel-title" id="theoretical-title-${id}">
+                        <i class="fa-solid fa-cash-register"></i> Saisie des encaissements en Espèces
+                    </h3>
                     <div class="panel-inputs" id="dynamic-inputs-container-${id}">
-                        <div class="compact-input-group" data-method="especes"><label for="fond_de_caisse_${id}">Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div>
-                        <div class="compact-input-group" data-method="especes"><label for="ventes_especes_${id}">Encaissement Espèces</label><input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]"></div>
-                        <div class="compact-input-group" data-method="cb" style="display: none;"><label for="ventes_cb_${id}">Encaissement CB</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div>
-                        <div class="compact-input-group" data-method="cheques" style="display: none;"><label for="ventes_cheques_${id}">Encaissement Chèques</label><input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]"></div>
-                        <div class="compact-input-group" data-method="especes cb cheques"><label for="retrocession_${id}" id="retrocession-label-${id}">Rétrocessions en Espèces</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
+                        <div class="compact-input-group" data-method="especes">
+                            <label for="fond_de_caisse_${id}">Fond de Caisse</label>
+                            <input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]">
+                        </div>
+                        <div class="compact-input-group" data-method="especes">
+                            <label for="ventes_especes_${id}">Encaissement Espèces</label>
+                            <input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]">
+                        </div>
+                        <div class="compact-input-group" data-method="cb" style="display: none;">
+                            <label for="ventes_cb_${id}">Encaissement CB</label>
+                            <input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]">
+                        </div>
+                        <div class="compact-input-group" data-method="cheques" style="display: none;">
+                            <label for="ventes_cheques_${id}">Encaissement Chèques</label>
+                            <input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]">
+                        </div>
+                         <div class="compact-input-group" data-method="especes cb cheques">
+                            <label for="retrocession_${id}" id="retrocession-label-${id}">Rétrocessions en Espèces</label>
+                            <input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]">
+                        </div>
                     </div>
                 </div>
+
                 <div class="payment-method-tabs">
                     <div class="payment-method-selector">
                         <button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}" data-method-key="especes"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>
@@ -85,22 +103,34 @@ function renderCalculatorUI() {
                         <button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}" data-method-key="cheques"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button>
                         <button type="button" class="payment-tab-link" data-payment-tab="reserve_${id}" data-method-key="reserve"><i class="fa-solid fa-vault"></i> Réserve</button>
                     </div>
+
                     <div id="especes_${id}" class="payment-tab-content active"><div class="payment-details-grid"><div><h4>Billets</h4><div class="grid">${billets}</div></div><div><h4>Pièces</h4><div class="grid">${pieces}</div></div></div></div>
                     <div id="cb_${id}" class="payment-tab-content"><div class="payment-details-grid">${tpeHtml || '<p>Aucun terminal de paiement configuré pour cette caisse.</p>'}</div></div>
                     <div id="cheques_${id}" class="payment-tab-content cheque-section">
                         <div class="cheque-grid">
                             <div class="cheque-form-container">
                                 <h4><i class="fa-solid fa-plus-circle"></i> Ajouter un chèque</h4>
-                                <div class="form-group"><label for="cheque-amount-${id}">Montant</label><input type="text" id="cheque-amount-${id}" placeholder="0,00 ${config.currencySymbol}"></div>
-                                <div class="form-group"><label for="cheque-comment-${id}">Commentaire (Ex: N° du chèque)</label><input type="text" id="cheque-comment-${id}" placeholder="Chèque n°12345"></div>
-                                <button type="button" class="btn new-btn add-cheque-btn" data-caisse-id="${id}" style="width: 100%;"><i class="fa-solid fa-plus"></i> Ajouter à la liste</button>
+                                <div class="form-group">
+                                    <label for="cheque-amount-${id}">Montant</label>
+                                    <input type="text" id="cheque-amount-${id}" placeholder="0,00 ${config.currencySymbol}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="cheque-comment-${id}">Commentaire (Ex: N° du chèque)</label>
+                                    <input type="text" id="cheque-comment-${id}" placeholder="Chèque n°12345">
+                                </div>
+                                <button type="button" class="btn new-btn add-cheque-btn" data-caisse-id="${id}" style="width: 100%;">
+                                    <i class="fa-solid fa-plus"></i> Ajouter à la liste
+                                </button>
                             </div>
                             <div class="cheque-list-container">
                                 <div class="cheque-list-header">
                                     <h4><i class="fa-solid fa-list-ol"></i> Chèques Encaissés</h4>
-                                    <div class="cheque-total">Total: <span id="cheque-total-${id}">0,00 €</span></div>
+                                    <div class="cheque-total">
+                                        Total: <span id="cheque-total-${id}">0,00 €</span>
+                                    </div>
                                 </div>
-                                <div id="cheque-list-${id}" class="cheque-list"></div>
+                                <div id="cheque-list-${id}" class="cheque-list">
+                                    </div>
                                 <div id="cheque-hidden-inputs-${id}"></div>
                             </div>
                         </div>
@@ -126,11 +156,14 @@ function calculateAll() {
                 document.getElementById(`total_${name}_${id}`).textContent = formatCurrency(totalLigne);
             }
         }
+        
         const fondDeCaisse = parseLocaleFloat(document.getElementById(`fond_de_caisse_${id}`).value);
         const ventesEspeces = parseLocaleFloat(document.getElementById(`ventes_especes_${id}`).value);
         const retrocession = parseLocaleFloat(document.getElementById(`retrocession_${id}`).value);
+        
         const recetteReelleEspeces = totalCompteEspeces - fondDeCaisse;
         const ecart = recetteReelleEspeces - (ventesEspeces + retrocession);
+        
         updateEcartDisplay(id, ecart);
     });
 }
@@ -159,8 +192,10 @@ function renderChequeList(caisseId) {
     const totalContainer = document.getElementById(`cheque-total-${caisseId}`);
     const hiddenInputsContainer = document.getElementById(`cheque-hidden-inputs-${caisseId}`);
     if (!listContainer || !totalContainer || !hiddenInputsContainer) return;
+
     const cheques = chequesState[caisseId] || [];
     let totalCheques = 0;
+    
     if (cheques.length === 0) {
         listContainer.innerHTML = '<p class="empty-list">Aucun chèque ajouté.</p>';
     } else {
@@ -175,15 +210,21 @@ function renderChequeList(caisseId) {
                                 <td>${formatCurrency(parseLocaleFloat(cheque.montant))}</td>
                                 <td>${cheque.commentaire || ''}</td>
                                 <td class="cheque-actions">
-                                    <button type="button" class="btn-icon edit-cheque-btn" data-caisse-id="${caisseId}" data-index="${index}" title="Modifier"><i class="fa-solid fa-pencil"></i></button>
-                                    <button type="button" class="btn-icon delete-btn delete-cheque-btn" data-caisse-id="${caisseId}" data-index="${index}" title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
+                                    <button type="button" class="btn-icon edit-cheque-btn" data-caisse-id="${caisseId}" data-index="${index}" title="Modifier">
+                                        <i class="fa-solid fa-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn-icon delete-btn delete-cheque-btn" data-caisse-id="${caisseId}" data-index="${index}" title="Supprimer">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
                                 </td>
                             </tr>`;
                     }).join('')}
                 </tbody>
             </table>`;
     }
+
     totalContainer.textContent = formatCurrency(totalCheques);
+
     hiddenInputsContainer.innerHTML = cheques.map((cheque, index) => `
         <input type="hidden" name="caisse[${caisseId}][cheques][${index}][montant]" value="${cheque.montant}">
         <input type="hidden" name="caisse[${caisseId}][cheques][${index}][commentaire]" value="${cheque.commentaire}">
@@ -209,10 +250,14 @@ function handleWebSocketMessage(data) {
             initializeCloture(config, wsResourceId);
             break;
         case 'full_form_state':
+            // --- DEBUT DE LA CORRECTION ---
+            // On traite séparément les champs de formulaire et les chèques
             if (data.state) {
                 for (const id in data.state) {
                     const field = document.getElementById(id);
-                    if (field) field.value = data.state[id];
+                    if (field) {
+                        field.value = data.state[id];
+                    }
                 }
             }
             if (data.cheques) {
@@ -224,6 +269,7 @@ function handleWebSocketMessage(data) {
                 }
             }
             calculateAll();
+            // --- FIN DE LA CORRECTION ---
             break;
         case 'update':
             if (data.id && document.activeElement.id !== data.id) {
@@ -328,20 +374,25 @@ function attachEventListeners() {
             paymentTab.classList.add('active');
             const tabId = paymentTab.dataset.paymentTab;
             container.querySelector(`#${tabId}`)?.classList.add('active');
+
             const caisseId = paymentTab.closest('.caisse-tab-content').id.replace('caisse', '');
             const methodKey = paymentTab.dataset.methodKey;
+            
             const dynamicInputsContainer = document.getElementById(`dynamic-inputs-container-${caisseId}`);
             const titleElement = document.getElementById(`theoretical-title-${caisseId}`);
             const retrocessionLabel = document.getElementById(`retrocession-label-${caisseId}`);
+
             const labels = {
                 especes: { title: 'Saisie des encaissements en Espèces', icon: 'fa-cash-register', retro: 'Rétrocessions en Espèces' },
                 cb: { title: 'Saisie des encaissements en CB', icon: 'fa-credit-card', retro: 'Rétrocessions en CB' },
                 cheques: { title: 'Saisie des encaissements en Chèques', icon: 'fa-money-check-dollar', retro: 'Rétrocessions en Chèques' }
             };
+
             if (labels[methodKey]) {
                 titleElement.innerHTML = `<i class="fa-solid ${labels[methodKey].icon}"></i> ${labels[methodKey].title}`;
                 retrocessionLabel.textContent = labels[methodKey].retro;
             }
+
             dynamicInputsContainer.querySelectorAll('.compact-input-group').forEach(group => {
                 if (group.dataset.method.includes(methodKey)) {
                     group.style.display = 'flex';
@@ -349,6 +400,7 @@ function attachEventListeners() {
                     group.style.display = 'none';
                 }
             });
+
             const panel = dynamicInputsContainer.closest('.theoretical-inputs-panel');
             if (methodKey === 'reserve') {
                 panel.style.display = 'none';
@@ -387,8 +439,10 @@ function attachEventListeners() {
         if (editBtn) {
             const { caisseId, index } = editBtn.dataset;
             const cheque = chequesState[caisseId][index];
+            
             const newAmountStr = prompt("Modifier le montant :", cheque.montant);
             const newComment = prompt("Modifier le commentaire :", cheque.commentaire);
+        
             if (newAmountStr !== null) {
                 const newAmount = parseLocaleFloat(newAmountStr);
                 if (newAmount > 0) {
@@ -429,6 +483,7 @@ function attachEventListeners() {
             const submitBtn = form.querySelector('button[type="submit"]');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Envoi...';
+
             try {
                 const response = await fetch('index.php?route=reserve/submit_demande', {
                     method: 'POST',
@@ -436,6 +491,7 @@ function attachEventListeners() {
                 });
                 const result = await response.json();
                 if (!result.success) throw new Error(result.message);
+
                 alert('Demande envoyée avec succès !');
                 sendWsMessage({ type: 'nouvelle_demande_reserve' });
                 form.reset();
@@ -453,6 +509,7 @@ function attachEventListeners() {
 export function handleAllCaissesClosed(isAllClosed) {
     const existingBanner = document.getElementById('final-cloture-banner');
     const container = document.getElementById('history-view-banner-container');
+    
     if (isAllClosed && !existingBanner && container) {
         const bannerHtml = `
             <div id="final-cloture-banner" class="history-view-banner" style="background-color: rgba(39, 174, 96, 0.1); border-color: var(--color-success);">
@@ -474,9 +531,11 @@ async function performFinalCloture() {
     if (!confirm("Êtes-vous sûr de vouloir finaliser la journée ? Cette action est irréversible et réinitialisera les caisses pour demain.")) {
         return;
     }
+
     const button = document.getElementById('trigger-final-cloture');
     button.disabled = true;
     button.textContent = 'Finalisation...';
+
     try {
         const form = document.getElementById('caisse-form');
         const formData = new FormData();
@@ -485,15 +544,19 @@ async function performFinalCloture() {
                 formData.append(field.name, field.value);
             }
         });
+
         const response = await fetch('index.php?route=cloture/confirm_generale', {
             method: 'POST',
             body: formData
         });
         const result = await response.json();
         if (!result.success) throw new Error(result.message);
+        
         sendWsMessage({ type: 'force_reload_all' });
+
         alert(result.message);
         window.location.reload();
+
     } catch (error) {
         alert(`Erreur lors de la finalisation : ${error.message}`);
         button.disabled = false;
@@ -505,12 +568,15 @@ export async function initializeCalculator() {
     try {
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
+
         try {
             const response = await fetch('index.php?route=calculateur/get_initial_data');
             const result = await response.json();
             if (result.success && result.data) {
                 console.log(`%c[CHARGEMENT INITIAL] Sauvegarde BDD chargée : "${result.data.nom_comptage}"`, 'color: green; font-weight: bold;');
+                
                 const dataToLoad = result.data;
+
                 if (dataToLoad.nom_comptage.startsWith('Fond de caisse J+1') || dataToLoad.nom_comptage.startsWith('Sauvegarde auto')) {
                     document.getElementById('nom_comptage').value = '';
                     document.getElementById('explication').value = '';
@@ -518,6 +584,7 @@ export async function initializeCalculator() {
                     document.getElementById('nom_comptage').value = dataToLoad.nom_comptage || '';
                     document.getElementById('explication').value = dataToLoad.explication || '';
                 }
+                
                 for (const caisseId in dataToLoad) {
                     if (config.nomsCaisses[caisseId]) {
                         for (const key in dataToLoad[caisseId]) {
@@ -544,12 +611,16 @@ export async function initializeCalculator() {
         } catch (error) {
             console.error("Erreur lors du chargement de la sauvegarde initiale:", error);
         }
+
         calculateAll();
         setActiveMessageHandler(handleWebSocketMessage);
         attachEventListeners();
+        
         console.log("[Calculator] Prêt. Demande de l'état complet au serveur WebSocket.");
         sendWsMessage({ type: 'get_full_state' });
+
         updateAllReserveTabs();
+
     } catch (error) {
         console.error("Erreur critique lors de l'initialisation du calculateur :", error);
         document.getElementById('main-content').innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;

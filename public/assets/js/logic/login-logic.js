@@ -1,4 +1,6 @@
-// Fichier : public/assets/js/logic/login-logic.js
+// Fichier : public/assets/js/logic/login-logic.js (Corrigé)
+
+import { handleRouting } from '../router.js';
 
 /**
  * Gère la soumission du formulaire de connexion à l'API.
@@ -24,15 +26,18 @@ async function handleLoginSubmit(event) {
         
         const result = await response.json();
 
-        if (!result.success) {
+        if (!response.ok || !result.success) {
             throw new Error(result.message || 'Identifiants incorrects.');
         }
 
+        // --- DÉBUT DE LA CORRECTION ---
         // Connexion réussie !
-        // On redirige vers la page admin en utilisant le routeur de la SPA
-        window.location.hash = '#/admin'; // Une façon simple de changer de page
-        window.dispatchEvent(new PopStateEvent('popstate'));
-
+        // On utilise le routeur de la SPA pour naviguer vers la page admin.
+        // Cela évite un rechargement complet de la page.
+        console.log('Connexion réussie, redirection vers /admin');
+        history.pushState(null, '', '/admin'); // Change l'URL dans la barre d'adresse
+        handleRouting(); // Demande au routeur de charger la page /admin
+        // --- FIN DE LA CORRECTION ---
 
     } catch (error) {
         if (errorContainer) {
@@ -44,7 +49,6 @@ async function handleLoginSubmit(event) {
         submitButton.innerHTML = 'Se connecter';
     }
 }
-
 
 /**
  * Initialise la logique de la page de connexion.
