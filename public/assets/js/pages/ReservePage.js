@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/pages/ReservePage.js
+// Fichier : public/assets/js/pages/ReservePage.js (Version Complète et Corrigée)
 
 import { initializeReserveLogic } from '../logic/reserve-logic.js';
 
@@ -35,6 +35,13 @@ export function renderReservePage(element) {
                 <div id="historique-list">
                     </div>
             </section>
+        </div>
+    </div>
+
+    <div id="process-demande-modal" class="modal">
+        <div class="modal-content">
+            <div id="process-demande-modal-content">
+                </div>
         </div>
     </div>
   `;

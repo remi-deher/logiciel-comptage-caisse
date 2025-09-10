@@ -67,6 +67,12 @@ class AdminController {
                 case 'add_caisse': $this->caisseManagementService->addCaisse($_POST['caisse_name'] ?? ''); break;
                 case 'rename_caisse': $this->caisseManagementService->renameCaisse(intval($_POST['caisse_id'] ?? 0), $_POST['caisse_name'] ?? ''); break;
                 case 'delete_caisse': $this->caisseManagementService->deleteCaisse(intval($_POST['caisse_id'] ?? 0)); break;
+		case 'update_reserve':
+                if (isset($_POST['quantities']) && is_array($_POST['quantities'])) {
+                    $this->reserveService->updateQuantities($_POST['quantities']);
+                    $_SESSION['admin_message'] = "Stock de la réserve mis à jour.";
+                }
+                break;
             }
             header('Location: /admin');
             exit;

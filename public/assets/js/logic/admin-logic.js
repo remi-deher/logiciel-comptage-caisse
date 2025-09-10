@@ -44,6 +44,20 @@ function renderAdminDashboard(container, data) {
         </tr>
     `).join('');
 
+    const allDenominations = { ...data.denominations.billets, ...data.denominations.pieces };
+    const sortedDenoms = Object.entries(allDenominations).sort((a, b) => b[1] - a[1]);
+
+    const reserveInputsHtml = sortedDenoms.map(([name, value]) => {
+        const quantite = data.reserve_status.denominations[name] || 0;
+        const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+        return `
+            <div class="form-group-inline">
+                <label for="reserve_${name}">${label}</label>
+                <input type="number" id="reserve_${name}" name="quantities[${name}]" value="${quantite}" min="0">
+            </div>
+        `;
+    }).join('');
+
     container.innerHTML = `
         <div class="admin-grid">
             <div class="admin-card">

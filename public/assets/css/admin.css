@@ -48,3 +48,34 @@
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/* === STYLES POUR LA GESTION DE LA RÉSERVE === */
+
+.admin-card-full-width {
+    grid-column: 1 / -1; /* Fait en sorte que la carte prenne toute la largeur */
+}
+
+.reserve-inputs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+}
+
+.form-group-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: var(--color-surface-alt);
+    padding: 10px;
+    border-radius: 6px;
+}
+
+.form-group-inline label {
+    font-weight: bold;
+    flex-basis: 60px; /* Donne une largeur fixe aux labels */
+}
+
+.form-group-inline input {
+    width: 100%;
+    text-align: right;
+}
