@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS `comptage_cheques` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `comptage_detail_id` INT(11) NOT NULL,
   `montant` DECIMAL(10,2) NOT NULL,
+  `commentaire` VARCHAR(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`comptage_detail_id`) REFERENCES `comptage_details`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

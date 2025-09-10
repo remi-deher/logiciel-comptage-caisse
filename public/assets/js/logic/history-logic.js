@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version avec affichage des retraits)
+// Fichier : public/assets/js/logic/history-logic.js (Version avec affichage des retraits et des chèques)
 import { sendWsMessage } from './websocket-service.js';
 
 // --- Fonctions Utilitaires ---
@@ -64,8 +64,6 @@ export async function initializeHistoryLogic() {
     log('Initialisation de la logique de la page Historique.');
     const historyPage = document.getElementById('history-page');
     if (!historyPage) return;
-
-    // CORRECTION : Toutes les fonctions de rendu et de logique sont maintenant dans le scope de l'initialisation.
     
     function renderCards(container, historique) {
         if (!historique || historique.length === 0) {
@@ -139,6 +137,21 @@ export async function initializeHistoryLogic() {
                     return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(parseInt(quantite, 10) * value)}</td></tr>`;
                 }).join('');
             const totalRetraits = Object.entries(data.retraits || {}).reduce((sum, [key, qty]) => sum + (parseInt(qty, 10) * allDenomsMap[key]), 0);
+
+            // --- DEBUT CORRECTION: Affichage des chèques ---
+            const cheques = data.cheques || [];
+            const totalCheques = cheques.reduce((sum, cheque) => sum + parseFloat(cheque.montant), 0);
+            const chequesHtml = cheques.length > 0 ? `
+                <h4 class="modal-table-title" style="color: #3498db">Chèques Encaissés</h4>
+                <table class="modal-details-table cheque-table-modal">
+                    <thead><tr><th>Montant</th><th>Commentaire</th></tr></thead>
+                    <tbody>
+                        ${cheques.map(c => `<tr><td class="text-right">${formatEuros(c.montant)}</td><td>${c.commentaire || ''}</td></tr>`).join('')}
+                    </tbody>
+                    <tfoot><tr><td>Total Chèques</td><td class="text-right">${formatEuros(totalCheques)}</td></tr></tfoot>
+                </table>
+            ` : '';
+            // --- FIN CORRECTION ---
     
             return `
             <div>
@@ -151,6 +164,7 @@ export async function initializeHistoryLogic() {
                         <tr class="${getEcartClass(caisseResult.ecart)}"><td colspan="2"><strong>Écart</strong></td><td class="text-right"><strong>${formatEuros(caisseResult.ecart)}</strong></td></tr>
                     </tfoot>
                 </table>
+                ${chequesHtml}
                 ${retraitsHtml ? `<h4 class="modal-table-title" style="color: var(--color-danger)">Retraits Effectués</h4><table class="modal-details-table retrait-table">
                     <thead><tr><th>Dénomination Retirée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
                     <tbody>${retraitsHtml}</tbody>
@@ -447,8 +461,6 @@ export async function initializeHistoryLogic() {
         attachWithdrawalsEventListeners();
     }
 
-
-    // --- Fin des fonctions de rendu ---
 
     const controlsContainer = historyPage.querySelector('.filter-section');
     if(controlsContainer && !document.getElementById('comparison-toolbar')) {

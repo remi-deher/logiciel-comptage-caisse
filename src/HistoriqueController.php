@@ -5,8 +5,7 @@ require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
 require_once __DIR__ . '/services/FilterService.php';
 
-class HistoriqueController
-{
+class HistoriqueController {
     private $pdo;
     private $noms_caisses;
     private $denominations;
@@ -14,19 +13,13 @@ class HistoriqueController
     private $versionService;
     private $filterService;
 
-    public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse)
-    {
+    public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse) {
         $this->pdo = $pdo;
         $this->noms_caisses = $noms_caisses;
         $this->denominations = $denominations;
         $this->tpe_par_caisse = $tpe_par_caisse;
         $this->versionService = new VersionService();
         $this->filterService = new FilterService();
-    }
-
-    public function historique()
-    {
-        // ... (cette fonction reste inchangée)
     }
 
     public function getHistoriqueDataJson()
@@ -58,13 +51,11 @@ class HistoriqueController
 
         $historique_page = $this->fetchComptagesDetails($comptage_ids);
 
-        // For withdrawal processing, we need all comptages for the given filters not just paginated ones
         $sql_all_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage DESC";
         $stmt_all_ids = $this->pdo->prepare($sql_all_ids);
         $stmt_all_ids->execute($bind_values);
         $all_comptage_ids = $stmt_all_ids->fetchAll(PDO::FETCH_COLUMN);
         $historique_complet = $this->fetchComptagesDetails($all_comptage_ids);
-
 
         echo json_encode([
             'historique' => $historique_page,
@@ -76,8 +67,7 @@ class HistoriqueController
         exit;
     }
 
-    private function fetchComptagesDetails(array $comptage_ids)
-    {
+    private function fetchComptagesDetails(array $comptage_ids) {
         if (empty($comptage_ids)) return [];
 
         $historique = [];
@@ -92,19 +82,17 @@ class HistoriqueController
                 cd.id as comptage_detail_id,
                 GROUP_CONCAT(DISTINCT CONCAT(d.denomination_nom, ':', d.quantite) SEPARATOR ';') as denominations,
                 GROUP_CONCAT(DISTINCT CONCAT(r.denomination_nom, ':', r.quantite_retiree) SEPARATOR ';') as retraits,
-                GROUP_CONCAT(DISTINCT CONCAT(cb.terminal_id, ':', cb.montant) SEPARATOR ';') as cb_releves,
-                GROUP_CONCAT(DISTINCT ch.montant SEPARATOR ';') as cheques_releves
+                GROUP_CONCAT(DISTINCT CONCAT(cb.terminal_id, ':', cb.montant) SEPARATOR ';') as cb_releves
             FROM comptages c
             LEFT JOIN comptage_details cd ON c.id = cd.comptage_id
             LEFT JOIN comptage_denominations d ON cd.id = d.comptage_detail_id
             LEFT JOIN comptage_retraits r ON cd.id = r.comptage_detail_id
             LEFT JOIN comptage_cb cb ON cd.id = cb.comptage_detail_id
-            LEFT JOIN comptage_cheques ch ON cd.id = ch.comptage_detail_id
             WHERE c.id IN ({$placeholders})
             GROUP BY c.id, cd.id
             ORDER BY c.date_comptage DESC, cd.caisse_id ASC
         ");
-
+        
         $stmt->execute($comptage_ids);
         $raw_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -119,7 +107,7 @@ class HistoriqueController
                     'caisses_data' => []
                 ];
             }
-
+            
             $denominations_array = [];
             if ($row['denominations']) {
                 foreach (explode(';', $row['denominations']) as $part) {
@@ -127,7 +115,7 @@ class HistoriqueController
                     $denominations_array[] = ['denomination_nom' => $name, 'quantite' => $quantity];
                 }
             }
-
+            
             $retraits_array = [];
             if ($row['retraits']) {
                 foreach (explode(';', $row['retraits']) as $part) {
@@ -135,15 +123,19 @@ class HistoriqueController
                     $retraits_array[$name] = $quantity;
                 }
             }
-
+            
             $cb_releves_array = [];
             if ($row['cb_releves']) {
-                foreach (explode(';', $row['cb_releves']) as $part) {
+                foreach(explode(';', $row['cb_releves']) as $part) {
                     list($terminal_id, $montant) = explode(':', $part);
                     if (!isset($cb_releves_array[$terminal_id])) $cb_releves_array[$terminal_id] = [];
                     $cb_releves_array[$terminal_id][] = $montant;
                 }
             }
+            
+            $stmt_cheques = $this->pdo->prepare("SELECT montant, commentaire FROM comptage_cheques WHERE comptage_detail_id = ?");
+            $stmt_cheques->execute([$row['comptage_detail_id']]);
+            $cheques_array = $stmt_cheques->fetchAll(PDO::FETCH_ASSOC);
 
             $historique[$comptage_id]['caisses_data'][$row['caisse_id']] = [
                 'fond_de_caisse' => $row['fond_de_caisse'],
@@ -153,7 +145,8 @@ class HistoriqueController
                 'retrocession' => $row['retrocession'],
                 'denominations' => $denominations_array,
                 'retraits' => $retraits_array,
-                'cb' => $cb_releves_array
+                'cb' => $cb_releves_array,
+                'cheques' => $cheques_array
             ];
         }
 
@@ -164,9 +157,25 @@ class HistoriqueController
         return array_values($historique);
     }
 
-    public function delete()
-    {
-        // ... (cette fonction reste inchangée)
+    public function delete() {
+        header('Content-Type: application/json');
+        AuthController::checkAuth();
+        $id_a_supprimer = intval($_POST['id_a_supprimer'] ?? 0);
+
+        if ($id_a_supprimer > 0) {
+            try {
+                $stmt = $this->pdo->prepare("DELETE FROM comptages WHERE id = ?");
+                $stmt->execute([$id_a_supprimer]);
+                echo json_encode(['success' => true, 'message' => "Le comptage a bien été supprimé."]);
+            } catch (Exception $e) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => "Erreur de base de données : " . $e->getMessage()]);
+            }
+        } else {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => "ID de comptage invalide."]);
+        }
+        exit;
     }
 
     public function exportCsv()
@@ -174,7 +183,7 @@ class HistoriqueController
         $date_debut = $_GET['date_debut'] ?? '';
         $date_fin = $_GET['date_fin'] ?? '';
         $recherche = $_GET['recherche'] ?? '';
-
+        
         $filter_params = $this->filterService->getWhereClauseAndBindings($date_debut, $date_fin, $recherche);
         $sql_where = $filter_params['sql_where'];
         $bind_values = $filter_params['bind_values'];
@@ -191,8 +200,7 @@ class HistoriqueController
         header('Content-Disposition: attachment; filename="' . $filename . '"');
 
         $output = fopen('php://output', 'w');
-
-        // --- DÉBUT DE LA CORRECTION POUR L'EXPORT CSV ---
+        
         $header = ['ID', 'Nom', 'Date', 'Explication'];
         foreach ($this->noms_caisses as $id => $nom) {
             $header[] = "Caisse {$id} - Nom";
@@ -217,16 +225,15 @@ class HistoriqueController
                 if ($caisse_data) {
                     $rowData[] = $nom_caisse;
                     $rowData[] = str_replace('.', ',', $caisse_data['fond_de_caisse']);
-                    // On utilise les nouvelles clés, avec un fallback à '0' si elles n'existent pas
                     $rowData[] = str_replace('.', ',', $caisse_data['ventes_especes'] ?? '0');
                     $rowData[] = str_replace('.', ',', $caisse_data['ventes_cb'] ?? '0');
                     $rowData[] = str_replace('.', ',', $caisse_data['ventes_cheques'] ?? '0');
                     $rowData[] = str_replace('.', ',', $caisse_data['retrocession']);
                     foreach ($this->denominations as $type => $denoms) {
                         foreach (array_keys($denoms) as $key) {
-                            $denom_value = 0;
-                            foreach ($caisse_data['denominations'] as $d) {
-                                if ($d['denomination_nom'] === $key) {
+                             $denom_value = 0;
+                            foreach($caisse_data['denominations'] as $d){
+                                if($d['denomination_nom'] === $key){
                                     $denom_value = $d['quantite'];
                                     break;
                                 }
@@ -236,14 +243,13 @@ class HistoriqueController
                     }
                 } else {
                     $columnCount = 6 + count($this->denominations['billets']) + count($this->denominations['pieces']);
-                    for ($i = 0; $i < $columnCount; $i++) {
+                    for ($i=0; $i < $columnCount; $i++) { 
                         $rowData[] = '';
                     }
                 }
             }
             fputcsv($output, $rowData, ';');
         }
-        // --- FIN DE LA CORRECTION POUR L'EXPORT CSV ---
         fclose($output);
         exit;
     }
