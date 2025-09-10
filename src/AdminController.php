@@ -67,12 +67,31 @@ class AdminController {
                 case 'add_caisse': $this->caisseManagementService->addCaisse($_POST['caisse_name'] ?? ''); break;
                 case 'rename_caisse': $this->caisseManagementService->renameCaisse(intval($_POST['caisse_id'] ?? 0), $_POST['caisse_name'] ?? ''); break;
                 case 'delete_caisse': $this->caisseManagementService->deleteCaisse(intval($_POST['caisse_id'] ?? 0)); break;
-		case 'update_reserve':
-                if (isset($_POST['quantities']) && is_array($_POST['quantities'])) {
-                    $this->reserveService->updateQuantities($_POST['quantities']);
-                    $_SESSION['admin_message'] = "Stock de la réserve mis à jour.";
-                }
-                break;
+		        case 'update_reserve':
+                    if (isset($_POST['quantities']) && is_array($_POST['quantities'])) {
+                        $this->reserveService->updateQuantities($_POST['quantities']);
+                        $_SESSION['admin_message'] = "Stock de la réserve mis à jour.";
+                    }
+                    break;
+                
+                // --- DÉBUT DES AJOUTS POUR LES TPE ---
+                case 'add_terminal':
+                    $this->terminalManagementService->addTerminal(
+                        $_POST['terminal_name'] ?? '',
+                        intval($_POST['caisse_id'] ?? 0)
+                    );
+                    break;
+                case 'rename_terminal':
+                    $this->terminalManagementService->renameTerminal(
+                        intval($_POST['terminal_id'] ?? 0),
+                        $_POST['terminal_name'] ?? '',
+                        intval($_POST['caisse_id'] ?? 0)
+                    );
+                    break;
+                case 'delete_terminal':
+                    $this->terminalManagementService->deleteTerminal(intval($_POST['terminal_id'] ?? 0));
+                    break;
+                // --- FIN DES AJOUTS POUR LES TPE ---
             }
             header('Location: /admin');
             exit;

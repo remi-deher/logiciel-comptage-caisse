@@ -17,6 +17,8 @@ async function fetchAdminData() {
 
 // --- Rendu ---
 function renderAdminDashboard(container, data) {
+    const caisseOptionsHtml = Object.entries(data.caisses).map(([id, nom]) => `<option value="${id}">${nom}</option>`).join('');
+
     const caissesHtml = Object.entries(data.caisses).map(([id, nom]) => `
         <tr>
             <td data-label="Nom">
@@ -44,19 +46,36 @@ function renderAdminDashboard(container, data) {
         </tr>
     `).join('');
 
-    const allDenominations = { ...data.denominations.billets, ...data.denominations.pieces };
-    const sortedDenoms = Object.entries(allDenominations).sort((a, b) => b[1] - a[1]);
+    // --- DÉBUT DU BLOC POUR LES TPE ---
+    const terminauxHtml = data.terminaux.map(terminal => {
+        // Pour chaque terminal, on crée une liste d'options pour le <select> en présélectionnant la bonne caisse
+        const caisseTerminalOptions = Object.entries(data.caisses).map(([id, nom]) => 
+            `<option value="${id}" ${terminal.caisse_associee == id ? 'selected' : ''}>${nom}</option>`
+        ).join('');
 
-    const reserveInputsHtml = sortedDenoms.map(([name, value]) => {
-        const quantite = data.reserve_status.denominations[name] || 0;
-        const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
         return `
-            <div class="form-group-inline">
-                <label for="reserve_${name}">${label}</label>
-                <input type="number" id="reserve_${name}" name="quantities[${name}]" value="${quantite}" min="0">
-            </div>
+        <tr>
+            <td data-label="Nom & Caisse">
+                <form class="inline-form js-admin-action-form" method="POST" action="index.php?route=admin/action">
+                    <input type="hidden" name="action" value="rename_terminal">
+                    <input type="hidden" name="terminal_id" value="${terminal.id}">
+                    <input type="text" name="terminal_name" value="${terminal.nom_terminal}" class="inline-input" aria-label="Nom du terminal" style="flex-grow: 2;">
+                    <select name="caisse_id" class="inline-input">${caisseTerminalOptions}</select>
+                    <button type="submit" class="action-btn-small new-btn"><i class="fa-solid fa-pencil"></i></button>
+                </form>
+            </td>
+            <td data-label="Actions">
+                <form class="inline-form js-admin-action-form" method="POST" action="index.php?route=admin/action">
+                     <input type="hidden" name="action" value="delete_terminal">
+                     <input type="hidden" name="terminal_id" value="${terminal.id}">
+                     <button type="submit" class="action-btn-small delete-btn" data-confirm="Êtes-vous sûr de vouloir supprimer ce terminal ?"><i class="fa-solid fa-trash-can"></i></button>
+                </form>
+            </td>
+        </tr>
         `;
     }).join('');
+    // --- FIN DU BLOC POUR LES TPE ---
+
 
     container.innerHTML = `
         <div class="admin-grid">
@@ -75,6 +94,24 @@ function renderAdminDashboard(container, data) {
             </div>
             
             <div class="admin-card">
+                <h3><i class="fa-solid fa-credit-card"></i> Gestion des TPE</h3>
+                <div class="admin-card-content">
+                    <table class="admin-table"><tbody>${terminauxHtml}</tbody></table>
+                </div>
+                <div class="admin-card-footer">
+                    <form class="inline-form js-admin-action-form" method="POST" action="index.php?route=admin/action">
+                        <input type="hidden" name="action" value="add_terminal">
+                        <input type="text" name="terminal_name" required placeholder="Nom du nouveau TPE" class="inline-input" style="flex-grow: 2;">
+                        <select name="caisse_id" required class="inline-input">
+                            <option value="" disabled selected>Associer à une caisse...</option>
+                            ${caisseOptionsHtml}
+                        </select>
+                        <button type="submit" class="action-btn-small save-btn"><i class="fa-solid fa-plus"></i></button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="admin-card admin-card-full-width">
                 <h3><i class="fa-solid fa-users-cog"></i> Gestion des Administrateurs</h3>
                 <div class="admin-card-content">
                     <table class="admin-table">
@@ -106,7 +143,7 @@ export async function initializeAdminLogic() {
                     return; // Annule la soumission si l'utilisateur dit non
                 }
                 
-                // Pour la simplicité de la migration, on soumet le formulaire de manière classique,
+                // Pour la simplicité, on soumet le formulaire de manière classique,
                 // ce qui provoquera un rechargement de la page admin.
                 form.submit();
             }
