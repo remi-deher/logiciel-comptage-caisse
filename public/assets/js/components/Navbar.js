@@ -37,7 +37,7 @@ export function renderNavbar(element) {
             </div>
         </div>
         
-        <button class="navbar-toggler" id="navbar-toggler" aria-label="Toggle navigation">
+        <button class="navbar-toggler" id="navbar-toggler" aria-label="Toggle navigation" aria-controls="mobile-menu" aria-expanded="false">
             <i class="fa-solid fa-bars"></i>
         </button>
         <div class="mobile-menu" id="mobile-menu"></div>

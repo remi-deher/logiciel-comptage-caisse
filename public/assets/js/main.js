@@ -26,6 +26,12 @@ function globalWsMessageHandler(data) {
 function initializeNavbarLogic() {
     console.log('[Main] Initialisation de la logique de la barre de navigation...');
     const themeSwitcher = document.getElementById('theme-switcher');
+    const userMenuToggler = document.getElementById('user-menu-toggler');
+    const userMenuDropdown = document.getElementById('user-menu-dropdown');
+    const navbarToggler = document.getElementById('navbar-toggler');
+    const mobileMenu = document.getElementById('mobile-menu');
+
+    // Logique du changement de thème
     if (themeSwitcher) {
         themeSwitcher.addEventListener('click', () => {
             const currentTheme = document.body.dataset.theme || 'light';
@@ -34,16 +40,36 @@ function initializeNavbarLogic() {
             localStorage.setItem('theme', newTheme);
         });
     }
-    const userMenuToggler = document.getElementById('user-menu-toggler');
-    const userMenuDropdown = document.getElementById('user-menu-dropdown');
+
+    // Logique du menu utilisateur
     if (userMenuToggler && userMenuDropdown) {
         userMenuToggler.addEventListener('click', (e) => {
             e.stopPropagation();
-            userMenuDropdown.classList.toggle('show');
+            const isVisible = userMenuDropdown.classList.toggle('show');
+            userMenuToggler.setAttribute('aria-expanded', isVisible);
         });
         document.addEventListener('click', () => {
             if (userMenuDropdown.classList.contains('show')) {
                 userMenuDropdown.classList.remove('show');
+                userMenuToggler.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    // --- NOUVEAU BLOC : Logique du menu mobile ---
+    if (navbarToggler && mobileMenu) {
+        navbarToggler.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isExpanded = navbarToggler.getAttribute('aria-expanded') === 'true';
+            navbarToggler.setAttribute('aria-expanded', !isExpanded);
+            mobileMenu.classList.toggle('show');
+
+            // On copie les liens de la navigation principale dans le menu mobile (une seule fois)
+            if (mobileMenu.innerHTML === '') {
+                const navLinks = document.querySelector('.navbar-links');
+                if (navLinks) {
+                    mobileMenu.innerHTML = navLinks.innerHTML;
+                }
             }
         });
     }
