@@ -11,6 +11,7 @@ let wizardState = {
     selectedCaisses: [],
     confirmedData: {},
 };
+let chequesState = {}; // NOUVEAU
 
 // --- Fonctions Utilitaires ---
 const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(amount);
@@ -40,6 +41,8 @@ async function fetchInitialData() {
              calculatorData.caisse[caisseId] = rawData[caisseId];
              if (!calculatorData.caisse[caisseId].denominations) calculatorData.caisse[caisseId].denominations = {};
              if (!calculatorData.caisse[caisseId].tpe) calculatorData.caisse[caisseId].tpe = {};
+             // NOUVEAU: Initialiser les chèques
+             chequesState[caisseId] = rawData[caisseId].cheques || [];
         }
     }
     console.log("[Wizard] Configuration et données de la BDD chargées.", { config, calculatorData });
@@ -160,6 +163,40 @@ function renderSuggestionTable(suggestionData) {
     return `<div class="withdrawal-summary-card"><div class="withdrawal-total-header"><div class="total-amount">${formatCurrency(suggestionData.totalToWithdraw)}</div><div class="total-label">Total à retirer de la caisse</div></div><div class="withdrawal-details-list">${detailRows}</div></div>`;
 }
 
+// NOUVELLE FONCTION pour afficher la liste des chèques dans l'assistant
+function renderChequeListWizard(caisseId) {
+    const listContainer = document.getElementById(`cheque-list-${caisseId}-wizard`);
+    const totalContainer = document.getElementById(`cheque-total-${caisseId}-wizard`);
+    if (!listContainer || !totalContainer) return;
+
+    const cheques = chequesState[caisseId] || [];
+    let totalCheques = 0;
+    
+    if (cheques.length === 0) {
+        listContainer.innerHTML = '<p class="empty-list">Aucun chèque ajouté.</p>';
+    } else {
+        listContainer.innerHTML = `
+            <table class="cheque-table">
+                <thead><tr><th>Montant</th><th>Commentaire</th><th>Action</th></tr></thead>
+                <tbody>
+                    ${cheques.map((cheque, index) => {
+                        totalCheques += parseLocaleFloat(cheque.montant);
+                        return `
+                            <tr>
+                                <td>${formatCurrency(parseLocaleFloat(cheque.montant))}</td>
+                                <td>${cheque.commentaire || ''}</td>
+                                <td><button type="button" class="btn delete-btn delete-cheque-btn-wizard" data-caisse-id="${caisseId}" data-index="${index}"><i class="fa-solid fa-trash-can"></i></button></td>
+                            </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>`;
+    }
+    totalContainer.textContent = formatCurrency(totalCheques);
+    // On met à jour la donnée principale pour la sauvegarde finale
+    calculatorData.caisse[caisseId].cheques = cheques;
+}
+
+
 async function renderStep1_Selection() {
     const container = document.querySelector('.wizard-content');
     if (!container) return;
@@ -206,12 +243,8 @@ function renderStep2_Counting() {
         const tpeData = caisseData.tpe || {};
 
         const buildTextInput = (name, value) => `<input type="text" id="${name}_${id}" name="caisse[${id}][${name}]" data-caisse-id="${id}" value="${value || ''}">`;
-        
-        // ----- DEBUT DE LA CORRECTION -----
-        // On s'assure que l'ID généré ici est IDENTIQUE à celui du calculateur
         const buildDenomInput = (name, value) => `<input type="number" id="${name}_${id}" name="caisse[${id}][denominations][${name}]" data-caisse-id="${id}" value="${value || ''}" min="0">`;
-        // ----- FIN DE LA CORRECTION -----
-
+        
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
         
@@ -238,12 +271,26 @@ function renderStep2_Counting() {
                     </div>
                     <div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>
                     <div id="cb_${id}" class="payment-tab-content"><div class="grid">${tpeHtml || '<p>Aucun TPE pour cette caisse.</p>'}</div></div>
-                    <div id="cheques_${id}" class="payment-tab-content"><div class="form-group"><label>Total Chèques Encaissés</label>${buildTextInput('cheques_total', caisseData.cheques_total)}</div></div>
+                    <div id="cheques_${id}" class="payment-tab-content">
+                        <div class="cheque-input-section">
+                             <div class="form-group"><label for="cheque-amount-${id}-wizard">Montant du chèque</label><input type="text" id="cheque-amount-${id}-wizard" placeholder="0,00"></div>
+                             <div class="form-group"><label for="cheque-comment-${id}-wizard">Commentaire (optionnel)</label><input type="text" id="cheque-comment-${id}-wizard" placeholder="Ex: Chèque n°123"></div>
+                             <button type="button" class="btn new-btn add-cheque-btn-wizard" data-caisse-id="${id}"><i class="fa-solid fa-plus"></i> Ajouter</button>
+                        </div>
+                        <div class="cheque-list-section">
+                             <h4>Liste des chèques</h4>
+                             <div id="cheque-list-${id}-wizard" class="cheque-list"></div>
+                             <div class="cheque-total">Total des chèques: <span id="cheque-total-${id}-wizard">0,00 €</span></div>
+                        </div>
+                    </div>
                 </div>
             </div>`;
     });
     container.innerHTML = `<div class="wizard-step-content"><h3>Vérifiez les comptages</h3><div class="tab-selector">${tabsHtml}</div><div class="ecart-display-container">${ecartsHtml}</div><div id="caisses-content-container">${contentHtml}</div></div>`;
-    wizardState.selectedCaisses.forEach(id => calculateAllForCaisse(id));
+    wizardState.selectedCaisses.forEach(id => {
+        calculateAllForCaisse(id);
+        renderChequeListWizard(id);
+    });
 }
 
 function renderStep3_Summary() {
@@ -282,7 +329,7 @@ function renderStep4_Finalization() {
                 totalCompteCb += parseLocaleFloat(caisseData.tpe[tpeId]);
             }
         }
-        const totalCompteCheques = parseLocaleFloat(caisseData.cheques_total);
+        const totalCompteCheques = (chequesState[id] || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
         const totalCompteCaisse = totalCompteEspeces + totalCompteCb + totalCompteCheques;
         const ecartEspeces = (totalCompteEspeces - parseLocaleFloat(caisseData.fond_de_caisse)) - (parseLocaleFloat(caisseData.ventes_especes) + parseLocaleFloat(caisseData.retrocession));
         const fondDeCaisseJ1 = totalCompteEspeces - retrait;
@@ -333,7 +380,7 @@ async function handleNextStep() {
                     ventes_cb: '0', 
                     ventes_cheques: '0', 
                     retrocession: '0', 
-                    cheques_total: '0' 
+                    cheques: [] 
                 };
             }
             sendWsMessage({ type: 'cloture_lock', caisse_id: id });
@@ -352,7 +399,13 @@ async function handleNextStep() {
                      for(const [subKey, subValue] of Object.entries(value)) {
                         formData.append(`caisse[${id}][${key}][${subKey}]`, subValue);
                     }
-                } else {
+                } else if (key === 'cheques') {
+                    (value || []).forEach((cheque, index) => {
+                        formData.append(`caisse[${id}][cheques][${index}][montant]`, cheque.montant);
+                        formData.append(`caisse[${id}][cheques][${index}][commentaire]`, cheque.commentaire);
+                    });
+                }
+                else {
                     formData.append(`caisse[${id}][${key}]`, value);
                 }
             }
@@ -404,7 +457,9 @@ function attachWizardListeners() {
             const nameAttr = e.target.name;
             const caisseId = e.target.dataset.caisseId;
             
-            sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
+            if (!e.target.id.startsWith('cheque-')) { // Ne pas traiter les champs de saisie de chèque ici
+                sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
+            }
 
             if (!caisseId || !calculatorData.caisse[caisseId] || !nameAttr) return;
 
@@ -441,6 +496,30 @@ function attachWizardListeners() {
             paymentTab.classList.add('active');
             const tabId = paymentTab.dataset.paymentTab;
             container.querySelector(`#${tabId}`)?.classList.add('active');
+        }
+        
+        const addBtn = e.target.closest('.add-cheque-btn-wizard');
+        if (addBtn) {
+            const caisseId = addBtn.dataset.caisseId;
+            const amountInput = document.getElementById(`cheque-amount-${caisseId}-wizard`);
+            const commentInput = document.getElementById(`cheque-comment-${caisseId}-wizard`);
+            const amount = parseLocaleFloat(amountInput.value);
+            if (amount > 0) {
+                chequesState[caisseId].push({ montant: amount, commentaire: commentInput.value });
+                renderChequeListWizard(caisseId);
+                sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: chequesState[caisseId] });
+                amountInput.value = '';
+                commentInput.value = '';
+                amountInput.focus();
+            }
+        }
+        
+        const deleteBtn = e.target.closest('.delete-cheque-btn-wizard');
+        if (deleteBtn) {
+            const { caisseId, index } = deleteBtn.dataset;
+            chequesState[caisseId].splice(index, 1);
+            renderChequeListWizard(caisseId);
+            sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: chequesState[caisseId] });
         }
     });
 }

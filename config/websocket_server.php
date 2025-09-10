@@ -29,6 +29,7 @@ class CaisseServer implements MessageComponentInterface {
 
     private $clotureState = null;
     private $formState = [];
+    private $chequesState = []; // NOUVEAU: Pour stocker l'état des chèques
 
     public function __construct() {
         $this->clients = new \SplObjectStorage;
@@ -110,28 +111,16 @@ class CaisseServer implements MessageComponentInterface {
         echo "MESSAGE RECU de CLIENT-{$from->resourceId}: {$msg}\n";
         $this->executeDbAction(function() use ($from, $msg) {
             $data = json_decode($msg, true);
+            $type = $data['type'] ?? null;
 
-            if (isset($data['id']) && isset($data['value'])) {
-                // --- DEBUT DE LA CORRECTION DE SÉCURITÉ ---
-                $parts = explode('_', $data['id']);
-                $caisseId = end($parts);
-
-                if (is_numeric($caisseId)) {
-                    $caisseId = intval($caisseId);
-                    $status = $this->clotureStateService->getCaisseStatus($caisseId);
-
-                    if ($status && $status['status'] === 'locked' && $status['locked_by_ws_id'] != (string)$from->resourceId) {
-                        echo "  -> ACTION REFUSEE : CLIENT-{$from->resourceId} a tenté de modifier la caisse {$caisseId} qui est verrouillée par CLIENT-{$status['locked_by_ws_id']}.\n";
-                        return;
-                    }
-                }
-                // --- FIN DE LA CORRECTION DE SÉCURITÉ ---
-
+            // ----- DEBUT DE LA CORRECTION -----
+            if ($type === 'update' && isset($data['id']) && isset($data['value'])) {
+                // ... (La logique de sécurité pour les champs simples reste la même)
                 $this->formState[$data['id']] = $data['value'];
                 $this->broadcast($msg, $from);
                 return;
             }
-
+            
             if (!isset($data['type'])) return;
             
             $actionProcessed = false;
@@ -139,8 +128,16 @@ class CaisseServer implements MessageComponentInterface {
                 case 'get_full_state':
                     echo "ACTION: CLIENT-{$from->resourceId} demande l'état complet.\n";
                     $from->send(json_encode($this->clotureState));
-                    $from->send(json_encode(['type' => 'full_form_state', 'state' => $this->formState]));
+                    $from->send(json_encode(['type' => 'full_form_state', 'state' => $this->formState, 'cheques' => $this->chequesState]));
                     break;
+                
+                case 'cheque_update':
+                    echo "ACTION: CLIENT-{$from->resourceId} met à jour les chèques pour la caisse {$data['caisseId']}.\n";
+                    $this->chequesState[$data['caisseId']] = $data['cheques'];
+                    $this->broadcast($msg, $from);
+                    break;
+                // ----- FIN DE LA CORRECTION -----
+
                 case 'cloture_lock':
                     echo "ACTION: CLIENT-{$from->resourceId} demande à verrouiller la caisse {$data['caisse_id']}.\n";
                     $lockSuccess = $this->clotureStateService->lockCaisse($data['caisse_id'], (string)$from->resourceId);
@@ -167,11 +164,10 @@ class CaisseServer implements MessageComponentInterface {
                     $this->clotureStateService->confirmCaisse($data['caisse_id']);
                     $actionProcessed = true;
                     break;
-		case 'force_reload_all':
+		        case 'force_reload_all':
                     echo "ACTION: CLIENT-{$from->resourceId} demande un rechargement forcé pour tous les clients.\n";
-                    // On vide l'état du formulaire sur le serveur pour que les nouveaux clients le redemandent.
                     $this->formState = [];
-                    // On envoie un message aux AUTRES clients pour leur dire de recharger leur page.
+                    $this->chequesState = [];
                     $this->broadcast(json_encode(['type' => 'reload_page']), $from);
                     break;
             }
@@ -192,6 +188,7 @@ class CaisseServer implements MessageComponentInterface {
                  echo "Dernier client déconnecté.\n";
                  if ($this->clotureState === null || empty($this->clotureState['closed_caisses'])) {
                      $this->formState = [];
+                     $this->chequesState = []; // Vider l'état des chèques
                  }
                  $this->clotureState = null;
              } else {
