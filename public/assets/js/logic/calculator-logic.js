@@ -54,6 +54,7 @@ async function fetchCalculatorConfig() {
     return data;
 }
 
+// Remplacez l'ancienne fonction renderCalculatorUI
 function renderCalculatorUI() {
     const page = calculatorPageElement();
     if (!page) return;
@@ -71,16 +72,14 @@ function renderCalculatorUI() {
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
             const fieldName = `caisse[${id}][tpe][${tpeId}]`;
-            return `<div class="form-group"><label>${tpe.nom}</label><input type="text" data-caisse-id="${id}" name="${fieldName}"></div>`
+            return `<div class="form-group"><label>Relevé TPE : ${tpe.nom}</label><input type="text" data-caisse-id="${id}" name="${fieldName}"></div>`
         }).join('');
         
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
-                <div class="grid grid-4" style="margin-bottom:20px;">
-                    <div class="form-group"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div>
-                    <div class="form-group"><label>Ventes Espèces (Théorique)</label><input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]"></div>
-                    <div class="form-group"><label>Ventes CB (Théorique)</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div>
-                    <div class="form-group"><label>Ventes Chèques (Théorique)</label><input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]"></div>
+                <div class="grid grid-2" style="margin-bottom:20px;">
+                    <div class="form-group"><label>Fond de Caisse (Espèces)</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div>
+                    <div class="form-group"><label>Rétrocessions (Espèces)</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
                 </div>
                 <div class="payment-method-tabs">
                     <div class="payment-method-selector">
@@ -89,16 +88,41 @@ function renderCalculatorUI() {
                         <button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button>
                         <button type="button" class="payment-tab-link" data-payment-tab="reserve_${id}"><i class="fa-solid fa-vault"></i> Réserve</button>
                     </div>
-                    <div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>
-                    <div id="cb_${id}" class="payment-tab-content">
-                        ${tpeHtml || '<p>Aucun terminal de paiement configuré pour cette caisse.</p>'}
-                    </div>
-                    <div id="cheques_${id}" class="payment-tab-content">
-                        <div class="form-group">
-                            <label>Montant total des chèques</label>
-                            <input type="text" name="caisse[${id}][cheques_total]" placeholder="0,00">
+
+                    <div id="especes_${id}" class="payment-tab-content active">
+                        <div class="form-group sales-group">
+                            <label>Ventes Espèces (Théorique)</label>
+                            <input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]">
+                        </div>
+                        <div class="payment-details-grid">
+                            <div><h4>Billets</h4><div class="grid">${billets}</div></div>
+                            <div><h4>Pièces</h4><div class="grid">${pieces}</div></div>
                         </div>
                     </div>
+
+                    <div id="cb_${id}" class="payment-tab-content">
+                        <div class="form-group sales-group">
+                             <label>Ventes CB (Théorique)</label>
+                             <input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]">
+                        </div>
+                        <div class="payment-details-grid">
+                            ${tpeHtml || '<p>Aucun terminal de paiement configuré pour cette caisse.</p>'}
+                        </div>
+                    </div>
+
+                    <div id="cheques_${id}" class="payment-tab-content">
+                        <div class="form-group sales-group">
+                            <label>Ventes Chèques (Théorique)</label>
+                            <input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]">
+                        </div>
+                        <div class="payment-details-grid">
+                            <div class="form-group">
+                                <label>Montant total des chèques réellement encaissés</label>
+                                <input type="text" name="caisse[${id}][cheques_total]" placeholder="0,00">
+                            </div>
+                        </div>
+                    </div>
+
                     <div id="reserve_${id}" class="payment-tab-content">
                         <p>Chargement des informations de la réserve...</p>
                     </div>
@@ -107,7 +131,6 @@ function renderCalculatorUI() {
     });
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
 }
-
 
 function calculateAll() {
     if (!config.nomsCaisses) return;
