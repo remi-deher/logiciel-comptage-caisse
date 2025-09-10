@@ -1,4 +1,5 @@
 // Fichier : public/assets/js/logic/history-logic.js (Version avec affichage des retraits)
+import { sendWsMessage } from './websocket-service.js';
 
 // --- Fonctions Utilitaires ---
 const log = (message, ...details) => console.log(`[Historique Log] %c${message}`, 'color: #3498db; font-weight: bold;', ...details);
@@ -554,7 +555,9 @@ export async function initializeHistoryLogic() {
                     if (!result.success) {
                         throw new Error(result.message || 'Erreur inconnue lors de la préparation des données.');
                     }
-                    
+
+		sendWsMessage({ type: 'force_reload_all' })
+
                     window.location.href = '/calculateur';
 
                 } catch (error) {

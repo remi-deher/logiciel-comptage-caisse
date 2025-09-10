@@ -155,7 +155,14 @@ function handleWebSocketMessage(data) {
                     calculateAll();
                 }
             }
+            break; // Le 'break;' ici est crucial
+        
+        // NOUVEAU BLOC AJOUTÉ
+        case 'reload_page':
+            alert("Les données ont été mises à jour par un autre utilisateur. La page va être actualisée pour afficher les dernières informations.");
+            window.location.reload();
             break;
+        // FIN DU NOUVEAU BLOC
     }
 }
 
@@ -260,6 +267,8 @@ async function performFinalCloture() {
         });
         const result = await response.json();
         if (!result.success) throw new Error(result.message);
+
+	sendWsMessage({ type: 'force_reload_all' });
 
         alert(result.message);
         window.location.reload();

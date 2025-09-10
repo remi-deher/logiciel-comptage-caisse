@@ -167,6 +167,13 @@ class CaisseServer implements MessageComponentInterface {
                     $this->clotureStateService->confirmCaisse($data['caisse_id']);
                     $actionProcessed = true;
                     break;
+		case 'force_reload_all':
+                    echo "ACTION: CLIENT-{$from->resourceId} demande un rechargement forcé pour tous les clients.\n";
+                    // On vide l'état du formulaire sur le serveur pour que les nouveaux clients le redemandent.
+                    $this->formState = [];
+                    // On envoie un message aux AUTRES clients pour leur dire de recharger leur page.
+                    $this->broadcast(json_encode(['type' => 'reload_page']), $from);
+                    break;
             }
 
             if ($actionProcessed) {
