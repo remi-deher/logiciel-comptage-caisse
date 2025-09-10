@@ -49,23 +49,13 @@ export function updateClotureUI(newState) {
         const isLockedByOther = lockInfo && lockInfo.locked_by && String(lockInfo.locked_by) !== String(resourceId);
         
         field.disabled = isClosed || isLockedByOther;
-        const parentFormGroup = field.closest('.form-group');
+        const parentFormGroup = field.closest('.form-group') || field.closest('.compact-input-group');
         if (parentFormGroup) {
             parentFormGroup.style.opacity = (isClosed || isLockedByOther) ? '0.7' : '1';
             parentFormGroup.title = isClosed ? 'Cette caisse est clôturée.' : (isLockedByOther ? `Cette caisse est en cours de modification par un autre utilisateur.` : '');
         }
     });
-
-    if (config.nomsCaisses) {
-        const totalCaisses = Object.keys(config.nomsCaisses).length;
-        if (totalCaisses > 0 && closedCaisses.length === totalCaisses) {
-            handleAllCaissesClosed(true);
-        } else {
-            handleAllCaissesClosed(false);
-        }
-    }
-}
-
+    
 export function setupGlobalClotureButton() {
     const clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn) return;
