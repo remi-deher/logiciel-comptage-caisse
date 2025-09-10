@@ -295,36 +295,43 @@
     }
 }
 
-/* === NOUVEAU PANNEAU DE SAISIE THÉORIQUE === */
+/* === PANNEAU DE SAISIE DES ENCAISSEMENTS === */
 .theoretical-inputs-panel {
-    background-color: var(--color-surface-alt);
+    /* On enlève le fond et l'ombre pour une meilleure intégration */
+    background-color: transparent;
     border: 1px solid var(--color-border-light);
     border-radius: 12px;
     margin-bottom: 25px;
-    box-shadow: 0 4px 10px var(--shadow-color);
     overflow: hidden;
+    transition: all 0.3s ease;
 }
 
 .panel-title {
     margin: 0;
     padding: 15px 20px;
-    font-size: 1.2em;
-    color: var(--color-text-primary);
+    font-size: 1.1em; /* Légèrement réduit pour être moins imposant */
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    background-color: var(--color-surface-alt);
     border-bottom: 1px solid var(--color-border-light);
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
+.panel-title i {
+    color: var(--color-primary);
+}
+
 .panel-inputs {
     display: flex;
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 20px;
     padding: 20px;
 }
 
 .compact-input-group {
-    flex: 1 1 200px; /* Permet aux champs de s'adapter à l'espace */
+    flex: 1 1 200px;
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -337,7 +344,10 @@
 }
 
 .compact-input-group input {
-    font-size: 1.1em;
+    font-size: 1.2em; /* On augmente la taille de la police pour la lisibilité */
     font-weight: bold;
-    padding: 8px 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background-color: var(--color-surface);
 }
