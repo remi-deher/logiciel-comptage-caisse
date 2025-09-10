@@ -44,13 +44,15 @@ class StatistiquesController {
         $total_retrocession_global = 0;
 
         foreach ($this->noms_caisses as $caisse_id => $nom_caisse) {
+            // --- DÉBUT DE LA CORRECTION 1 ---
             $sql_caisse_stats = "SELECT 
-                SUM(cd.ventes) AS total_ventes, 
-                AVG(cd.ventes) AS moyenne_ventes,
+                SUM(cd.ventes_especes + cd.ventes_cb + cd.ventes_cheques) AS total_ventes, 
+                AVG(cd.ventes_especes + cd.ventes_cb + cd.ventes_cheques) AS moyenne_ventes,
                 SUM(cd.retrocession) AS total_retrocession
             FROM comptages c
             JOIN comptage_details cd ON c.id = cd.comptage_id
             WHERE cd.caisse_id = ? " . str_replace("WHERE", "AND", $sql_where);
+            // --- FIN DE LA CORRECTION 1 ---
             
             $stmt = $this->pdo->prepare($sql_caisse_stats);
             $caisse_bind_values = array_merge([$caisse_id], $bind_values);
@@ -75,11 +77,13 @@ class StatistiquesController {
 
         $ventes_moyennes_global = $total_comptages > 0 ? $total_ventes_global / $total_comptages : 0;
         
-        // Récupération des données pour le graphique linéaire
-        $evolution_sql = "SELECT DATE(c.date_comptage) as date, SUM(cd.ventes) as total_ventes, SUM(cd.retrocession) as total_retrocession FROM comptages c JOIN comptage_details cd ON c.id = cd.comptage_id " . $sql_where . " GROUP BY DATE(c.date_comptage) ORDER BY date ASC";
+        // --- DÉBUT DE LA CORRECTION 2 ---
+        $evolution_sql = "SELECT DATE(c.date_comptage) as date, SUM(cd.ventes_especes + cd.ventes_cb + cd.ventes_cheques) as total_ventes, SUM(cd.retrocession) as total_retrocession FROM comptages c JOIN comptage_details cd ON c.id = cd.comptage_id " . $sql_where . " GROUP BY DATE(c.date_comptage) ORDER BY date ASC";
+        // --- FIN DE LA CORRECTION 2 ---
+        
         $evolution_stmt = $this->pdo->prepare($evolution_sql);
         $evolution_stmt->execute($bind_values);
-        $evolution_results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $evolution_results = $evolution_stmt->fetchAll(PDO::FETCH_ASSOC); // Correction ici, utilisait $stmt au lieu de $evolution_stmt
         
         $evolution_dates = [];
         $evolution_ventes = [];
@@ -90,7 +94,6 @@ class StatistiquesController {
             $evolution_retrocession[] = floatval($row['total_retrocession']);
         }
         
-        // Données pour le graphique en entonnoir
         $funnel_data = [
             'labels' => ['Ventes', 'Rétrocessions', 'Total réel'],
             'data' => [
@@ -100,7 +103,6 @@ class StatistiquesController {
             ]
         ];
         
-        // Données pour le graphique radar
         $radar_labels = array_keys($this->noms_caisses);
         $radar_data_ventes = array_column($caisses_data, 'total_ventes');
         $radar_data_ventes_moyennes = array_column($caisses_data, 'moyenne_ventes');
