@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version à utiliser pour le test)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète et Corrigée)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -57,14 +57,22 @@ function renderCalculatorUI() {
     const caissesContainer = page.querySelector('#caisses-content-container');
     let tabsHtml = '', contentHtml = '', ecartsHtml = '';
     Object.entries(config.nomsCaisses).forEach(([id, nom], index) => {
-        chequesState[id] = [];
+        chequesState[id] = []; // Initialisation de l'état des chèques pour chaque caisse
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][denominations][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][denominations][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
+        
+        // --- DEBUT DE LA CORRECTION ---
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
-        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="form-group"><label>Relevé TPE : ${tpe.nom}</label><input type="text" data-caisse-id="${id}" name="caisse[${id}][tpe][${tpeId}]"></div>`).join('');
+        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => 
+            `<div class="form-group">
+                <label>Relevé TPE : ${tpe.nom}</label>
+                <input type="text" data-caisse-id="${id}" id="tpe_${tpeId}_${id}" name="caisse[${id}][tpe][${tpeId}]">
+            </div>`
+        ).join('');
+        // --- FIN DE LA CORRECTION ---
         
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
