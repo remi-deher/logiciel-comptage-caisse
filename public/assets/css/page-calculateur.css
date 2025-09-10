@@ -219,3 +219,28 @@
 }
 #cloture-generale-modal .modal-header h3 { color: white; border: none; }
 #cloture-generale-modal .modal-body { padding: 25px; }
+
+.pending-demande-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: var(--color-surface-alt);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 0.95em;
+}
+
+.pending-demande-item strong {
+    font-weight: bold;
+    color: var(--color-primary);
+}
+
+.reserve-demande-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border-light);
+}

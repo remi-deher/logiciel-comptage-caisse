@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version avec Autosave en BDD)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète et Corrigée)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -74,7 +74,6 @@ function renderCalculatorUI() {
             return `<div class="form-group"><label>${tpe.nom}</label><input type="text" data-caisse-id="${id}" id="${fieldId}" name="${fieldName}"></div>`
         }).join('');
         
-        // --- DÉBUT DES MODIFICATIONS ---
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
                 <div class="grid grid-3" style="margin-bottom:20px;">
@@ -176,14 +175,82 @@ function handleWebSocketMessage(data) {
                     calculateAll();
                 }
             }
-            break; // Le 'break;' ici est crucial
-        
-        // NOUVEAU BLOC AJOUTÉ
+            break;
         case 'reload_page':
             alert("Les données ont été mises à jour par un autre utilisateur. La page va être actualisée pour afficher les dernières informations.");
             window.location.reload();
             break;
-        // FIN DU NOUVEAU BLOC
+        case 'nouvelle_demande_reserve':
+            console.log('[WebSocket] Une mise à jour de la réserve a eu lieu, rafraîchissement des données.');
+            updateAllReserveTabs();
+            break;
+    }
+}
+
+async function fetchReserveData() {
+    try {
+        const response = await fetch('index.php?route=reserve/get_data');
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data.success ? data : null;
+    } catch (error) {
+        console.error("Erreur lors de la récupération des données de la réserve:", error);
+        return null;
+    }
+}
+
+function renderReserveTabContent(caisseId, reserveData) {
+    const container = document.getElementById(`reserve_${caisseId}`);
+    if (!container) return;
+
+    const demandesEnAttente = reserveData?.demandes_en_attente.filter(d => d.caisse_id.toString() === caisseId) || [];
+    let demandesHtml = '<h4>Demandes en attente</h4>';
+    if (demandesEnAttente.length > 0) {
+        demandesHtml += demandesEnAttente.map(demande => {
+            const denomValue = (config.denominations.billets[demande.denomination_demandee] || config.denominations.pieces[demande.denomination_demandee]);
+            const label = denomValue >= 1 ? `${denomValue} ${config.currencySymbol}` : `${denomValue * 100} cts`;
+            return `<div class="pending-demande-item"><span>${demande.quantite_demandee} x ${label}</span> <strong>${formatCurrency(demande.valeur_demandee)}</strong></div>`;
+        }).join('');
+    } else {
+        demandesHtml += '<p>Aucune demande en attente pour cette caisse.</p>';
+    }
+
+    const allDenominations = { ...config.denominations.billets, ...config.denominations.pieces };
+    const sortedDenoms = Object.entries(allDenominations).sort((a, b) => b[1] - a[1]);
+    const denomOptions = sortedDenoms.map(([name, value]) => {
+        const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+        return `<option value="${name}">${label}</option>`;
+    }).join('');
+
+    const formHtml = `
+        <h4 style="margin-top: 30px;">Faire une nouvelle demande</h4>
+        <form class="reserve-demande-form" data-caisse-id="${caisseId}">
+            <input type="hidden" name="caisse_id" value="${caisseId}">
+            <div class="form-group">
+                <label>Dénomination nécessaire</label>
+                <select name="denomination_demandee" required>${denomOptions}</select>
+            </div>
+            <div class="form-group">
+                <label>Quantité</label>
+                <input type="number" name="quantite_demandee" min="1" required>
+            </div>
+             <div class="form-group">
+                <label>Notes (optionnel)</label>
+                <textarea name="notes_demandeur" rows="2"></textarea>
+            </div>
+            <button type="submit" class="btn save-btn">Envoyer la demande</button>
+        </form>
+    `;
+
+    container.innerHTML = demandesHtml + formHtml;
+}
+
+async function updateAllReserveTabs() {
+    const reserveData = await fetchReserveData();
+    if (reserveData) {
+        Object.keys(config.nomsCaisses).forEach(caisseId => {
+            renderReserveTabContent(caisseId, reserveData);
+        });
     }
 }
 
@@ -240,6 +307,35 @@ function attachEventListeners() {
             saveButton.textContent = 'Enregistrer le Comptage';
         }
     });
+
+    page.addEventListener('submit', async (e) => {
+        if (e.target.classList.contains('reserve-demande-form')) {
+            e.preventDefault();
+            const form = e.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Envoi...';
+
+            try {
+                const response = await fetch('index.php?route=reserve/submit_demande', {
+                    method: 'POST',
+                    body: new FormData(form)
+                });
+                const result = await response.json();
+                if (!result.success) throw new Error(result.message);
+
+                alert('Demande envoyée avec succès !');
+                sendWsMessage({ type: 'nouvelle_demande_reserve' });
+                form.reset();
+                updateAllReserveTabs();
+            } catch (error) {
+                alert(`Erreur: ${error.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Envoyer la demande';
+            }
+        }
+    });
 }
 
 export function handleAllCaissesClosed(isAllClosed) {
@@ -275,7 +371,6 @@ async function performFinalCloture() {
     try {
         const form = document.getElementById('caisse-form');
         const formData = new FormData();
-        // CORRECTION : On collecte manuellement les données pour inclure les champs désactivés.
         form.querySelectorAll('input, textarea').forEach(field => {
             if (field.name) {
                 formData.append(field.name, field.value);
@@ -288,8 +383,8 @@ async function performFinalCloture() {
         });
         const result = await response.json();
         if (!result.success) throw new Error(result.message);
-
-	sendWsMessage({ type: 'force_reload_all' });
+        
+        sendWsMessage({ type: 'force_reload_all' });
 
         alert(result.message);
         window.location.reload();
@@ -350,6 +445,8 @@ export async function initializeCalculator() {
         
         console.log("[Calculator] Prêt. Demande de l'état complet au serveur WebSocket.");
         sendWsMessage({ type: 'get_full_state' });
+
+        updateAllReserveTabs();
 
     } catch (error) {
         console.error("Erreur critique lors de l'initialisation du calculateur :", error);
