@@ -208,14 +208,96 @@ function renderSuggestionTable(suggestionData) {
     `;
 }
 
-function renderStep1_Selection() {
+async function renderStep1_Selection() {
     const container = document.querySelector('.wizard-content');
     if (!container) return;
-    const caissesHtml = Object.entries(config.nomsCaisses).map(([id, nom]) => `<label class="caisse-selection-item"><input type="checkbox" name="caisseSelection" value="${id}"><div class="caisse-info"><i class="fa-solid fa-cash-register"></i><span>${nom}</span></div></label>`).join('');
-    container.innerHTML = `<div class="wizard-step-content"><h3>Sélectionnez les caisses à clôturer</h3><div class="caisse-selection-grid">${caissesHtml}</div></div>`;
-    container.querySelector('.caisse-selection-grid').addEventListener('change', () => {
-        document.getElementById('wizard-next-btn').disabled = container.querySelectorAll('input:checked').length === 0;
-    });
+
+    // Affiche un état de chargement
+    container.innerHTML = '<p style="text-align:center;">Chargement de l\'état des caisses...</p>';
+
+    try {
+        // Étape 1 : On récupère l'état actuel des caisses depuis l'API
+        const response = await fetch('index.php?route=cloture/get_state');
+        const stateData = await response.json();
+        if (!stateData.success) {
+            throw new Error("Impossible de récupérer l'état des caisses.");
+        }
+        const lockedCaisses = stateData.locked_caisses || [];
+        const closedCaisses = (stateData.closed_caisses || []).map(String);
+
+        // Étape 2 : On génère le HTML pour chaque caisse en fonction de son statut
+        const caissesHtml = Object.entries(config.nomsCaisses).map(([id, nom]) => {
+            const isClosed = closedCaisses.includes(id);
+            const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === id);
+            const isLocked = lockInfo && String(lockInfo.locked_by) !== String(wsResourceId);
+            const isDisabled = isClosed || isLocked;
+
+            let statusClass = 'status-libre';
+            let statusIcon = 'fa-check-circle';
+            let statusText = 'Prête pour la clôture';
+
+            if (isClosed) {
+                statusClass = 'status-cloturee';
+                statusIcon = 'fa-flag-checkered';
+                statusText = 'Déjà clôturée';
+            } else if (isLocked) {
+                statusClass = 'status-verrouillee';
+                statusIcon = 'fa-lock';
+                statusText = 'Utilisée par un autre collaborateur';
+            }
+
+            return `
+                <label class="caisse-selection-item ${statusClass}" title="${statusText}">
+                    <input type="checkbox" name="caisseSelection" value="${id}" ${isDisabled ? 'disabled' : ''}>
+                    <div class="caisse-info">
+                        <i class="fa-solid ${statusIcon}"></i>
+                        <span>${nom}</span>
+                        <small class="caisse-status-text">${statusText}</small>
+                    </div>
+                </label>`;
+        }).join('');
+
+        // Étape 3 : On affiche le rendu final avec la légende et les boutons d'action
+        container.innerHTML = `
+            <div class="wizard-step-content">
+                <h3>Sélectionnez les caisses à clôturer</h3>
+                <div class="selection-controls">
+                    <div class="color-key">
+                        <div><span class="color-dot color-libre"></span> Libre</div>
+                        <div><span class="color-dot color-verrouillee"></span> En cours d'utilisation</div>
+                        <div><span class="color-dot color-cloturee"></span> Déjà clôturée</div>
+                    </div>
+                    <div class="button-group">
+                        <button type="button" id="select-all-btn" class="btn action-btn">Tout sélectionner</button>
+                        <button type="button" id="deselect-all-btn" class="btn action-btn">Tout désélectionner</button>
+                    </div>
+                </div>
+                <div class="caisse-selection-grid">${caissesHtml}</div>
+            </div>`;
+        
+        // Étape 4 : On attache la logique aux nouveaux éléments
+        const grid = container.querySelector('.caisse-selection-grid');
+        const nextBtn = document.getElementById('wizard-next-btn');
+
+        const updateNextButtonState = () => {
+            nextBtn.disabled = grid.querySelectorAll('input:checked').length === 0;
+        };
+
+        grid.addEventListener('change', updateNextButtonState);
+
+        document.getElementById('select-all-btn').addEventListener('click', () => {
+            grid.querySelectorAll('input[type="checkbox"]:not(:disabled)').forEach(cb => cb.checked = true);
+            updateNextButtonState();
+        });
+
+        document.getElementById('deselect-all-btn').addEventListener('click', () => {
+            grid.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => cb.checked = false);
+            updateNextButtonState();
+        });
+
+    } catch (error) {
+        container.innerHTML = `<p class="error" style="text-align:center;">${error.message}</p>`;
+    }
 }
 
 function renderStep2_Counting() {
