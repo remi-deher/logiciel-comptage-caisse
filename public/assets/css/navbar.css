@@ -127,3 +127,36 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
         color: white;
     }
 }
+
+.user-menu-dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.95em;
+    padding: 10px 15px;
+    border-radius: 6px;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.user-menu-dropdown a:hover {
+    background-color: var(--color-surface-alt-hover);
+    color: var(--color-text-primary);
+}
+
+.user-menu-dropdown a .fa-fw {
+    width: 20px; /* Aligne les icônes */
+    text-align: center;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background-color: var(--color-border-light);
+    margin: 8px 5px; /* Marge légèrement réduite pour un look plus compact */
+}
+
+.dropdown-logout-link:hover {
+    background-color: rgba(192, 57, 43, 0.1); /* Fond rouge léger au survol */
+    color: var(--color-danger); /* Texte en rouge au survol */
+}

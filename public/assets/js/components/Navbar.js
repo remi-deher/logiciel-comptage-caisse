@@ -26,13 +26,23 @@ export function renderNavbar(element) {
                 <i class="fa-solid fa-moon"></i>
             </button>
             <div class="user-menu">
-                <button id="user-menu-toggler" class="user-menu-btn"><i class="fa-solid fa-user-gear"></i></button>
+                <button id="user-menu-toggler" class="user-menu-btn" aria-label="Menu utilisateur" aria-expanded="false"><i class="fa-solid fa-user-gear"></i></button>
                 <div id="user-menu-dropdown" class="user-menu-dropdown">
-                    <a href="/aide"><i class="fa-solid fa-circle-question"></i> Aide</a>
-                    <a href="/changelog"><i class="fa-solid fa-rocket"></i> Changelog</a>
-                    <hr>
-                    <a href="/admin"><i class="fa-solid fa-toolbox"></i> Administration</a>
-                    <a href="/logout"><i class="fa-solid fa-sign-out-alt"></i> Déconnexion</a>
+                    <div class="dropdown-group">
+                        <a href="/aide"><i class="fa-solid fa-circle-question fa-fw"></i> Aide</a>
+                        <a href="/changelog"><i class="fa-solid fa-rocket fa-fw"></i> Changelog</a>
+                    </div>
+
+                    <div class="dropdown-divider"></div>
+
+                    <div class="dropdown-group">
+                        <a href="/admin"><i class="fa-solid fa-toolbox fa-fw"></i> Administration</a>
+                        <a href="/update"><i class="fa-solid fa-cloud-arrow-down fa-fw"></i> Mise à jour</a>
+                    </div>
+
+                    <div class="dropdown-divider"></div>
+
+                    <a href="/logout" class="dropdown-logout-link"><i class="fa-solid fa-sign-out-alt fa-fw"></i> Déconnexion</a>
                 </div>
             </div>
         </div>
