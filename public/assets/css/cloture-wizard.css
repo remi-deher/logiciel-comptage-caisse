@@ -494,3 +494,101 @@
 .next-steps-info li:last-child {
     margin-bottom: 0;
 }
+
+/* Conteneur pour les contrôles (légende + boutons) */
+.selection-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 25px;
+    padding: 15px;
+    background-color: var(--color-surface);
+    border-radius: 8px;
+}
+
+/* Légende des couleurs */
+.color-key {
+    display: flex;
+    gap: 20px;
+}
+.color-key div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+}
+.color-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+}
+.color-dot.color-libre { background-color: var(--color-success); }
+.color-dot.color-cloturee { background-color: var(--color-text-muted); }
+.color-dot.color-verrouillee { background-color: var(--color-warning); }
+
+/* Groupe de boutons "Tout sélectionner" */
+.selection-controls .button-group {
+    display: flex;
+    gap: 10px;
+}
+.selection-controls .action-btn {
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-secondary);
+    padding: 8px 15px;
+    font-size: 0.9em;
+    border-radius: 20px;
+}
+.selection-controls .action-btn:hover {
+    background-color: var(--color-surface-alt-hover);
+    color: var(--color-text-primary);
+}
+
+
+/* Amélioration des cartes de sélection de caisse */
+.caisse-selection-item .caisse-info {
+    border-left-width: 5px; /* Pour un indicateur de couleur plus visible */
+}
+
+.caisse-selection-item.status-libre .caisse-info {
+    border-left-color: var(--color-success);
+}
+.caisse-selection-item.status-libre .caisse-info i {
+    color: var(--color-success);
+}
+
+.caisse-selection-item.status-cloturee .caisse-info {
+    border-left-color: var(--color-text-muted);
+    opacity: 0.6;
+}
+.caisse-selection-item.status-cloturee .caisse-info i {
+    color: var(--color-text-muted);
+}
+.caisse-selection-item.status-cloturee {
+    cursor: not-allowed;
+}
+
+.caisse-selection-item.status-verrouillee .caisse-info {
+    border-left-color: var(--color-warning);
+    opacity: 0.6;
+}
+.caisse-selection-item.status-verrouillee .caisse-info i {
+    color: var(--color-warning);
+}
+.caisse-selection-item.status-verrouillee {
+    cursor: not-allowed;
+}
+
+.caisse-status-text {
+    font-size: 0.8em;
+    color: var(--color-text-secondary);
+    margin-top: 10px;
+    font-style: italic;
+    min-height: 1.6em; /* Évite le décalage de hauteur */
+}
+
+.caisse-selection-item input:checked + .caisse-info {
+    border-color: var(--color-primary); /* Garde la couleur de sélection */
+    border-left-width: 5px; /* Conserve l'épaisseur */
+}
