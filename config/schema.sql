@@ -1,4 +1,4 @@
--- config/schema.sql - Nouvelle version normalisée avec table des retraits
+-- config/schema.sql - Version finale avec ventes séparées
 
 CREATE TABLE IF NOT EXISTS `comptages` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -19,7 +19,9 @@ CREATE TABLE IF NOT EXISTS `comptage_details` (
   `comptage_id` int(11) NOT NULL,
   `caisse_id` int(11) NOT NULL,
   `fond_de_caisse` decimal(10,2) DEFAULT 0.00,
-  `ventes` decimal(10,2) DEFAULT 0.00,
+  `ventes_especes` decimal(10,2) DEFAULT 0.00,
+  `ventes_cb` decimal(10,2) DEFAULT 0.00,
+  `ventes_cheques` decimal(10,2) DEFAULT 0.00,
   `retrocession` decimal(10,2) DEFAULT 0.00,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`comptage_id`) REFERENCES `comptages`(`id`) ON DELETE CASCADE,
@@ -35,7 +37,6 @@ CREATE TABLE IF NOT EXISTS `comptage_denominations` (
   FOREIGN KEY (`comptage_detail_id`) REFERENCES `comptage_details`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- NOUVEAU : Table pour stocker les retraits effectués lors de la clôture
 CREATE TABLE IF NOT EXISTS `comptage_retraits` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `comptage_detail_id` int(11) NOT NULL,
@@ -73,7 +74,7 @@ CREATE TABLE IF NOT EXISTS `comptage_cb` (
   `comptage_detail_id` INT(11) NOT NULL,
   `terminal_id` INT(11) NOT NULL,
   `montant` DECIMAL(10,2) NOT NULL,
-  `heure_releve` TIME DEFAULT NULL, -- NOUVELLE COLONNE
+  `heure_releve` TIME DEFAULT NULL,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`comptage_detail_id`) REFERENCES `comptage_details`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`terminal_id`) REFERENCES `terminaux_paiement`(`id`) ON DELETE CASCADE
@@ -105,13 +106,12 @@ CREATE TABLE IF NOT EXISTS `reserve_demandes` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `date_demande` DATETIME NOT NULL,
   `caisse_id` INT(11) NOT NULL,
-  `demandeur_nom` VARCHAR(255) NULL, -- Nom de l'opérateur (si vous avez un système d'utilisateurs)
+  `demandeur_nom` VARCHAR(255) NULL,
   `denomination_demandee` VARCHAR(255) NOT NULL,
   `quantite_demandee` INT(11) NOT NULL,
   `valeur_demandee` DECIMAL(10,2) NOT NULL,
   `statut` ENUM('EN_ATTENTE', 'TRAITEE', 'ANNULEE') NOT NULL DEFAULT 'EN_ATTENTE',
   `notes_demandeur` TEXT DEFAULT NULL,
-  -- Ces champs seront remplis lors du traitement par le dirigeant
   `date_traitement` DATETIME NULL,
   `approbateur_nom` VARCHAR(255) NULL, 
   PRIMARY KEY (`id`),

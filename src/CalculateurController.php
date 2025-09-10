@@ -73,28 +73,27 @@ class CalculateurController {
             $comptage_detail_id = $row['id'];
             $data[$caisse_id] = [
                 'fond_de_caisse' => $row['fond_de_caisse'], 
-                'ventes' => $row['ventes'], 
+                'ventes_especes' => $row['ventes_especes'], 
+                'ventes_cb' => $row['ventes_cb'], 
+                'ventes_cheques' => $row['ventes_cheques'], 
                 'retrocession' => $row['retrocession'], 
                 'denominations' => [],
                 'tpe' => [],
                 'cheques_total' => '0'
             ];
 
-            // Chargement des dénominations (espèces)
             $stmt_denoms = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
             $stmt_denoms->execute([$comptage_detail_id]);
             while ($denom_row = $stmt_denoms->fetch()) {
                 $data[$caisse_id]['denominations'][$denom_row['denomination_nom']] = $denom_row['quantite'];
             }
 
-            // Chargement des relevés CB
             $stmt_cb = $this->pdo->prepare("SELECT terminal_id, montant FROM comptage_cb WHERE comptage_detail_id = ?");
             $stmt_cb->execute([$comptage_detail_id]);
             while ($cb_row = $stmt_cb->fetch()) {
                 $data[$caisse_id]['tpe'][$cb_row['terminal_id']] = $cb_row['montant'];
             }
             
-            // Chargement des chèques
             $stmt_cheque = $this->pdo->prepare("SELECT montant FROM comptage_cheques WHERE comptage_detail_id = ?");
             $stmt_cheque->execute([$comptage_detail_id]);
             $cheque_row = $stmt_cheque->fetch();
@@ -129,7 +128,6 @@ class CalculateurController {
             $data_to_load = $this->loadComptageData($comptage_id_to_load);
 
             $this->pdo->beginTransaction();
-
             $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
 
             $new_nom_comptage = "Sauvegarde Auto - chargement depuis historique [" . $original_name . "]";
@@ -139,25 +137,22 @@ class CalculateurController {
 
             foreach ($data_to_load as $caisse_id => $caisse_data) {
                 if (isset($this->noms_caisses[$caisse_id])) {
-                    $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                    $stmt_details->execute([$new_comptage_id, $caisse_id, $caisse_data['fond_de_caisse'], $caisse_data['ventes'], $caisse_data['retrocession']]);
+                    $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt_details->execute([$new_comptage_id, $caisse_id, $caisse_data['fond_de_caisse'], $caisse_data['ventes_especes'], $caisse_data['ventes_cb'], $caisse_data['ventes_cheques'], $caisse_data['retrocession']]);
                     $new_comptage_detail_id = $this->pdo->lastInsertId();
 
-                    // Espèces
                     if (isset($caisse_data['denominations'])) {
                         foreach ($caisse_data['denominations'] as $denom_name => $quantity) {
                              $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
                              $stmt_denom->execute([$new_comptage_detail_id, $denom_name, $quantity]);
                         }
                     }
-                    // CB
                     if (isset($caisse_data['tpe'])) {
                         foreach($caisse_data['tpe'] as $terminal_id => $montant) {
                             $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant) VALUES (?, ?, ?)");
                             $stmt_cb->execute([$new_comptage_detail_id, $terminal_id, $montant]);
                         }
                     }
-                    // Chèques
                     if(isset($caisse_data['cheques_total']) && $caisse_data['cheques_total'] > 0) {
                         $stmt_cheque = $this->pdo->prepare("INSERT INTO comptage_cheques (comptage_detail_id, montant) VALUES (?, ?)");
                         $stmt_cheque->execute([$new_comptage_detail_id, $caisse_data['cheques_total']]);
@@ -166,13 +161,9 @@ class CalculateurController {
             }
 
             $this->pdo->commit();
-
             echo json_encode(['success' => true, 'message' => 'Sauvegarde automatique créée depuis l\'historique.']);
-
         } catch (Exception $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Erreur serveur: ' . $e->getMessage()]);
         }
@@ -198,11 +189,11 @@ class CalculateurController {
             foreach ($this->noms_caisses as $caisse_id => $nom) {
                 $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
                 if (empty($caisse_data)) continue;
-                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
+
+                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes_especes'), get_numeric_value($caisse_data, 'ventes_cb'), get_numeric_value($caisse_data, 'ventes_cheques'), get_numeric_value($caisse_data, 'retrocession')]);
                 $comptage_detail_id = $this->pdo->lastInsertId();
 
-                // Enregistrement des dénominations (espèces)
                 foreach ($this->denominations as $type => $denominations_list) {
                     foreach ($denominations_list as $name => $value) {
                         $quantite = get_numeric_value($caisse_data, $name);
@@ -213,7 +204,6 @@ class CalculateurController {
                     }
                 }
                 
-                // Enregistrement des relevés TPE (Carte Bancaire)
                 if (isset($caisse_data['tpe']) && is_array($caisse_data['tpe'])) {
                     foreach ($caisse_data['tpe'] as $terminal_id => $montant) {
                         $montant_val = get_numeric_value($caisse_data['tpe'], $terminal_id);
@@ -224,7 +214,6 @@ class CalculateurController {
                     }
                 }
 
-                // Enregistrement des chèques
                 $cheques_total = get_numeric_value($caisse_data, 'cheques_total');
                 if ($cheques_total > 0) {
                     $stmt_cheque = $this->pdo->prepare("INSERT INTO comptage_cheques (comptage_detail_id, montant) VALUES (?, ?)");
@@ -273,11 +262,10 @@ class CalculateurController {
                 
                 $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
                 if (!empty($caisse_data)) {
-                    $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                    $stmt_details->execute([$comptage_id_cloture, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes'), get_numeric_value($caisse_data, 'retrocession')]);
+                    $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt_details->execute([$comptage_id_cloture, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes_especes'), get_numeric_value($caisse_data, 'ventes_cb'), get_numeric_value($caisse_data, 'ventes_cheques'), get_numeric_value($caisse_data, 'retrocession')]);
                     $comptage_detail_id = $this->pdo->lastInsertId();
 
-                    // Espèces
                     foreach ($this->denominations as $type => $list) {
                         foreach ($list as $name => $value) {
                             $quantite = get_numeric_value($caisse_data, $name);
@@ -288,7 +276,6 @@ class CalculateurController {
                         }
                     }
                     
-                    // CB
                     if (isset($caisse_data['tpe']) && is_array($caisse_data['tpe'])) {
                         foreach ($caisse_data['tpe'] as $terminal_id => $montant) {
                             $montant_val = get_numeric_value($caisse_data['tpe'], $terminal_id);
@@ -299,14 +286,12 @@ class CalculateurController {
                         }
                     }
 
-                    // Chèques
                     $cheques_total = get_numeric_value($caisse_data, 'cheques_total');
                     if ($cheques_total > 0) {
                         $stmt_cheque = $this->pdo->prepare("INSERT INTO comptage_cheques (comptage_detail_id, montant) VALUES (?, ?)");
                         $stmt_cheque->execute([$comptage_detail_id, $cheques_total]);
                     }
                     
-                    // Retraits
                     $retraits_data = isset($_POST['retraits'][$caisse_id]) && is_array($_POST['retraits'][$caisse_id]) ? $_POST['retraits'][$caisse_id] : [];
                     foreach ($retraits_data as $denom_name => $quantity) {
                         if (intval($quantity) > 0) {
@@ -371,8 +356,8 @@ class CalculateurController {
                 
                 if (!$latest_cloture_data) continue;
 
-                $stmt_details_cg = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, ?, ?)");
-                $stmt_details_cg->execute([$comptage_id_cloture_generale, $caisse_id, $latest_cloture_data['fond_de_caisse'], $latest_cloture_data['ventes'], $latest_cloture_data['retrocession']]);
+                $stmt_details_cg = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt_details_cg->execute([$comptage_id_cloture_generale, $caisse_id, $latest_cloture_data['fond_de_caisse'], $latest_cloture_data['ventes_especes'], $latest_cloture_data['ventes_cb'], $latest_cloture_data['ventes_cheques'], $latest_cloture_data['retrocession']]);
                 $detail_id_cg = $this->pdo->lastInsertId();
                 
                 $denominations_array = [];
@@ -414,7 +399,7 @@ class CalculateurController {
                     }
                 }
                 
-                $stmt_details_j1 = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes, retrocession) VALUES (?, ?, ?, 0, 0)");
+                $stmt_details_j1 = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession) VALUES (?, ?, ?, 0, 0, 0, 0)");
                 $stmt_details_j1->execute([$comptage_id_j1, $caisse_id, $nouveau_fond_de_caisse]);
                 $comptage_detail_id_j1 = $this->pdo->lastInsertId();
 
@@ -425,7 +410,6 @@ class CalculateurController {
             }
             
             $this->clotureStateService->resetState();
-            
             $this->pdo->commit();
             
             echo json_encode(['success' => true, 'message' => "Clôture générale réussie ! Le fond de caisse pour le jour suivant a été préparé."]);
