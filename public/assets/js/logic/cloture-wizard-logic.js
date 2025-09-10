@@ -506,7 +506,25 @@ async function handleNextStep() {
     nextBtn.disabled = true;
     if (wizardState.currentStep === 1) {
         wizardState.selectedCaisses = Array.from(document.querySelectorAll('input:checked')).map(cb => cb.value);
-        wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
+
+        // --- DEBUT DE LA CORRECTION ---
+        // On s'assure que chaque caisse sélectionnée a un objet de données, même vide.
+        // Cela empêche l'erreur si une caisse n'avait pas de données dans la sauvegarde initiale.
+        wizardState.selectedCaisses.forEach(id => {
+            if (!calculatorData.caisse[id]) {
+                console.log(`[Wizard] Initialisation des données pour la caisse ${id} qui n'était pas dans la sauvegarde.`);
+                calculatorData.caisse[id] = {
+                    denominations: {},
+                    fond_de_caisse: '0',
+                    ventes: '0',
+                    retrocession: '0'
+                };
+            }
+            // On envoie le message de verrouillage ici
+            sendWsMessage({ type: 'cloture_lock', caisse_id: id });
+        });
+        // --- FIN DE LA CORRECTION ---
+
         wizardState.currentStep = 2;
     } 
     else if (wizardState.currentStep === 2) { wizardState.currentStep = 3; }
@@ -516,6 +534,7 @@ async function handleNextStep() {
         formData.append('explication', 'Clôture de journée via l\'assistant.');
         wizardState.selectedCaisses.forEach(id => {
             formData.append('caisses_a_cloturer[]', id);
+            // Cette boucle est maintenant sécurisée grâce à la correction ci-dessus
             for (const [key, value] of Object.entries(calculatorData.caisse[id])) {
                 if (key !== 'denominations') {
                      formData.append(`caisse[${id}][${key}]`, value);
@@ -533,6 +552,9 @@ async function handleNextStep() {
             const response = await fetch('index.php?route=cloture/confirm_caisse', { method: 'POST', body: formData });
             const result = await response.json();
             if (!result.success) throw new Error(result.message);
+
+            sendWsMessage({ type: 'force_reload_all' }); // Notifie les autres clients
+
             alert('Clôture réussie ! La page va être rechargée.');
             wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_caisse_confirmed', caisse_id: id }));
             window.location.href = '/calculateur';
