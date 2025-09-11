@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version avec encart unique et champs réintégrés)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version avec logique de télécollecte affinée)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -57,25 +57,34 @@ function renderTpeList(caisseId, terminalId) {
     const hiddenInputsContainer = document.getElementById(`tpe-hidden-inputs-${terminalId}-${caisseId}`);
     if (!listContainer || !hiddenInputsContainer) return;
 
-    const releves = tpeState[caisseId]?.[terminalId] || [];
+    // Trier les relevés par heure pour un affichage et un calcul corrects
+    const releves = (tpeState[caisseId]?.[terminalId] || []).sort((a, b) => a.heure.localeCompare(b.heure));
     
     if (releves.length === 0) {
         listContainer.innerHTML = '<p class="empty-list">Aucun relevé ajouté.</p>';
     } else {
         listContainer.innerHTML = `
             <table class="tpe-releves-table">
-                <thead><tr><th>Heure</th><th>Montant</th><th>Action</th></tr></thead>
+                <thead><tr><th>Heure</th><th>Montant Total Affiché</th><th>Activité</th><th>Action</th></tr></thead>
                 <tbody>
-                    ${releves.map((releve, index) => `
+                    ${releves.map((releve, index) => {
+                        let differenceHtml = '<td>-</td>';
+                        if (index > 0) {
+                            const difference = parseLocaleFloat(releve.montant) - parseLocaleFloat(releves[index - 1].montant);
+                            differenceHtml = `<td class="releve-difference">(+ ${formatCurrency(difference)})</td>`;
+                        }
+                        return `
                         <tr>
                             <td>${releve.heure}</td>
                             <td>${formatCurrency(parseLocaleFloat(releve.montant))}</td>
+                            ${differenceHtml}
                             <td>
                                 <button type="button" class="btn-icon delete-btn delete-tpe-releve-btn" data-caisse-id="${caisseId}" data-terminal-id="${terminalId}" data-index="${index}" title="Supprimer">
                                     <i class="fa-solid fa-trash-can"></i>
                                 </button>
                             </td>
-                        </tr>`).join('')}
+                        </tr>`
+                    }).join('')}
                 </tbody>
             </table>`;
     }
@@ -85,6 +94,7 @@ function renderTpeList(caisseId, terminalId) {
         <input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${index}][heure]" value="${releve.heure}">
     `).join('');
 }
+
 
 // --- RENDU UI & CALCULS ---
 
@@ -121,8 +131,8 @@ function renderCalculatorUI() {
                 <h4>${tpe.nom}</h4>
                 <div class="tpe-releves-list" id="tpe-releves-list-${tpeId}-${id}"></div>
                 <div class="tpe-releve-form">
-                    <input type="text" id="tpe-releve-montant-${tpeId}-${id}" placeholder="Montant du relevé">
-                    <button type="button" class="btn new-btn add-tpe-releve-btn" data-caisse-id="${id}" data-terminal-id="${tpeId}"><i class="fa-solid fa-plus"></i></button>
+                    <input type="text" id="tpe-releve-montant-${tpeId}-${id}" placeholder="Total affiché sur le TPE">
+                    <button type="button" class="btn new-btn add-tpe-releve-btn" data-caisse-id="${id}" data-terminal-id="${tpeId}"><i class="fa-solid fa-plus"></i> Ajouter relevé</button>
                 </div>
                 <div id="tpe-hidden-inputs-${tpeId}-${id}"></div>
             </div>`;
@@ -147,7 +157,7 @@ function renderCalculatorUI() {
 
                     <div id="especes_${id}" class="payment-tab-content active">
                         <div class="theoretical-inputs-panel">
-                            <div class="compact-input-group"><label>Encaissement Espèces</label><input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]"></div>
+                            <div class="compact-input-group"><label>Encaissement Espèces Théorique</label><input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]"></div>
                             <div class="compact-input-group"><label>Rétrocessions en Espèces</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
                         </div>
                         <div class="payment-details-grid">
@@ -158,14 +168,14 @@ function renderCalculatorUI() {
 
                     <div id="cb_${id}" class="payment-tab-content">
                         <div class="theoretical-inputs-panel">
-                            <div class="compact-input-group"><label>Encaissement CB</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div>
+                            <div class="compact-input-group"><label>Encaissement CB Théorique</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div>
                         </div>
                         ${tpeSectionHtml}
                     </div>
 
                     <div id="cheques_${id}" class="payment-tab-content">
                         <div class="theoretical-inputs-panel">
-                            <div class="compact-input-group"><label>Encaissement Chèques</label><input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]"></div>
+                            <div class="compact-input-group"><label>Encaissement Chèques Théorique</label><input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]"></div>
                         </div>
                         <div class="cheque-section">
                             <div class="cheque-grid">
@@ -214,15 +224,19 @@ function calculateAll() {
         const recetteReelleEspeces = totalCompteEspeces - fondDeCaisse;
         const ecartEspeces = recetteReelleEspeces - (ventesEspeces + retrocession);
 
-        // --- Calcul CB ---
-        let totalRelevesCb = 0;
+        // --- NOUVELLE LOGIQUE DE CALCUL CB (TÉLÉCOLLECTE FINALE) ---
+        let totalCalculeCb = 0;
         if (tpeState[id]) {
             for (const terminalId in tpeState[id]) {
-                totalRelevesCb += (tpeState[id][terminalId] || []).reduce((sum, releve) => sum + parseLocaleFloat(releve.montant), 0);
+                const releves = (tpeState[id][terminalId] || []).sort((a, b) => a.heure.localeCompare(b.heure));
+                if (releves.length > 0) {
+                    const dernierReleve = parseLocaleFloat(releves[releves.length - 1].montant);
+                    totalCalculeCb += dernierReleve;
+                }
             }
         }
         const ventesCb = parseLocaleFloat(document.getElementById(`ventes_cb_${id}`).value);
-        const ecartCb = totalRelevesCb - ventesCb;
+        const ecartCb = totalCalculeCb - ventesCb;
 
         // --- Calcul Chèques ---
         const totalCheques = (chequesState[id] || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
@@ -456,7 +470,6 @@ function attachEventListeners() {
             paymentTab.classList.add('active');
             const tabId = paymentTab.dataset.paymentTab;
             container.querySelector(`#${tabId}`)?.classList.add('active');
-            const caisseId = paymentTab.closest('.caisse-tab-content').id.replace('caisse', '');
             calculateAll(); 
         }
 
@@ -513,11 +526,11 @@ function attachEventListeners() {
             const { caisseId, terminalId } = addTpeBtn.dataset;
             const amountInput = document.getElementById(`tpe-releve-montant-${terminalId}-${caisseId}`);
             const amount = parseLocaleFloat(amountInput.value);
-            if (amount > 0) {
+            if (amountInput.value.trim() !== '') {
                 const now = new Date();
                 const newReleve = {
                     montant: amount,
-                    heure: now.toTimeString().split(' ')[0]
+                    heure: now.toTimeString().split(' ')[0].substring(0, 5) // HH:MM
                 };
                 if (!tpeState[caisseId]) tpeState[caisseId] = {};
                 if (!tpeState[caisseId][terminalId]) tpeState[caisseId][terminalId] = [];
