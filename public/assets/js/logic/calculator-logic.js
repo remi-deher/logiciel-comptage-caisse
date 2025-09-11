@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version avec export corrigé)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version avec autosave corrigé)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -80,6 +80,7 @@ function renderTpeList(caisseId, terminalId) {
             </table>`;
     }
 
+    // --- CORRECTION : Création des champs cachés pour l'autosave ---
     hiddenInputsContainer.innerHTML = releves.map((releve, index) => `
         <input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${index}][montant]" value="${releve.montant}">
         <input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${index}][heure]" value="${releve.heure}">
