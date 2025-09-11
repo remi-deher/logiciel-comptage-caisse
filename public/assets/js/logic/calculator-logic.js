@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète et Corrigée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version avec export corrigé)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -6,8 +6,9 @@ import { initializeCloture, updateClotureUI } from './cloture-logic.js';
 
 let config = {};
 let wsResourceId = null;
-let autosaveTimer = null; // Timer pour la fonction d'autosave
-let chequesState = {}; // Pour gérer l'état des chèques
+let autosaveTimer = null;
+let chequesState = {};
+let tpeState = {};
 
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
@@ -49,6 +50,68 @@ async function fetchCalculatorConfig() {
     return data;
 }
 
+// --- LOGIQUE POUR L'ONGLET CB ---
+
+function renderTpeList(caisseId, terminalId) {
+    const listContainer = document.getElementById(`tpe-releves-list-${terminalId}-${caisseId}`);
+    const hiddenInputsContainer = document.getElementById(`tpe-hidden-inputs-${terminalId}-${caisseId}`);
+    if (!listContainer || !hiddenInputsContainer) return;
+
+    const releves = tpeState[caisseId]?.[terminalId] || [];
+    
+    if (releves.length === 0) {
+        listContainer.innerHTML = '<p class="empty-list">Aucun relevé ajouté.</p>';
+    } else {
+        listContainer.innerHTML = `
+            <table class="tpe-releves-table">
+                <thead><tr><th>Heure</th><th>Montant</th><th>Action</th></tr></thead>
+                <tbody>
+                    ${releves.map((releve, index) => `
+                        <tr>
+                            <td>${releve.heure}</td>
+                            <td>${formatCurrency(parseLocaleFloat(releve.montant))}</td>
+                            <td>
+                                <button type="button" class="btn-icon delete-btn delete-tpe-releve-btn" data-caisse-id="${caisseId}" data-terminal-id="${terminalId}" data-index="${index}" title="Supprimer">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </td>
+                        </tr>`).join('')}
+                </tbody>
+            </table>`;
+    }
+
+    hiddenInputsContainer.innerHTML = releves.map((releve, index) => `
+        <input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${index}][montant]" value="${releve.montant}">
+        <input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${index}][heure]" value="${releve.heure}">
+    `).join('');
+}
+
+function calculateCbTotalAndEcart(caisseId) {
+    let totalRelevesCaisse = 0;
+    if (tpeState[caisseId]) {
+        for (const terminalId in tpeState[caisseId]) {
+            totalRelevesCaisse += (tpeState[caisseId][terminalId] || []).reduce((sum, releve) => sum + parseLocaleFloat(releve.montant), 0);
+        }
+    }
+
+    const ventesCbTheorique = parseLocaleFloat(document.getElementById(`ventes_cb_${caisseId}`).value);
+    const ecart = totalRelevesCaisse - ventesCbTheorique;
+
+    const totalDisplay = document.getElementById(`total-releves-cb-${caisseId}`);
+    const ecartDisplay = document.getElementById(`ecart-cb-${caisseId}`);
+
+    if (totalDisplay) totalDisplay.textContent = formatCurrency(totalRelevesCaisse);
+    if (ecartDisplay) {
+        ecartDisplay.textContent = formatCurrency(ecart);
+        const parent = ecartDisplay.parentElement;
+        parent.classList.remove('ecart-ok', 'ecart-positif', 'ecart-negatif');
+        if (Math.abs(ecart) < 0.01) parent.classList.add('ecart-ok');
+        else parent.classList.add(ecart > 0 ? 'ecart-positif' : 'ecart-negatif');
+    }
+}
+
+// --- RENDU UI & CALCULS ---
+
 function renderCalculatorUI() {
     const page = calculatorPageElement();
     if (!page) return;
@@ -57,23 +120,37 @@ function renderCalculatorUI() {
     const caissesContainer = page.querySelector('#caisses-content-container');
     let tabsHtml = '', contentHtml = '', ecartsHtml = '';
     Object.entries(config.nomsCaisses).forEach(([id, nom], index) => {
-        chequesState[id] = []; // Initialisation de l'état des chèques pour chaque caisse
+        chequesState[id] = [];
+        tpeState[id] = {};
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][denominations][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][denominations][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         
-        // --- DEBUT DE LA CORRECTION ---
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
-        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => 
-            `<div class="form-group">
-                <label>Relevé TPE : ${tpe.nom}</label>
-                <input type="text" data-caisse-id="${id}" id="tpe_${tpeId}_${id}" name="caisse[${id}][tpe][${tpeId}]">
-            </div>`
-        ).join('');
-        // --- FIN DE LA CORRECTION ---
+        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
+            tpeState[id][tpeId] = [];
+            return `
+            <div class="tpe-card">
+                <h4>${tpe.nom}</h4>
+                <div class="tpe-releves-list" id="tpe-releves-list-${tpeId}-${id}"></div>
+                <div class="tpe-releve-form">
+                    <input type="text" id="tpe-releve-montant-${tpeId}-${id}" placeholder="Montant du relevé">
+                    <button type="button" class="btn new-btn add-tpe-releve-btn" data-caisse-id="${id}" data-terminal-id="${tpeId}"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <div id="tpe-hidden-inputs-${tpeId}-${id}"></div>
+            </div>`;
+        }).join('');
         
+        const tpeSectionHtml = tpePourCaisse.length > 0 ? `
+            <div class="tpe-grid">${tpeHtml}</div>
+            <div class="tpe-summary">
+                <div class="summary-item">Total Relevés TPE: <span id="total-releves-cb-${id}">0,00 €</span></div>
+                <div class="summary-item">Écart CB: <span id="ecart-cb-${id}">0,00 €</span></div>
+            </div>` 
+            : '<p>Aucun terminal de paiement configuré pour cette caisse.</p>';
+
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
                 <div class="theoretical-inputs-panel">
@@ -94,7 +171,7 @@ function renderCalculatorUI() {
                         <button type="button" class="payment-tab-link" data-payment-tab="reserve_${id}" data-method-key="reserve"><i class="fa-solid fa-vault"></i> Réserve</button>
                     </div>
                     <div id="especes_${id}" class="payment-tab-content active"><div class="payment-details-grid"><div><h4>Billets</h4><div class="grid">${billets}</div></div><div><h4>Pièces</h4><div class="grid">${pieces}</div></div></div></div>
-                    <div id="cb_${id}" class="payment-tab-content"><div class="payment-details-grid">${tpeHtml || '<p>Aucun terminal de paiement configuré pour cette caisse.</p>'}</div></div>
+                    <div id="cb_${id}" class="payment-tab-content">${tpeSectionHtml}</div>
                     <div id="cheques_${id}" class="payment-tab-content cheque-section">
                         <div class="cheque-grid">
                             <div class="cheque-form-container">
@@ -140,6 +217,7 @@ function calculateAll() {
         const recetteReelleEspeces = totalCompteEspeces - fondDeCaisse;
         const ecart = recetteReelleEspeces - (ventesEspeces + retrocession);
         updateEcartDisplay(id, ecart);
+        calculateCbTotalAndEcart(id);
     });
 }
 
@@ -256,6 +334,14 @@ function handleWebSocketMessage(data) {
             console.log('[WebSocket] Une mise à jour de la réserve a eu lieu, rafraîchissement des données.');
             updateAllReserveTabs();
             break;
+        case 'tpe_update':
+            if (data.caisseId && data.terminalId && data.releves) {
+                if (!tpeState[data.caisseId]) tpeState[data.caisseId] = {};
+                tpeState[data.caisseId][data.terminalId] = data.releves;
+                renderTpeList(data.caisseId, data.terminalId);
+                calculateCbTotalAndEcart(data.caisseId);
+            }
+            break;
     }
 }
 
@@ -308,7 +394,11 @@ function attachEventListeners() {
 
     page.addEventListener('input', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            if (!e.target.id.startsWith('cheque-')) {
+            const caisseId = e.target.dataset.caisseId;
+            if (e.target.id.startsWith('ventes_cb_')) {
+                calculateCbTotalAndEcart(caisseId);
+            }
+            if (!e.target.id.startsWith('cheque-') && !e.target.id.startsWith('tpe-releve-montant')) {
                  calculateAll();
                  triggerAutosave();
                  sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
@@ -409,6 +499,42 @@ function attachEventListeners() {
                 }
             }
         }
+
+        const addTpeBtn = e.target.closest('.add-tpe-releve-btn');
+        if (addTpeBtn) {
+            const { caisseId, terminalId } = addTpeBtn.dataset;
+            const amountInput = document.getElementById(`tpe-releve-montant-${terminalId}-${caisseId}`);
+            const amount = parseLocaleFloat(amountInput.value);
+            if (amount > 0) {
+                const now = new Date();
+                const newReleve = {
+                    montant: amount,
+                    heure: now.toTimeString().split(' ')[0]
+                };
+                if (!tpeState[caisseId]) tpeState[caisseId] = {};
+                if (!tpeState[caisseId][terminalId]) tpeState[caisseId][terminalId] = [];
+                tpeState[caisseId][terminalId].push(newReleve);
+                
+                renderTpeList(caisseId, terminalId);
+                calculateCbTotalAndEcart(caisseId);
+                sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: tpeState[caisseId][terminalId] });
+                amountInput.value = '';
+                amountInput.focus();
+                triggerAutosave();
+            }
+        }
+
+        const deleteTpeBtn = e.target.closest('.delete-tpe-releve-btn');
+        if (deleteTpeBtn) {
+            const { caisseId, terminalId, index } = deleteTpeBtn.dataset;
+            if (tpeState[caisseId]?.[terminalId]) {
+                tpeState[caisseId][terminalId].splice(index, 1);
+                renderTpeList(caisseId, terminalId);
+                calculateCbTotalAndEcart(caisseId);
+                sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: tpeState[caisseId][terminalId] });
+                triggerAutosave();
+            }
+        }
     });
 
     const form = document.getElementById('caisse-form');
@@ -488,7 +614,7 @@ async function performFinalCloture() {
     try {
         const form = document.getElementById('caisse-form');
         const formData = new FormData();
-        form.querySelectorAll('input, textarea').forEach(field => {
+        form.querySelectorAll('input, textarea, select').forEach(field => {
             if (field.name) {
                 formData.append(field.name, field.value);
             }
@@ -517,7 +643,6 @@ export async function initializeCalculator() {
             const response = await fetch('index.php?route=calculateur/get_initial_data');
             const result = await response.json();
             if (result.success && result.data) {
-                console.log(`%c[CHARGEMENT INITIAL] Sauvegarde BDD chargée : "${result.data.nom_comptage}"`, 'color: green; font-weight: bold;');
                 const dataToLoad = result.data;
                 if (dataToLoad.nom_comptage.startsWith('Fond de caisse J+1') || dataToLoad.nom_comptage.startsWith('Sauvegarde auto')) {
                     document.getElementById('nom_comptage').value = '';
@@ -529,11 +654,16 @@ export async function initializeCalculator() {
                 for (const caisseId in dataToLoad) {
                     if (config.nomsCaisses[caisseId]) {
                         for (const key in dataToLoad[caisseId]) {
-                             if (key === 'denominations' || key === 'tpe') {
+                             if (key === 'denominations') {
                                 for (const subKey in dataToLoad[caisseId][key]) {
-                                    const fieldName = key === 'tpe' ? `caisse[${caisseId}][tpe][${subKey}]` : `${subKey}_${caisseId}`;
-                                    const field = document.querySelector(`[name="${fieldName}"]`) || document.getElementById(fieldName);
+                                    const fieldName = `${subKey}_${caisseId}`;
+                                    const field = document.getElementById(fieldName);
                                     if (field) field.value = dataToLoad[caisseId][key][subKey];
+                                }
+                            } else if (key === 'tpe') {
+                                tpeState[caisseId] = dataToLoad[caisseId][key] || {};
+                                for(const terminalId in tpeState[caisseId]) {
+                                    renderTpeList(caisseId, terminalId);
                                 }
                             } else if (key === 'cheques') {
                                 chequesState[caisseId] = dataToLoad[caisseId][key] || [];
@@ -552,6 +682,7 @@ export async function initializeCalculator() {
         } catch (error) {
             console.error("Erreur lors du chargement de la sauvegarde initiale:", error);
         }
+
         calculateAll();
         setActiveMessageHandler(handleWebSocketMessage);
         attachEventListeners();
