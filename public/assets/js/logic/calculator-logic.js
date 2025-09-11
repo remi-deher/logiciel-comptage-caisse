@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version avec logique de télécollecte affinée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version avec autosave à la sortie)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -6,35 +6,37 @@ import { updateClotureUI, initializeCloture } from './cloture-logic.js';
 
 let config = {};
 let wsResourceId = null;
-let autosaveTimer = null;
 let chequesState = {};
 let tpeState = {};
+let isDirty = false; // Drapeau pour suivre les modifications non sauvegardées
 
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
-// --- FONCTION AUTOSAVE ---
-function triggerAutosave() {
-    clearTimeout(autosaveTimer);
-    const statusElement = document.getElementById('autosave-status');
-    if (statusElement) {
-        statusElement.textContent = 'Modifications en attente...';
+// --- NOUVELLE LOGIQUE D'AUTOSAVE ---
+async function handleAutosave() {
+    if (!isDirty) {
+        return; // Pas de changement, on ne fait rien
     }
-    autosaveTimer = setTimeout(async () => {
-        const form = document.getElementById('caisse-form');
-        if (!form) return;
-        if (statusElement) statusElement.textContent = 'Sauvegarde...';
-        try {
-            const formData = new FormData(form);
-            const response = await fetch('index.php?route=calculateur/autosave', { method: 'POST', body: formData });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message);
-            if (statusElement) statusElement.textContent = `Dernière sauvegarde à ${new Date().toLocaleTimeString()}`;
-        } catch (error) {
-            if (statusElement) statusElement.textContent = 'Erreur de sauvegarde auto.';
-            console.error("Erreur d'autosave:", error);
-        }
-    }, 2000);
+
+    console.log("[Autosave] Détection de changements non sauvegardés. Lancement de la sauvegarde...");
+    const form = document.getElementById('caisse-form');
+    if (!form) return;
+
+    const statusElement = document.getElementById('autosave-status');
+    if (statusElement) statusElement.textContent = 'Sauvegarde en cours...';
+    
+    try {
+        const formData = new FormData(form);
+        // Utilise navigator.sendBeacon pour une sauvegarde fiable même en quittant la page
+        navigator.sendBeacon('index.php?route=calculateur/autosave', formData);
+        isDirty = false; // On considère les changements comme sauvegardés
+        if (statusElement) statusElement.textContent = 'Changements sauvegardés.';
+    } catch (error) {
+        if (statusElement) statusElement.textContent = 'Erreur de sauvegarde.';
+        console.error("Erreur d'autosave :", error);
+    }
 }
+
 
 const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(amount);
 const parseLocaleFloat = (str) => {
@@ -51,13 +53,11 @@ async function fetchCalculatorConfig() {
 }
 
 // --- LOGIQUE POUR L'ONGLET CB ---
-
 function renderTpeList(caisseId, terminalId) {
     const listContainer = document.getElementById(`tpe-releves-list-${terminalId}-${caisseId}`);
     const hiddenInputsContainer = document.getElementById(`tpe-hidden-inputs-${terminalId}-${caisseId}`);
     if (!listContainer || !hiddenInputsContainer) return;
 
-    // Trier les relevés par heure pour un affichage et un calcul corrects
     const releves = (tpeState[caisseId]?.[terminalId] || []).sort((a, b) => a.heure.localeCompare(b.heure));
     
     if (releves.length === 0) {
@@ -97,7 +97,6 @@ function renderTpeList(caisseId, terminalId) {
 
 
 // --- RENDU UI & CALCULS ---
-
 function renderCalculatorUI() {
     const page = calculatorPageElement();
     if (!page) return;
@@ -440,16 +439,35 @@ function attachEventListeners() {
     const page = calculatorPageElement();
     if (!page) return;
 
+    // --- Événement centralisé pour marquer les changements ---
     page.addEventListener('input', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            isDirty = true;
+            document.getElementById('autosave-status').textContent = 'Changements non sauvegardés.';
+            
             if (!e.target.id.startsWith('cheque-') && !e.target.id.startsWith('tpe-releve-montant')) {
                  calculateAll();
-                 triggerAutosave();
                  sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
             }
         }
     });
     
+    // Écouteurs pour la navigation interne (changement de page via le routeur)
+    const mainContent = document.getElementById('main-content');
+    if (mainContent) {
+        mainContent.beforePageChange = handleAutosave;
+    }
+    
+    // Écouteur pour la fermeture de l'onglet/navigateur
+    window.addEventListener('beforeunload', (e) => {
+        if (isDirty) {
+            handleAutosave();
+            // La ligne suivante est nécessaire pour certains navigateurs, même si le message n'est plus affiché
+            e.preventDefault(); 
+            e.returnValue = '';
+        }
+    });
+
     const tabSelector = page.querySelector('.tab-selector');
     tabSelector.addEventListener('click', e => {
         const btn = e.target.closest('.tab-link');
@@ -475,6 +493,7 @@ function attachEventListeners() {
 
         const addBtn = e.target.closest('.add-cheque-btn');
         if (addBtn) {
+            isDirty = true;
             const caisseId = addBtn.dataset.caisseId;
             const amountInput = document.getElementById(`cheque-amount-${caisseId}`);
             const commentInput = document.getElementById(`cheque-comment-${caisseId}`);
@@ -486,23 +505,23 @@ function attachEventListeners() {
                 amountInput.value = '';
                 commentInput.value = '';
                 amountInput.focus();
-                triggerAutosave();
                 calculateAll();
             }
         }
         
         const deleteBtn = e.target.closest('.delete-cheque-btn');
         if (deleteBtn) {
+            isDirty = true;
             const { caisseId, index } = deleteBtn.dataset;
             chequesState[caisseId].splice(index, 1);
             renderChequeList(caisseId);
             sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: chequesState[caisseId] });
-            triggerAutosave();
             calculateAll();
         }
 
         const editBtn = e.target.closest('.edit-cheque-btn');
         if (editBtn) {
+            isDirty = true;
             const { caisseId, index } = editBtn.dataset;
             const cheque = chequesState[caisseId][index];
             const newAmountStr = prompt("Modifier le montant :", cheque.montant);
@@ -513,7 +532,6 @@ function attachEventListeners() {
                     chequesState[caisseId][index] = { montant: newAmount, commentaire: newComment };
                     renderChequeList(caisseId);
                     sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: chequesState[caisseId] });
-                    triggerAutosave();
                     calculateAll();
                 } else {
                     alert("Le montant doit être un nombre positif.");
@@ -523,6 +541,7 @@ function attachEventListeners() {
 
         const addTpeBtn = e.target.closest('.add-tpe-releve-btn');
         if (addTpeBtn) {
+            isDirty = true;
             const { caisseId, terminalId } = addTpeBtn.dataset;
             const amountInput = document.getElementById(`tpe-releve-montant-${terminalId}-${caisseId}`);
             const amount = parseLocaleFloat(amountInput.value);
@@ -540,19 +559,18 @@ function attachEventListeners() {
                 sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: tpeState[caisseId][terminalId] });
                 amountInput.value = '';
                 amountInput.focus();
-                triggerAutosave();
                 calculateAll();
             }
         }
 
         const deleteTpeBtn = e.target.closest('.delete-tpe-releve-btn');
         if (deleteTpeBtn) {
+            isDirty = true;
             const { caisseId, terminalId, index } = deleteTpeBtn.dataset;
             if (tpeState[caisseId]?.[terminalId]) {
                 tpeState[caisseId][terminalId].splice(index, 1);
                 renderTpeList(caisseId, terminalId);
                 sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: tpeState[caisseId][terminalId] });
-                triggerAutosave();
                 calculateAll();
             }
         }
@@ -568,6 +586,8 @@ function attachEventListeners() {
             const response = await fetch('index.php?route=calculateur/save', { method: 'POST', body: new FormData(form) });
             const result = await response.json();
             if (!result.success) throw new Error(result.message);
+            isDirty = false; // Réinitialiser le drapeau après une sauvegarde manuelle réussie
+            document.getElementById('autosave-status').textContent = 'Comptage enregistré manuellement.';
             alert('Sauvegarde manuelle réussie !');
         } catch (error) {
             alert(`Erreur de sauvegarde : ${error.message}`);
@@ -626,6 +646,9 @@ export function handleAllCaissesClosed(isAllClosed) {
 }
 
 async function performFinalCloture() {
+    if (isDirty) {
+        await handleAutosave();
+    }
     if (!confirm("Êtes-vous sûr de vouloir finaliser la journée ? Cette action est irréversible et réinitialisera les caisses pour demain.")) {
         return;
     }
