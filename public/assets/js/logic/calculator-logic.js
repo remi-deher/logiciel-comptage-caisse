@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version avec nouvelles interfaces CB et Chèques)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version avec encart unique et champs réintégrés)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -8,7 +8,7 @@ let config = {};
 let wsResourceId = null;
 let autosaveTimer = null;
 let chequesState = {};
-let tpeState = {}; // État pour les relevés TPE
+let tpeState = {};
 
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
@@ -86,30 +86,6 @@ function renderTpeList(caisseId, terminalId) {
     `).join('');
 }
 
-function calculateCbTotalAndEcart(caisseId) {
-    let totalRelevesCaisse = 0;
-    if (tpeState[caisseId]) {
-        for (const terminalId in tpeState[caisseId]) {
-            totalRelevesCaisse += (tpeState[caisseId][terminalId] || []).reduce((sum, releve) => sum + parseLocaleFloat(releve.montant), 0);
-        }
-    }
-
-    const ventesCbTheorique = parseLocaleFloat(document.getElementById(`ventes_cb_${caisseId}`).value);
-    const ecart = totalRelevesCaisse - ventesCbTheorique;
-
-    const totalDisplay = document.getElementById(`total-releves-cb-${caisseId}`);
-    const ecartDisplay = document.getElementById(`ecart-cb-${caisseId}`);
-
-    if (totalDisplay) totalDisplay.textContent = formatCurrency(totalRelevesCaisse);
-    if (ecartDisplay) {
-        ecartDisplay.textContent = formatCurrency(ecart);
-        const parent = ecartDisplay.parentElement;
-        parent.classList.remove('ecart-ok', 'ecart-positif', 'ecart-negatif');
-        if (Math.abs(ecart) < 0.01) parent.classList.add('ecart-ok');
-        else parent.classList.add(ecart > 0 ? 'ecart-positif' : 'ecart-negatif');
-    }
-}
-
 // --- RENDU UI & CALCULS ---
 
 function renderCalculatorUI() {
@@ -124,7 +100,16 @@ function renderCalculatorUI() {
         tpeState[id] = {};
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
-        ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
+        
+        ecartsHtml += `
+            <div id="ecart-display-caisse${id}" class="ecart-display ${isActive}">
+                <div id="main-ecart-caisse${id}" class="main-ecart-display">
+                    <span class="ecart-label">Écart Espèces</span>
+                    <span class="ecart-value">0,00 €</span>
+                </div>
+                <div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div>
+            </div>`;
+
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][denominations][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v*100) + ' cts'}</label><input type="number" data-caisse-id="${id}" id="${name}_${id}" name="caisse[${id}][denominations][${name}]" min="0" placeholder="0"><span class="total-line" id="total_${name}_${id}"></span></div>`).join('');
         
@@ -143,26 +128,15 @@ function renderCalculatorUI() {
             </div>`;
         }).join('');
         
-        const tpeSectionHtml = tpePourCaisse.length > 0 ? `
-            <div class="tpe-grid">${tpeHtml}</div>
-            <div class="tpe-summary">
-                <div class="summary-item">Total Relevés TPE: <span id="total-releves-cb-${id}">0,00 €</span></div>
-                <div class="summary-item">Écart CB: <span id="ecart-cb-${id}">0,00 €</span></div>
-            </div>` 
-            : '<p>Aucun terminal de paiement configuré pour cette caisse.</p>';
+        const tpeSectionHtml = tpePourCaisse.length > 0 ? `<div class="tpe-grid">${tpeHtml}</div>` : '<p>Aucun terminal de paiement configuré pour cette caisse.</p>';
 
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
-                <div class="theoretical-inputs-panel">
-                    <h3 class="panel-title" id="theoretical-title-${id}"><i class="fa-solid fa-cash-register"></i> Saisie des encaissements en Espèces</h3>
-                    <div class="panel-inputs" id="dynamic-inputs-container-${id}">
-                        <div class="compact-input-group" data-method="especes"><label for="fond_de_caisse_${id}">Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div>
-                        <div class="compact-input-group" data-method="especes"><label for="ventes_especes_${id}">Encaissement Espèces</label><input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]"></div>
-                        <div class="compact-input-group" data-method="cb" style="display: none;"><label for="ventes_cb_${id}">Encaissement CB</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div>
-                        <div class="compact-input-group" data-method="cheques" style="display: none;"><label for="ventes_cheques_${id}">Encaissement Chèques</label><input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]"></div>
-                        <div class="compact-input-group" data-method="especes cb cheques"><label for="retrocession_${id}" id="retrocession-label-${id}">Rétrocessions en Espèces</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
-                    </div>
+                <div class="form-group compact-input-group" style="max-width: 300px; margin-bottom: 25px;">
+                    <label>Fond de Caisse (uniquement en espèces)</label>
+                    <input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]">
                 </div>
+
                 <div class="payment-method-tabs">
                     <div class="payment-method-selector">
                         <button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}" data-method-key="especes"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>
@@ -170,23 +144,45 @@ function renderCalculatorUI() {
                         <button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}" data-method-key="cheques"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button>
                         <button type="button" class="payment-tab-link" data-payment-tab="reserve_${id}" data-method-key="reserve"><i class="fa-solid fa-vault"></i> Réserve</button>
                     </div>
-                    <div id="especes_${id}" class="payment-tab-content active"><div class="payment-details-grid"><div><h4>Billets</h4><div class="grid">${billets}</div></div><div><h4>Pièces</h4><div class="grid">${pieces}</div></div></div></div>
-                    <div id="cb_${id}" class="payment-tab-content">${tpeSectionHtml}</div>
-                    <div id="cheques_${id}" class="payment-tab-content cheque-section">
-                        <div class="cheque-grid">
-                            <div class="cheque-form-container">
-                                <h4><i class="fa-solid fa-plus-circle"></i> Ajouter un chèque</h4>
-                                <div class="form-group"><label for="cheque-amount-${id}">Montant</label><input type="text" id="cheque-amount-${id}" placeholder="0,00 ${config.currencySymbol}"></div>
-                                <div class="form-group"><label for="cheque-comment-${id}">Commentaire (Ex: N° du chèque)</label><input type="text" id="cheque-comment-${id}" placeholder="Chèque n°12345"></div>
-                                <button type="button" class="btn new-btn add-cheque-btn" data-caisse-id="${id}" style="width: 100%;"><i class="fa-solid fa-plus"></i> Ajouter à la liste</button>
-                            </div>
-                            <div class="cheque-list-container">
-                                <div class="cheque-list-header">
-                                    <h4><i class="fa-solid fa-list-ol"></i> Chèques Encaissés</h4>
-                                    <div class="cheque-total" id="cheque-total-container-${id}">Total: <span id="cheque-total-${id}">0,00 €</span></div>
+
+                    <div id="especes_${id}" class="payment-tab-content active">
+                        <div class="theoretical-inputs-panel">
+                            <div class="compact-input-group"><label>Encaissement Espèces</label><input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]"></div>
+                            <div class="compact-input-group"><label>Rétrocessions en Espèces</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
+                        </div>
+                        <div class="payment-details-grid">
+                            <div><h4>Billets</h4><div class="grid">${billets}</div></div>
+                            <div><h4>Pièces</h4><div class="grid">${pieces}</div></div>
+                        </div>
+                    </div>
+
+                    <div id="cb_${id}" class="payment-tab-content">
+                        <div class="theoretical-inputs-panel">
+                            <div class="compact-input-group"><label>Encaissement CB</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div>
+                        </div>
+                        ${tpeSectionHtml}
+                    </div>
+
+                    <div id="cheques_${id}" class="payment-tab-content">
+                        <div class="theoretical-inputs-panel">
+                            <div class="compact-input-group"><label>Encaissement Chèques</label><input type="text" data-caisse-id="${id}" id="ventes_cheques_${id}" name="caisse[${id}][ventes_cheques]"></div>
+                        </div>
+                        <div class="cheque-section">
+                            <div class="cheque-grid">
+                                <div class="cheque-form-container">
+                                    <h4><i class="fa-solid fa-plus-circle"></i> Ajouter un chèque</h4>
+                                    <div class="form-group"><label for="cheque-amount-${id}">Montant</label><input type="text" id="cheque-amount-${id}" placeholder="0,00 ${config.currencySymbol}"></div>
+                                    <div class="form-group"><label for="cheque-comment-${id}">Commentaire</label><input type="text" id="cheque-comment-${id}" placeholder="Chèque n°12345"></div>
+                                    <button type="button" class="btn new-btn add-cheque-btn" data-caisse-id="${id}" style="width: 100%;"><i class="fa-solid fa-plus"></i> Ajouter</button>
                                 </div>
-                                <div id="cheque-list-${id}" class="cheque-list"></div>
-                                <div id="cheque-hidden-inputs-${id}"></div>
+                                <div class="cheque-list-container">
+                                    <div class="cheque-list-header">
+                                        <h4><i class="fa-solid fa-list-ol"></i> Chèques Encaissés</h4>
+                                        <div class="cheque-total" id="cheque-total-container-${id}">Total: <span id="cheque-total-${id}">0,00 €</span></div>
+                                    </div>
+                                    <div id="cheque-list-${id}" class="cheque-list"></div>
+                                    <div id="cheque-hidden-inputs-${id}"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -200,6 +196,7 @@ function renderCalculatorUI() {
 function calculateAll() {
     if (!config.nomsCaisses) return;
     Object.keys(config.nomsCaisses).forEach(id => {
+        // --- Calcul Espèces ---
         let totalCompteEspeces = 0;
         const allDenoms = {...config.denominations.billets, ...config.denominations.pieces};
         for (const name in allDenoms) {
@@ -215,29 +212,58 @@ function calculateAll() {
         const ventesEspeces = parseLocaleFloat(document.getElementById(`ventes_especes_${id}`).value);
         const retrocession = parseLocaleFloat(document.getElementById(`retrocession_${id}`).value);
         const recetteReelleEspeces = totalCompteEspeces - fondDeCaisse;
-        const ecart = recetteReelleEspeces - (ventesEspeces + retrocession);
-        updateEcartDisplay(id, ecart);
-        calculateCbTotalAndEcart(id);
+        const ecartEspeces = recetteReelleEspeces - (ventesEspeces + retrocession);
+
+        // --- Calcul CB ---
+        let totalRelevesCb = 0;
+        if (tpeState[id]) {
+            for (const terminalId in tpeState[id]) {
+                totalRelevesCb += (tpeState[id][terminalId] || []).reduce((sum, releve) => sum + parseLocaleFloat(releve.montant), 0);
+            }
+        }
+        const ventesCb = parseLocaleFloat(document.getElementById(`ventes_cb_${id}`).value);
+        const ecartCb = totalRelevesCb - ventesCb;
+
+        // --- Calcul Chèques ---
+        const totalCheques = (chequesState[id] || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
+        const ventesCheques = parseLocaleFloat(document.getElementById(`ventes_cheques_${id}`).value);
+        const ecartCheques = totalCheques - ventesCheques;
+
+        updateEcartDisplay(id, { especes: ecartEspeces, cb: ecartCb, cheques: ecartCheques });
     });
 }
 
-function updateEcartDisplay(id, ecart) {
-    const display = document.getElementById(`ecart-display-caisse${id}`);
-    if (!display) return;
-    const valueSpan = display.querySelector('.ecart-value');
-    const explanation = display.querySelector('.ecart-explanation');
-    display.classList.remove('ecart-ok', 'ecart-positif', 'ecart-negatif');
-    if (valueSpan) valueSpan.textContent = formatCurrency(ecart);
-    if (Math.abs(ecart) < 0.01) {
-        display.classList.add('ecart-ok');
-        if (explanation) explanation.textContent = "L'écart en espèces est de 0.";
-    } else if (ecart > 0) {
-        display.classList.add('ecart-positif');
-        if (explanation) explanation.textContent = "Il y a un surplus d'espèces dans la caisse.";
-    } else {
-        display.classList.add('ecart-negatif');
-        if (explanation) explanation.textContent = "Il manque des espèces dans la caisse.";
+function updateEcartDisplay(id, ecarts) {
+    const activeTabKey = document.querySelector(`#caisse${id} .payment-tab-link.active`)?.dataset.methodKey || 'especes';
+    const mainDisplay = document.getElementById(`main-ecart-caisse${id}`);
+    const secondaryContainer = document.getElementById(`secondary-ecarts-caisse${id}`);
+
+    const ecartData = {
+        especes: { label: 'Écart Espèces', value: ecarts.especes },
+        cb: { label: 'Écart CB', value: ecarts.cb },
+        cheques: { label: 'Écart Chèques', value: ecarts.cheques }
+    };
+    
+    // Mise à jour de l'affichage principal
+    const mainData = ecartData[activeTabKey];
+    mainDisplay.querySelector('.ecart-label').textContent = mainData.label;
+    mainDisplay.querySelector('.ecart-value').textContent = formatCurrency(mainData.value);
+    mainDisplay.className = 'main-ecart-display';
+    if (Math.abs(mainData.value) < 0.01) mainDisplay.classList.add('ecart-ok');
+    else mainDisplay.classList.add(mainData.value > 0 ? 'ecart-positif' : 'ecart-negatif');
+
+    // Mise à jour des affichages secondaires
+    let secondaryHtml = '';
+    for (const key in ecartData) {
+        if (key !== activeTabKey) {
+            const data = ecartData[key];
+            let className = 'secondary-ecart-item ';
+            if (Math.abs(data.value) < 0.01) className += 'ecart-ok';
+            else className += (data.value > 0 ? 'ecart-positif' : 'ecart-negatif');
+            secondaryHtml += `<div class="${className}"><span>${data.label}:</span> <strong>${formatCurrency(data.value)}</strong></div>`;
+        }
     }
+    secondaryContainer.innerHTML = secondaryHtml;
 }
 
 function renderChequeList(caisseId) {
@@ -331,6 +357,7 @@ function handleWebSocketMessage(data) {
             if (data.caisseId && data.cheques) {
                 chequesState[data.caisseId] = data.cheques;
                 renderChequeList(data.caisseId);
+                calculateAll();
             }
             break;
         case 'reload_page':
@@ -346,7 +373,7 @@ function handleWebSocketMessage(data) {
                 if (!tpeState[data.caisseId]) tpeState[data.caisseId] = {};
                 tpeState[data.caisseId][data.terminalId] = data.releves;
                 renderTpeList(data.caisseId, data.terminalId);
-                calculateCbTotalAndEcart(data.caisseId);
+                calculateAll();
             }
             break;
     }
@@ -401,10 +428,6 @@ function attachEventListeners() {
 
     page.addEventListener('input', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            const caisseId = e.target.dataset.caisseId;
-            if (e.target.id.startsWith('ventes_cb_')) {
-                calculateCbTotalAndEcart(caisseId);
-            }
             if (!e.target.id.startsWith('cheque-') && !e.target.id.startsWith('tpe-releve-montant')) {
                  calculateAll();
                  triggerAutosave();
@@ -434,32 +457,7 @@ function attachEventListeners() {
             const tabId = paymentTab.dataset.paymentTab;
             container.querySelector(`#${tabId}`)?.classList.add('active');
             const caisseId = paymentTab.closest('.caisse-tab-content').id.replace('caisse', '');
-            const methodKey = paymentTab.dataset.methodKey;
-            const dynamicInputsContainer = document.getElementById(`dynamic-inputs-container-${caisseId}`);
-            const titleElement = document.getElementById(`theoretical-title-${caisseId}`);
-            const retrocessionLabel = document.getElementById(`retrocession-label-${caisseId}`);
-            const labels = {
-                especes: { title: 'Saisie des encaissements en Espèces', icon: 'fa-cash-register', retro: 'Rétrocessions en Espèces' },
-                cb: { title: 'Saisie des encaissements en CB', icon: 'fa-credit-card', retro: 'Rétrocessions en CB' },
-                cheques: { title: 'Saisie des encaissements en Chèques', icon: 'fa-money-check-dollar', retro: 'Rétrocessions en Chèques' }
-            };
-            if (labels[methodKey]) {
-                titleElement.innerHTML = `<i class="fa-solid ${labels[methodKey].icon}"></i> ${labels[methodKey].title}`;
-                retrocessionLabel.textContent = labels[methodKey].retro;
-            }
-            dynamicInputsContainer.querySelectorAll('.compact-input-group').forEach(group => {
-                if (group.dataset.method.includes(methodKey)) {
-                    group.style.display = 'flex';
-                } else {
-                    group.style.display = 'none';
-                }
-            });
-            const panel = dynamicInputsContainer.closest('.theoretical-inputs-panel');
-            if (methodKey === 'reserve') {
-                panel.style.display = 'none';
-            } else {
-                panel.style.display = 'block';
-            }
+            calculateAll(); 
         }
 
         const addBtn = e.target.closest('.add-cheque-btn');
@@ -476,6 +474,7 @@ function attachEventListeners() {
                 commentInput.value = '';
                 amountInput.focus();
                 triggerAutosave();
+                calculateAll();
             }
         }
         
@@ -486,6 +485,7 @@ function attachEventListeners() {
             renderChequeList(caisseId);
             sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: chequesState[caisseId] });
             triggerAutosave();
+            calculateAll();
         }
 
         const editBtn = e.target.closest('.edit-cheque-btn');
@@ -501,6 +501,7 @@ function attachEventListeners() {
                     renderChequeList(caisseId);
                     sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: chequesState[caisseId] });
                     triggerAutosave();
+                    calculateAll();
                 } else {
                     alert("Le montant doit être un nombre positif.");
                 }
@@ -523,11 +524,11 @@ function attachEventListeners() {
                 tpeState[caisseId][terminalId].push(newReleve);
                 
                 renderTpeList(caisseId, terminalId);
-                calculateCbTotalAndEcart(caisseId);
                 sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: tpeState[caisseId][terminalId] });
                 amountInput.value = '';
                 amountInput.focus();
                 triggerAutosave();
+                calculateAll();
             }
         }
 
@@ -537,9 +538,9 @@ function attachEventListeners() {
             if (tpeState[caisseId]?.[terminalId]) {
                 tpeState[caisseId][terminalId].splice(index, 1);
                 renderTpeList(caisseId, terminalId);
-                calculateCbTotalAndEcart(caisseId);
                 sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: tpeState[caisseId][terminalId] });
                 triggerAutosave();
+                calculateAll();
             }
         }
     });

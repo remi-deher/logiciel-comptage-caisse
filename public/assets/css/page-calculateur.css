@@ -1,4 +1,4 @@
-/* Fichier : public/assets/css/page-calculateur.css (Version Complète) */
+/* Fichier : public/assets/css/page-calculateur.css (Version avec encart unique et champs réintégrés) */
 
 /* --- BANDEAU MODE CONSULTATION --- */
 .history-view-banner {
@@ -42,7 +42,7 @@
 .tab-link.cloture-en-cours { color: #8a2be2 !important; }
 .tab-link.cloturee { background-color: #8a2be2; color: white; border-color: #7a1fb9; }
 
-/* --- INDICATEUR D'ÉCART (NORMAL ET FLOTTANT) --- */
+/* --- NOUVEL INDICATEUR D'ÉCART (FLOTTANT ET DYNAMIQUE) --- */
 .ecart-display-container {
     text-align: center;
     margin-bottom: 20px;
@@ -56,22 +56,52 @@
     display: none;
     padding: 15px;
     border: 2px solid var(--color-border-light);
-    border-radius: 8px;
-    font-size: 1.1em;
-    font-weight: bold;
-    transition: background-color 0.3s, border-color 0.3s, opacity 0.5s;
+    border-radius: 12px;
+    transition: opacity 0.5s;
     opacity: 0;
     background-color: var(--color-surface);
 }
 .ecart-display.active { display: block; opacity: 1; }
-.ecart-display .ecart-value { font-size: 1.5em; display: block; margin-bottom: 5px; }
-.ecart-explanation { font-size: 0.9em; font-style: italic; font-weight: normal; color: var(--color-text-secondary); margin-top: 8px; min-height: 1.2em; }
-.ecart-display.ecart-ok { background-color: rgba(39, 174, 96, 0.1); border-color: var(--color-success); }
-.ecart-display.ecart-ok .ecart-value { color: var(--color-success); }
-.ecart-display.ecart-positif { background-color: rgba(243, 156, 18, 0.1); border-color: var(--color-warning); }
-.ecart-display.ecart-positif .ecart-value { color: var(--color-warning); }
-.ecart-display.ecart-negatif { background-color: rgba(192, 57, 43, 0.1); border-color: var(--color-danger); }
-.ecart-display.ecart-negatif .ecart-value { color: var(--color-danger); }
+
+.main-ecart-display {
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: background-color 0.3s, border-color 0.3s;
+}
+.main-ecart-display .ecart-label {
+    display: block;
+    font-size: 1em;
+    font-weight: bold;
+    color: var(--color-text-secondary);
+}
+.main-ecart-display .ecart-value {
+    display: block;
+    font-size: 2.2em;
+    font-weight: bold;
+}
+.main-ecart-display.ecart-ok { background-color: rgba(39, 174, 96, 0.1); }
+.main-ecart-display.ecart-ok .ecart-value { color: var(--color-success); }
+.main-ecart-display.ecart-positif { background-color: rgba(243, 156, 18, 0.1); }
+.main-ecart-display.ecart-positif .ecart-value { color: var(--color-warning); }
+.main-ecart-display.ecart-negatif { background-color: rgba(192, 57, 43, 0.1); }
+.main-ecart-display.ecart-negatif .ecart-value { color: var(--color-danger); }
+
+.secondary-ecarts {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    font-size: 0.9em;
+}
+.secondary-ecart-item span {
+    color: var(--color-text-secondary);
+}
+.secondary-ecart-item strong {
+    font-weight: bold;
+}
+.secondary-ecart-item.ecart-ok strong { color: var(--color-success); }
+.secondary-ecart-item.ecart-positif strong { color: var(--color-warning); }
+.secondary-ecart-item.ecart-negatif strong { color: var(--color-danger); }
 
 /* --- ONGLETS DES MODES DE PAIEMENT --- */
 .payment-method-tabs { margin-top: 20px; border: 1px solid var(--color-border-light); border-radius: 12px; overflow: hidden; background-color: var(--color-surface); }
@@ -84,8 +114,18 @@
 
 /* --- GRILLES DE SAISIE --- */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; }
-.grid-3 { grid-template-columns: 1fr; gap: 15px;}
 .total-line { display: block; text-align: right; margin-top: 5px; font-size: 0.9em; color: var(--color-text-secondary); }
+.payment-details-grid {
+    margin-top: 25px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 25px;
+}
+@media (min-width: 768px) {
+    .payment-details-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
 
 /* --- SECTION SAUVEGARDE --- */
 .save-section {
@@ -95,53 +135,27 @@
     border-radius: 12px;
 }
 
-/* --- PANNEAU DE SAISIE DES ENCAISSEMENTS --- */
+/* --- PANNEAU DE SAISIE DES ENCAISSEMENTS (DANS LES ONGLETS) --- */
 .theoretical-inputs-panel {
-    background-color: transparent;
-    border: 1px solid var(--color-border-light);
-    border-radius: 12px;
-    margin-bottom: 25px;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-
-.panel-title {
-    margin: 0;
-    padding: 15px 20px;
-    font-size: 1.1em;
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    background-color: var(--color-surface-alt);
-    border-bottom: 1px solid var(--color-border-light);
     display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.panel-title i {
-    color: var(--color-primary);
-}
-
-.panel-inputs {
-    display: flex;
-    flex-wrap: wrap;
     gap: 20px;
+    flex-wrap: wrap;
+    background-color: var(--color-surface-alt);
     padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
 }
-
 .compact-input-group {
     flex: 1 1 200px;
     display: flex;
     flex-direction: column;
     gap: 5px;
 }
-
 .compact-input-group label {
     font-size: 0.9em;
     font-weight: bold;
     color: var(--color-text-secondary);
 }
-
 .compact-input-group input {
     font-size: 1.2em;
     font-weight: bold;
@@ -152,34 +166,29 @@
 }
 
 /* === SECTION CHÈQUES AMÉLIORÉE === */
-
 .cheque-section {
-    background-color: var(--color-surface-alt);
+    background-color: transparent;
     border-radius: 8px;
 }
-
 .cheque-grid {
     display: grid;
-    grid-template-columns: 1fr; /* Une colonne sur mobile */
+    grid-template-columns: 1fr;
     gap: 25px;
 }
-
 @media (min-width: 768px) {
     .cheque-grid {
-        grid-template-columns: 300px 1fr; /* Deux colonnes sur écrans plus larges */
+        grid-template-columns: 300px 1fr;
     }
 }
-
 .cheque-form-container, .cheque-list-container {
-    padding: 20px;
+    padding: 0;
 }
-
 .cheque-form-container {
     background-color: var(--color-surface);
     border-radius: 8px;
     border: 1px solid var(--color-border-light);
+    padding: 20px;
 }
-
 .cheque-list-header {
     display: flex;
     justify-content: space-between;
@@ -188,71 +197,25 @@
     padding-bottom: 10px;
     margin-bottom: 15px;
 }
-
-.cheque-list-header h4 {
-    margin: 0;
-    border: none;
-}
-
-.cheque-total {
-    font-size: 1.2em;
-    font-weight: bold;
-}
-
-.cheque-list .empty-list {
-    text-align: center;
-    padding: 30px;
-    color: var(--color-text-muted);
-    font-style: italic;
-}
-
-.cheque-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.cheque-table th, .cheque-table td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid var(--color-border-light);
-}
-
+.cheque-list-header h4 { margin: 0; border: none; }
+.cheque-total { font-size: 1.2em; font-weight: bold; }
+.cheque-list .empty-list { text-align: center; padding: 30px; color: var(--color-text-muted); font-style: italic; }
+.cheque-table { width: 100%; border-collapse: collapse; }
+.cheque-table th, .cheque-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--color-border-light); }
 .cheque-table td:first-child { font-weight: bold; }
 .cheque-table td:nth-child(2) { color: var(--color-text-secondary); }
-
-.cheque-actions {
-    text-align: right;
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-}
-
-.btn-icon {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 1.1em;
-    padding: 5px;
-    color: var(--color-text-muted);
-    transition: color 0.2s, transform 0.2s;
-}
-
-.btn-icon:hover {
-    transform: scale(1.2);
-}
-
+.cheque-actions { text-align: right; display: flex; gap: 10px; justify-content: flex-end; }
+.btn-icon { background: transparent; border: none; cursor: pointer; font-size: 1.1em; padding: 5px; color: var(--color-text-muted); transition: color 0.2s, transform 0.2s; }
+.btn-icon:hover { transform: scale(1.2); }
 .btn-icon.edit-cheque-btn:hover { color: var(--color-primary); }
 .btn-icon.delete-btn:hover { color: var(--color-danger); }
 
-
 /* === AMÉLIORATION DE L'ONGLET CARTE BANCAIRE (SYSTÈME DE RELEVÉS) === */
-
 .tpe-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 20px;
 }
-
 .tpe-card {
     background-color: var(--color-surface);
     border: 1px solid var(--color-border-light);
@@ -260,66 +223,11 @@
     display: flex;
     flex-direction: column;
 }
-
-.tpe-card h4 {
-    margin: 0;
-    padding: 15px;
-    background-color: var(--color-surface-alt);
-    border-bottom: 1px solid var(--color-border-light);
-}
-
-.tpe-releves-list {
-    flex-grow: 1;
-    padding: 10px;
-    min-height: 150px;
-    max-height: 250px;
-    overflow-y: auto;
-}
-
-.tpe-releves-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.tpe-releves-table td {
-    padding: 8px 5px;
-    border-bottom: 1px solid var(--color-border-light);
-}
+.tpe-card h4 { margin: 0; padding: 15px; background-color: var(--color-surface-alt); border-bottom: 1px solid var(--color-border-light); }
+.tpe-releves-list { flex-grow: 1; padding: 10px; min-height: 150px; max-height: 250px; overflow-y: auto; }
+.tpe-releves-table { width: 100%; border-collapse: collapse; }
+.tpe-releves-table td { padding: 8px 5px; border-bottom: 1px solid var(--color-border-light); }
 .tpe-releves-table td:last-child { text-align: right; }
-
-.tpe-releve-form {
-    display: flex;
-    gap: 5px;
-    padding: 15px;
-    border-top: 1px solid var(--color-border-light);
-}
-
-.tpe-releve-form input {
-    flex-grow: 1;
-}
-
-.tpe-releve-form .btn {
-    flex-shrink: 0;
-}
-
-.tpe-summary {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 2px solid var(--color-border-light);
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 10px;
-    font-size: 1.2em;
-    font-weight: bold;
-}
-
-.tpe-summary .summary-item span {
-    display: inline-block;
-    min-width: 120px;
-    text-align: right;
-}
-
-.tpe-summary .summary-item .ecart-ok { color: var(--color-success); }
-.tpe-summary .summary-item .ecart-positif { color: var(--color-warning); }
-.tpe-summary .summary-item .ecart-negatif { color: var(--color-danger); }
+.tpe-releve-form { display: flex; gap: 5px; padding: 15px; border-top: 1px solid var(--color-border-light); }
+.tpe-releve-form input { flex-grow: 1; }
+.tpe-releve-form .btn { flex-shrink: 0; }
