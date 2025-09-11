@@ -2,6 +2,7 @@
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
+import { updateClotureUI, initializeCloture } from './cloture-logic.js';
 
 let config = {};
 let wsResourceId = null;
