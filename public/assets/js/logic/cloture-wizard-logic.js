@@ -1,6 +1,7 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Version Finale Complète et Corrigée)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé pour une mise à jour correcte des données)
 
 import { sendWsMessage } from './websocket-service.js';
+import { setActiveMessageHandler } from '../main.js';
 
 // --- Variables d'état ---
 let config = {};
@@ -11,7 +12,7 @@ let wizardState = {
     selectedCaisses: [],
     confirmedData: {},
 };
-let chequesState = {}; // NOUVEAU
+let chequesState = {};
 
 // --- Fonctions Utilitaires ---
 const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(amount);
@@ -27,26 +28,100 @@ async function fetchInitialData() {
     config = configResult;
 
     if (!dataResult.success || !dataResult.data) {
-        throw new Error("Dernière sauvegarde non trouvée. Veuillez retourner au calculateur.");
-    }
-
-    const rawData = dataResult.data;
-    calculatorData = {
-        nom_comptage: rawData.nom_comptage,
-        explication: rawData.explication,
-        caisse: {}
-    };
-    for (const caisseId in rawData) {
-        if (!isNaN(caisseId)) {
-             calculatorData.caisse[caisseId] = rawData[caisseId];
-             if (!calculatorData.caisse[caisseId].denominations) calculatorData.caisse[caisseId].denominations = {};
-             if (!calculatorData.caisse[caisseId].tpe) calculatorData.caisse[caisseId].tpe = {};
-             // NOUVEAU: Initialiser les chèques
-             chequesState[caisseId] = rawData[caisseId].cheques || [];
+        calculatorData = { caisse: {} };
+    } else {
+        const rawData = dataResult.data;
+        calculatorData = {
+            nom_comptage: rawData.nom_comptage,
+            explication: rawData.explication,
+            caisse: {}
+        };
+        for (const caisseId in rawData) {
+            if (!isNaN(caisseId)) {
+                 calculatorData.caisse[caisseId] = rawData[caisseId];
+                 if (!calculatorData.caisse[caisseId].denominations) calculatorData.caisse[caisseId].denominations = {};
+                 if (!calculatorData.caisse[caisseId].tpe) calculatorData.caisse[caisseId].tpe = {};
+                 chequesState[caisseId] = rawData[caisseId].cheques || [];
+            }
         }
     }
-    console.log("[Wizard] Configuration et données de la BDD chargées.", { config, calculatorData });
+    console.log("[Wizard] Données de base chargées. Demande de la synchronisation live...");
+    sendWsMessage({ type: 'get_full_state' });
 }
+
+
+// --- Gestionnaire de messages WebSocket pour l'assistant ---
+function handleWizardWebSocketMessage(data) {
+    if (!calculatorData.caisse) return;
+
+    switch (data.type) {
+        case 'welcome':
+            wsResourceId = data.resourceId.toString();
+            break;
+        
+        case 'full_form_state':
+            console.log("[Wizard] Réception de l'état complet du serveur. Fusion des données...");
+            if (data.state) {
+                 Object.entries(data.state).forEach(([fieldId, value]) => {
+                    const match = fieldId.match(/^([a-zA-Z0-9]+)_(\d+)$/);
+                    if (match) {
+                        const key = match[1];
+                        const caisseId = match[2];
+
+                        // CORRECTION : S'assurer que la structure de la caisse existe
+                        if (!calculatorData.caisse[caisseId]) {
+                            calculatorData.caisse[caisseId] = { denominations: {}, tpe: {}, cheques: [] };
+                        }
+
+                        if (Object.keys(config.denominations.billets).includes(key) || Object.keys(config.denominations.pieces).includes(key)) {
+                            if (!calculatorData.caisse[caisseId].denominations) calculatorData.caisse[caisseId].denominations = {};
+                            calculatorData.caisse[caisseId].denominations[key] = value;
+                        } else {
+                            calculatorData.caisse[caisseId][key] = value;
+                        }
+                    }
+                });
+            }
+             if (data.cheques) {
+                Object.assign(chequesState, data.cheques);
+            }
+            console.log("[Wizard] Données live synchronisées.", { calculatorData, chequesState });
+            break;
+            
+        case 'update':
+            const matchUpdate = data.id.match(/^([a-zA-Z0-9]+)_(\d+)$/);
+            if (matchUpdate) {
+                const key = matchUpdate[1];
+                const caisseId = matchUpdate[2];
+
+                // CORRECTION : S'assurer que la structure de la caisse existe
+                if (!calculatorData.caisse[caisseId]) {
+                    calculatorData.caisse[caisseId] = { denominations: {}, tpe: {}, cheques: [] };
+                }
+
+                if (Object.keys(config.denominations.billets).includes(key) || Object.keys(config.denominations.pieces).includes(key)) {
+                     if (!calculatorData.caisse[caisseId].denominations) calculatorData.caisse[caisseId].denominations = {};
+                    calculatorData.caisse[caisseId].denominations[key] = data.value;
+                } else {
+                    calculatorData.caisse[caisseId][key] = data.value;
+                }
+            }
+            break;
+            
+        case 'cheque_update':
+            if (data.caisseId && data.cheques) {
+                chequesState[data.caisseId] = data.cheques;
+            }
+            break;
+        
+        case 'cloture_locked_caisses':
+             if (wizardState.currentStep === 1) {
+                 renderStep1_Selection();
+             }
+             break;
+    }
+}
+
 
 // --- Logique de Calcul ---
 function calculateAllForCaisse(caisseId) {
@@ -143,6 +218,7 @@ function calculateWithdrawalSuggestion(caisseId) {
     return { suggestions, totalToWithdraw };
 }
 
+
 // --- Fonctions de Rendu ---
 function updateEcartDisplay(id, ecart) {
     const display = document.getElementById(`ecart-display-caisse${id}_wizard`);
@@ -163,7 +239,6 @@ function renderSuggestionTable(suggestionData) {
     return `<div class="withdrawal-summary-card"><div class="withdrawal-total-header"><div class="total-amount">${formatCurrency(suggestionData.totalToWithdraw)}</div><div class="total-label">Total à retirer de la caisse</div></div><div class="withdrawal-details-list">${detailRows}</div></div>`;
 }
 
-// NOUVELLE FONCTION pour afficher la liste des chèques dans l'assistant
 function renderChequeListWizard(caisseId) {
     const listContainer = document.getElementById(`cheque-list-${caisseId}-wizard`);
     const totalContainer = document.getElementById(`cheque-total-${caisseId}-wizard`);
@@ -192,10 +267,8 @@ function renderChequeListWizard(caisseId) {
             </table>`;
     }
     totalContainer.textContent = formatCurrency(totalCheques);
-    // On met à jour la donnée principale pour la sauvegarde finale
     calculatorData.caisse[caisseId].cheques = cheques;
 }
-
 
 async function renderStep1_Selection() {
     const container = document.querySelector('.wizard-content');
@@ -242,14 +315,14 @@ function renderStep2_Counting() {
         const denominationsData = caisseData.denominations || {};
         const tpeData = caisseData.tpe || {};
 
-        const buildTextInput = (name, value) => `<input type="text" id="${name}_${id}" name="caisse[${id}][${name}]" data-caisse-id="${id}" value="${value || ''}">`;
-        const buildDenomInput = (name, value) => `<input type="number" id="${name}_${id}" name="caisse[${id}][denominations][${name}]" data-caisse-id="${id}" value="${value || ''}" min="0">`;
+        const buildTextInput = (name, value) => `<input type="text" id="${name}_${id}_wizard" name="caisse[${id}][${name}]" data-caisse-id="${id}" value="${value || ''}">`;
+        const buildDenomInput = (name, value) => `<input type="number" id="${name}_${id}_wizard" name="caisse[${id}][denominations][${name}]" data-caisse-id="${id}" value="${value || ''}" min="0">`;
         
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
         
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([, tpe]) => tpe.caisse_id.toString() === id) : [];
-        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="form-group"><label>${tpe.nom}</label><input type="text" id="tpe_${tpeId}_${id}" name="caisse[${id}][tpe][${tpeId}]" data-caisse-id="${id}" value="${tpeData[tpeId] || ''}"></div>`).join('');
+        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="form-group"><label>${tpe.nom}</label><input type="text" id="tpe_${tpeId}_${id}_wizard" name="caisse[${id}][tpe][${tpeId}]" data-caisse-id="${id}" value="${tpeData[tpeId] || ''}"></div>`).join('');
 
         contentHtml += `
             <div id="caisse${id}_wizard" class="caisse-tab-content ${isActive}">
@@ -385,6 +458,7 @@ async function handleNextStep() {
             }
             sendWsMessage({ type: 'cloture_lock', caisse_id: id });
         });
+        setActiveMessageHandler(null); 
         wizardState.currentStep = 2;
     } 
     else if (wizardState.currentStep === 2) { wizardState.currentStep = 3; }
@@ -435,6 +509,7 @@ function handlePrevStep() {
     if (wizardState.currentStep === 2) {
         wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
         wizardState.selectedCaisses = [];
+        setActiveMessageHandler(handleWizardWebSocketMessage);
     }
     wizardState.currentStep--;
     updateWizardUI();
@@ -446,6 +521,7 @@ function attachWizardListeners() {
     document.getElementById('wizard-cancel-btn').addEventListener('click', () => {
         if (confirm("Voulez-vous vraiment annuler ?")) {
             wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
+            setActiveMessageHandler(null); 
             window.location.href = '/calculateur';
         }
     });
@@ -457,10 +533,6 @@ function attachWizardListeners() {
             const nameAttr = e.target.name;
             const caisseId = e.target.dataset.caisseId;
             
-            if (!e.target.id.startsWith('cheque-')) { // Ne pas traiter les champs de saisie de chèque ici
-                sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
-            }
-
             if (!caisseId || !calculatorData.caisse[caisseId] || !nameAttr) return;
 
             const keys = nameAttr.match(/\[([^\]]+)\]/g).map(key => key.slice(1, -1));
@@ -507,7 +579,6 @@ function attachWizardListeners() {
             if (amount > 0) {
                 chequesState[caisseId].push({ montant: amount, commentaire: commentInput.value });
                 renderChequeListWizard(caisseId);
-                sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: chequesState[caisseId] });
                 amountInput.value = '';
                 commentInput.value = '';
                 amountInput.focus();
@@ -519,13 +590,13 @@ function attachWizardListeners() {
             const { caisseId, index } = deleteBtn.dataset;
             chequesState[caisseId].splice(index, 1);
             renderChequeListWizard(caisseId);
-            sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: chequesState[caisseId] });
         }
     });
 }
 
 export async function initializeClotureWizard() {
     try {
+        setActiveMessageHandler(handleWizardWebSocketMessage);
         await fetchInitialData();
         updateWizardUI();
         attachWizardListeners();
