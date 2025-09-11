@@ -138,7 +138,6 @@ export async function initializeHistoryLogic() {
                 }).join('');
             const totalRetraits = Object.entries(data.retraits || {}).reduce((sum, [key, qty]) => sum + (parseInt(qty, 10) * allDenomsMap[key]), 0);
 
-            // --- DEBUT CORRECTION: Affichage des chèques ---
             const cheques = data.cheques || [];
             const totalCheques = cheques.reduce((sum, cheque) => sum + parseFloat(cheque.montant), 0);
             const chequesHtml = cheques.length > 0 ? `
@@ -151,7 +150,36 @@ export async function initializeHistoryLogic() {
                     <tfoot><tr><td>Total Chèques</td><td class="text-right">${formatEuros(totalCheques)}</td></tr></tfoot>
                 </table>
             ` : '';
-            // --- FIN CORRECTION ---
+
+            // --- DÉBUT DE L'AJOUT POUR LES TPE ---
+            let totalCb = 0;
+            const cbHtml = (config.tpeParCaisse && Object.keys(config.tpeParCaisse).length > 0) ? Object.entries(config.tpeParCaisse)
+                .filter(([,tpe]) => tpe.caisse_id.toString() === caisse_id)
+                .map(([tpeId, tpe]) => {
+                    const releves = data.cb[tpeId] || [];
+                    if (releves.length === 0) return '';
+                    const totalTpe = releves.reduce((sum, r) => sum + parseFloat(r.montant), 0);
+                    totalCb += totalTpe;
+                    return `
+                        <h5 class="modal-table-subtitle">${tpe.nom}</h5>
+                        <table class="modal-details-table cb-table-modal">
+                            <thead><tr><th>Heure du relevé</th><th class="text-right">Montant</th></tr></thead>
+                            <tbody>
+                                ${releves.map(r => `<tr><td>${r.heure_releve}</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('')}
+                            </tbody>
+                            <tfoot><tr><td>Total TPE</td><td class="text-right">${formatEuros(totalTpe)}</td></tr></tfoot>
+                        </table>
+                    `;
+                }).join('') : '';
+
+            const cbSectionHtml = cbHtml ? `
+                <h4 class="modal-table-title" style="color: #27ae60">Relevés Carte Bancaire</h4>
+                ${cbHtml}
+                <table class="modal-details-table cb-table-modal">
+                    <tfoot><tr class="grand-total-cb"><td><strong>Total CB Compté</strong></td><td class="text-right"><strong>${formatEuros(totalCb)}</strong></td></tr></tfoot>
+                </table>
+            ` : '';
+            // --- FIN DE L'AJOUT POUR LES TPE ---
     
             return `
             <div>
@@ -160,11 +188,12 @@ export async function initializeHistoryLogic() {
                     <thead><tr><th>Dénomination Comptée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
                     <tbody>${denomsHtml}</tbody>
                     <tfoot>
-                        <tr><td colspan="2">Total Compté</td><td class="text-right">${formatEuros(caisseResult.total_compte)}</td></tr>
-                        <tr class="${getEcartClass(caisseResult.ecart)}"><td colspan="2"><strong>Écart</strong></td><td class="text-right"><strong>${formatEuros(caisseResult.ecart)}</strong></td></tr>
+                        <tr><td colspan="2">Total Compté Espèces</td><td class="text-right">${formatEuros(caisseResult.total_compte)}</td></tr>
+                        <tr class="${getEcartClass(caisseResult.ecart)}"><td colspan="2"><strong>Écart Espèces</strong></td><td class="text-right"><strong>${formatEuros(caisseResult.ecart)}</strong></td></tr>
                     </tfoot>
                 </table>
                 ${chequesHtml}
+                ${cbSectionHtml} 
                 ${retraitsHtml ? `<h4 class="modal-table-title" style="color: var(--color-danger)">Retraits Effectués</h4><table class="modal-details-table retrait-table">
                     <thead><tr><th>Dénomination Retirée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
                     <tbody>${retraitsHtml}</tbody>
