@@ -33,22 +33,24 @@ function calculate_results_from_data($data_rows) {
 
         $fond_de_caisse = floatval($caisse_data['fond_de_caisse'] ?? 0);
         
-        // --- DÉBUT DE LA CORRECTION : GESTION DES ANCIENS/NOUVEAUX FORMATS ---
-        if (isset($caisse_data['ventes'])) { // Si l'ancien format est détecté
-            $ventes = floatval($caisse_data['ventes']);
-        } else { // Nouveau format
-            $ventes = (floatval($caisse_data['ventes_especes'] ?? 0) +
-                       floatval($caisse_data['ventes_cb'] ?? 0) +
-                       floatval($caisse_data['ventes_cheques'] ?? 0));
-        }
-        // --- FIN DE LA CORRECTION ---
+        // --- DÉBUT DU BLOC CORRIGÉ ---
+        // On inclut maintenant TOUS les types de ventes dans le calcul
+        $ventes_especes = floatval($caisse_data['ventes_especes'] ?? 0);
+        $ventes_cb = floatval($caisse_data['ventes_cb'] ?? 0);
+        $ventes_cheques = floatval($caisse_data['ventes_cheques'] ?? 0);
+        $ventes_totales = $ventes_especes + $ventes_cb + $ventes_cheques;
+        // --- FIN DU BLOC CORRIGÉ ---
 
         $retrocession = floatval($caisse_data['retrocession'] ?? 0);
-        $recette_theorique = $ventes + $retrocession;
-        $recette_reelle = $total_compte - $fond_de_caisse;
-        $ecart = $recette_theorique > 0 ? $recette_reelle - $recette_theorique : 0;
         
-        $results['caisses'][$caisse_id] = compact('total_compte', 'fond_de_caisse', 'ventes', 'retrocession', 'recette_theorique', 'recette_reelle', 'ecart');
+        // Le calcul de la recette théorique prend maintenant en compte le total des ventes
+        $recette_theorique = $ventes_totales + $retrocession;
+        $recette_reelle = $total_compte - $fond_de_caisse;
+        $ecart = $recette_reelle - $ventes_especes - $retrocession;
+        
+        $results['caisses'][$caisse_id] = compact('total_compte', 'fond_de_caisse', 'ventes_totales', 'retrocession', 'recette_theorique', 'recette_reelle', 'ecart');
+        
+        // Mise à jour des totaux combinés
         $results['combines']['total_compté'] += $total_compte;
         $results['combines']['recette_reelle'] += $recette_reelle;
         $results['combines']['recette_theorique'] += $recette_theorique;
