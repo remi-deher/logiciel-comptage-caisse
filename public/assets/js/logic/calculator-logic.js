@@ -1,14 +1,14 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version avec autosave corrigé)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version avec nouvelles interfaces CB et Chèques)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
-import { initializeCloture, updateClotureUI } from './cloture-logic.js';
+import { initializeCloture, updateClotureUI, handleAllCaissesClosed } from './cloture-logic.js';
 
 let config = {};
 let wsResourceId = null;
 let autosaveTimer = null;
 let chequesState = {};
-let tpeState = {};
+let tpeState = {}; // État pour les relevés TPE
 
 const calculatorPageElement = () => document.getElementById('calculator-page');
 
@@ -80,7 +80,6 @@ function renderTpeList(caisseId, terminalId) {
             </table>`;
     }
 
-    // --- CORRECTION : Création des champs cachés pour l'autosave ---
     hiddenInputsContainer.innerHTML = releves.map((releve, index) => `
         <input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${index}][montant]" value="${releve.montant}">
         <input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${index}][heure]" value="${releve.heure}">
@@ -184,7 +183,7 @@ function renderCalculatorUI() {
                             <div class="cheque-list-container">
                                 <div class="cheque-list-header">
                                     <h4><i class="fa-solid fa-list-ol"></i> Chèques Encaissés</h4>
-                                    <div class="cheque-total">Total: <span id="cheque-total-${id}">0,00 €</span></div>
+                                    <div class="cheque-total" id="cheque-total-container-${id}">Total: <span id="cheque-total-${id}">0,00 €</span></div>
                                 </div>
                                 <div id="cheque-list-${id}" class="cheque-list"></div>
                                 <div id="cheque-hidden-inputs-${id}"></div>
@@ -244,10 +243,13 @@ function updateEcartDisplay(id, ecart) {
 function renderChequeList(caisseId) {
     const listContainer = document.getElementById(`cheque-list-${caisseId}`);
     const totalContainer = document.getElementById(`cheque-total-${caisseId}`);
+    const totalContainerParent = document.getElementById(`cheque-total-container-${caisseId}`);
     const hiddenInputsContainer = document.getElementById(`cheque-hidden-inputs-${caisseId}`);
     if (!listContainer || !totalContainer || !hiddenInputsContainer) return;
+
     const cheques = chequesState[caisseId] || [];
     let totalCheques = 0;
+    
     if (cheques.length === 0) {
         listContainer.innerHTML = '<p class="empty-list">Aucun chèque ajouté.</p>';
     } else {
@@ -270,7 +272,11 @@ function renderChequeList(caisseId) {
                 </tbody>
             </table>`;
     }
-    totalContainer.textContent = formatCurrency(totalCheques);
+
+    if (totalContainerParent) {
+        totalContainerParent.innerHTML = `Total (${cheques.length} chèque${cheques.length > 1 ? 's' : ''}): <span id="cheque-total-${caisseId}">${formatCurrency(totalCheques)}</span>`;
+    }
+
     hiddenInputsContainer.innerHTML = cheques.map((cheque, index) => `
         <input type="hidden" name="caisse[${caisseId}][cheques][${index}][montant]" value="${cheque.montant}">
         <input type="hidden" name="caisse[${caisseId}][cheques][${index}][commentaire]" value="${cheque.commentaire}">
