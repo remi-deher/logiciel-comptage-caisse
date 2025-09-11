@@ -207,12 +207,14 @@ class CalculateurController {
                     }
                 }
                 
+                // --- LOGIQUE DE SAUVEGARDE TPE UNIFIÉE ---
                 if (isset($caisse_data['tpe']) && is_array($caisse_data['tpe'])) {
                     foreach ($caisse_data['tpe'] as $terminal_id => $releves) {
                         if (is_array($releves)) {
                             foreach ($releves as $releve) {
-                                $montant_val = get_numeric_value($releve, 'montant');
-                                if ($montant_val > 0) {
+                                // On s'assure que le montant est bien numérique avant de l'insérer
+                                if (isset($releve['montant']) && is_numeric(str_replace(',', '.', $releve['montant']))) {
+                                    $montant_val = get_numeric_value($releve, 'montant');
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
                                     $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $releve['heure']]);
                                 }
@@ -257,7 +259,7 @@ class CalculateurController {
         }
         exit;
     }
-
+    
     public function cloture() {
         header('Content-Type: application/json');
         try {
@@ -301,15 +303,14 @@ class CalculateurController {
                     }
                 }
                 
-                // --- DÉBUT DU BLOC CORRIGÉ ---
-                // Ajout de la logique pour enregistrer les relevés TPE
+                // --- LOGIQUE DE SAUVEGARDE TPE UNIFIÉE ---
                 if (isset($caisse_data['tpe']) && is_array($caisse_data['tpe'])) {
                     foreach ($caisse_data['tpe'] as $terminal_id => $releves) {
                         if (is_array($releves)) {
                             foreach ($releves as $releve) {
-                                $montant_val = get_numeric_value($releve, 'montant');
-                                // On vérifie que la valeur est numérique, car le champ peut être soumis vide
-                                if (is_numeric($releve['montant'])) {
+                                // On s'assure que le montant est bien numérique avant de l'insérer
+                                if (isset($releve['montant']) && is_numeric(str_replace(',', '.', $releve['montant']))) {
+                                    $montant_val = get_numeric_value($releve, 'montant');
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
                                     $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $releve['heure']]);
                                 }
@@ -317,7 +318,6 @@ class CalculateurController {
                         }
                     }
                 }
-                // --- FIN DU BLOC CORRIGÉ ---
     
                 if (isset($caisse_data['cheques']) && is_array($caisse_data['cheques'])) {
                     foreach ($caisse_data['cheques'] as $cheque) {

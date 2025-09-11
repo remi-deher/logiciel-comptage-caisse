@@ -1,5 +1,5 @@
 <?php
-// src/Utils.php - Version mise à jour pour le schéma normalisé.
+// src/Utils.php - Version finale corrigée avec calcul de recette réelle complet
 
 function calculate_results_from_data($data_rows) {
     $results = [
@@ -16,8 +16,8 @@ function calculate_results_from_data($data_rows) {
     if (!isset($denominations)) $denominations = [];
 
     foreach ($data_rows as $caisse_id => $caisse_data) {
-        $total_compte = 0;
-        
+        // --- 1. Calcul des totaux réellement comptés pour chaque mode de paiement ---
+        $total_compte_especes = 0;
         if (isset($caisse_data['denominations'])) {
             foreach ($caisse_data['denominations'] as $denom) {
                 $valeur = 0;
@@ -27,33 +27,62 @@ function calculate_results_from_data($data_rows) {
                         break;
                     }
                 }
-                $total_compte += floatval($denom['quantite']) * $valeur;
+                $total_compte_especes += floatval($denom['quantite']) * $valeur;
+            }
+        }
+
+        $total_compte_cb = 0;
+        if (isset($caisse_data['cb']) && is_array($caisse_data['cb'])) {
+            foreach ($caisse_data['cb'] as $terminal_id => $releves) {
+                if(is_array($releves) && !empty($releves)) {
+                    // Logique de télécollecte : on ne prend que le dernier relevé du terminal
+                    usort($releves, function($a, $b) {
+                        return strcmp($a['heure_releve'], $b['heure_releve']);
+                    });
+                    $dernierReleve = end($releves);
+                    $total_compte_cb += floatval($dernierReleve['montant']);
+                }
+            }
+        }
+
+        $total_compte_cheques = 0;
+        if (isset($caisse_data['cheques']) && is_array($caisse_data['cheques'])) {
+            foreach($caisse_data['cheques'] as $cheque) {
+                $total_compte_cheques += floatval($cheque['montant']);
             }
         }
 
         $fond_de_caisse = floatval($caisse_data['fond_de_caisse'] ?? 0);
-        
-        // --- DÉBUT DU BLOC CORRIGÉ ---
-        // On inclut maintenant TOUS les types de ventes dans le calcul
+
+        // --- 2. Calcul de la Recette Réelle Totale ---
+        $recette_reelle_especes = $total_compte_especes - $fond_de_caisse;
+        $recette_reelle_totale = $recette_reelle_especes + $total_compte_cb + $total_compte_cheques;
+
+        // --- 3. Calcul de la Recette Théorique Totale ---
         $ventes_especes = floatval($caisse_data['ventes_especes'] ?? 0);
         $ventes_cb = floatval($caisse_data['ventes_cb'] ?? 0);
         $ventes_cheques = floatval($caisse_data['ventes_cheques'] ?? 0);
-        $ventes_totales = $ventes_especes + $ventes_cb + $ventes_cheques;
-        // --- FIN DU BLOC CORRIGÉ ---
-
         $retrocession = floatval($caisse_data['retrocession'] ?? 0);
+        $recette_theorique_totale = $ventes_especes + $ventes_cb + $ventes_cheques + $retrocession;
+
+        // --- 4. Calcul de l'Écart Total ---
+        $ecart = $recette_reelle_totale - $recette_theorique_totale;
         
-        // Le calcul de la recette théorique prend maintenant en compte le total des ventes
-        $recette_theorique = $ventes_totales + $retrocession;
-        $recette_reelle = $total_compte - $fond_de_caisse;
-        $ecart = $recette_reelle - $ventes_especes - $retrocession;
-        
-        $results['caisses'][$caisse_id] = compact('total_compte', 'fond_de_caisse', 'ventes_totales', 'retrocession', 'recette_theorique', 'recette_reelle', 'ecart');
-        
-        // Mise à jour des totaux combinés
-        $results['combines']['total_compté'] += $total_compte;
-        $results['combines']['recette_reelle'] += $recette_reelle;
-        $results['combines']['recette_theorique'] += $recette_theorique;
+        // Stockage des résultats pour cette caisse
+        $results['caisses'][$caisse_id] = [
+            'total_compté' => $total_compte_especes + $total_compte_cb + $total_compte_cheques,
+            'fond_de_caisse' => $fond_de_caisse,
+            'ventes' => $ventes_especes + $ventes_cb + $ventes_cheques,
+            'retrocession' => $retrocession,
+            'recette_theorique' => $recette_theorique_totale,
+            'recette_reelle' => $recette_reelle_totale,
+            'ecart' => $ecart
+        ];
+
+        // Mise à jour des totaux combinés pour l'ensemble du comptage
+        $results['combines']['total_compté'] += $results['caisses'][$caisse_id]['total_compté'];
+        $results['combines']['recette_reelle'] += $recette_reelle_totale;
+        $results['combines']['recette_theorique'] += $recette_theorique_totale;
         $results['combines']['ecart'] += $ecart;
     }
     
