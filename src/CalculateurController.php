@@ -258,72 +258,89 @@ class CalculateurController {
         exit;
     }
 
-    public function cloture() {
-        header('Content-Type: application/json');
-        try {
-            $this->pdo->beginTransaction();
+public function cloture() {
+    header('Content-Type: application/json');
+    try {
+        $this->pdo->beginTransaction();
 
-            $caisses_a_cloturer = $_POST['caisses_a_cloturer'] ?? [];
+        $caisses_a_cloturer = $_POST['caisses_a_cloturer'] ?? [];
 
-            foreach ($caisses_a_cloturer as $caisse_id) {
-                $caisse_id = intval($caisse_id);
-                if ($this->clotureStateService->isCaisseConfirmed($caisse_id)) {
-                    continue;
-                }
-
-                $nom_comptage = "Clôture Caisse " . ($this->noms_caisses[$caisse_id] ?? $caisse_id) . " du " . date('Y-m-d H:i:s');
-                $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
-                $stmt->execute([$nom_comptage, "Clôture individuelle via l'assistant.", date('Y-m-d H:i:s')]);
-                $comptage_id = $this->pdo->lastInsertId();
-
-                $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
-                if (empty($caisse_data)) continue;
-
-                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes_especes'), get_numeric_value($caisse_data, 'ventes_cb'), get_numeric_value($caisse_data, 'ventes_cheques'), get_numeric_value($caisse_data, 'retrocession')]);
-                $comptage_detail_id = $this->pdo->lastInsertId();
-                
-                if (isset($caisse_data['denominations'])) {
-                    foreach ($caisse_data['denominations'] as $name => $quantite) {
-                        $quantite = intval($quantite);
-                        if ($quantite >= 0) {
-                            $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
-                            $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
-                        }
-                    }
-                }
-                
-                $retraits_data = $_POST['retraits'][$caisse_id] ?? [];
-                foreach($retraits_data as $denom_name => $qty) {
-                    if (intval($qty) > 0) {
-                        $stmt_retrait = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
-                        $stmt_retrait->execute([$comptage_detail_id, $denom_name, intval($qty)]);
-                    }
-                }
-                
-                if (isset($caisse_data['cheques']) && is_array($caisse_data['cheques'])) {
-                    foreach ($caisse_data['cheques'] as $cheque) {
-                        $montant_cheque = get_numeric_value($cheque, 'montant');
-                        if ($montant_cheque > 0) {
-                            $stmt_cheque = $this->pdo->prepare("INSERT INTO comptage_cheques (comptage_detail_id, montant, commentaire) VALUES (?, ?, ?)");
-                            $stmt_cheque->execute([$comptage_detail_id, $montant_cheque, $cheque['commentaire'] ?? '']);
-                        }
-                    }
-                }
-
-                $this->clotureStateService->confirmCaisse($caisse_id);
+        foreach ($caisses_a_cloturer as $caisse_id) {
+            $caisse_id = intval($caisse_id);
+            if ($this->clotureStateService->isCaisseConfirmed($caisse_id)) {
+                continue;
             }
 
-            $this->pdo->commit();
-            echo json_encode(['success' => true, 'message' => 'Les caisses sélectionnées ont été clôturées avec succès.']);
+            $nom_comptage = "Clôture Caisse " . ($this->noms_caisses[$caisse_id] ?? $caisse_id) . " du " . date('Y-m-d H:i:s');
+            $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
+            $stmt->execute([$nom_comptage, "Clôture individuelle via l'assistant.", date('Y-m-d H:i:s')]);
+            $comptage_id = $this->pdo->lastInsertId();
 
-        } catch (Exception $e) {
-            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
-            http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Erreur lors de la clôture : ' . $e->getMessage()]);
+            $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
+            if (empty($caisse_data)) continue;
+
+            $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes_especes'), get_numeric_value($caisse_data, 'ventes_cb'), get_numeric_value($caisse_data, 'ventes_cheques'), get_numeric_value($caisse_data, 'retrocession')]);
+            $comptage_detail_id = $this->pdo->lastInsertId();
+            
+            if (isset($caisse_data['denominations'])) {
+                foreach ($caisse_data['denominations'] as $name => $quantite) {
+                    $quantite = intval($quantite);
+                    if ($quantite >= 0) {
+                        $stmt_denom = $this->pdo->prepare("INSERT INTO comptage_denominations (comptage_detail_id, denomination_nom, quantite) VALUES (?, ?, ?)");
+                        $stmt_denom->execute([$comptage_detail_id, $name, $quantite]);
+                    }
+                }
+            }
+            
+            $retraits_data = $_POST['retraits'][$caisse_id] ?? [];
+            foreach($retraits_data as $denom_name => $qty) {
+                if (intval($qty) > 0) {
+                    $stmt_retrait = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
+                    $stmt_retrait->execute([$comptage_detail_id, $denom_name, intval($qty)]);
+                }
+            }
+            
+            // --- DÉBUT DU BLOC CORRIGÉ ---
+            // Ajout de la logique pour enregistrer les relevés TPE
+            if (isset($caisse_data['tpe']) && is_array($caisse_data['tpe'])) {
+                foreach ($caisse_data['tpe'] as $terminal_id => $releves) {
+                    if (is_array($releves)) {
+                        foreach ($releves as $releve) {
+                            $montant_val = get_numeric_value($releve, 'montant');
+                            if ($montant_val > 0) {
+                                $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
+                                $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $releve['heure']]);
+                            }
+                        }
+                    }
+                }
+            }
+            // --- FIN DU BLOC CORRIGÉ ---
+
+            if (isset($caisse_data['cheques']) && is_array($caisse_data['cheques'])) {
+                foreach ($caisse_data['cheques'] as $cheque) {
+                    $montant_cheque = get_numeric_value($cheque, 'montant');
+                    if ($montant_cheque > 0) {
+                        $stmt_cheque = $this->pdo->prepare("INSERT INTO comptage_cheques (comptage_detail_id, montant, commentaire) VALUES (?, ?, ?)");
+                        $stmt_cheque->execute([$comptage_detail_id, $montant_cheque, $cheque['commentaire'] ?? '']);
+                    }
+                }
+            }
+
+            $this->clotureStateService->confirmCaisse($caisse_id);
         }
-        exit;
+
+        $this->pdo->commit();
+        echo json_encode(['success' => true, 'message' => 'Les caisses sélectionnées ont été clôturées avec succès.']);
+
+    } catch (Exception $e) {
+        if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Erreur lors de la clôture : ' . $e->getMessage()]);
     }
+    exit;
+}
 
     public function cloture_generale() {
         header('Content-Type: application/json');
