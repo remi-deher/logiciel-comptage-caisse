@@ -79,17 +79,10 @@ class HistoriqueController {
                 cd.caisse_id, cd.fond_de_caisse, 
                 cd.ventes_especes, cd.ventes_cb, cd.ventes_cheques, 
                 cd.retrocession,
-                cd.id as comptage_detail_id,
-                GROUP_CONCAT(DISTINCT CONCAT(d.denomination_nom, ':', d.quantite) SEPARATOR ';') as denominations,
-                GROUP_CONCAT(DISTINCT CONCAT(r.denomination_nom, ':', r.quantite_retiree) SEPARATOR ';') as retraits,
-                GROUP_CONCAT(DISTINCT CONCAT(cb.terminal_id, ':', cb.montant) SEPARATOR ';') as cb_releves
+                cd.id as comptage_detail_id
             FROM comptages c
             LEFT JOIN comptage_details cd ON c.id = cd.comptage_id
-            LEFT JOIN comptage_denominations d ON cd.id = d.comptage_detail_id
-            LEFT JOIN comptage_retraits r ON cd.id = r.comptage_detail_id
-            LEFT JOIN comptage_cb cb ON cd.id = cb.comptage_detail_id
             WHERE c.id IN ({$placeholders})
-            GROUP BY c.id, cd.id
             ORDER BY c.date_comptage DESC, cd.caisse_id ASC
         ");
         
@@ -108,34 +101,23 @@ class HistoriqueController {
                 ];
             }
             
-            $denominations_array = [];
-            if ($row['denominations']) {
-                foreach (explode(';', $row['denominations']) as $part) {
-                    list($name, $quantity) = explode(':', $part);
-                    $denominations_array[] = ['denomination_nom' => $name, 'quantite' => $quantity];
-                }
-            }
-            
-            $retraits_array = [];
-            if ($row['retraits']) {
-                foreach (explode(';', $row['retraits']) as $part) {
-                    list($name, $quantity) = explode(':', $part);
-                    $retraits_array[$name] = $quantity;
-                }
-            }
-            
-            $cb_releves_array = [];
-            if ($row['cb_releves']) {
-                foreach(explode(';', $row['cb_releves']) as $part) {
-                    list($terminal_id, $montant) = explode(':', $part);
-                    if (!isset($cb_releves_array[$terminal_id])) $cb_releves_array[$terminal_id] = [];
-                    $cb_releves_array[$terminal_id][] = $montant;
-                }
-            }
+            $stmt_denoms = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
+            $stmt_denoms->execute([$row['comptage_detail_id']]);
+            $denominations_array = $stmt_denoms->fetchAll(PDO::FETCH_ASSOC);
+
+            $stmt_retraits = $this->pdo->prepare("SELECT denomination_nom, quantite_retiree FROM comptage_retraits WHERE comptage_detail_id = ?");
+            $stmt_retraits->execute([$row['comptage_detail_id']]);
+            $retraits_array = $stmt_retraits->fetchAll(PDO::FETCH_KEY_PAIR);
             
             $stmt_cheques = $this->pdo->prepare("SELECT montant, commentaire FROM comptage_cheques WHERE comptage_detail_id = ?");
             $stmt_cheques->execute([$row['comptage_detail_id']]);
             $cheques_array = $stmt_cheques->fetchAll(PDO::FETCH_ASSOC);
+
+            // --- DEBUT DE L'AJOUT POUR LES TPE ---
+            $stmt_cb = $this->pdo->prepare("SELECT terminal_id, montant, heure_releve FROM comptage_cb WHERE comptage_detail_id = ? ORDER BY heure_releve ASC");
+            $stmt_cb->execute([$row['comptage_detail_id']]);
+            $cb_releves_array = $stmt_cb->fetchAll(PDO::FETCH_ASSOC | PDO::FETCH_GROUP);
+            // --- FIN DE L'AJOUT POUR LES TPE ---
 
             $historique[$comptage_id]['caisses_data'][$row['caisse_id']] = [
                 'fond_de_caisse' => $row['fond_de_caisse'],
@@ -145,7 +127,7 @@ class HistoriqueController {
                 'retrocession' => $row['retrocession'],
                 'denominations' => $denominations_array,
                 'retraits' => $retraits_array,
-                'cb' => $cb_releves_array,
+                'cb' => $cb_releves_array, // Ajout des relevés
                 'cheques' => $cheques_array
             ];
         }
