@@ -42,7 +42,7 @@ date_default_timezone_set(defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Europe/Paris
 
 $currenciesData = [];
 if (file_exists(ROOT_PATH . '/config/currencies.json')) {
-    $currenciesData = json_decode(file_get_contents(ROOT_PATH . '/config/currencies.json'), true);
+	    $currenciesData = json_decode(file_get_contents(ROOT_PATH . '/config/currencies.json'), true);
 }
 $current_currency_code = defined('APP_CURRENCY') ? APP_CURRENCY : 'EUR';
 $current_currency_symbol = $currenciesData[$current_currency_code]['symbol'] ?? '€';
@@ -104,7 +104,7 @@ $request_method = $_SERVER['REQUEST_METHOD'];
 $route_key = "{$request_method}:{$route}";
 
 $routes = [
-    'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $current_currency_code, $current_currency_symbol) {
+    'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $current_currency_code, $current_currency_symbol, $rouleaux_pieces) {
         echo json_encode([
             'success' => true,
             'nomsCaisses' => $noms_caisses,
@@ -112,7 +112,8 @@ $routes = [
             'tpeParCaisse' => $tpe_par_caisse,
             'minToKeep' => $min_to_keep,
             'currencyCode' => $current_currency_code,
-            'currencySymbol' => $current_currency_symbol
+            'currencySymbol' => $current_currency_symbol,
+            'rouleauxPieces' => $rouleaux_pieces ?? []
         ]);
     },
     'GET:calculateur/get_initial_data' => [$calculateurController, 'getInitialData'],
