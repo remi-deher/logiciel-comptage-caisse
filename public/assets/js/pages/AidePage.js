@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/pages/AidePage.js (Dynamique avec JSON)
+// Fichier : public/assets/js/pages/AidePage.js
 
 import { initializeAideLogic } from '../logic/aide-logic.js';
 
@@ -12,22 +12,34 @@ function buildHelpCard(card) {
         ? `<a href="${card.link}" class="btn help-btn-link"><i class="fa-solid fa-arrow-right"></i> Accéder</a>`
         : '';
 
-    // On encode le contenu pour le passer sans risque à l'attribut data-content
+    // Encode le contenu pour le passer sans risque à l'attribut data-content
     const encodedContent = encodeURIComponent(card.content);
+
+    // Génère les étiquettes (tags)
+    const tagsHtml = (card.tags || [])
+        .map(tag => `<span class="help-card-tag">${tag}</span>`)
+        .join('');
 
     return `
         <div class="help-card"
              data-title="${card.title}"
              data-icon="${card.icon}"
              data-content="${encodedContent}">
+            
             <div class="help-card-header">
                 <div class="help-card-icon"><i class="${card.icon}"></i></div>
                 <h3>${card.title}</h3>
             </div>
-            <p>${card.summary}</p>
-            <div class="help-card-footer">
-                ${linkButton}
+
+            <div class="help-card-content">
+                <p>${card.summary}</p>
             </div>
+            
+            <div class="help-card-tags">
+                ${tagsHtml}
+            </div>
+
+            ${card.link ? `<div class="help-card-footer">${linkButton}</div>` : ''}
         </div>
     `;
 }
@@ -37,13 +49,13 @@ export function renderAidePage(element) {
   element.innerHTML = `
     <div class="container" id="help-page">
         <div class="help-header">
-            <h2><i class="fa-solid fa-book-open" style="color: #3498db;"></i> Documentation Complète</h2>
-            <p style="font-size: 1.1em;">Un guide détaillé pour les utilisateurs et les techniciens.</p>
+            <h2><i class="fa-solid fa-book-open"></i> Centre d'Aide</h2>
+            <p>Trouvez des réponses à vos questions et découvrez comment tirer le meilleur parti de l'application.</p>
         </div>
 
         <div class="help-search-container">
             <i class="fa-solid fa-search"></i>
-            <input type="text" id="help-search-input" placeholder="Rechercher un sujet...">
+            <input type="text" id="help-search-input" placeholder="Rechercher un sujet (ex: clôture, réserve)...">
         </div>
 
         <div id="help-content-container">
