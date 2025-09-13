@@ -20,6 +20,7 @@ async function handleAutosave() {
     const statusElement = document.getElementById('autosave-status');
     if (statusElement) statusElement.textContent = 'Sauvegarde en cours...';
     try {
+        // sendBeacon est idéal pour les sauvegardes en quittant la page
         navigator.sendBeacon('index.php?route=calculateur/autosave', new FormData(form));
         isDirty = false;
         if (statusElement) statusElement.textContent = 'Changements sauvegardés.';
@@ -378,6 +379,7 @@ function attachEventListeners() {
             if (amount > 0) {
                 chequesState[caisseId].push({ montant: amount, commentaire: commentInput.value });
                 isDirty = true;
+                document.getElementById('autosave-status').textContent = 'Changements non sauvegardés.';
                 renderChequeList(caisseId);
                 calculateAll();
                 sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: chequesState[caisseId] });
@@ -393,6 +395,7 @@ function attachEventListeners() {
             if (confirm('Voulez-vous vraiment supprimer ce chèque ?')) {
                 chequesState[caisseId].splice(index, 1);
                 isDirty = true;
+                document.getElementById('autosave-status').textContent = 'Changements non sauvegardés.';
                 renderChequeList(caisseId);
                 calculateAll();
                 sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: chequesState[caisseId] });
@@ -409,6 +412,7 @@ function attachEventListeners() {
             if (amount > 0) {
                 tpeState[caisseId][terminalId].push({ montant: amount, heure: currentTime });
                 isDirty = true;
+                document.getElementById('autosave-status').textContent = 'Changements non sauvegardés.';
                 renderTpeList(caisseId, terminalId);
                 calculateAll();
                 amountInput.value = '';
@@ -421,6 +425,7 @@ function attachEventListeners() {
             const { caisseId, terminalId, index } = deleteTpeBtn.dataset;
             tpeState[caisseId][terminalId].splice(index, 1);
             isDirty = true;
+            document.getElementById('autosave-status').textContent = 'Changements non sauvegardés.';
             renderTpeList(caisseId, terminalId);
             calculateAll();
         }
@@ -509,19 +514,29 @@ export async function initializeCalculator() {
                 for (const caisseId in data) {
                     if (!isNaN(caisseId) && config.nomsCaisses[caisseId]) {
                         const caisseData = data[caisseId];
-                        Object.keys(caisseData).forEach(key => {
-                            const field = document.getElementById(`${key}_${caisseId}`);
-                            if (field) field.value = caisseData[key];
-                            else if (key === 'denominations') {
-                                Object.entries(caisseData.denominations).forEach(([denom, qty]) => {
-                                    const denomField = document.getElementById(`${denom}_${caisseId}`);
-                                    if(denomField) denomField.value = qty;
-                                });
-                            }
+                        
+                        // Set values for standard fields
+                        ['fond_de_caisse', 'ventes_especes', 'ventes_cb', 'ventes_cheques', 'retrocession'].forEach(key => {
+                             const field = document.getElementById(`${key}_${caisseId}`);
+                             if (field && caisseData[key] !== undefined) {
+                                 field.value = caisseData[key];
+                             }
                         });
+
+                        if (caisseData.denominations) {
+                             Object.entries(caisseData.denominations).forEach(([denom, qty]) => {
+                                const denomField = document.getElementById(`${denom}_${caisseId}`);
+                                if(denomField) denomField.value = qty;
+                             });
+                        }
                         if (caisseData.cheques) {
                             chequesState[caisseId] = caisseData.cheques;
                             renderChequeList(caisseId);
+                            // Re-populate the theoretical sales after rendering the list
+                            const ventesChequesField = document.getElementById(`ventes_cheques_${caisseId}`);
+                            if(ventesChequesField && caisseData.ventes_cheques) {
+                                ventesChequesField.value = caisseData.ventes_cheques;
+                            }
                         }
                         if(caisseData.tpe) {
                             Object.entries(caisseData.tpe).forEach(([terminalId, releves]) => {

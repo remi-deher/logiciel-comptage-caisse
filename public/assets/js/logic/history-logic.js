@@ -106,7 +106,7 @@ export async function initializeHistoryLogic() {
         const comptage = fullHistoryData.find(c => c.id.toString() === comptageId.toString());
         if (!comptage) { container.innerHTML = "Erreur: détails non trouvés."; return; }
     
-        const { combines, caisses } = comptage.results;
+        const { combines } = comptage.results;
     
         const summaryHtml = `
             <ul class="summary-list">
@@ -115,16 +115,14 @@ export async function initializeHistoryLogic() {
                 <li><i class="fa-solid fa-receipt summary-icon icon-ventes"></i><div><span>Ventes Théoriques</span><strong>${formatEuros(combines.recette_theorique)}</strong></div></li>
                  <li><i class="fa-solid fa-landmark summary-icon icon-fond-caisse"></i><div><span>Total Compté</span><strong>${formatEuros(combines.total_compté)}</strong></div></li>
             </ul>`;
-        
+    
         const caissesHtml = Object.entries(comptage.caisses_data).map(([caisse_id, data]) => {
-            let totalEspeces = 0;
             let totalBillets = 0, totalPieces = 0, totalRouleaux = 0;
             let billetsHtml = '', piecesHtml = '', rouleauxHtml = '';
 
             data.denominations.forEach(denom => {
                 const quantite = parseInt(denom.quantite, 10);
                 if (quantite === 0) return;
-
                 const denomName = denom.denomination_nom;
 
                 if (denomName.endsWith('_roll')) {
@@ -148,8 +146,7 @@ export async function initializeHistoryLogic() {
                     piecesHtml += `<tr><td>Pièces ${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(totalLigne)}</td></tr>`;
                 }
             });
-
-            totalEspeces = totalBillets + totalPieces + totalRouleaux;
+            const totalEspeces = totalBillets + totalPieces + totalRouleaux;
             
             const especesTable = `
                 <h4 class="modal-table-title" style="color: #16a085;">Détail Espèces</h4>
