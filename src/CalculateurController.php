@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Version Finale Complète et Corrigée)
+// Fichier : src/CalculateurController.php (Corrigé et Complet)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -396,11 +396,8 @@ class CalculateurController {
                     foreach ($latest_cloture_data['retraits'] as $denom_name => $qty_retiree) {
                         if (isset($denominations_j1[$denom_name])) {
                             $denominations_j1[$denom_name] -= $qty_retiree;
-                            // --- DEBUT DE LA CORRECTION ---
-                            // On soustrait la VALEUR des retraits du total pour le nouveau fond de caisse
                             $valeur_retrait = $qty_retiree * ($all_denoms_map[$denom_name] ?? 0);
                             $nouveau_fond_de_caisse -= $valeur_retrait;
-                            // --- FIN DE LA CORRECTION ---
                         }
                     }
                 }
@@ -452,28 +449,33 @@ class CalculateurController {
         $stmt_cheques->execute([$detail_id]);
         $data['cheques'] = $stmt_cheques->fetchAll(PDO::FETCH_ASSOC);
     
-        // --- DEBUT DE LA CORRECTION ---
-        global $rouleaux_pieces;
-        if (!isset($rouleaux_pieces)) $rouleaux_pieces = [];
+        // *** DEBUT DE LA CORRECTION ***
+        // Calcul des totaux pour chaque mode de paiement
         $data['total_compte_especes'] = 0;
         $all_denoms_map = ($this->denominations['billets'] ?? []) + ($this->denominations['pieces'] ?? []);
         
         foreach($data['denominations'] as $denomination_nom => $quantite) {
-            $quantite = floatval($quantite);
-            $valeur_unitaire = 0;
-            if (str_ends_with($denomination_nom, '_roll')) {
-                $base_denom = str_replace('_roll', '', $denomination_nom);
-                if (isset($all_denoms_map[$base_denom]) && isset($rouleaux_pieces[$base_denom])) {
-                    $valeur_unitaire = floatval($all_denoms_map[$base_denom]) * intval($rouleaux_pieces[$base_denom]);
-                }
-            } else {
-                if (isset($all_denoms_map[$denomination_nom])) {
-                    $valeur_unitaire = floatval($all_denoms_map[$denomination_nom]);
+            $data['total_compte_especes'] += floatval($quantite) * floatval($all_denoms_map[$denomination_nom] ?? 0);
+        }
+
+        $data['total_compte_cb'] = 0;
+        if (isset($data['tpe'])) {
+            foreach ($data['tpe'] as $releves) {
+                if (is_array($releves)) {
+                    foreach ($releves as $releve) {
+                        $data['total_compte_cb'] += floatval($releve['montant'] ?? 0);
+                    }
                 }
             }
-            $data['total_compte_especes'] += $quantite * $valeur_unitaire;
         }
-        // --- FIN DE LA CORRECTION ---
+        
+        $data['total_compte_cheques'] = 0;
+        if (isset($data['cheques'])) {
+            foreach ($data['cheques'] as $cheque) {
+                $data['total_compte_cheques'] += floatval($cheque['montant'] ?? 0);
+            }
+        }
+        // *** FIN DE LA CORRECTION ***
     
         return $data;
     }

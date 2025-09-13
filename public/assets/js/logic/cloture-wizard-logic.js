@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Version Complète, sans rouleaux et avec réouverture)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé et Complet)
 
 import { sendWsMessage } from './websocket-service.js';
 import { setActiveMessageHandler } from '../main.js';
@@ -13,6 +13,7 @@ let wizardState = {
     confirmedData: {},
 };
 let chequesState = {};
+let tpeState = {}; // Ajout pour gérer l'état des TPE de manière isolée
 
 // --- Fonctions Utilitaires ---
 const formatCurrency = (amount) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(amount);
@@ -40,8 +41,11 @@ async function fetchInitialData() {
             if (!isNaN(caisseId)) {
                  calculatorData.caisse[caisseId] = rawData[caisseId];
                  if (!calculatorData.caisse[caisseId].denominations) calculatorData.caisse[caisseId].denominations = {};
+                 // On s'assure que TPE est initialisé comme un objet vide s'il n'existe pas
                  if (!calculatorData.caisse[caisseId].tpe) calculatorData.caisse[caisseId].tpe = {};
                  chequesState[caisseId] = rawData[caisseId].cheques || [];
+                 // On charge l'état des TPE dans notre variable dédiée
+                 tpeState[caisseId] = rawData[caisseId].tpe || {};
             }
         }
     }
@@ -87,7 +91,11 @@ function handleWizardWebSocketMessage(data) {
              if (data.cheques) {
                 Object.assign(chequesState, data.cheques);
             }
-            console.log("[Wizard] Données live synchronisées.", { calculatorData, chequesState });
+            // Synchronisation de l'état des TPE
+            if (data.tpe) {
+                Object.assign(tpeState, data.tpe);
+            }
+            console.log("[Wizard] Données live synchronisées.", { calculatorData, chequesState, tpeState });
             break;
             
         case 'update':
@@ -373,7 +381,9 @@ function renderStep2_Counting() {
         
         const caisseData = calculatorData.caisse[id] || {};
         const denominationsData = caisseData.denominations || {};
-        const tpeData = caisseData.tpe || {};
+        // *** DEBUT DE LA CORRECTION ***
+        // On utilise tpeState qui est synchronisé, plutôt que caisseData.tpe
+        const tpeRelevesPourCaisse = tpeState[id] || {};
 
         const buildTextInput = (name, value) => `<input type="text" id="${name}_${id}_wizard" name="caisse[${id}][${name}]" data-caisse-id="${id}" value="${value || ''}">`;
         const buildDenomInput = (name, value) => `<input type="number" id="${name}_${id}_wizard" name="caisse[${id}][denominations][${name}]" data-caisse-id="${id}" value="${value || ''}" min="0">`;
@@ -382,7 +392,14 @@ function renderStep2_Counting() {
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
         
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([, tpe]) => tpe.caisse_id.toString() === id) : [];
-        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="form-group"><label>${tpe.nom}</label><input type="text" id="tpe_${tpeId}_${id}_wizard" name="caisse[${id}][tpe][${tpeId}]" data-caisse-id="${id}" value="${tpeData[tpeId] || ''}"></div>`).join('');
+        
+        // La logique d'affichage des TPE est revue pour être en lecture seule et afficher la somme.
+        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
+            const releves = tpeRelevesPourCaisse[tpeId] || [];
+            const totalTpe = releves.reduce((sum, releve) => sum + parseLocaleFloat(releve.montant), 0);
+            return `<div class="form-group"><label>${tpe.nom} (Total)</label><input type="text" id="tpe_total_${tpeId}_${id}_wizard" value="${formatCurrency(totalTpe)}" readonly></div>`;
+        }).join('');
+        // *** FIN DE LA CORRECTION ***
 
         contentHtml += `
             <div id="caisse${id}_wizard" class="caisse-tab-content ${isActive}">
@@ -460,9 +477,10 @@ function renderStep4_Finalization() {
         }
         
         let totalCompteCb = 0;
-        if(caisseData.tpe) {
-            for(const tpeId in caisseData.tpe) {
-                totalCompteCb += parseLocaleFloat(caisseData.tpe[tpeId]);
+        if(tpeState[id]) { // Utilise tpeState
+            for(const tpeId in tpeState[id]) {
+                const releves = tpeState[id][tpeId] || [];
+                totalCompteCb += releves.reduce((sum, r) => sum + parseLocaleFloat(r.montant), 0);
             }
         }
         const totalCompteCheques = (chequesState[id] || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
@@ -520,6 +538,7 @@ async function handleNextStep() {
                     cheques: [] 
                 };
             }
+            if(!tpeState[id]) tpeState[id] = {}; // Initialise tpeState si besoin
             sendWsMessage({ type: 'cloture_lock', caisse_id: id });
         });
         setActiveMessageHandler(null); 
@@ -533,12 +552,23 @@ async function handleNextStep() {
         wizardState.selectedCaisses.forEach(id => {
             formData.append('caisses_a_cloturer[]', id);
             for (const [key, value] of Object.entries(calculatorData.caisse[id])) {
-                if (key === 'denominations' || key === 'tpe') {
+                if (key === 'denominations') {
                      for(const [subKey, subValue] of Object.entries(value)) {
                         formData.append(`caisse[${id}][${key}][${subKey}]`, subValue);
                     }
+                } else if (key === 'tpe') {
+                    // *** DEBUT DE LA CORRECTION ***
+                    // On envoie les données depuis tpeState, qui est complet
+                    const tpeDataForCaisse = tpeState[id] || {};
+                    for(const [terminalId, releves] of Object.entries(tpeDataForCaisse)) {
+                        (releves || []).forEach((releve, index) => {
+                            formData.append(`caisse[${id}][tpe][${terminalId}][${index}][montant]`, releve.montant);
+                            formData.append(`caisse[${id}][tpe][${terminalId}][${index}][heure]`, releve.heure);
+                        });
+                    }
+                    // *** FIN DE LA CORRECTION ***
                 } else if (key === 'cheques') {
-                    (value || []).forEach((cheque, index) => {
+                    (chequesState[id] || []).forEach((cheque, index) => { // Utilise chequesState
                         formData.append(`caisse[${id}][cheques][${index}][montant]`, cheque.montant);
                         formData.append(`caisse[${id}][cheques][${index}][commentaire]`, cheque.commentaire);
                     });
