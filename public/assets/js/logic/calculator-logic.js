@@ -62,9 +62,7 @@ function createDenominationCard(caisseId, name, value, type) {
         <div class="denom-card ${cardClass}">
             <div class="denom-card-header">${label}</div>
             <div class="denom-card-body">
-                <button type="button" class="btn-adjust" data-target-id="${inputId}" data-amount="-1" aria-label="Diminuer">-</button>
                 <input type="number" class="quantity-input" data-caisse-id="${caisseId}" id="${inputId}" name="${nameAttr}" min="0" placeholder="0">
-                <button type="button" class="btn-adjust" data-target-id="${inputId}" data-amount="1" aria-label="Augmenter">+</button>
             </div>
             <div class="denom-card-footer" id="${totalId}">0,00 €</div>
         </div>`;
@@ -331,6 +329,26 @@ function attachEventListeners() {
         }
     });
     
+
+    page.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && e.target.matches('.quantity-input')) {
+            e.preventDefault(); // Empêche la soumission du formulaire
+            
+            // Trouve tous les champs de saisie visibles dans l'ordre du DOM
+            const inputs = Array.from(page.querySelectorAll('.quantity-input:not([disabled])'));
+            const currentIndex = inputs.indexOf(e.target);
+            const nextInput = inputs[currentIndex + 1];
+
+            if (nextInput) {
+                nextInput.focus(); // Passe au champ suivant
+                nextInput.select(); // Sélectionne le contenu pour une saisie rapide
+            } else {
+                // Optionnel : si on est sur le dernier champ, on peut passer à un autre élément
+                document.getElementById('nom_comptage')?.focus();
+            }
+        }
+    });
+
     page.addEventListener('input', e => {
         if (e.target.matches('input[type="text"], input[type="number"], input[type="time"], textarea')) {
             isDirty = true;
