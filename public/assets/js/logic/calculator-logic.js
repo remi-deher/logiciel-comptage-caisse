@@ -88,25 +88,20 @@ function renderCalculatorUI() {
                 <div class="compact-input-group"><label>Rétrocessions en Espèces</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
             </div>
             <div class="cash-drawer-section">
-                <h4><i class="fa-solid fa-money-bill-wave"></i> Billets</h4>
+                <h4><i class="fa-solid fa-money-bill-wave"></i> Billets <span class="section-total" id="total-billets-${id}">0,00 €</span></h4>
                 <div class="denominations-container">${billetsHtml}</div>
             </div>
-            <div class="pieces-layout">
-                <div class="cash-drawer-section">
-                    <h4><i class="fa-solid fa-box-archive"></i> Rouleaux de pièces</h4>
-                    <div class="denominations-container">${piecesRollsHtml}</div>
-                </div>
-                <div class="cash-drawer-section">
-                    <h4><i class="fa-solid fa-coins"></i> Pièces à l'unité</h4>
-                    <div class="denominations-container">${piecesLooseHtml}</div>
-                </div>
-                <div class="cash-drawer-section totals-summary">
-                    <h4><i class="fa-solid fa-calculator"></i> Totaux Espèces</h4>
-                    <div class="summary-line"><span>Total Billets</span><span id="total-billets-${id}">0,00 €</span></div>
-                    <div class="summary-line"><span>Total Rouleaux</span><span id="total-rouleaux-${id}">0,00 €</span></div>
-                    <div class="summary-line"><span>Total Pièces Uniques</span><span id="total-pieces-${id}">0,00 €</span></div>
-                    <div class="summary-line grand-total"><span>Total Espèces Compté</span><span id="total-especes-${id}">0,00 €</span></div>
-                </div>
+            <div class="cash-drawer-section">
+                <h4><i class="fa-solid fa-coins"></i> Pièces à l'unité <span class="section-total" id="total-pieces-${id}">0,00 €</span></h4>
+                <div class="denominations-container">${piecesLooseHtml}</div>
+            </div>
+            <div class="cash-drawer-section">
+                <h4><i class="fa-solid fa-box-archive"></i> Rouleaux de pièces <span class="section-total" id="total-rouleaux-${id}">0,00 €</span></h4>
+                <div class="denominations-container">${piecesRollsHtml}</div>
+            </div>
+            <div class="cash-drawer-section totals-summary">
+                <h4><i class="fa-solid fa-calculator"></i> Total Espèces Compté</h4>
+                <div class="summary-line grand-total"><span>Total Espèces Compté</span><span id="total-especes-${id}">0,00 €</span></div>
             </div>`;
         
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
