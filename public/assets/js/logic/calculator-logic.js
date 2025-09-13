@@ -14,17 +14,15 @@ const calculatorPageElement = () => document.getElementById('calculator-page');
 
 // --- Logique d'Autosave ---
 async function handleAutosave() {
-    if (!isDirty) return; // Si rien n'a changé, on ne fait rien
+    if (!isDirty) return;
     const form = document.getElementById('caisse-form');
     if (!form) return;
     const statusElement = document.getElementById('autosave-status');
     if (statusElement) statusElement.textContent = 'Sauvegarde en cours...';
     try {
-        // On utilise fetch ici car il retourne une promesse, ce qui permet au routeur d'attendre sa complétion.
         const response = await fetch('index.php?route=calculateur/autosave', {
             method: 'POST',
             body: new FormData(form),
-            // keepalive permet à la requête de continuer même si on quitte la page (pour le rafraîchissement F5)
             keepalive: true 
         });
         const result = await response.json();
@@ -135,6 +133,7 @@ function renderCalculatorUI() {
             </div>`;
     });
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
+    
     Object.keys(config.nomsCaisses).forEach(id => {
         renderChequeList(id);
         Object.keys(tpeState[id]).forEach(tpeId => renderTpeList(id, tpeId));
@@ -324,17 +323,13 @@ function attachEventListeners() {
     const page = calculatorPageElement();
     if (!page) return;
 
-    // --- DÉBUT DE LA CORRECTION ---
     const mainContent = document.getElementById('main-content');
-    // On attache la fonction de sauvegarde au hook du routeur.
     if (mainContent) mainContent.beforePageChange = handleAutosave;
-    // On conserve l'écouteur 'beforeunload' pour les cas où l'utilisateur quitte/rafraîchit la page.
     window.addEventListener('beforeunload', () => {
         if (isDirty) {
             handleAutosave();
         }
     });
-    // --- FIN DE LA CORRECTION ---
     
     page.addEventListener('input', e => {
         if (e.target.matches('input[type="text"], input[type="number"], input[type="time"], textarea')) {
@@ -513,11 +508,15 @@ async function performFinalCloture() {
 export async function initializeCalculator() {
     try {
         config = await fetchCalculatorConfig();
+        // D'abord on crée toute la structure HTML
         renderCalculatorUI();
         
+        // Ensuite, on récupère les données
         try {
             const response = await fetch('index.php?route=calculateur/get_initial_data');
             const result = await response.json();
+
+            // Et c'est seulement maintenant qu'on remplit les champs
             if (result.success && result.data) {
                 const data = result.data;
                 document.getElementById('nom_comptage').value = data.nom_comptage || '';
@@ -527,12 +526,25 @@ export async function initializeCalculator() {
                     if (!isNaN(caisseId) && config.nomsCaisses[caisseId]) {
                         const caisseData = data[caisseId];
                         
-                        ['fond_de_caisse', 'ventes_especes', 'ventes_cb', 'ventes_cheques', 'retrocession'].forEach(key => {
+                        ['fond_de_caisse', 'ventes_especes', 'ventes_cb', 'retrocession'].forEach(key => {
                              const field = document.getElementById(`${key}_${caisseId}`);
                              if (field && caisseData[key] !== undefined) {
                                  field.value = caisseData[key];
                              }
                         });
+
+                        // --- DEBUT DE LA CORRECTION ---
+                        // On traite les chèques d'abord pour s'assurer que le champ 'ventes_cheques' existe
+                        if (caisseData.cheques) {
+                            chequesState[caisseId] = caisseData.cheques;
+                            renderChequeList(caisseId);
+                        }
+                        // Maintenant que renderChequeList a été appelé, le champ existe et on peut le remplir.
+                        const ventesChequesField = document.getElementById(`ventes_cheques_${caisseId}`);
+                        if(ventesChequesField && caisseData.ventes_cheques) {
+                            ventesChequesField.value = caisseData.ventes_cheques;
+                        }
+                        // --- FIN DE LA CORRECTION ---
 
                         if (caisseData.denominations) {
                              Object.entries(caisseData.denominations).forEach(([denom, qty]) => {
@@ -540,14 +552,7 @@ export async function initializeCalculator() {
                                 if(denomField) denomField.value = qty;
                              });
                         }
-                        if (caisseData.cheques) {
-                            chequesState[caisseId] = caisseData.cheques;
-                            renderChequeList(caisseId);
-                            const ventesChequesField = document.getElementById(`ventes_cheques_${caisseId}`);
-                            if(ventesChequesField && caisseData.ventes_cheques) {
-                                ventesChequesField.value = caisseData.ventes_cheques;
-                            }
-                        }
+                        
                         if(caisseData.tpe) {
                             Object.entries(caisseData.tpe).forEach(([terminalId, releves]) => {
                                 if(tpeState[caisseId] && releves) {
