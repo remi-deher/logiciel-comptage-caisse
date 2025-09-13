@@ -127,7 +127,8 @@ class CalculateurController {
             $data_to_load = $this->loadComptageData($comptage_id_to_load);
 
             $this->pdo->beginTransaction();
-            $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
+            // On ne supprime plus l'ancienne sauvegarde auto
+            // $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
 
             $new_nom_comptage = "Sauvegarde Auto - chargement depuis historique [" . $original_name . "]";
             $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
@@ -182,7 +183,8 @@ class CalculateurController {
             $this->pdo->beginTransaction();
             $nom_comptage = trim($_POST['nom_comptage'] ?? '');
             if ($is_autosave) {
-                $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
+                // LA LIGNE SUIVANTE A ÉTÉ SUPPRIMÉE
+                // $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {
                 $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;
