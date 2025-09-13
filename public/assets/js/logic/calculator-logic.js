@@ -50,7 +50,6 @@ async function fetchCalculatorConfig() {
 }
 
 // --- Fonctions de Rendu (UI) ---
-
 function createDenominationCard(caisseId, name, value, type) {
     const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
     const inputId = `${name}_${caisseId}`;
@@ -271,7 +270,14 @@ function renderTpeList(caisseId, terminalId) {
 function handleWebSocketMessage(data) {
     switch (data.type) {
         case 'cloture_locked_caisses':
+            // 1. Mettre à jour l'UI (onglets violets, champs désactivés, etc.)
             updateClotureUI(data);
+            
+            // 2. Vérifier si toutes les caisses sont clôturées pour afficher le bandeau final
+            const closedCaisses = (data.closed_caisses || []).map(String);
+            const totalCaisses = Object.keys(config.nomsCaisses || {}).length;
+            const allClosed = totalCaisses > 0 && closedCaisses.length === totalCaisses;
+            handleAllCaissesClosed(allClosed);
             break;
         case 'welcome':
             wsResourceId = data.resourceId.toString();
@@ -329,21 +335,16 @@ function attachEventListeners() {
         }
     });
     
-
     page.addEventListener('keydown', e => {
         if (e.key === 'Enter' && e.target.matches('.quantity-input')) {
-            e.preventDefault(); // Empêche la soumission du formulaire
-            
-            // Trouve tous les champs de saisie visibles dans l'ordre du DOM
+            e.preventDefault();
             const inputs = Array.from(page.querySelectorAll('.quantity-input:not([disabled])'));
             const currentIndex = inputs.indexOf(e.target);
             const nextInput = inputs[currentIndex + 1];
-
             if (nextInput) {
-                nextInput.focus(); // Passe au champ suivant
-                nextInput.select(); // Sélectionne le contenu pour une saisie rapide
+                nextInput.focus();
+                nextInput.select();
             } else {
-                // Optionnel : si on est sur le dernier champ, on peut passer à un autre élément
                 document.getElementById('nom_comptage')?.focus();
             }
         }
@@ -361,20 +362,6 @@ function attachEventListeners() {
     });
     
     page.addEventListener('click', e => {
-        const btnAdjust = e.target.closest('.btn-adjust');
-        if (btnAdjust) {
-            const { targetId, amount } = btnAdjust.dataset;
-            const input = document.getElementById(targetId);
-            if (input) {
-                let currentValue = parseInt(input.value, 10) || 0;
-                currentValue += parseInt(amount, 10);
-                input.value = Math.max(0, currentValue);
-                isDirty = true;
-                calculateAll();
-                sendWsMessage({ type: 'update', id: input.id, value: input.value });
-            }
-        }
-        
         const tabLink = e.target.closest('.tab-link');
         if (tabLink) {
             page.querySelectorAll('.tab-link, .caisse-tab-content, .ecart-display').forEach(el => el.classList.remove('active'));
@@ -432,7 +419,7 @@ function attachEventListeners() {
             const { caisseId, terminalId } = addTpeBtn.dataset;
             const amountInput = document.getElementById(`tpe-releve-montant-${terminalId}-${caisseId}`);
             const amount = parseLocaleFloat(amountInput.value);
-            const currentTime = new Date().toTimeString().slice(0, 5); // HH:MM
+            const currentTime = new Date().toTimeString().slice(0, 5);
 
             if (amount > 0) {
                 tpeState[caisseId][terminalId].push({ montant: amount, heure: currentTime });
@@ -526,15 +513,12 @@ async function performFinalCloture() {
 export async function initializeCalculator() {
     try {
         config = await fetchCalculatorConfig();
-        // D'abord on crée toute la structure HTML
         renderCalculatorUI();
         
-        // Ensuite, on récupère les données
         try {
             const response = await fetch('index.php?route=calculateur/get_initial_data');
             const result = await response.json();
 
-            // Et c'est seulement maintenant qu'on remplit les champs
             if (result.success && result.data) {
                 const data = result.data;
                 document.getElementById('nom_comptage').value = data.nom_comptage || '';
@@ -551,18 +535,14 @@ export async function initializeCalculator() {
                              }
                         });
 
-                        // --- DEBUT DE LA CORRECTION ---
-                        // On traite les chèques d'abord pour s'assurer que le champ 'ventes_cheques' existe
                         if (caisseData.cheques) {
                             chequesState[caisseId] = caisseData.cheques;
                             renderChequeList(caisseId);
                         }
-                        // Maintenant que renderChequeList a été appelé, le champ existe et on peut le remplir.
                         const ventesChequesField = document.getElementById(`ventes_cheques_${caisseId}`);
                         if(ventesChequesField && caisseData.ventes_cheques) {
                             ventesChequesField.value = caisseData.ventes_cheques;
                         }
-                        // --- FIN DE LA CORRECTION ---
 
                         if (caisseData.denominations) {
                              Object.entries(caisseData.denominations).forEach(([denom, qty]) => {
