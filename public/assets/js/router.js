@@ -36,19 +36,19 @@ const routes = {
  * Fonction principale de routage.
  */
 export async function handleRouting() {
+    // --- DÉBUT DE LA CORRECTION ---
+    // Si une fonction de "nettoyage" a été définie pour la page précédente, on l'exécute et on attend qu'elle se termine.
     if (mainContent && typeof mainContent.beforePageChange === 'function') {
         await mainContent.beforePageChange();
-        mainContent.beforePageChange = null;
+        mainContent.beforePageChange = null; // On nettoie pour la prochaine navigation
     }
+    // --- FIN DE LA CORRECTION ---
 
     let path = window.location.pathname;
     if (path === '' || path === '/index.html' || path.endsWith('index.php')) {
         path = '/';
     }
     
-    // CORRECTION : La logique du bouton de clôture est maintenant gérée par les pages elles-mêmes.
-    // On s'assure qu'il est désactivé par défaut lors de la navigation.
-
     const route = routes[path] || { 
         render: (element) => {
             element.innerHTML = `<div class="container"><h2>Erreur 404</h2><p>La page que vous cherchez n'existe pas.</p></div>`;
@@ -60,8 +60,6 @@ export async function handleRouting() {
         loadPageCSS(route.css);
         mainContent.innerHTML = ''; 
         
-        // On définit le gestionnaire de messages sur null avant de charger la page.
-        // La page active (ex: calculateur) sera responsable de définir son propre gestionnaire.
         setActiveMessageHandler(null);
         
         route.render(mainContent);
@@ -77,7 +75,6 @@ function updateActiveNavLink(currentPath) {
     navLinks.forEach(link => {
         const linkPath = new URL(link.href).pathname;
         
-        // Gère les cas où plusieurs URL mènent à la même "page" active
         const isCalculateur = (currentPath === '/' || currentPath === '/calculateur') && (linkPath === '/' || linkPath === '/calculateur');
         
         if (linkPath === currentPath || isCalculateur) {

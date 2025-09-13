@@ -14,14 +14,22 @@ const calculatorPageElement = () => document.getElementById('calculator-page');
 
 // --- Logique d'Autosave ---
 async function handleAutosave() {
-    if (!isDirty) return;
+    if (!isDirty) return; // Si rien n'a changé, on ne fait rien
     const form = document.getElementById('caisse-form');
     if (!form) return;
     const statusElement = document.getElementById('autosave-status');
     if (statusElement) statusElement.textContent = 'Sauvegarde en cours...';
     try {
-        // sendBeacon est idéal pour les sauvegardes en quittant la page
-        navigator.sendBeacon('index.php?route=calculateur/autosave', new FormData(form));
+        // On utilise fetch ici car il retourne une promesse, ce qui permet au routeur d'attendre sa complétion.
+        const response = await fetch('index.php?route=calculateur/autosave', {
+            method: 'POST',
+            body: new FormData(form),
+            // keepalive permet à la requête de continuer même si on quitte la page (pour le rafraîchissement F5)
+            keepalive: true 
+        });
+        const result = await response.json();
+        if (!result.success) throw new Error(result.message);
+        
         isDirty = false;
         if (statusElement) statusElement.textContent = 'Changements sauvegardés.';
     } catch (error) {
@@ -316,6 +324,18 @@ function attachEventListeners() {
     const page = calculatorPageElement();
     if (!page) return;
 
+    // --- DÉBUT DE LA CORRECTION ---
+    const mainContent = document.getElementById('main-content');
+    // On attache la fonction de sauvegarde au hook du routeur.
+    if (mainContent) mainContent.beforePageChange = handleAutosave;
+    // On conserve l'écouteur 'beforeunload' pour les cas où l'utilisateur quitte/rafraîchit la page.
+    window.addEventListener('beforeunload', () => {
+        if (isDirty) {
+            handleAutosave();
+        }
+    });
+    // --- FIN DE LA CORRECTION ---
+    
     page.addEventListener('input', e => {
         if (e.target.matches('input[type="text"], input[type="number"], input[type="time"], textarea')) {
             isDirty = true;
@@ -327,14 +347,6 @@ function attachEventListeners() {
         }
     });
     
-    const mainContent = document.getElementById('main-content');
-    if (mainContent) mainContent.beforePageChange = handleAutosave;
-    window.addEventListener('beforeunload', (e) => {
-        if (isDirty) {
-            handleAutosave();
-        }
-    });
-
     page.addEventListener('click', e => {
         const btnAdjust = e.target.closest('.btn-adjust');
         if (btnAdjust) {
@@ -515,7 +527,6 @@ export async function initializeCalculator() {
                     if (!isNaN(caisseId) && config.nomsCaisses[caisseId]) {
                         const caisseData = data[caisseId];
                         
-                        // Set values for standard fields
                         ['fond_de_caisse', 'ventes_especes', 'ventes_cb', 'ventes_cheques', 'retrocession'].forEach(key => {
                              const field = document.getElementById(`${key}_${caisseId}`);
                              if (field && caisseData[key] !== undefined) {
@@ -532,7 +543,6 @@ export async function initializeCalculator() {
                         if (caisseData.cheques) {
                             chequesState[caisseId] = caisseData.cheques;
                             renderChequeList(caisseId);
-                            // Re-populate the theoretical sales after rendering the list
                             const ventesChequesField = document.getElementById(`ventes_cheques_${caisseId}`);
                             if(ventesChequesField && caisseData.ventes_cheques) {
                                 ventesChequesField.value = caisseData.ventes_cheques;
