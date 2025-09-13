@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé pour une mise à jour correcte des données et avec la fonction de réouverture)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé pour la gestion des rouleaux)
 
 import { sendWsMessage } from './websocket-service.js';
 import { setActiveMessageHandler } from '../main.js';
@@ -63,7 +63,7 @@ function handleWizardWebSocketMessage(data) {
             console.log("[Wizard] Réception de l'état complet du serveur. Fusion des données...");
             if (data.state) {
                  Object.entries(data.state).forEach(([fieldId, value]) => {
-                    const match = fieldId.match(/^([a-zA-Z0-9]+)_(\d+)$/);
+                    const match = fieldId.match(/^([a-zA-Z0-9_]+)_(\d+)$/); // Gère les noms avec _
                     if (match) {
                         const key = match[1];
                         const caisseId = match[2];
@@ -72,7 +72,11 @@ function handleWizardWebSocketMessage(data) {
                             calculatorData.caisse[caisseId] = { denominations: {}, tpe: {}, cheques: [] };
                         }
 
-                        if (Object.keys(config.denominations.billets).includes(key) || Object.keys(config.denominations.pieces).includes(key)) {
+                        // On vérifie si la clé est une dénomination (avec ou sans _roll)
+                        const isDenom = Object.keys(config.denominations.billets).includes(key) || 
+                                        Object.keys(config.denominations.pieces).some(p => key.startsWith(p));
+
+                        if (isDenom) {
                             if (!calculatorData.caisse[caisseId].denominations) calculatorData.caisse[caisseId].denominations = {};
                             calculatorData.caisse[caisseId].denominations[key] = value;
                         } else {
@@ -88,7 +92,7 @@ function handleWizardWebSocketMessage(data) {
             break;
             
         case 'update':
-            const matchUpdate = data.id.match(/^([a-zA-Z0-9]+)_(\d+)$/);
+            const matchUpdate = data.id.match(/^([a-zA-Z0-9_]+)_(\d+)$/);
             if (matchUpdate) {
                 const key = matchUpdate[1];
                 const caisseId = matchUpdate[2];
@@ -97,7 +101,10 @@ function handleWizardWebSocketMessage(data) {
                     calculatorData.caisse[caisseId] = { denominations: {}, tpe: {}, cheques: [] };
                 }
 
-                if (Object.keys(config.denominations.billets).includes(key) || Object.keys(config.denominations.pieces).includes(key)) {
+                const isDenom = Object.keys(config.denominations.billets).includes(key) || 
+                                Object.keys(config.denominations.pieces).some(p => key.startsWith(p));
+
+                if (isDenom) {
                      if (!calculatorData.caisse[caisseId].denominations) calculatorData.caisse[caisseId].denominations = {};
                     calculatorData.caisse[caisseId].denominations[key] = data.value;
                 } else {
@@ -126,16 +133,34 @@ function calculateAllForCaisse(caisseId) {
     if (!calculatorData.caisse?.[caisseId]) return;
 
     let totalCompteEspeces = 0;
-    const allDenoms = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
     const denominationsData = calculatorData.caisse[caisseId].denominations || {};
 
-    for (const name in allDenoms) {
+    // Calcul pour billets
+    Object.entries(config.denominations.billets || {}).forEach(([name, value]) => {
         const quantite = parseInt(denominationsData[name], 10) || 0;
-        const totalLigne = quantite * parseFloat(allDenoms[name]);
+        const totalLigne = quantite * parseFloat(value);
         totalCompteEspeces += totalLigne;
         const totalLineEl = document.getElementById(`total_${name}_${caisseId}_wizard`);
         if (totalLineEl) totalLineEl.textContent = formatCurrency(totalLigne);
-    }
+    });
+
+    // Calcul pour pièces (unités et rouleaux)
+    Object.entries(config.denominations.pieces || {}).forEach(([name, value]) => {
+        // Pièces à l'unité
+        const quantiteLoose = parseInt(denominationsData[name], 10) || 0;
+        const totalLigneLoose = quantiteLoose * parseFloat(value);
+        totalCompteEspeces += totalLigneLoose;
+        const totalLineElLoose = document.getElementById(`total_${name}_${caisseId}_wizard`);
+        if (totalLineElLoose) totalLineElLoose.textContent = formatCurrency(totalLigneLoose);
+
+        // Rouleaux
+        const quantiteRoll = parseInt(denominationsData[`${name}_roll`], 10) || 0;
+        const piecesPerRoll = config.rouleauxPieces?.[name] || 0;
+        const totalLigneRoll = quantiteRoll * piecesPerRoll * parseFloat(value);
+        totalCompteEspeces += totalLigneRoll;
+        const totalLineElRoll = document.getElementById(`total_${name}_roll_${caisseId}_wizard`);
+        if (totalLineElRoll) totalLineElRoll.textContent = formatCurrency(totalLigneRoll);
+    });
 
     const fondDeCaisse = parseLocaleFloat(calculatorData.caisse[caisseId].fond_de_caisse);
     const ventesEspeces = parseLocaleFloat(calculatorData.caisse[caisseId].ventes_especes);
@@ -152,13 +177,17 @@ function calculateWithdrawalSuggestion(caisseId) {
     if (!caisseData) return { suggestions: [], totalToWithdraw: 0 };
 
     const denominationsData = caisseData.denominations || {};
+    // On ne prend que les billets et les pièces à l'unité pour les calculs
     const allDenoms = { ...(config.denominations?.billets || {}), ...(config.denominations?.pieces || {}) };
     const minToKeepRules = config.minToKeep || {};
 
     const targetFundValue = parseLocaleFloat(caisseData.fond_de_caisse);
+    
     const currentQuantities = {};
     let currentTotalValue = 0;
+    // On ne calcule la valeur actuelle qu'avec les billets et pièces, en ignorant les rouleaux
     for (const name in allDenoms) {
+        // La clé pour les données est directe (ex: 'b5', 'p200'), pas de '_roll'
         const qty = parseInt(denominationsData[name], 10) || 0;
         if (qty > 0) {
             currentQuantities[name] = qty;
@@ -231,7 +260,7 @@ function updateEcartDisplay(id, ecart) {
 
 function renderSuggestionTable(suggestionData) {
     if (!suggestionData || !suggestionData.suggestions || suggestionData.suggestions.length === 0) {
-        return `<div class="withdrawal-summary-card"><div class="withdrawal-total-header status-ok"><div class="total-amount">0,00 €</div><div class="total-label">Aucun retrait nécessaire</div></div><div class="withdrawal-details-list"><div class="detail-item-empty">Le fond de caisse correspond à la cible.</div></div></div>`;
+        return `<div class="withdrawal-summary-card"><div class="withdrawal-total-header status-ok"><div class="total-amount">${formatCurrency(0)}</div><div class="total-label">Aucun retrait nécessaire</div></div><div class="withdrawal-details-list"><div class="detail-item-empty">Le fond de caisse correspond à la cible.</div></div></div>`;
     }
     const detailRows = suggestionData.suggestions.map(s => `<div class="detail-item"><span class="detail-item-label"><i class="fa-solid fa-money-bill-wave item-icon"></i> Retirer ${s.qty} x ${s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`}</span><span class="detail-item-value">${formatCurrency(s.total)}</span></div>`).join('');
     return `<div class="withdrawal-summary-card"><div class="withdrawal-total-header"><div class="total-amount">${formatCurrency(suggestionData.totalToWithdraw)}</div><div class="total-label">Total à retirer de la caisse</div></div><div class="withdrawal-details-list">${detailRows}</div></div>`;
@@ -302,7 +331,6 @@ async function renderStep1_Selection() {
                 statusText = 'Utilisée par un autre collaborateur';
             }
             
-            // On utilise une structure différente si c'est un bouton pour ne pas avoir de <label> cliquable autour
             if(isClosed) {
                 return `
                 <div class="caisse-selection-item ${statusClass}" title="${statusText}">
@@ -375,6 +403,7 @@ function renderStep2_Counting() {
         
         const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
         const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
+        const rouleaux = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>Rlx. ${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label>${buildDenomInput(`${name}_roll`, denominationsData[`${name}_roll`])}<span class="total-line" id="total_${name}_roll_${id}_wizard"></span></div>`).join('');
         
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([, tpe]) => tpe.caisse_id.toString() === id) : [];
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="form-group"><label>${tpe.nom}</label><input type="text" id="tpe_${tpeId}_${id}_wizard" name="caisse[${id}][tpe][${tpeId}]" data-caisse-id="${id}" value="${tpeData[tpeId] || ''}"></div>`).join('');
@@ -397,7 +426,7 @@ function renderStep2_Counting() {
                         <button type="button" class="payment-tab-link" data-payment-tab="cb_${id}"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>
                         <button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button>
                     </div>
-                    <div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>
+                    <div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div><h4 style="margin-top:20px;">Rouleaux</h4><div class="grid">${rouleaux}</div></div>
                     <div id="cb_${id}" class="payment-tab-content"><div class="grid">${tpeHtml || '<p>Aucun TPE pour cette caisse.</p>'}</div></div>
                     <div id="cheques_${id}" class="payment-tab-content">
                         <div class="cheque-input-section">
@@ -447,10 +476,19 @@ function renderStep4_Finalization() {
         const totalVentesCaisse = ventesEspeces + ventesCb + ventesCheques;
         const retrait = confirmedData.totalToWithdraw || 0;
         let totalCompteEspeces = 0;
+        
         const allDenoms = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
         for (const name in caisseData.denominations) {
-            totalCompteEspeces += (parseInt(caisseData.denominations[name], 10) || 0) * parseFloat(allDenoms[name]);
+            const qty = parseInt(caisseData.denominations[name], 10) || 0;
+            if (name.endsWith('_roll')) {
+                const baseName = name.replace('_roll', '');
+                const piecesPerRoll = config.rouleauxPieces?.[baseName] || 0;
+                totalCompteEspeces += qty * piecesPerRoll * parseFloat(allDenoms[baseName]);
+            } else {
+                 totalCompteEspeces += qty * parseFloat(allDenoms[name]);
+            }
         }
+        
         let totalCompteCb = 0;
         if(caisseData.tpe) {
             for(const tpeId in caisseData.tpe) {
@@ -497,7 +535,7 @@ async function handleNextStep() {
     const nextBtn = document.getElementById('wizard-next-btn');
     nextBtn.disabled = true;
     if (wizardState.currentStep === 1) {
-        wizardState.selectedCaisses = Array.from(document.querySelectorAll('input:checked')).map(cb => cb.value);
+        wizardState.selectedCaisses = Array.from(document.querySelectorAll('input[name="caisseSelection"]:checked')).map(cb => cb.value);
         wizardState.selectedCaisses.forEach(id => {
             if (!calculatorData.caisse[id]) {
                 calculatorData.caisse[id] = { 
