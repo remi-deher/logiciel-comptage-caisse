@@ -12,35 +12,45 @@ function calculate_results_from_data($data_rows) {
         ]
     ];
     
-    global $denominations;
+    global $denominations, $rouleaux_pieces;
     if (!isset($denominations)) $denominations = [];
+    if (!isset($rouleaux_pieces)) $rouleaux_pieces = []; // Assurer que la variable existe
+
+    $all_denoms_map = ($denominations['billets'] ?? []) + ($denominations['pieces'] ?? []);
 
     foreach ($data_rows as $caisse_id => $caisse_data) {
         // --- 1. Calcul des totaux réellement comptés pour chaque mode de paiement ---
         $total_compte_especes = 0;
         if (isset($caisse_data['denominations'])) {
             foreach ($caisse_data['denominations'] as $denom) {
-                $valeur = 0;
-                foreach ($denominations as $list) {
-                    if (isset($list[$denom['denomination_nom']])) {
-                        $valeur = floatval($list[$denom['denomination_nom']]);
-                        break;
+                $denomination_nom = $denom['denomination_nom'];
+                $quantite = floatval($denom['quantite']);
+                $valeur_unitaire = 0;
+
+                // --- DEBUT DE LA CORRECTION POUR LES ROULEAUX ---
+                if (str_ends_with($denomination_nom, '_roll')) {
+                    $base_denom = str_replace('_roll', '', $denomination_nom);
+                    if (isset($all_denoms_map[$base_denom]) && isset($rouleaux_pieces[$base_denom])) {
+                        $valeur_unitaire = floatval($all_denoms_map[$base_denom]) * intval($rouleaux_pieces[$base_denom]);
+                    }
+                } else {
+                    if (isset($all_denoms_map[$denomination_nom])) {
+                        $valeur_unitaire = floatval($all_denoms_map[$denomination_nom]);
                     }
                 }
-                $total_compte_especes += floatval($denom['quantite']) * $valeur;
+                // --- FIN DE LA CORRECTION POUR LES ROULEAUX ---
+                
+                $total_compte_especes += $quantite * $valeur_unitaire;
             }
         }
 
         $total_compte_cb = 0;
         if (isset($caisse_data['cb']) && is_array($caisse_data['cb'])) {
-            foreach ($caisse_data['cb'] as $terminal_id => $releves) {
-                if(is_array($releves) && !empty($releves)) {
-                    // Logique de télécollecte : on ne prend que le dernier relevé du terminal
-                    usort($releves, function($a, $b) {
-                        return strcmp($a['heure_releve'], $b['heure_releve']);
-                    });
-                    $dernierReleve = end($releves);
-                    $total_compte_cb += floatval($dernierReleve['montant']);
+            foreach ($caisse_data['cb'] as $releves) {
+                if (is_array($releves)) {
+                    foreach ($releves as $releve) {
+                        $total_compte_cb += floatval($releve['montant'] ?? 0);
+                    }
                 }
             }
         }
@@ -48,17 +58,19 @@ function calculate_results_from_data($data_rows) {
         $total_compte_cheques = 0;
         if (isset($caisse_data['cheques']) && is_array($caisse_data['cheques'])) {
             foreach($caisse_data['cheques'] as $cheque) {
-                $total_compte_cheques += floatval($cheque['montant']);
+                $total_compte_cheques += floatval($cheque['montant'] ?? 0);
             }
         }
 
         $fond_de_caisse = floatval($caisse_data['fond_de_caisse'] ?? 0);
+        $total_compte_global = $total_compte_especes + $total_compte_cb + $total_compte_cheques;
 
         // --- 2. Calcul de la Recette Réelle Totale ---
-        $recette_reelle_especes = $total_compte_especes - $fond_de_caisse;
-        $recette_reelle_totale = $recette_reelle_especes + $total_compte_cb + $total_compte_cheques;
+        // La recette réelle est ce qui a été compté au total, moins le fond de caisse initial.
+        $recette_reelle_totale = $total_compte_global - $fond_de_caisse;
 
         // --- 3. Calcul de la Recette Théorique Totale ---
+        // La recette théorique est la somme de toutes les ventes déclarées.
         $ventes_especes = floatval($caisse_data['ventes_especes'] ?? 0);
         $ventes_cb = floatval($caisse_data['ventes_cb'] ?? 0);
         $ventes_cheques = floatval($caisse_data['ventes_cheques'] ?? 0);
@@ -66,11 +78,12 @@ function calculate_results_from_data($data_rows) {
         $recette_theorique_totale = $ventes_especes + $ventes_cb + $ventes_cheques + $retrocession;
 
         // --- 4. Calcul de l'Écart Total ---
+        // L'écart est la différence entre ce qui a été réellement compté et ce qui aurait dû être là.
         $ecart = $recette_reelle_totale - $recette_theorique_totale;
         
         // Stockage des résultats pour cette caisse
         $results['caisses'][$caisse_id] = [
-            'total_compté' => $total_compte_especes + $total_compte_cb + $total_compte_cheques,
+            'total_compté' => $total_compte_global,
             'fond_de_caisse' => $fond_de_caisse,
             'ventes' => $ventes_especes + $ventes_cb + $ventes_cheques,
             'retrocession' => $retrocession,
@@ -80,7 +93,7 @@ function calculate_results_from_data($data_rows) {
         ];
 
         // Mise à jour des totaux combinés pour l'ensemble du comptage
-        $results['combines']['total_compté'] += $results['caisses'][$caisse_id]['total_compté'];
+        $results['combines']['total_compté'] += $total_compte_global;
         $results['combines']['recette_reelle'] += $recette_reelle_totale;
         $results['combines']['recette_theorique'] += $recette_theorique_totale;
         $results['combines']['ecart'] += $ecart;
