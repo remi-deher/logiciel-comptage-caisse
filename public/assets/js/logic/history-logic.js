@@ -116,27 +116,52 @@ export async function initializeHistoryLogic() {
                  <li><i class="fa-solid fa-landmark summary-icon icon-fond-caisse"></i><div><span>Total Compté</span><strong>${formatEuros(combines.total_compté)}</strong></div></li>
             </ul>`;
         
-        const allDenomsMap = { ...config.denominations.billets, ...config.denominations.pieces };
-    
         const caissesHtml = Object.entries(comptage.caisses_data).map(([caisse_id, data]) => {
-            const caisseResult = caisses[caisse_id];
-            const denomsHtml = Object.entries(allDenomsMap)
-                .map(([key, value]) => {
-                    const denomData = data.denominations.find(d => d.denomination_nom === key);
-                    const quantite = denomData ? parseInt(denomData.quantite, 10) : 0;
-                    if (quantite === 0) return '';
+            let totalEspeces = 0;
+            let totalBillets = 0, totalPieces = 0, totalRouleaux = 0;
+            let billetsHtml = '', piecesHtml = '', rouleauxHtml = '';
+
+            data.denominations.forEach(denom => {
+                const quantite = parseInt(denom.quantite, 10);
+                if (quantite === 0) return;
+
+                const denomName = denom.denomination_nom;
+
+                if (denomName.endsWith('_roll')) {
+                    const baseDenom = denomName.replace('_roll', '');
+                    const pieceValue = parseFloat(config.denominations.pieces[baseDenom]);
+                    const piecesPerRoll = parseInt(config.rouleauxPieces[baseDenom], 10);
+                    const totalLigne = quantite * piecesPerRoll * pieceValue;
+                    totalRouleaux += totalLigne;
+                    const label = pieceValue >= 1 ? `${pieceValue} ${config.currencySymbol}` : `${pieceValue * 100} cts`;
+                    rouleauxHtml += `<tr><td>Rouleaux ${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(totalLigne)}</td></tr>`;
+                } else if (config.denominations.billets[denomName]) {
+                    const value = parseFloat(config.denominations.billets[denomName]);
+                    const totalLigne = quantite * value;
+                    totalBillets += totalLigne;
+                    billetsHtml += `<tr><td>Billets ${value} ${config.currencySymbol}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(totalLigne)}</td></tr>`;
+                } else if (config.denominations.pieces[denomName]) {
+                    const value = parseFloat(config.denominations.pieces[denomName]);
+                    const totalLigne = quantite * value;
+                    totalPieces += totalLigne;
                     const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                    return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
-                }).join('');
+                    piecesHtml += `<tr><td>Pièces ${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(totalLigne)}</td></tr>`;
+                }
+            });
+
+            totalEspeces = totalBillets + totalPieces + totalRouleaux;
             
-            const retraitsHtml = Object.entries(data.retraits || {})
-                .map(([key, quantite]) => {
-                    const value = parseFloat(allDenomsMap[key]);
-                    if (parseInt(quantite, 10) === 0) return '';
-                    const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                    return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(parseInt(quantite, 10) * value)}</td></tr>`;
-                }).join('');
-            const totalRetraits = Object.entries(data.retraits || {}).reduce((sum, [key, qty]) => sum + (parseInt(qty, 10) * allDenomsMap[key]), 0);
+            const especesTable = `
+                <h4 class="modal-table-title" style="color: #16a085;">Détail Espèces</h4>
+                <table class="modal-details-table">
+                    <thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
+                    <tbody>
+                        ${billetsHtml ? `<tr><td colspan="3" class="table-subtitle">Billets</td></tr>${billetsHtml}` : ''}
+                        ${piecesHtml ? `<tr><td colspan="3" class="table-subtitle">Pièces</td></tr>${piecesHtml}` : ''}
+                        ${rouleauxHtml ? `<tr><td colspan="3" class="table-subtitle">Rouleaux</td></tr>${rouleauxHtml}` : ''}
+                    </tbody>
+                    <tfoot><tr><td colspan="2">Total Espèces Compté</td><td class="text-right">${formatEuros(totalEspeces)}</td></tr></tfoot>
+                </table>`;
 
             const cheques = data.cheques || [];
             const totalCheques = cheques.reduce((sum, cheque) => sum + parseFloat(cheque.montant), 0);
@@ -151,25 +176,19 @@ export async function initializeHistoryLogic() {
                 </table>
             ` : '';
 
-            // --- DÉBUT DE L'AJOUT POUR LES TPE ---
             let totalCb = 0;
             const cbHtml = (config.tpeParCaisse && Object.keys(config.tpeParCaisse).length > 0) ? Object.entries(config.tpeParCaisse)
                 .filter(([,tpe]) => tpe.caisse_id.toString() === caisse_id)
                 .map(([tpeId, tpe]) => {
                     const releves = data.cb[tpeId] || [];
                     if (releves.length === 0) return '';
-                    const totalTpe = releves.reduce((sum, r) => sum + parseFloat(r.montant), 0);
-                    totalCb += totalTpe;
+                    releves.forEach(r => totalCb += parseFloat(r.montant));
                     return `
-                        <h5 class="modal-table-subtitle">${tpe.nom}</h5>
+                        <h5 class="modal-table-subtitle">${tpe.nom} (Total: ${formatEuros(releves.reduce((s, r) => s + parseFloat(r.montant), 0))})</h5>
                         <table class="modal-details-table cb-table-modal">
                             <thead><tr><th>Heure du relevé</th><th class="text-right">Montant</th></tr></thead>
-                            <tbody>
-                                ${releves.map(r => `<tr><td>${r.heure_releve}</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('')}
-                            </tbody>
-                            <tfoot><tr><td>Total TPE</td><td class="text-right">${formatEuros(totalTpe)}</td></tr></tfoot>
-                        </table>
-                    `;
+                            <tbody>${releves.map(r => `<tr><td>${r.heure_releve}</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('')}</tbody>
+                        </table>`;
                 }).join('') : '';
 
             const cbSectionHtml = cbHtml ? `
@@ -179,26 +198,28 @@ export async function initializeHistoryLogic() {
                     <tfoot><tr class="grand-total-cb"><td><strong>Total CB Compté</strong></td><td class="text-right"><strong>${formatEuros(totalCb)}</strong></td></tr></tfoot>
                 </table>
             ` : '';
-            // --- FIN DE L'AJOUT POUR LES TPE ---
-    
+            
+            const allDenomsMap = { ...config.denominations.billets, ...config.denominations.pieces };
+            const retraitsHtml = Object.entries(data.retraits || {})
+                .map(([key, quantite]) => {
+                    const value = parseFloat(allDenomsMap[key]);
+                    if (parseInt(quantite, 10) === 0) return '';
+                    const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+                    return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(parseInt(quantite, 10) * value)}</td></tr>`;
+                }).join('');
+            const totalRetraits = Object.entries(data.retraits || {}).reduce((sum, [key, qty]) => sum + (parseInt(qty, 10) * allDenomsMap[key]), 0);
+
             return `
             <div>
-                <h4 class="modal-table-title">${config.nomsCaisses[caisse_id] || `Caisse ${caisse_id}`}</h4>
-                <table class="modal-details-table">
-                    <thead><tr><th>Dénomination Comptée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
-                    <tbody>${denomsHtml}</tbody>
-                    <tfoot>
-                        <tr><td colspan="2">Total Compté Espèces</td><td class="text-right">${formatEuros(caisseResult.total_compte)}</td></tr>
-                        <tr class="${getEcartClass(caisseResult.ecart)}"><td colspan="2"><strong>Écart Espèces</strong></td><td class="text-right"><strong>${formatEuros(caisseResult.ecart)}</strong></td></tr>
-                    </tfoot>
-                </table>
-                ${chequesHtml}
-                ${cbSectionHtml} 
-                ${retraitsHtml ? `<h4 class="modal-table-title" style="color: var(--color-danger)">Retraits Effectués</h4><table class="modal-details-table retrait-table">
+                <h3 class="modal-table-title" style="font-size: 1.5em; text-align: center; border: none;">${config.nomsCaisses[caisse_id] || `Caisse ${caisse_id}`}</h3>
+                <div class="card">${especesTable}</div>
+                ${chequesHtml ? `<div class="card">${chequesHtml}</div>` : ''}
+                ${cbSectionHtml ? `<div class="card">${cbSectionHtml}</div>` : ''}
+                ${retraitsHtml ? `<div class="card"><h4 class="modal-table-title" style="color: var(--color-danger)">Retraits Effectués</h4><table class="modal-details-table retrait-table">
                     <thead><tr><th>Dénomination Retirée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
                     <tbody>${retraitsHtml}</tbody>
                     <tfoot><tr><td colspan="2">Total Retiré</td><td class="text-right">${formatEuros(totalRetraits)}</td></tr></tfoot>
-                </table>` : ''}
+                </table></div>` : ''}
             </div>`;
         }).join('');
     
