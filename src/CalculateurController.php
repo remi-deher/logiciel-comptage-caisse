@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Corrigé et Complet)
+// Fichier : src/CalculateurController.php (Final et Confirmé)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -68,7 +68,7 @@ class CalculateurController {
             
             $data[$caisse_id] = [
                 'fond_de_caisse' => $row['fond_de_caisse'] ?? '0',
-                'ventes_especes' => $row['ventes_especes'] ?? ($row['ventes'] ?? '0'),
+                'ventes_especes' => $row['ventes_especes'] ?? '0',
                 'ventes_cb'      => $row['ventes_cb'] ?? '0',
                 'ventes_cheques' => $row['ventes_cheques'] ?? '0',
                 'retrocession'   => $row['retrocession'] ?? '0',
@@ -103,6 +103,7 @@ class CalculateurController {
         return $data;
     }
 
+    // ... (Le reste du fichier reste inchangé) ...
     public function save() { $this->handleSave(false); }
     public function autosave() { $this->handleSave(true); }
 
@@ -449,8 +450,6 @@ class CalculateurController {
         $stmt_cheques->execute([$detail_id]);
         $data['cheques'] = $stmt_cheques->fetchAll(PDO::FETCH_ASSOC);
     
-        // *** DEBUT DE LA CORRECTION ***
-        // Calcul des totaux pour chaque mode de paiement
         $data['total_compte_especes'] = 0;
         $all_denoms_map = ($this->denominations['billets'] ?? []) + ($this->denominations['pieces'] ?? []);
         
@@ -475,7 +474,6 @@ class CalculateurController {
                 $data['total_compte_cheques'] += floatval($cheque['montant'] ?? 0);
             }
         }
-        // *** FIN DE LA CORRECTION ***
     
         return $data;
     }

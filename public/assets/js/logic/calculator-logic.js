@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version simplifiée sans les rouleaux)
+// Fichier : public/assets/js/logic/calculator-logic.js (Final et Corrigé)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -23,11 +23,11 @@ async function handleAutosave() {
         const response = await fetch('index.php?route=calculateur/autosave', {
             method: 'POST',
             body: new FormData(form),
-            keepalive: true 
+            keepalive: true
         });
         const result = await response.json();
         if (!result.success) throw new Error(result.message);
-        
+
         isDirty = false;
         if (statusElement) statusElement.textContent = 'Changements sauvegardés.';
     } catch (error) {
@@ -102,7 +102,7 @@ function renderCalculatorUI() {
             <div class="cash-drawer-section totals-summary">
                  <div class="summary-line grand-total"><span>Total Espèces Compté</span><span id="total-especes-${id}">0,00 €</span></div>
             </div>`;
-        
+
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
             tpeState[id][tpeId] = [];
@@ -126,7 +126,7 @@ function renderCalculatorUI() {
             </div>`;
     });
     tabSelector.innerHTML = tabsHtml; ecartContainer.innerHTML = ecartsHtml; caissesContainer.innerHTML = contentHtml;
-    
+
     Object.keys(config.nomsCaisses).forEach(id => {
         renderChequeList(id);
         Object.keys(tpeState[id]).forEach(tpeId => renderTpeList(id, tpeId));
@@ -137,7 +137,7 @@ function calculateAll() {
     if (!config.nomsCaisses) return;
     Object.keys(config.nomsCaisses).forEach(id => {
         let totalBillets = 0, totalPieces = 0;
-        
+
         Object.entries(config.denominations.billets).forEach(([name, value]) => {
             const input = document.getElementById(`${name}_${id}`);
             if (input) {
@@ -223,10 +223,10 @@ function renderChequeList(caisseId) {
     const listContainer = document.getElementById(`cheque-list-${caisseId}`);
     const totalContainerParent = document.getElementById(`cheque-total-container-${caisseId}`);
     const hiddenInputsContainer = document.getElementById(`cheque-hidden-inputs-${caisseId}`);
-    
+
     const cheques = chequesState[caisseId] || [];
     let totalCheques = 0;
-    
+
     if (cheques.length === 0) {
         listContainer.innerHTML = '<p class="empty-list">Aucun chèque ajouté.</p>';
     } else {
@@ -257,7 +257,7 @@ function handleWebSocketMessage(data) {
     switch (data.type) {
         case 'cloture_locked_caisses':
             updateClotureUI(data);
-            
+
             const closedCaisses = (data.closed_caisses || []).map(String);
             const totalCaisses = Object.keys(config.nomsCaisses || {}).length;
             const allClosed = totalCaisses > 0 && closedCaisses.length === totalCaisses;
@@ -267,13 +267,9 @@ function handleWebSocketMessage(data) {
             wsResourceId = data.resourceId.toString();
             initializeCloture(config, wsResourceId);
             break;
+
         case 'full_form_state':
-            if (data.state) {
-                for (const id in data.state) {
-                    const field = document.getElementById(id);
-                    if (field) field.value = data.state[id];
-                }
-            }
+            // Etape 1: Mettre à jour les données des chèques et redessiner les listes.
             if (data.cheques) {
                 for (const caisseId in data.cheques) {
                     if (chequesState.hasOwnProperty(caisseId)) {
@@ -282,8 +278,18 @@ function handleWebSocketMessage(data) {
                     }
                 }
             }
+            // Etape 2: Appliquer TOUTES les valeurs de l'état du formulaire.
+            if (data.state) {
+                for (const id in data.state) {
+                    const field = document.getElementById(id);
+                    if (field) {
+                        field.value = data.state[id];
+                    }
+                }
+            }
             calculateAll();
             break;
+
         case 'update':
             if (data.id && document.activeElement && document.activeElement.id !== data.id) {
                 const input = document.getElementById(data.id);
@@ -297,6 +303,12 @@ function handleWebSocketMessage(data) {
             if (data.caisseId && data.cheques && chequesState.hasOwnProperty(data.caisseId)) {
                 chequesState[data.caisseId] = data.cheques;
                 renderChequeList(data.caisseId);
+                const field = document.getElementById(`ventes_cheques_${data.caisseId}`);
+                if (field && field.value === '') {
+                    const form = document.getElementById('caisse-form');
+                    const hiddenInput = form.querySelector(`input[name="caisse[${data.caisseId}][ventes_cheques]"]`);
+                    if(hiddenInput) field.value = hiddenInput.value;
+                }
                 calculateAll();
             }
             break;
@@ -318,7 +330,7 @@ function attachEventListeners() {
             handleAutosave();
         }
     });
-    
+
     page.addEventListener('keydown', e => {
         if (e.key === 'Enter' && e.target.matches('.quantity-input')) {
             e.preventDefault();
@@ -344,7 +356,7 @@ function attachEventListeners() {
             }
         }
     });
-    
+
     page.addEventListener('click', e => {
         const tabLink = e.target.closest('.tab-link');
         if (tabLink) {
@@ -362,7 +374,7 @@ function attachEventListeners() {
             paymentTab.classList.add('active');
             const tabId = paymentTab.dataset.paymentTab;
             container.querySelector(`#${tabId}`)?.classList.add('active');
-            calculateAll(); 
+            calculateAll();
         }
 
         const addChequeBtn = e.target.closest('.add-cheque-btn');
@@ -384,7 +396,7 @@ function attachEventListeners() {
                 amountInput.focus();
             }
         }
-        
+
         const deleteChequeBtn = e.target.closest('.delete-cheque-btn');
         if (deleteChequeBtn) {
             const { caisseId, index } = deleteChequeBtn.dataset;
@@ -498,7 +510,7 @@ export async function initializeCalculator() {
     try {
         config = await fetchCalculatorConfig();
         renderCalculatorUI();
-        
+
         try {
             const response = await fetch('index.php?route=calculateur/get_initial_data');
             const result = await response.json();
@@ -511,8 +523,8 @@ export async function initializeCalculator() {
                 for (const caisseId in data) {
                     if (!isNaN(caisseId) && config.nomsCaisses[caisseId]) {
                         const caisseData = data[caisseId];
-                        
-                        ['fond_de_caisse', 'ventes_especes', 'ventes_cb', 'retrocession'].forEach(key => {
+
+                        ['fond_de_caisse', 'ventes_especes', 'ventes_cb', 'retrocession', 'ventes_cheques'].forEach(key => {
                              const field = document.getElementById(`${key}_${caisseId}`);
                              if (field && caisseData[key] !== undefined) {
                                  field.value = caisseData[key];
@@ -523,6 +535,7 @@ export async function initializeCalculator() {
                             chequesState[caisseId] = caisseData.cheques;
                             renderChequeList(caisseId);
                         }
+
                         const ventesChequesField = document.getElementById(`ventes_cheques_${caisseId}`);
                         if(ventesChequesField && caisseData.ventes_cheques) {
                             ventesChequesField.value = caisseData.ventes_cheques;
@@ -534,7 +547,7 @@ export async function initializeCalculator() {
                                 if(denomField) denomField.value = qty;
                              });
                         }
-                        
+
                         if(caisseData.tpe) {
                             Object.entries(caisseData.tpe).forEach(([terminalId, releves]) => {
                                 if(tpeState[caisseId] && releves) {
