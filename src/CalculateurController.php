@@ -127,9 +127,7 @@ class CalculateurController {
             $data_to_load = $this->loadComptageData($comptage_id_to_load);
 
             $this->pdo->beginTransaction();
-            // On ne supprime plus l'ancienne sauvegarde auto
-            // $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
-
+            
             $new_nom_comptage = "Sauvegarde Auto - chargement depuis historique [" . $original_name . "]";
             $stmt = $this->pdo->prepare("INSERT INTO comptages (nom_comptage, explication, date_comptage) VALUES (?, ?, ?)");
             $stmt->execute([$new_nom_comptage, "Chargé depuis l'historique.", date('Y-m-d H:i:s')]);
@@ -183,8 +181,6 @@ class CalculateurController {
             $this->pdo->beginTransaction();
             $nom_comptage = trim($_POST['nom_comptage'] ?? '');
             if ($is_autosave) {
-                // LA LIGNE SUIVANTE A ÉTÉ SUPPRIMÉE
-                // $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {
                 $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;
@@ -396,10 +392,15 @@ class CalculateurController {
                 $nouveau_fond_de_caisse = $latest_cloture_data['total_compte_especes'];
 
                 if (!empty($latest_cloture_data['retraits'])) {
+                    $all_denoms_map = ($this->denominations['billets'] ?? []) + ($this->denominations['pieces'] ?? []);
                     foreach ($latest_cloture_data['retraits'] as $denom_name => $qty_retiree) {
                         if (isset($denominations_j1[$denom_name])) {
                             $denominations_j1[$denom_name] -= $qty_retiree;
-                            $nouveau_fond_de_caisse -= $qty_retiree * ($this->denominations['billets'][$denom_name] ?? $this->denominations['pieces'][$denom_name] ?? 0);
+                            // --- DEBUT DE LA CORRECTION ---
+                            // On soustrait la VALEUR des retraits du total pour le nouveau fond de caisse
+                            $valeur_retrait = $qty_retiree * ($all_denoms_map[$denom_name] ?? 0);
+                            $nouveau_fond_de_caisse -= $valeur_retrait;
+                            // --- FIN DE LA CORRECTION ---
                         }
                     }
                 }
@@ -451,10 +452,28 @@ class CalculateurController {
         $stmt_cheques->execute([$detail_id]);
         $data['cheques'] = $stmt_cheques->fetchAll(PDO::FETCH_ASSOC);
     
+        // --- DEBUT DE LA CORRECTION ---
+        global $rouleaux_pieces;
+        if (!isset($rouleaux_pieces)) $rouleaux_pieces = [];
         $data['total_compte_especes'] = 0;
-        foreach($data['denominations'] as $nom => $qte) {
-            $data['total_compte_especes'] += $qte * ($this->denominations['billets'][$nom] ?? $this->denominations['pieces'][$nom] ?? 0);
+        $all_denoms_map = ($this->denominations['billets'] ?? []) + ($this->denominations['pieces'] ?? []);
+        
+        foreach($data['denominations'] as $denomination_nom => $quantite) {
+            $quantite = floatval($quantite);
+            $valeur_unitaire = 0;
+            if (str_ends_with($denomination_nom, '_roll')) {
+                $base_denom = str_replace('_roll', '', $denomination_nom);
+                if (isset($all_denoms_map[$base_denom]) && isset($rouleaux_pieces[$base_denom])) {
+                    $valeur_unitaire = floatval($all_denoms_map[$base_denom]) * intval($rouleaux_pieces[$base_denom]);
+                }
+            } else {
+                if (isset($all_denoms_map[$denomination_nom])) {
+                    $valeur_unitaire = floatval($all_denoms_map[$denomination_nom]);
+                }
+            }
+            $data['total_compte_especes'] += $quantite * $valeur_unitaire;
         }
+        // --- FIN DE LA CORRECTION ---
     
         return $data;
     }
