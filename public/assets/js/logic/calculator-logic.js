@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Complète et Corrigée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version simplifiée sans les rouleaux)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -50,12 +50,13 @@ async function fetchCalculatorConfig() {
 }
 
 // --- Fonctions de Rendu (UI) ---
+
 function createDenominationCard(caisseId, name, value, type) {
     const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
     const inputId = `${name}_${caisseId}`;
     const totalId = `total_${inputId}`;
     const nameAttr = `caisse[${caisseId}][denominations][${name}]`;
-    const cardClass = type === 'piece' || type === 'roll' ? 'is-piece' : '';
+    const cardClass = type === 'piece' ? 'is-piece' : '';
 
     return `
         <div class="denom-card ${cardClass}">
@@ -83,7 +84,6 @@ function renderCalculatorUI() {
         ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><div id="main-ecart-caisse${id}" class="main-ecart-display"><span class="ecart-label">Écart Espèces</span><span class="ecart-value">0,00 €</span></div><div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div></div>`;
 
         const billetsHtml = Object.entries(config.denominations.billets).map(([name, v]) => createDenominationCard(id, name, v, 'bill')).join('');
-        const piecesRollsHtml = Object.entries(config.denominations.pieces).map(([name, v]) => createDenominationCard(id, `${name}_roll`, v, 'roll')).join('');
         const piecesLooseHtml = Object.entries(config.denominations.pieces).map(([name, v]) => createDenominationCard(id, name, v, 'piece')).join('');
 
         const especesTabContent = `
@@ -96,12 +96,8 @@ function renderCalculatorUI() {
                 <div class="denominations-container">${billetsHtml}</div>
             </div>
              <div class="cash-drawer-section">
-                <h4><i class="fa-solid fa-coins"></i> Pièces à l'unité <span class="section-total" id="total-pieces-${id}">0,00 €</span></h4>
+                <h4><i class="fa-solid fa-coins"></i> Pièces <span class="section-total" id="total-pieces-${id}">0,00 €</span></h4>
                 <div class="denominations-container">${piecesLooseHtml}</div>
-            </div>
-            <div class="cash-drawer-section">
-                <h4><i class="fa-solid fa-box-archive"></i> Rouleaux de pièces <span class="section-total" id="total-rouleaux-${id}">0,00 €</span></h4>
-                <div class="denominations-container">${piecesRollsHtml}</div>
             </div>
             <div class="cash-drawer-section totals-summary">
                  <div class="summary-line grand-total"><span>Total Espèces Compté</span><span id="total-especes-${id}">0,00 €</span></div>
@@ -140,7 +136,7 @@ function renderCalculatorUI() {
 function calculateAll() {
     if (!config.nomsCaisses) return;
     Object.keys(config.nomsCaisses).forEach(id => {
-        let totalBillets = 0, totalPieces = 0, totalRouleaux = 0;
+        let totalBillets = 0, totalPieces = 0;
         
         Object.entries(config.denominations.billets).forEach(([name, value]) => {
             const input = document.getElementById(`${name}_${id}`);
@@ -154,27 +150,17 @@ function calculateAll() {
 
         Object.entries(config.denominations.pieces).forEach(([name, value]) => {
             const inputLoose = document.getElementById(`${name}_${id}`);
-            const inputRoll = document.getElementById(`${name}_roll_${id}`);
-            const rollQuantityPerUnit = config.rouleauxPieces[name] || 0;
-
             if (inputLoose) {
                 const quantite = parseInt(inputLoose.value, 10) || 0;
                 const totalLigne = quantite * parseFloat(value);
                 totalPieces += totalLigne;
                 document.getElementById(`total_${name}_${id}`).textContent = formatCurrency(totalLigne);
             }
-            if (inputRoll) {
-                const quantite = parseInt(inputRoll.value, 10) || 0;
-                const totalLigne = quantite * rollQuantityPerUnit * parseFloat(value);
-                totalRouleaux += totalLigne;
-                document.getElementById(`total_${name}_roll_${id}`).textContent = formatCurrency(totalLigne);
-            }
         });
 
         document.getElementById(`total-billets-${id}`).textContent = formatCurrency(totalBillets);
         document.getElementById(`total-pieces-${id}`).textContent = formatCurrency(totalPieces);
-        document.getElementById(`total-rouleaux-${id}`).textContent = formatCurrency(totalRouleaux);
-        const totalEspeces = totalBillets + totalPieces + totalRouleaux;
+        const totalEspeces = totalBillets + totalPieces;
         document.getElementById(`total-especes-${id}`).textContent = formatCurrency(totalEspeces);
 
         const fondDeCaisse = parseLocaleFloat(document.getElementById(`fond_de_caisse_${id}`).value);
@@ -270,10 +256,8 @@ function renderTpeList(caisseId, terminalId) {
 function handleWebSocketMessage(data) {
     switch (data.type) {
         case 'cloture_locked_caisses':
-            // 1. Mettre à jour l'UI (onglets violets, champs désactivés, etc.)
             updateClotureUI(data);
             
-            // 2. Vérifier si toutes les caisses sont clôturées pour afficher le bandeau final
             const closedCaisses = (data.closed_caisses || []).map(String);
             const totalCaisses = Object.keys(config.nomsCaisses || {}).length;
             const allClosed = totalCaisses > 0 && closedCaisses.length === totalCaisses;

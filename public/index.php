@@ -4,18 +4,14 @@
 
 // --- Étape 1: Initialisation de l'environnement ---
 
-// On désactive l'affichage des erreurs pour ne pas corrompre les réponses JSON.
-// En développement, les erreurs devraient être consultées dans les logs du serveur.
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
-// On définit les en-têtes HTTP standards pour une API JSON.
 header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Origin: *"); // Pour le développement, à restreindre en production
+header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-// Gère les requêtes OPTIONS (pré-vérification) envoyées par les navigateurs.
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     exit(0);
 }
@@ -32,7 +28,6 @@ if (file_exists(ROOT_PATH . '/config/config.php')) {
     exit;
 }
 
-// **CORRECTION : S'assurer que les variables critiques sont définies pour éviter les erreurs fatales**
 $noms_caisses = $noms_caisses ?? [];
 $denominations = $denominations ?? ['billets' => [], 'pieces' => []];
 $tpe_par_caisse = $tpe_par_caisse ?? [];
@@ -78,7 +73,6 @@ require_once ROOT_PATH . '/src/StatistiquesController.php';
 try {
     $pdo = Bdd::getPdo();
 
-    // Instanciation de tous les contrôleurs avec leurs dépendances
     $adminController = new AdminController($pdo, $denominations);
     $authController = new AuthController($pdo);
     $statistiquesController = new StatistiquesController($pdo, $noms_caisses, $denominations);
@@ -104,7 +98,7 @@ $request_method = $_SERVER['REQUEST_METHOD'];
 $route_key = "{$request_method}:{$route}";
 
 $routes = [
-    'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $current_currency_code, $current_currency_symbol, $rouleaux_pieces) {
+    'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $current_currency_code, $current_currency_symbol) {
         echo json_encode([
             'success' => true,
             'nomsCaisses' => $noms_caisses,
@@ -113,13 +107,12 @@ $routes = [
             'minToKeep' => $min_to_keep,
             'currencyCode' => $current_currency_code,
             'currencySymbol' => $current_currency_symbol,
-            'rouleauxPieces' => $rouleaux_pieces ?? []
         ]);
     },
     'GET:calculateur/get_initial_data' => [$calculateurController, 'getInitialData'],
     'POST:calculateur/save' => [$calculateurController, 'save'],
     'POST:calculateur/autosave' => [$calculateurController, 'autosave'],
-    'POST:calculateur/load_from_history' => [$calculateurController, 'loadFromHistory'], // CORRECTION : Ajout de la nouvelle route
+    'POST:calculateur/load_from_history' => [$calculateurController, 'loadFromHistory'],
     'GET:historique/get_data' => [$historiqueController, 'getHistoriqueDataJson'],
     'POST:historique/delete' => [$historiqueController, 'delete'],
     'GET:historique/export_csv' => [$historiqueController, 'exportCsv'],
