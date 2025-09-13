@@ -55,6 +55,13 @@ export function updateClotureUI(newState) {
             parentFormGroup.title = isClosed ? 'Cette caisse est clôturée.' : (isLockedByOther ? `Cette caisse est en cours de modification par un autre utilisateur.` : '');
         }
     });
+
+    // --- AJOUT DE LA VÉRIFICATION FINALE ---
+    const totalCaisses = Object.keys(config.nomsCaisses || {}).length;
+    const allClosed = totalCaisses > 0 && closedCaisses.length === totalCaisses;
+    
+    // On appelle la fonction qui gère l'affichage du bandeau final
+    handleAllCaissesClosed(allClosed);
 }
 
 export function setupGlobalClotureButton() {

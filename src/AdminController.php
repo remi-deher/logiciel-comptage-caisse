@@ -46,6 +46,26 @@ class AdminController {
         $stmt = $this->pdo->query("SELECT * FROM terminaux_paiement ORDER BY nom_terminal ASC");
         $terminaux = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // --- Début de l'ajout : Récupération du statut des caisses ---
+        $locked_caisses = $this->clotureStateService->getLockedCaisses();
+        $closed_caisses = $this->clotureStateService->getClosedCaisses();
+        $all_caisses_status = [];
+        foreach ($noms_caisses as $id => $nom) {
+            $status = 'open';
+            if (in_array($id, $closed_caisses)) {
+                $status = 'closed';
+            } else {
+                foreach ($locked_caisses as $locked) {
+                    if ($locked['caisse_id'] == $id) {
+                        $status = 'locked';
+                        break;
+                    }
+                }
+            }
+            $all_caisses_status[$id] = $status;
+        }
+        // --- Fin de l'ajout ---
+
         echo json_encode([
             'success' => true,
             'caisses' => $noms_caisses,

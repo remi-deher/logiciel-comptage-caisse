@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé pour une mise à jour correcte des données)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé pour une mise à jour correcte des données et avec la fonction de réouverture)
 
 import { sendWsMessage } from './websocket-service.js';
 import { setActiveMessageHandler } from '../main.js';
@@ -68,7 +68,6 @@ function handleWizardWebSocketMessage(data) {
                         const key = match[1];
                         const caisseId = match[2];
 
-                        // CORRECTION : S'assurer que la structure de la caisse existe
                         if (!calculatorData.caisse[caisseId]) {
                             calculatorData.caisse[caisseId] = { denominations: {}, tpe: {}, cheques: [] };
                         }
@@ -94,7 +93,6 @@ function handleWizardWebSocketMessage(data) {
                 const key = matchUpdate[1];
                 const caisseId = matchUpdate[2];
 
-                // CORRECTION : S'assurer que la structure de la caisse existe
                 if (!calculatorData.caisse[caisseId]) {
                     calculatorData.caisse[caisseId] = { denominations: {}, tpe: {}, cheques: [] };
                 }
@@ -278,29 +276,86 @@ async function renderStep1_Selection() {
         const response = await fetch('index.php?route=cloture/get_state');
         const stateData = await response.json();
         if (!stateData.success) throw new Error("Impossible de récupérer l'état des caisses.");
+        
         const lockedCaisses = stateData.locked_caisses || [];
         const closedCaisses = (stateData.closed_caisses || []).map(String);
+
         const caissesHtml = Object.entries(config.nomsCaisses).map(([id, nom]) => {
             const isClosed = closedCaisses.includes(id);
             const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === id);
             const isLocked = lockInfo && String(lockInfo.locked_by) !== String(wsResourceId);
-            const isDisabled = isClosed || isLocked;
-            let statusClass = 'status-libre', statusIcon = 'fa-check-circle', statusText = 'Prête pour la clôture';
-            if (isClosed) { statusClass = 'status-cloturee'; statusIcon = 'fa-flag-checkered'; statusText = 'Déjà clôturée'; }
-            else if (isLocked) { statusClass = 'status-verrouillee'; statusIcon = 'fa-lock'; statusText = 'Utilisée par un autre collaborateur'; }
-            return `<label class="caisse-selection-item ${statusClass}" title="${statusText}"><input type="checkbox" name="caisseSelection" value="${id}" ${isDisabled ? 'disabled' : ''}><div class="caisse-info"><i class="fa-solid ${statusIcon}"></i><span>${nom}</span><small class="caisse-status-text">${statusText}</small></div></label>`;
+            const isDisabled = isLocked;
+
+            let statusClass = 'status-libre';
+            let statusIcon = 'fa-check-circle';
+            let statusText = 'Prête pour la clôture';
+            let actionHtml = `<input type="checkbox" name="caisseSelection" value="${id}" ${isDisabled ? 'disabled' : ''}>`;
+
+            if (isClosed) {
+                statusClass = 'status-cloturee';
+                statusIcon = 'fa-flag-checkered';
+                statusText = 'Déjà clôturée';
+                actionHtml = `<button type="button" class="btn reopen-btn js-reopen-caisse" data-caisse-id="${id}"><i class="fa-solid fa-lock-open"></i> Rouvrir</button>`;
+            } else if (isLocked) {
+                statusClass = 'status-verrouillee';
+                statusIcon = 'fa-lock';
+                statusText = 'Utilisée par un autre collaborateur';
+            }
+            
+            // On utilise une structure différente si c'est un bouton pour ne pas avoir de <label> cliquable autour
+            if(isClosed) {
+                return `
+                <div class="caisse-selection-item ${statusClass}" title="${statusText}">
+                    <div class="caisse-info">
+                        <i class="fa-solid ${statusIcon}"></i>
+                        <span>${nom}</span>
+                        <small class="caisse-status-text">${statusText}</small>
+                        <div class="caisse-action-footer">
+                            ${actionHtml}
+                        </div>
+                    </div>
+                </div>`;
+            } else {
+                 return `
+                 <label class="caisse-selection-item ${statusClass}" title="${statusText}">
+                    ${actionHtml}
+                    <div class="caisse-info">
+                        <i class="fa-solid ${statusIcon}"></i>
+                        <span>${nom}</span>
+                        <small class="caisse-status-text">${statusText}</small>
+                    </div>
+                </label>`;
+            }
         }).join('');
+
         container.innerHTML = `<div class="wizard-step-content"><h3>Sélectionnez les caisses à clôturer</h3><div class="selection-controls"><div class="color-key"><div><span class="color-dot color-libre"></span> Libre</div><div><span class="color-dot color-verrouillee"></span> En cours d'utilisation</div><div><span class="color-dot color-cloturee"></span> Déjà clôturée</div></div><div class="button-group"><button type="button" id="select-all-btn" class="btn action-btn">Tout sélectionner</button><button type="button" id="deselect-all-btn" class="btn action-btn">Tout désélectionner</button></div></div><div class="caisse-selection-grid">${caissesHtml}</div></div>`;
         const grid = container.querySelector('.caisse-selection-grid');
         const nextBtn = document.getElementById('wizard-next-btn');
         const updateNextButtonState = () => { nextBtn.disabled = grid.querySelectorAll('input:checked').length === 0; };
+        
         grid.addEventListener('change', updateNextButtonState);
+        
+        grid.addEventListener('click', (e) => {
+            const reopenBtn = e.target.closest('.js-reopen-caisse');
+            if (reopenBtn) {
+                const caisseId = reopenBtn.dataset.caisseId;
+                if (confirm(`Êtes-vous sûr de vouloir rouvrir la caisse "${config.nomsCaisses[caisseId]}" ?`)) {
+                    sendWsMessage({ type: 'cloture_reopen', caisse_id: caisseId });
+                    reopenBtn.textContent = 'Ouverture...';
+                    reopenBtn.disabled = true;
+                }
+            }
+        });
+        
         document.getElementById('select-all-btn').addEventListener('click', () => { grid.querySelectorAll('input[type="checkbox"]:not(:disabled)').forEach(cb => cb.checked = true); updateNextButtonState(); });
         document.getElementById('deselect-all-btn').addEventListener('click', () => { grid.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => cb.checked = false); updateNextButtonState(); });
+        updateNextButtonState();
+
     } catch (error) {
         container.innerHTML = `<p class="error" style="text-align:center;">${error.message}</p>`;
     }
 }
+
 
 function renderStep2_Counting() {
     const container = document.querySelector('.wizard-content');
@@ -577,6 +632,7 @@ function attachWizardListeners() {
             const commentInput = document.getElementById(`cheque-comment-${caisseId}-wizard`);
             const amount = parseLocaleFloat(amountInput.value);
             if (amount > 0) {
+                if (!chequesState[caisseId]) chequesState[caisseId] = [];
                 chequesState[caisseId].push({ montant: amount, commentaire: commentInput.value });
                 renderChequeListWizard(caisseId);
                 amountInput.value = '';
@@ -588,8 +644,10 @@ function attachWizardListeners() {
         const deleteBtn = e.target.closest('.delete-cheque-btn-wizard');
         if (deleteBtn) {
             const { caisseId, index } = deleteBtn.dataset;
-            chequesState[caisseId].splice(index, 1);
-            renderChequeListWizard(caisseId);
+            if (chequesState[caisseId]) {
+                chequesState[caisseId].splice(index, 1);
+                renderChequeListWizard(caisseId);
+            }
         }
     });
 }
