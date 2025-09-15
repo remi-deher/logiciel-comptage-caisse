@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Final et Corrigé)
+// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé avec la nouvelle logique TPE)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -168,7 +168,23 @@ function calculateAll() {
         const retrocession = parseLocaleFloat(document.getElementById(`retrocession_${id}`).value);
         const ecartEspeces = (totalEspeces - fondDeCaisse) - (ventesEspeces + retrocession);
 
-        const totalComptéCB = Object.values(tpeState[id] || {}).flat().reduce((sum, releve) => sum + parseLocaleFloat(releve.montant), 0);
+        // --- DÉBUT DE LA MODIFICATION DE LA LOGIQUE CB ---
+        let totalComptéCB = 0;
+        if (tpeState[id]) {
+            // Pour chaque terminal de la caisse
+            for (const terminalId in tpeState[id]) {
+                const releves = tpeState[id][terminalId];
+                // S'il y a des relevés pour ce terminal
+                if (releves && releves.length > 0) {
+                    // On prend uniquement le dernier relevé
+                    const dernierReleve = releves[releves.length - 1];
+                    // On l'ajoute au total CB de la caisse
+                    totalComptéCB += parseLocaleFloat(dernierReleve.montant);
+                }
+            }
+        }
+        // --- FIN DE LA MODIFICATION DE LA LOGIQUE CB ---
+
         const ventesCb = parseLocaleFloat(document.getElementById(`ventes_cb_${id}`).value);
         const ecartCb = totalComptéCB - ventesCb;
 
@@ -246,7 +262,15 @@ function renderTpeList(caisseId, terminalId) {
     if (releves.length === 0) {
         listContainer.innerHTML = '<p class="empty-list">Aucun relevé pour ce TPE.</p>';
     } else {
-        listContainer.innerHTML = `<table class="tpe-table"><thead><tr><th>Heure</th><th>Montant</th><th>Action</th></tr></thead><tbody>${releves.map((releve, index) => `<tr><td>${releve.heure || 'N/A'}</td><td>${formatCurrency(parseLocaleFloat(releve.montant))}</td><td><button type="button" class="btn-icon delete-btn delete-tpe-releve-btn" data-caisse-id="${caisseId}" data-terminal-id="${terminalId}" data-index="${index}"><i class="fa-solid fa-trash-can"></i></button></td></tr>`).join('')}</tbody></table>`;
+        // --- DÉBUT DE LA MODIFICATION DE L'AFFICHAGE TPE ---
+        listContainer.innerHTML = `<table class="tpe-table"><thead><tr><th>Heure</th><th>Montant</th><th>Action</th></tr></thead><tbody>${releves.map((releve, index) => {
+            // On vérifie si c'est le dernier élément de la liste
+            const isLast = index === releves.length - 1;
+            // On ajoute une classe spéciale si c'est le cas
+            const rowClass = isLast ? 'releve-actif' : '';
+            return `<tr class="${rowClass}"><td>${releve.heure || 'N/A'}</td><td>${formatCurrency(parseLocaleFloat(releve.montant))}</td><td><button type="button" class="btn-icon delete-btn delete-tpe-releve-btn" data-caisse-id="${caisseId}" data-terminal-id="${terminalId}" data-index="${index}"><i class="fa-solid fa-trash-can"></i></button></td></tr>`;
+        }).join('')}</tbody></table>`;
+        // --- FIN DE LA MODIFICATION DE L'AFFICHAGE TPE ---
     }
 
     hiddenContainer.innerHTML = releves.map((r, i) => `<input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${i}][montant]" value="${r.montant}"><input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${i}][heure]" value="${r.heure}">`).join('');
@@ -275,6 +299,17 @@ function handleWebSocketMessage(data) {
                     if (chequesState.hasOwnProperty(caisseId)) {
                         chequesState[caisseId] = data.cheques[caisseId] || [];
                         renderChequeList(caisseId);
+                    }
+                }
+            }
+             // Etape 1.2: Mettre à jour les données des TPE et redessiner les listes.
+            if (data.tpe) {
+                for (const caisseId in data.tpe) {
+                    if (tpeState.hasOwnProperty(caisseId)) {
+                        tpeState[caisseId] = data.tpe[caisseId] || {};
+                        for(const terminalId in tpeState[caisseId]) {
+                            renderTpeList(caisseId, terminalId);
+                        }
                     }
                 }
             }
@@ -309,6 +344,13 @@ function handleWebSocketMessage(data) {
                     const hiddenInput = form.querySelector(`input[name="caisse[${data.caisseId}][ventes_cheques]"]`);
                     if(hiddenInput) field.value = hiddenInput.value;
                 }
+                calculateAll();
+            }
+            break;
+         case 'tpe_update':
+            if (data.caisseId && data.terminalId && data.releves && tpeState[data.caisseId]) {
+                tpeState[data.caisseId][data.terminalId] = data.releves;
+                renderTpeList(data.caisseId, data.terminalId);
                 calculateAll();
             }
             break;
@@ -423,6 +465,7 @@ function attachEventListeners() {
                 document.getElementById('autosave-status').textContent = 'Changements non sauvegardés.';
                 renderTpeList(caisseId, terminalId);
                 calculateAll();
+                sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: tpeState[caisseId][terminalId] });
                 amountInput.value = '';
                 amountInput.focus();
             }
@@ -436,6 +479,7 @@ function attachEventListeners() {
             document.getElementById('autosave-status').textContent = 'Changements non sauvegardés.';
             renderTpeList(caisseId, terminalId);
             calculateAll();
+            sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: tpeState[caisseId][terminalId] });
         }
     });
 

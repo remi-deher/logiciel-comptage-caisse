@@ -43,3 +43,13 @@
 @media (min-width: 768px) {.cheque-grid {grid-template-columns: 300px 1fr;}}
 .cheque-form-container, .cheque-list-container {padding: 0;}
 .cheque-form-container {background-color: var(--color-surface);border-radius: 8px;border: 1px solid var(--color-border-light); padding: 20px;}
+
+/* NOUVEAU: Style pour le relevé TPE actif */
+.tpe-table tbody tr.releve-actif {
+    background-color: rgba(39, 174, 96, 0.1); /* Vert clair */
+    font-weight: bold;
+}
+
+.tpe-table tbody tr.releve-actif td {
+    color: var(--color-success);
+}
