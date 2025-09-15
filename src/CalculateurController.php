@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Final et Confirmé)
+// Fichier : src/CalculateurController.php (Final et Corrigé)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -103,7 +103,6 @@ class CalculateurController {
         return $data;
     }
 
-    // ... (Le reste du fichier reste inchangé) ...
     public function save() { $this->handleSave(false); }
     public function autosave() { $this->handleSave(true); }
 
@@ -151,7 +150,8 @@ class CalculateurController {
                             if (is_array($releves)) {
                                 foreach ($releves as $releve) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
-                                    $stmt_cb->execute([$new_comptage_detail_id, $terminal_id, $releve['montant'], $releve['heure']]);
+                                    $heure_releve = (isset($releve['heure']) && $releve['heure'] !== '' && $releve['heure'] !== 'null') ? $releve['heure'] : null;
+                                    $stmt_cb->execute([$new_comptage_detail_id, $terminal_id, $releve['montant'], $heure_releve]);
                                 }
                             }
                         }
@@ -213,7 +213,8 @@ class CalculateurController {
                                 $montant_val = get_numeric_value($releve, 'montant');
                                 if ($montant_val > 0) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
-                                    $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $releve['heure'] ?? null]);
+                                    $heure_releve = (isset($releve['heure']) && $releve['heure'] !== '' && $releve['heure'] !== 'null') ? $releve['heure'] : null;
+                                    $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $heure_releve]);
                                 }
                             }
                         }
@@ -307,7 +308,8 @@ class CalculateurController {
                                 $montant_val = get_numeric_value($releve, 'montant');
                                 if ($montant_val > 0) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
-                                    $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $releve['heure'] ?? null]);
+                                    $heure_releve = (isset($releve['heure']) && $releve['heure'] !== '' && $releve['heure'] !== 'null') ? $releve['heure'] : null;
+                                    $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $heure_releve]);
                                 }
                             }
                         }
@@ -490,7 +492,8 @@ class CalculateurController {
                 if(is_array($releves)) {
                     foreach ($releves as $releve) {
                         $stmt = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
-                        $stmt->execute([$new_detail_id, $terminal_id, $releve['montant'], $releve['heure']]);
+                        $heure_releve = (isset($releve['heure']) && $releve['heure'] !== '' && $releve['heure'] !== 'null') ? $releve['heure'] : null;
+                        $stmt->execute([$new_detail_id, $terminal_id, $releve['montant'], $heure_releve]);
                     }
                 }
             }
