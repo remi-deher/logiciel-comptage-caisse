@@ -415,3 +415,122 @@
     font-family: inherit;
     font-size: 1em;
 }
+
+/* === NOUVEAUX STYLES POUR LA MODALE DE L'HISTORIQUE === */
+
+/* Grille principale dans la modale */
+.modal-details-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 30px;
+}
+@media (min-width: 1024px) {
+    .modal-details-layout {
+        grid-template-columns: 350px 1fr; /* Colonne fixe pour les graphiques */
+    }
+}
+
+/* Section des graphiques */
+.modal-charts-container h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    text-align: center;
+}
+.modal-charts-container .chart-wrapper {
+    background-color: var(--color-surface-alt);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+/* Grille pour les détails (espèces, cb, etc.) */
+.modal-details-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 25px;
+}
+@media (min-width: 768px) {
+    .modal-details-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Style des cartes de détail */
+.details-card {
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    overflow: hidden; /* Pour que les bordures s'appliquent bien */
+}
+.details-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--color-border-light);
+}
+.details-card-header h5 {
+    margin: 0;
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.details-card-header .total-amount {
+    font-size: 1.1em;
+    font-weight: bold;
+    font-family: monospace;
+}
+.details-card-body {
+    padding: 20px;
+}
+
+/* Tableaux à l'intérieur des cartes de détail */
+.details-card .modal-details-table {
+    margin-top: 0;
+    border: none;
+}
+.details-card .modal-details-table th, .details-card .modal-details-table td {
+    padding: 10px;
+    border-color: var(--color-border);
+}
+.details-card .modal-details-table thead {
+    background-color: var(--color-surface);
+}
+.table-subtitle {
+    font-weight: bold;
+    color: var(--color-text-secondary);
+    background-color: var(--color-surface);
+}
+
+.caisse-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.caisse-kpi-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+}
+
+.caisse-kpi-card span {
+    display: block;
+    font-size: 0.9em;
+    color: var(--color-text-secondary);
+    margin-bottom: 5px;
+}
+
+.caisse-kpi-card strong {
+    display: block;
+    font-size: 1.6em;
+    font-weight: 600;
+}
+.caisse-kpi-card.ecart-ok strong { color: var(--color-success); }
+.caisse-kpi-card.ecart-positif strong { color: var(--color-warning); }
+.caisse-kpi-card.ecart-negatif strong { color: var(--color-danger); }

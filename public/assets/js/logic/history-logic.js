@@ -1,9 +1,5 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version avec affichage des retraits et des chèques)
+// Fichier : public/assets/js/logic/history-logic.js (Version Complète, Finale et Corrigée)
 import { sendWsMessage } from './websocket-service.js';
-
-// --- Fonctions Utilitaires ---
-const log = (message, ...details) => console.log(`[Historique Log] %c${message}`, 'color: #3498db; font-weight: bold;', ...details);
-const logSuccess = (message, ...details) => console.log(`[Historique Log] %c${message}`, 'color: #27ae60; font-weight: bold;', ...details);
 
 // --- Variables globales pour la page ---
 let fullHistoryData = [];
@@ -11,6 +7,9 @@ let config = {};
 let withdrawalsByDay = {};
 let withdrawalChart = null;
 let withdrawalDonutChart = null;
+let modalRepartitionChart = null;
+let modalDenominationsChart = null;
+
 
 const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(montant);
 const formatDateFr = (dateString, options = { dateStyle: 'long', timeStyle: 'short' }) => new Intl.DateTimeFormat('fr-FR', options).format(new Date(dateString));
@@ -33,7 +32,7 @@ async function fetchHistoriqueData(params) {
 // --- Logique de traitement des données ---
 function processWithdrawalData(comptages, denominations) {
     withdrawalsByDay = {};
-    const allDenomsValueMap = { ...denominations.billets, ...denominations.pieces };
+    const allDenomsValueMap = { ...(denominations.billets || {}), ...(denominations.pieces || {}) };
     if (!comptages) return;
     for (const comptage of comptages) {
         const dateKey = new Date(comptage.date_comptage).toISOString().split('T')[0];
@@ -59,11 +58,75 @@ function processWithdrawalData(comptages, denominations) {
     }
 }
 
+
+// --- Fonctions pour les graphiques de la modale ---
+function renderModalCharts(caisseId, caisseData, caisseResults) {
+    if (modalRepartitionChart) modalRepartitionChart.destroy();
+    if (modalDenominationsChart) modalDenominationsChart.destroy();
+
+    const theme = { theme: { mode: document.body.dataset.theme === 'dark' ? 'dark' : 'light' } };
+
+    // 1. Graphique Donut de Répartition
+    const repartitionContainer = document.getElementById(`modal-repartition-chart-${caisseId}`);
+    if (repartitionContainer) {
+        const series = [
+            parseFloat(caisseResults.total_compte_especes || 0),
+            parseFloat(caisseResults.total_compte_cb || 0),
+            parseFloat(caisseResults.total_compte_cheques || 0)
+        ];
+        if (series.some(val => val > 0)) {
+            const optionsRepartition = {
+                ...theme,
+                series: series,
+                labels: ['Espèces', 'Carte Bancaire', 'Chèques'],
+                chart: { type: 'donut', height: 250 },
+                legend: { position: 'bottom' },
+                dataLabels: { enabled: true, formatter: (val) => `${val.toFixed(1)}%` },
+                tooltip: { y: { formatter: (val) => formatEuros(val) } }
+            };
+            modalRepartitionChart = new ApexCharts(repartitionContainer, optionsRepartition);
+            modalRepartitionChart.render();
+        } else {
+            repartitionContainer.innerHTML = '<p style="text-align:center; padding: 20px;">Aucune donnée de paiement à afficher.</p>';
+        }
+    }
+
+    // 2. Graphique Barres des Dénominations
+    const denominationsContainer = document.getElementById(`modal-denominations-chart-${caisseId}`);
+    if (denominationsContainer) {
+        const allDenomsMap = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
+        const denomData = caisseData.denominations
+            .filter(d => parseInt(d.quantite, 10) > 0)
+            .map(d => ({
+                quantite: parseInt(d.quantite, 10),
+                value: parseFloat(allDenomsMap[d.denomination_nom])
+             }))
+            .sort((a, b) => b.value - a.value);
+        
+        if (denomData.length > 0) {
+            const optionsDenominations = {
+                ...theme,
+                series: [{ name: 'Valeur', data: denomData.map(d => d.quantite * d.value) }],
+                chart: { type: 'bar', height: 250, toolbar: { show: false } },
+                plotOptions: { bar: { horizontal: false } },
+                dataLabels: { enabled: false },
+                xaxis: {
+                    categories: denomData.map(d => d.value >= 1 ? `${d.value}€` : `${d.value*100}c`),
+                },
+                yaxis: { labels: { formatter: (val) => formatEuros(val) } },
+                tooltip: { y: { formatter: (val) => formatEuros(val) } }
+            };
+            modalDenominationsChart = new ApexCharts(denominationsContainer, optionsDenominations);
+            modalDenominationsChart.render();
+        } else {
+             denominationsContainer.innerHTML = '<p style="text-align:center; padding: 20px;">Aucune dénomination comptée.</p>';
+        }
+    }
+}
+
+
 // --- Point d'entrée de la logique de la page ---
 export async function initializeHistoryLogic() {
-    log('Initialisation de la logique de la page Historique.');
-    const historyPage = document.getElementById('history-page');
-    if (!historyPage) return;
     
     function renderCards(container, historique) {
         if (!historique || historique.length === 0) {
@@ -111,113 +174,149 @@ export async function initializeHistoryLogic() {
         const summaryHtml = `
             <ul class="summary-list">
                 <li class="${getEcartClass(combines.ecart)}"><i class="fa-solid fa-right-left summary-icon"></i><div><span>Écart Total</span><strong>${formatEuros(combines.ecart)}</strong></div></li>
-                <li><i class="fa-solid fa-cash-register summary-icon icon-recette"></i><div><span>Recette Réelle Totale</span><strong>${formatEuros(combines.recette_reelle)}</strong></div></li>
-                <li><i class="fa-solid fa-receipt summary-icon icon-ventes"></i><div><span>Ventes Théoriques</span><strong>${formatEuros(combines.recette_theorique)}</strong></div></li>
-                 <li><i class="fa-solid fa-landmark summary-icon icon-fond-caisse"></i><div><span>Total Compté</span><strong>${formatEuros(combines.total_compté)}</strong></div></li>
+                <li><i class="fa-solid fa-cash-register summary-icon"></i><div><span>Recette Réelle Totale</span><strong>${formatEuros(combines.recette_reelle)}</strong></div></li>
+                <li><i class="fa-solid fa-receipt summary-icon"></i><div><span>Ventes Théoriques</span><strong>${formatEuros(combines.recette_theorique)}</strong></div></li>
+                <li><i class="fa-solid fa-landmark summary-icon"></i><div><span>Total Compté</span><strong>${formatEuros(combines.total_compté)}</strong></div></li>
             </ul>`;
     
         const caissesHtml = Object.entries(comptage.caisses_data).map(([caisse_id, data]) => {
-            let totalBillets = 0, totalPieces = 0, totalRouleaux = 0;
-            let billetsHtml = '', piecesHtml = '', rouleauxHtml = '';
+            const caisseResults = comptage.results.caisses[caisse_id];
+            if (!caisseResults) return ''; // Sécurité
 
+            const kpiHtml = `
+                <div class="caisse-kpi-grid">
+                    <div class="caisse-kpi-card">
+                        <span>Total Compté</span>
+                        <strong>${formatEuros(caisseResults.total_compté)}</strong>
+                    </div>
+                    <div class="caisse-kpi-card">
+                        <span>Recette Théorique</span>
+                        <strong>${formatEuros(caisseResults.recette_theorique)}</strong>
+                    </div>
+                    <div class="caisse-kpi-card ${getEcartClass(caisseResults.ecart)}">
+                        <span>Écart Caisse</span>
+                        <strong class="ecart-value">${formatEuros(caisseResults.ecart)}</strong>
+                    </div>
+                </div>`;
+
+            const chartsHtml = `
+                <div class="modal-charts-container">
+                    <div class="chart-wrapper">
+                        <h4>Répartition des Paiements</h4>
+                        <div id="modal-repartition-chart-${caisse_id}"></div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <h4>Valeur par Dénomination</h4>
+                        <div id="modal-denominations-chart-${caisse_id}"></div>
+                    </div>
+                </div>`;
+
+            let billetsHtml = '', piecesHtml = '';
             data.denominations.forEach(denom => {
                 const quantite = parseInt(denom.quantite, 10);
                 if (quantite === 0) return;
                 const denomName = denom.denomination_nom;
 
-                if (denomName.endsWith('_roll')) {
-                    const baseDenom = denomName.replace('_roll', '');
-                    const pieceValue = parseFloat(config.denominations.pieces[baseDenom]);
-                    const piecesPerRoll = parseInt(config.rouleauxPieces[baseDenom], 10);
-                    const totalLigne = quantite * piecesPerRoll * pieceValue;
-                    totalRouleaux += totalLigne;
-                    const label = pieceValue >= 1 ? `${pieceValue} ${config.currencySymbol}` : `${pieceValue * 100} cts`;
-                    rouleauxHtml += `<tr><td>Rouleaux ${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(totalLigne)}</td></tr>`;
-                } else if (config.denominations.billets[denomName]) {
+                if (config.denominations.billets[denomName]) {
                     const value = parseFloat(config.denominations.billets[denomName]);
-                    const totalLigne = quantite * value;
-                    totalBillets += totalLigne;
-                    billetsHtml += `<tr><td>Billets ${value} ${config.currencySymbol}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(totalLigne)}</td></tr>`;
+                    billetsHtml += `<tr><td>Billets ${value} ${config.currencySymbol}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
                 } else if (config.denominations.pieces[denomName]) {
                     const value = parseFloat(config.denominations.pieces[denomName]);
-                    const totalLigne = quantite * value;
-                    totalPieces += totalLigne;
                     const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                    piecesHtml += `<tr><td>Pièces ${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(totalLigne)}</td></tr>`;
+                    piecesHtml += `<tr><td>Pièces ${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
                 }
             });
-            const totalEspeces = totalBillets + totalPieces + totalRouleaux;
-            
-            const especesTable = `
-                <h4 class="modal-table-title" style="color: #16a085;">Détail Espèces</h4>
+
+            const especesTable = (billetsHtml || piecesHtml) ? `
                 <table class="modal-details-table">
                     <thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
                     <tbody>
-                        ${billetsHtml ? `<tr><td colspan="3" class="table-subtitle">Billets</td></tr>${billetsHtml}` : ''}
-                        ${piecesHtml ? `<tr><td colspan="3" class="table-subtitle">Pièces</td></tr>${piecesHtml}` : ''}
-                        ${rouleauxHtml ? `<tr><td colspan="3" class="table-subtitle">Rouleaux</td></tr>${rouleauxHtml}` : ''}
+                        ${billetsHtml ? `<tr class="table-subtitle"><td colspan="3">Billets</td></tr>${billetsHtml}` : ''}
+                        ${piecesHtml ? `<tr class="table-subtitle"><td colspan="3">Pièces</td></tr>${piecesHtml}` : ''}
                     </tbody>
-                    <tfoot><tr><td colspan="2">Total Espèces Compté</td><td class="text-right">${formatEuros(totalEspeces)}</td></tr></tfoot>
-                </table>`;
+                </table>` : '<p style="text-align:center; padding: 10px 0;">Aucune espèce comptée.</p>';
 
             const cheques = data.cheques || [];
-            const totalCheques = cheques.reduce((sum, cheque) => sum + parseFloat(cheque.montant), 0);
             const chequesHtml = cheques.length > 0 ? `
-                <h4 class="modal-table-title" style="color: #3498db">Chèques Encaissés</h4>
-                <table class="modal-details-table cheque-table-modal">
+                <table class="modal-details-table">
                     <thead><tr><th>Montant</th><th>Commentaire</th></tr></thead>
                     <tbody>
                         ${cheques.map(c => `<tr><td class="text-right">${formatEuros(c.montant)}</td><td>${c.commentaire || ''}</td></tr>`).join('')}
                     </tbody>
-                    <tfoot><tr><td>Total Chèques</td><td class="text-right">${formatEuros(totalCheques)}</td></tr></tfoot>
-                </table>
-            ` : '';
+                </table>` : '<p style="text-align:center; padding: 10px 0;">Aucun chèque enregistré.</p>';
 
-            let totalCb = 0;
-            const cbHtml = (config.tpeParCaisse && Object.keys(config.tpeParCaisse).length > 0) ? Object.entries(config.tpeParCaisse)
-                .filter(([,tpe]) => tpe.caisse_id.toString() === caisse_id)
-                .map(([tpeId, tpe]) => {
+            let cbHtml = '';
+            const tpePourCaisse = Object.entries(config.tpeParCaisse || {}).filter(([,tpe]) => tpe.caisse_id.toString() === caisse_id);
+            if (tpePourCaisse.length > 0) {
+                cbHtml = tpePourCaisse.map(([tpeId, tpe]) => {
                     const releves = data.cb[tpeId] || [];
-                    if (releves.length === 0) return '';
-                    releves.forEach(r => totalCb += parseFloat(r.montant));
+                    if (releves.length === 0) return `<p style="padding-bottom:10px;">Aucun relevé pour le TPE <strong>${tpe.nom}</strong>.</p>`;
                     return `
-                        <h5 class="modal-table-subtitle">${tpe.nom} (Total: ${formatEuros(releves.reduce((s, r) => s + parseFloat(r.montant), 0))})</h5>
-                        <table class="modal-details-table cb-table-modal">
-                            <thead><tr><th>Heure du relevé</th><th class="text-right">Montant</th></tr></thead>
-                            <tbody>${releves.map(r => `<tr><td>${r.heure_releve}</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('')}</tbody>
+                        <h5 class="modal-table-subtitle">${tpe.nom}</h5>
+                        <table class="modal-details-table">
+                            <thead><tr><th>Heure</th><th class="text-right">Montant</th></tr></thead>
+                            <tbody>${releves.map(r => `<tr><td>${r.heure_releve || 'N/A'}</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('')}</tbody>
                         </table>`;
-                }).join('') : '';
-
-            const cbSectionHtml = cbHtml ? `
-                <h4 class="modal-table-title" style="color: #27ae60">Relevés Carte Bancaire</h4>
-                ${cbHtml}
-                <table class="modal-details-table cb-table-modal">
-                    <tfoot><tr class="grand-total-cb"><td><strong>Total CB Compté</strong></td><td class="text-right"><strong>${formatEuros(totalCb)}</strong></td></tr></tfoot>
-                </table>
-            ` : '';
-            
-            const allDenomsMap = { ...config.denominations.billets, ...config.denominations.pieces };
-            const retraitsHtml = Object.entries(data.retraits || {})
-                .map(([key, quantite]) => {
-                    const value = parseFloat(allDenomsMap[key]);
-                    if (parseInt(quantite, 10) === 0) return '';
-                    const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                    return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(parseInt(quantite, 10) * value)}</td></tr>`;
                 }).join('');
-            const totalRetraits = Object.entries(data.retraits || {}).reduce((sum, [key, qty]) => sum + (parseInt(qty, 10) * allDenomsMap[key]), 0);
+            } else {
+                 cbHtml = '<p style="text-align:center; padding: 10px 0;">Aucun TPE configuré pour cette caisse.</p>';
+            }
+            
+            const allDenomsMap = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
+            const retraits = data.retraits || {};
+            const retraitsHtml = Object.keys(retraits).length > 0 ? `
+                <table class="modal-details-table">
+                    <thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead>
+                    <tbody>${Object.entries(retraits).map(([key, quantite]) => {
+                        const value = parseFloat(allDenomsMap[key]);
+                        const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+                        return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(parseInt(quantite, 10) * value)}</td></tr>`;
+                    }).join('')}</tbody>
+                </table>` : '<p style="text-align:center; padding: 10px 0;">Aucun retrait effectué.</p>';
+            
+            const detailsHtml = `
+                <div class="modal-details-grid">
+                    <div class="details-card">
+                        <div class="details-card-header">
+                            <h5><i class="fa-solid fa-money-bill-wave"></i> Espèces</h5>
+                            <span class="total-amount">${formatEuros(caisseResults.total_compte_especes)}</span>
+                        </div>
+                        <div class="details-card-body">${especesTable}</div>
+                    </div>
+                    <div class="details-card">
+                        <div class="details-card-header">
+                            <h5><i class="fa-solid fa-credit-card"></i> Carte Bancaire</h5>
+                             <span class="total-amount">${formatEuros(caisseResults.total_compte_cb)}</span>
+                        </div>
+                        <div class="details-card-body">${cbHtml}</div>
+                    </div>
+                    ${caisseResults.total_compte_cheques > 0 ? `
+                    <div class="details-card">
+                        <div class="details-card-header">
+                            <h5><i class="fa-solid fa-money-check-dollar"></i> Chèques</h5>
+                            <span class="total-amount">${formatEuros(caisseResults.total_compte_cheques)}</span>
+                        </div>
+                        <div class="details-card-body">${chequesHtml}</div>
+                    </div>` : ''}
+                    ${caisseResults.total_retraits > 0 ? `
+                    <div class="details-card">
+                        <div class="details-card-header">
+                             <h5><i class="fa-solid fa-arrow-down"></i> Retraits</h5>
+                             <span class="total-amount text-danger">${formatEuros(caisseResults.total_retraits)}</span>
+                        </div>
+                        <div class="details-card-body">${retraitsHtml}</div>
+                    </div>` : ''}
+                </div>`;
 
             return `
-            <div>
-                <h3 class="modal-table-title" style="font-size: 1.5em; text-align: center; border: none;">${config.nomsCaisses[caisse_id] || `Caisse ${caisse_id}`}</h3>
-                <div class="card">${especesTable}</div>
-                ${chequesHtml ? `<div class="card">${chequesHtml}</div>` : ''}
-                ${cbSectionHtml ? `<div class="card">${cbSectionHtml}</div>` : ''}
-                ${retraitsHtml ? `<div class="card"><h4 class="modal-table-title" style="color: var(--color-danger)">Retraits Effectués</h4><table class="modal-details-table retrait-table">
-                    <thead><tr><th>Dénomination Retirée</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
-                    <tbody>${retraitsHtml}</tbody>
-                    <tfoot><tr><td colspan="2">Total Retiré</td><td class="text-right">${formatEuros(totalRetraits)}</td></tr></tfoot>
-                </table></div>` : ''}
-            </div>`;
+                <div class="caisse-details-section" style="margin-top: 30px; border-top: 1px solid var(--color-border); padding-top: 20px;">
+                    <h3 style="font-size: 1.8em; text-align: center; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; margin-bottom: 20px;">${config.nomsCaisses[caisse_id] || `Caisse ${caisse_id}`}</h3>
+                    ${kpiHtml}
+                    <div class="modal-details-layout">
+                        ${chartsHtml}
+                        <div class="modal-details-container">${detailsHtml}</div>
+                    </div>
+                </div>`;
         }).join('');
     
         container.innerHTML = `
@@ -225,15 +324,16 @@ export async function initializeHistoryLogic() {
                 <div><h3>Détails de: ${comptage.nom_comptage}</h3><p>${formatDateFr(comptage.date_comptage)}</p></div>
                 <div class="modal-actions"><button id="print-modal-btn" class="action-btn"><i class="fa-solid fa-print"></i> Imprimer</button><span class="modal-close">&times;</span></div>
             </div>
-            <div class="modal-body" id="printable-content">${summaryHtml}<div class="modal-details-grid">${caissesHtml}</div></div>`;
+            <div class="modal-body" id="printable-content">${summaryHtml}${caissesHtml}</div>`;
     }
 
     function updateComparisonToolbar() {
-        const toolbar = document.getElementById('comparison-toolbar');
+        const historyPage = document.getElementById('history-page');
+        const toolbar = historyPage.querySelector('#comparison-toolbar');
         if (!toolbar) return;
         const counter = toolbar.querySelector('#comparison-counter');
         const button = toolbar.querySelector('#compare-btn');
-        const checked = document.querySelectorAll('.comparison-checkbox:checked');
+        const checked = historyPage.querySelectorAll('.comparison-checkbox:checked');
     
         if (checked.length > 0) {
             counter.textContent = `${checked.length} comptage(s) sélectionné(s)`;
@@ -245,9 +345,10 @@ export async function initializeHistoryLogic() {
     }
 
     function renderComparisonModal() {
-        const modal = document.getElementById('comparison-modal');
+        const historyPage = document.getElementById('history-page');
+        const modal = historyPage.querySelector('#comparison-modal');
         const content = modal.querySelector('#comparison-modal-content');
-        const checkedIds = [...document.querySelectorAll('.comparison-checkbox:checked')].map(cb => cb.dataset.comptageId);
+        const checkedIds = [...historyPage.querySelectorAll('.comparison-checkbox:checked')].map(cb => cb.dataset.comptageId);
         const comptagesToCompare = fullHistoryData.filter(c => checkedIds.includes(c.id.toString())).sort((a,b) => new Date(a.date_comptage) - new Date(b.date_comptage));
     
         const headersHtml = comptagesToCompare.map(c => `<th>${c.nom_comptage}<br><small>${formatDateFr(c.date_comptage)}</small></th>`).join('');
@@ -425,6 +526,7 @@ export async function initializeHistoryLogic() {
     }
 
     function attachWithdrawalsEventListeners() {
+        const historyPage = document.getElementById('history-page');
         const container = historyPage.querySelector('#retraits-view');
         if (!container) return;
         const logContainer = container.querySelector('#withdrawals-log-container');
@@ -451,6 +553,7 @@ export async function initializeHistoryLogic() {
     }
     
     function updateSelectionToolbar() {
+        const historyPage = document.getElementById('history-page');
         const toolbar = historyPage.querySelector('#day-selection-toolbar');
         if (!toolbar) return;
         const counter = toolbar.querySelector('#day-selection-counter');
@@ -467,8 +570,7 @@ export async function initializeHistoryLogic() {
     }
     
     function renderRetraitsView(container) {
-        log('Affichage de la vue "Synthèse des Retraits" avec les données par jour.', withdrawalsByDay);
-        const sortedDays = Object.keys(withdrawalsByDay).sort((a, b) => new Date(b) - new Date(a));
+       const sortedDays = Object.keys(withdrawalsByDay).sort((a, b) => new Date(b) - new Date(a));
     
         if (sortedDays.length === 0) {
             container.innerHTML = `<div class="withdrawals-header"><h3>Journal des Retraits</h3></div><p>Aucun retrait trouvé pour la période sélectionnée.</p>`;
@@ -507,7 +609,9 @@ export async function initializeHistoryLogic() {
         
         attachWithdrawalsEventListeners();
     }
-
+    
+    const historyPage = document.getElementById('history-page');
+    if (!historyPage) return;
 
     const controlsContainer = historyPage.querySelector('.filter-section');
     if(controlsContainer && !document.getElementById('comparison-toolbar')) {
@@ -573,8 +677,22 @@ export async function initializeHistoryLogic() {
         const target = e.target;
         
         if (target.closest('.details-btn') && target.closest('.history-card')) {
-            renderModalContent(modalContent, target.closest('.history-card').dataset.comptageId);
+            const comptageId = target.closest('.history-card').dataset.comptageId;
+            
+            renderModalContent(modalContent, comptageId);
             detailsModal.classList.add('visible');
+
+            // CORRECTION FINALE: Utilisation de requestAnimationFrame
+            requestAnimationFrame(() => {
+                const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
+                if (comptage) {
+                    Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
+                        if (comptage.results.caisses[caisse_id]) {
+                            renderModalCharts(caisse_id, data, comptage.results.caisses[caisse_id]);
+                        }
+                    });
+                }
+            });
         }
 
         if (target.closest('.delete-btn')) {
@@ -587,7 +705,6 @@ export async function initializeHistoryLogic() {
                     const response = await fetch('index.php?route=historique/delete', { method: 'POST', body: formData });
                     const result = await response.json();
                     if(!result.success) throw new Error(result.message || 'Erreur inconnue.');
-                    logSuccess(`Comptage ${comptageId} supprimé.`);
                     card.style.opacity = '0';
                     setTimeout(() => loadAndRender(currentParams), 300);
                 } catch(err) {
@@ -615,8 +732,7 @@ export async function initializeHistoryLogic() {
                         throw new Error(result.message || 'Erreur inconnue lors de la préparation des données.');
                     }
 
-		sendWsMessage({ type: 'force_reload_all' })
-
+		            sendWsMessage({ type: 'force_reload_all' })
                     window.location.href = '/calculateur';
 
                 } catch (error) {
@@ -658,7 +774,13 @@ export async function initializeHistoryLogic() {
         }
     });
 
-    detailsModal.addEventListener('click', (e) => { if (e.target.classList.contains('modal-close') || e.target.id === 'details-modal') { detailsModal.classList.remove('visible'); }});
+    detailsModal.addEventListener('click', (e) => { 
+        if (e.target.classList.contains('modal-close') || e.target.id === 'details-modal') { 
+            detailsModal.classList.remove('visible');
+            if (modalRepartitionChart) modalRepartitionChart.destroy();
+            if (modalDenominationsChart) modalDenominationsChart.destroy();
+        }
+    });
 
     const comparisonModal = document.getElementById('comparison-modal');
     comparisonModal.addEventListener('click', (e) => {

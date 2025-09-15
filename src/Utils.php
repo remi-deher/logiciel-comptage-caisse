@@ -1,5 +1,5 @@
 <?php
-// src/Utils.php - Version simplifiée sans les rouleaux
+// src/Utils.php - Version améliorée pour des calculs plus détaillés
 
 function calculate_results_from_data($data_rows) {
     $results = [
@@ -46,6 +46,15 @@ function calculate_results_from_data($data_rows) {
             }
         }
 
+        // NOUVEAU : Calcul du total des retraits
+        $total_retraits = 0;
+        if (isset($caisse_data['retraits']) && is_array($caisse_data['retraits'])) {
+            foreach($caisse_data['retraits'] as $denom => $qty) {
+                $valeur_unitaire = floatval($all_denoms_map[$denom] ?? 0);
+                $total_retraits += intval($qty) * $valeur_unitaire;
+            }
+        }
+
         $fond_de_caisse = floatval($caisse_data['fond_de_caisse'] ?? 0);
         $total_compte_global = $total_compte_especes + $total_compte_cb + $total_compte_cheques;
         $recette_reelle_totale = $total_compte_global - $fond_de_caisse;
@@ -58,6 +67,7 @@ function calculate_results_from_data($data_rows) {
 
         $ecart = $recette_reelle_totale - $recette_theorique_totale;
         
+        // AMÉLIORATION : On ajoute les totaux détaillés au tableau de résultats
         $results['caisses'][$caisse_id] = [
             'total_compté' => $total_compte_global,
             'fond_de_caisse' => $fond_de_caisse,
@@ -65,7 +75,13 @@ function calculate_results_from_data($data_rows) {
             'retrocession' => $retrocession,
             'recette_theorique' => $recette_theorique_totale,
             'recette_reelle' => $recette_reelle_totale,
-            'ecart' => $ecart
+            'ecart' => $ecart,
+            // --- AJOUTS ---
+            'total_compte_especes' => $total_compte_especes,
+            'total_compte_cb' => $total_compte_cb,
+            'total_compte_cheques' => $total_compte_cheques,
+            'total_retraits' => $total_retraits
+            // --- FIN DES AJOUTS ---
         ];
 
         $results['combines']['total_compté'] += $total_compte_global;
