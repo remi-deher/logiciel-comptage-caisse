@@ -1,10 +1,12 @@
+
 <?php
-// Fichier : src/CalculateurController.php (Final et Corrigé)
+// Fichier : src/CalculateurController.php (Refactorisé)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
 require_once __DIR__ . '/services/ClotureStateService.php';
 require_once __DIR__ . '/services/BackupService.php';
+require_once __DIR__ . '/Repository/ComptageRepository.php'; // AJOUT
 
 class CalculateurController {
     private $pdo;
@@ -13,6 +15,7 @@ class CalculateurController {
     private $versionService;
     private $clotureStateService;
     private $backupService;
+    private $comptageRepository; // AJOUT
 
     public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse_obsolete) {
         $this->pdo = $pdo;
@@ -21,6 +24,7 @@ class CalculateurController {
         $this->versionService = new VersionService();
         $this->clotureStateService = new ClotureStateService($pdo);
         $this->backupService = new BackupService();
+        $this->comptageRepository = new ComptageRepository($pdo); // AJOUT
     }
 
     public function getInitialData() {
@@ -46,7 +50,8 @@ class CalculateurController {
         }
 
         if ($last_comptage) {
-            $data = $this->loadComptageData($last_comptage['id']);
+            // Utilise maintenant le repository
+            $data = $this->comptageRepository->findDetailsById($last_comptage['id']); // MODIFICATION
             $data['nom_comptage'] = $last_comptage['nom_comptage'];
             $data['explication'] = $last_comptage['explication'];
             echo json_encode(['success' => true, 'data' => $data]);
@@ -54,53 +59,6 @@ class CalculateurController {
             echo json_encode(['success' => false, 'data' => null]);
         }
         exit;
-    }
-
-    private function loadComptageData($comptage_id) {
-        $data = [];
-        $stmt = $this->pdo->prepare("SELECT * FROM comptage_details WHERE comptage_id = ?");
-        $stmt->execute([$comptage_id]);
-        $details_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        foreach ($details_data as $row) {
-            $caisse_id = $row['caisse_id'];
-            $comptage_detail_id = $row['id'];
-            
-            $data[$caisse_id] = [
-                'fond_de_caisse' => $row['fond_de_caisse'] ?? '0',
-                'ventes_especes' => $row['ventes_especes'] ?? '0',
-                'ventes_cb'      => $row['ventes_cb'] ?? '0',
-                'ventes_cheques' => $row['ventes_cheques'] ?? '0',
-                'retrocession'   => $row['retrocession'] ?? '0',
-                'denominations'  => [],
-                'tpe'            => [],
-                'cheques'        => []
-            ];
-
-            $stmt_denoms = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
-            $stmt_denoms->execute([$comptage_detail_id]);
-            while ($denom_row = $stmt_denoms->fetch()) {
-                $data[$caisse_id]['denominations'][$denom_row['denomination_nom']] = $denom_row['quantite'];
-            }
-
-            $stmt_cb = $this->pdo->prepare("SELECT terminal_id, montant, heure_releve FROM comptage_cb WHERE comptage_detail_id = ? ORDER BY heure_releve ASC");
-            $stmt_cb->execute([$comptage_detail_id]);
-            while ($cb_row = $stmt_cb->fetch()) {
-                $terminal_id = $cb_row['terminal_id'];
-                if (!isset($data[$caisse_id]['tpe'][$terminal_id])) {
-                    $data[$caisse_id]['tpe'][$terminal_id] = [];
-                }
-                $data[$caisse_id]['tpe'][$terminal_id][] = [
-                    'montant' => $cb_row['montant'],
-                    'heure' => $cb_row['heure_releve']
-                ];
-            }
-            
-            $stmt_cheques = $this->pdo->prepare("SELECT montant, commentaire FROM comptage_cheques WHERE comptage_detail_id = ?");
-            $stmt_cheques->execute([$comptage_detail_id]);
-            $data[$caisse_id]['cheques'] = $stmt_cheques->fetchAll(PDO::FETCH_ASSOC);
-        }
-        return $data;
     }
 
     public function save() { $this->handleSave(false); }
@@ -124,7 +82,8 @@ class CalculateurController {
                 throw new Exception("Comptage original non trouvé.");
             }
 
-            $data_to_load = $this->loadComptageData($comptage_id_to_load);
+            // Utilise maintenant le repository
+            $data_to_load = $this->comptageRepository->findDetailsById($comptage_id_to_load); // MODIFICATION
 
             $this->pdo->beginTransaction();
             
