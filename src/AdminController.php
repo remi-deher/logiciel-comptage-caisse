@@ -39,32 +39,12 @@ class AdminController {
     }
 
     public function getDashboardData() {
-        global $noms_caisses, $denominations; // L'usage de global est acceptable ici car c'est pour l'affichage
+        global $noms_caisses, $denominations, $min_to_keep; // Ajout de $min_to_keep
 
         AuthController::checkAuth();
 
         $stmt = $this->pdo->query("SELECT * FROM terminaux_paiement ORDER BY nom_terminal ASC");
         $terminaux = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // --- Début de l'ajout : Récupération du statut des caisses ---
-        $locked_caisses = $this->clotureStateService->getLockedCaisses();
-        $closed_caisses = $this->clotureStateService->getClosedCaisses();
-        $all_caisses_status = [];
-        foreach ($noms_caisses as $id => $nom) {
-            $status = 'open';
-            if (in_array($id, $closed_caisses)) {
-                $status = 'closed';
-            } else {
-                foreach ($locked_caisses as $locked) {
-                    if ($locked['caisse_id'] == $id) {
-                        $status = 'locked';
-                        break;
-                    }
-                }
-            }
-            $all_caisses_status[$id] = $status;
-        }
-        // --- Fin de l'ajout ---
 
         echo json_encode([
             'success' => true,
@@ -74,6 +54,7 @@ class AdminController {
             'backups' => $this->backupService->getBackups(),
             'reserve_status' => $this->reserveService->getReserveStatus(),
             'denominations' => $denominations,
+            'min_to_keep' => $min_to_keep, // NOUVELLE DONNÉE ENVOYÉE AU FRONTEND
         ]);
         exit;
     }
@@ -94,7 +75,15 @@ class AdminController {
                     }
                     break;
                 
-                // --- DÉBUT DES AJOUTS POUR LES TPE ---
+                // --- NOUVEAU BLOC POUR LE FOND DE CAISSE MINIMAL ---
+                case 'update_min_to_keep':
+                    if (isset($_POST['min_to_keep']) && is_array($_POST['min_to_keep'])) {
+                        $this->configService->updateConfigFile(['min_to_keep' => $_POST['min_to_keep']]);
+                        $_SESSION['admin_message'] = "Configuration du fond de caisse minimal enregistrée.";
+                    }
+                    break;
+                // --- FIN DU BLOC ---
+
                 case 'add_terminal':
                     $this->terminalManagementService->addTerminal(
                         $_POST['terminal_name'] ?? '',
@@ -111,7 +100,6 @@ class AdminController {
                 case 'delete_terminal':
                     $this->terminalManagementService->deleteTerminal(intval($_POST['terminal_id'] ?? 0));
                     break;
-                // --- FIN DES AJOUTS POUR LES TPE ---
             }
             header('Location: /admin');
             exit;

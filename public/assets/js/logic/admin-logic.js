@@ -4,8 +4,6 @@
 async function fetchAdminData() {
     const response = await fetch('index.php?route=admin/dashboard_data');
     if (!response.ok) {
-        // Si la session a expiré ou si l'utilisateur n'est pas admin, l'API renverra une erreur
-        // (généralement 401 ou 403, gérée par AuthController::checkAuth()).
         throw new Error('Accès non autorisé ou erreur serveur. Veuillez vous reconnecter.');
     }
     const data = await response.json();
@@ -46,9 +44,7 @@ function renderAdminDashboard(container, data) {
         </tr>
     `).join('');
 
-    // --- DÉBUT DU BLOC POUR LES TPE ---
     const terminauxHtml = data.terminaux.map(terminal => {
-        // Pour chaque terminal, on crée une liste d'options pour le <select> en présélectionnant la bonne caisse
         const caisseTerminalOptions = Object.entries(data.caisses).map(([id, nom]) => 
             `<option value="${id}" ${terminal.caisse_associee == id ? 'selected' : ''}>${nom}</option>`
         ).join('');
@@ -74,7 +70,22 @@ function renderAdminDashboard(container, data) {
         </tr>
         `;
     }).join('');
-    // --- FIN DU BLOC POUR LES TPE ---
+
+    // --- DÉBUT DU NOUVEAU BLOC POUR LE FOND DE CAISSE MINIMAL ---
+    const allDenominations = { ...data.denominations.billets, ...data.denominations.pieces };
+    const sortedDenoms = Object.entries(allDenominations).sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]));
+    
+    const minToKeepHtml = sortedDenoms.map(([name, value]) => {
+        const label = value >= 1 ? `${value} €` : `${value * 100} cts`;
+        const currentValue = data.min_to_keep[name] || '';
+        return `
+            <div class="form-group-inline">
+                <label for="min_to_keep_${name}">${label}</label>
+                <input type="number" id="min_to_keep_${name}" name="min_to_keep[${name}]" value="${currentValue}" placeholder="0" min="0">
+            </div>
+        `;
+    }).join('');
+    // --- FIN DU NOUVEAU BLOC ---
 
 
     container.innerHTML = `
@@ -112,6 +123,22 @@ function renderAdminDashboard(container, data) {
             </div>
 
             <div class="admin-card admin-card-full-width">
+                <h3><i class="fa-solid fa-shield-halved"></i> Gestion du Fond de Caisse Minimal</h3>
+                <form class="js-admin-action-form" method="POST" action="index.php?route=admin/action">
+                    <input type="hidden" name="action" value="update_min_to_keep">
+                    <div class="admin-card-content">
+                         <p>Définissez ici la quantité minimale de chaque dénomination à conserver dans les caisses après la clôture. Cela influence la suggestion de retrait.</p>
+                        <div class="reserve-inputs-grid">
+                            ${minToKeepHtml}
+                        </div>
+                    </div>
+                    <div class="admin-card-footer">
+                        <button type="submit" class="btn save-btn">Enregistrer les minimums</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="admin-card admin-card-full-width">
                 <h3><i class="fa-solid fa-users-cog"></i> Gestion des Administrateurs</h3>
                 <div class="admin-card-content">
                     <table class="admin-table">
@@ -133,24 +160,19 @@ export async function initializeAdminLogic() {
         const data = await fetchAdminData();
         renderAdminDashboard(adminPageContainer, data);
 
-        // Attache un gestionnaire d'événements unique pour tous les formulaires
         adminPageContainer.addEventListener('submit', (e) => {
             const form = e.target.closest('.js-admin-action-form');
             if (form) {
                 e.preventDefault();
                 const confirmMessage = e.submitter?.dataset.confirm;
                 if (confirmMessage && !confirm(confirmMessage)) {
-                    return; // Annule la soumission si l'utilisateur dit non
+                    return;
                 }
-                
-                // Pour la simplicité, on soumet le formulaire de manière classique,
-                // ce qui provoquera un rechargement de la page admin.
                 form.submit();
             }
         });
 
     } catch (error) {
-        // Si l'API renvoie une erreur d'autorisation, on redirige vers la page de login
         window.location.href = '/login';
     }
 }

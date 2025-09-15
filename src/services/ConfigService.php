@@ -27,7 +27,6 @@ class ConfigService {
             'DB_PASS' => defined('DB_PASS') ? DB_PASS : '',
             'GIT_REPO_URL' => defined('GIT_REPO_URL') ? GIT_REPO_URL : '',
             'APP_TIMEZONE' => defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Europe/Paris',
-            // NOUVEAU : Ajout de la constante APP_CURRENCY
             'APP_CURRENCY' => defined('APP_CURRENCY') ? APP_CURRENCY : 'EUR',
         ];
 
@@ -41,10 +40,13 @@ class ConfigService {
         if (isset($updates['tpe_par_caisse'])) {
             $tpe_par_caisse = $updates['tpe_par_caisse'];
         }
+        // MODIFICATION CI-DESSOUS : On ajoute la gestion de min_to_keep
         if (isset($updates['min_to_keep'])) {
-            $min_to_keep = $updates['min_to_keep'];
+            // On s'assure de ne garder que les entrées avec une valeur numérique > 0
+            $min_to_keep = array_filter($updates['min_to_keep'], function($value) {
+                return is_numeric($value) && $value > 0;
+            });
         }
-        // NOUVEAU : Application des mises à jour pour les dénominations
         if (isset($updates['denominations'])) {
             $denominations = $updates['denominations'];
         }
@@ -59,7 +61,6 @@ class ConfigService {
         $new_content .= "define('GIT_REPO_URL', '" . addslashes($current_defines['GIT_REPO_URL']) . "');\n\n";
         $new_content .= "// Fuseau horaire de l'application\n";
         $new_content .= "define('APP_TIMEZONE', '" . addslashes($current_defines['APP_TIMEZONE']) . "');\n\n";
-        // NOUVEAU : Écriture de la constante APP_CURRENCY
         $new_content .= "// Devise de l'application\n";
         $new_content .= "define('APP_CURRENCY', '" . addslashes($current_defines['APP_CURRENCY']) . "');\n\n";
         $new_content .= "// Configuration de l'application\n";
