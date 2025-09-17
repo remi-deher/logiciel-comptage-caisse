@@ -54,8 +54,13 @@ export function renderHistoriquePage(element) {
                     <p id="details-sheet-subtitle"></p>
                 </div>
                 <div class="details-sheet-actions">
-                    <button id="print-details-btn" class="action-btn"><i class="fa-solid fa-print"></i> Imprimer</button>
-                    <button id="details-sheet-close-btn" class="details-sheet-close-btn">&times;</button>
+                    <button id="print-details-btn" class="sheet-action-btn" title="Imprimer">
+                        <i class="fa-solid fa-print"></i>
+                    </button>
+                    <button id="sheet-fullscreen-btn" class="sheet-action-btn" title="Agrandir / Réduire">
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+                    <button id="details-sheet-close-btn" class="details-sheet-close-btn" title="Fermer">&times;</button>
                 </div>
             </div>
             <div id="details-sheet-content" class="details-sheet-content">

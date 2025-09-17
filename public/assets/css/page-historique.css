@@ -1,5 +1,5 @@
 /* ==========================================================================
-   public/css/historique.css (Version Finale Corrigée)
+   public/css/historique.css (Version Finale Complète et Corrigée)
    ========================================================================== */
 
 /* --- Styles généraux de la page (onglets, filtres, grille...) --- */
@@ -35,7 +35,7 @@
 .pagination li a { background-color: var(--color-surface-alt); border: 1px solid var(--color-border-light); color: var(--color-text-secondary); border-radius: 6px; padding: 10px 18px; text-decoration: none; font-weight: 600; }
 .pagination li.active a { background-color: var(--color-primary); color: white; border-color: var(--color-primary); }
 
-/* --- Panneau de détails inférieur (Bottom Sheet) --- */
+/* --- DÉBUT DES MODIFICATIONS : Panneau de détails inférieur (Bottom Sheet) --- */
 .details-sheet-overlay {
     position: fixed;
     top: 0; left: 0; width: 100%; height: 100%;
@@ -58,7 +58,7 @@
     box-shadow: 0 -5px 30px rgba(0,0,0,0.2);
     z-index: 1000;
     transform: translateY(100%);
-    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s ease-in-out; /* Ajout de la transition sur la hauteur */
     display: flex;
     flex-direction: column;
 }
@@ -68,10 +68,37 @@
 .details-sheet-header { padding: 15px 20px; border-bottom: 1px solid var(--color-border-light); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
 .details-sheet-handle { width: 50px; height: 24px; position: absolute; top: -24px; left: 50%; transform: translateX(-50%); cursor: ns-resize; display: flex; align-items: center; justify-content: center; }
 .details-sheet-handle::before { content: ''; width: 40px; height: 5px; background-color: var(--color-border); border-radius: 3px; }
-.details-sheet-header .title-container h3 { margin: 0; border: none; }
+.details-sheet-header .title-container h3 { margin: 0; border: none; font-size: 1.2em; }
 .details-sheet-header .title-container p { margin: 5px 0 0; color: var(--color-text-secondary); font-size: 0.9em; }
 .details-sheet-actions { display: flex; gap: 10px; align-items: center; }
-.details-sheet-close-btn { background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--color-text-muted); }
+
+/* Styles pour les nouveaux boutons du panneau */
+.sheet-action-btn {
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border-light);
+    color: var(--color-text-secondary);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, color 0.2s;
+}
+.sheet-action-btn:hover {
+    background-color: var(--color-surface-alt-hover);
+    color: var(--color-text-primary);
+}
+.details-sheet-close-btn { /* Style pour le bouton croix */
+    background: none;
+    border: none;
+    font-size: 1.8em;
+    cursor: pointer;
+    color: var(--color-text-muted);
+}
+/* FIN DES MODIFICATIONS */
+
 .details-sheet-content { padding: 25px 30px; overflow-y: auto; flex-grow: 1; }
 
 /* --- Styles pour le contenu à l'intérieur du panneau --- */
@@ -120,3 +147,45 @@
 .day-card-footer { padding: 10px 15px; background-color: var(--color-surface-alt); border-top: 1px solid var(--color-border-light); text-align: right; }
 .selection-toolbar { position: fixed; bottom: 20px; left: 50%; transform: translate(-50%, 150%); background-color: var(--color-surface); padding: 15px 25px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 20px; z-index: 999; transition: transform 0.3s ease-in-out; }
 .selection-toolbar.visible { transform: translate(-50%, 0); }
+
+/* --- CORRECTION: Restauration des styles pour les petits boutons --- */
+.action-btn-small {
+    padding: 8px 15px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    border-radius: 20px;
+    border: 2px solid transparent;
+    transition: all 0.2s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1;
+}
+.details-btn {
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-secondary);
+    border-color: var(--color-border-light);
+}
+.details-btn:hover {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+.load-btn {
+    background-color: rgba(39, 174, 96, 0.1);
+    color: #27ae60;
+}
+.load-btn:hover {
+    background-color: var(--color-success);
+    color: white;
+}
+.delete-btn {
+    background-color: rgba(192, 57, 43, 0.1);
+    color: #c0392b;
+}
+.delete-btn:hover {
+    background-color: var(--color-danger);
+    color: white;
+}

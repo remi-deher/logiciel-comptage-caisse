@@ -1,17 +1,15 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version Finale Complète, Verbosifiée et Corrigée)
+// Fichier : public/assets/js/logic/history-logic.js (Version Finale Complète avec Panneau Inférieur et nouveaux boutons)
 import { sendWsMessage } from './websocket-service.js';
 
-// --- Déclaration des variables globales pour la page ---
-// Ces variables conserveront les données chargées pour éviter de les redemander au serveur inutilement.
-let fullHistoryData = []; // Stockera l'historique complet pour les filtres et comparaisons.
-let config = {}; // Stockera la configuration de l'application (noms des caisses, etc.).
-let withdrawalsByDay = {}; // Stockera les données agrégées pour la vue "Synthèse des Retraits".
-let sheetRepartitionChart = null; // Instance du graphique de répartition dans le panneau.
-let sheetDenominationsChart = null; // Instance du graphique des dénominations.
+// --- Variables globales pour la page ---
+let fullHistoryData = [];
+let config = {};
+let withdrawalsByDay = {};
+let sheetRepartitionChart = null;
+let sheetDenominationsChart = null;
 let withdrawalChart = null;
 let withdrawalDonutChart = null;
 
-// --- Fonctions utilitaires pour le formatage ---
 const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(montant);
 const formatDateFr = (dateString, options = { dateStyle: 'long', timeStyle: 'short' }) => new Intl.DateTimeFormat('fr-FR', options).format(new Date(dateString));
 const getEcartClass = (ecart) => {
@@ -19,25 +17,19 @@ const getEcartClass = (ecart) => {
     return ecart > 0 ? 'ecart-positif' : 'ecart-negatif';
 };
 
-// --- Communication avec l'API (Backend) ---
+// --- API ---
 async function fetchHistoriqueData(params) {
-    console.log('[HistoryLogic] fetchHistoriqueData: Début de la récupération des données avec les paramètres :', params);
     const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
     const historyPromise = fetch(`index.php?route=historique/get_data&${new URLSearchParams(params)}`).then(res => res.json());
     const [conf, history] = await Promise.all([configPromise, historyPromise]);
     config = conf;
-    if (!history.historique) {
-        console.error('[HistoryLogic] fetchHistoriqueData: Réponse invalide de l\'API.', history);
-        throw new Error(`La réponse de l'API pour l'historique est invalide.`);
-    }
+    if (!history.historique) throw new Error(`La réponse de l'API pour l'historique est invalide.`);
     fullHistoryData = history.historique_complet || [];
-    console.log('[HistoryLogic] fetchHistoriqueData: Données récupérées avec succès.');
     return history;
 }
 
 // --- Logique de traitement des données ---
 function processWithdrawalData(comptages, denominations) {
-    console.log('[HistoryLogic] processWithdrawalData: Traitement des données de retraits.');
     withdrawalsByDay = {};
     const allDenomsValueMap = { ...(denominations.billets || {}), ...(denominations.pieces || {}) };
     if (!comptages) return;
@@ -68,7 +60,6 @@ function processWithdrawalData(comptages, denominations) {
 
 // --- Fonctions pour les graphiques du panneau inférieur ---
 function renderSheetCharts(caisseId, caisseData, caisseResults) {
-    console.log(`[HistoryLogic] renderSheetCharts: Rendu des graphiques pour la caisse ${caisseId}.`);
     if (sheetRepartitionChart) sheetRepartitionChart.destroy();
     if (sheetDenominationsChart) sheetDenominationsChart.destroy();
 
@@ -123,10 +114,8 @@ function renderSheetCharts(caisseId, caisseData, caisseResults) {
 
 // --- Point d'entrée de la logique de la page ---
 export async function initializeHistoryLogic() {
-    console.log('[HistoryLogic] initializeHistoryLogic: Démarrage de l\'initialisation de la page d\'historique.');
     
     function renderCards(container, historique) {
-        console.log('[HistoryLogic] renderCards: Affichage des cartes de comptage.');
         if (!container) return;
         if (!historique || historique.length === 0) {
             container.innerHTML = `<p style="padding: 20px; text-align: center;">Aucun enregistrement trouvé.</p>`;
@@ -155,7 +144,6 @@ export async function initializeHistoryLogic() {
     }
 
     function renderPagination(container, currentPage, totalPages) {
-        console.log('[HistoryLogic] renderPagination: Affichage de la pagination.');
         if (!container) return;
         if (totalPages <= 1) { container.innerHTML = ''; return; }
         let html = '<ul class="pagination">';
@@ -167,17 +155,9 @@ export async function initializeHistoryLogic() {
     }
 
     function renderSheetContent(container, comptageId) {
-        console.log(`[HistoryLogic] renderSheetContent: Début du rendu du contenu du panneau pour le comptage ID ${comptageId}.`);
-        if (!container) {
-            console.error('[HistoryLogic] renderSheetContent: Le conteneur est introuvable.');
-            return;
-        }
+        if (!container) return;
         const comptage = fullHistoryData.find(c => c.id.toString() === comptageId.toString());
-        if (!comptage) {
-            container.innerHTML = "Erreur: détails du comptage non trouvés.";
-            console.error(`[HistoryLogic] renderSheetContent: Comptage avec ID ${comptageId} non trouvé dans fullHistoryData.`);
-            return;
-        }
+        if (!comptage) { container.innerHTML = "Erreur: détails non trouvés."; return; }
         
         document.getElementById('details-sheet-title').textContent = comptage.nom_comptage;
         document.getElementById('details-sheet-subtitle').textContent = formatDateFr(comptage.date_comptage);
@@ -256,24 +236,18 @@ export async function initializeHistoryLogic() {
         }).join('');
     
         container.innerHTML = `<div id="printable-content">${summaryHtml}${caissesHtml}</div>`;
-        console.log(`[HistoryLogic] renderSheetContent: Fin du rendu du contenu du panneau.`);
     }
 
     function openDetailsSheet(comptageId) {
-        console.log(`[HistoryLogic] openDetailsSheet: Tentative d'ouverture du panneau pour le comptage ID ${comptageId}.`);
         const sheet = document.getElementById('details-sheet');
         const overlay = document.getElementById('details-sheet-overlay');
         const content = document.getElementById('details-sheet-content');
-        if (!sheet || !overlay || !content) {
-            console.error("[HistoryLogic] openDetailsSheet: ERREUR - Un ou plusieurs éléments du panneau sont introuvables !");
-            return;
-        }
+        if (!sheet || !overlay || !content) return;
 
         content.innerHTML = '<p>Chargement des détails...</p>';
         sheet.style.height = '50vh';
         sheet.classList.add('visible');
         overlay.classList.add('visible');
-        console.log('[HistoryLogic] openDetailsSheet: Panneau et overlay rendus visibles.');
         
         renderSheetContent(content, comptageId);
 
@@ -290,7 +264,6 @@ export async function initializeHistoryLogic() {
     }
 
     function closeDetailsSheet() {
-        console.log('[HistoryLogic] closeDetailsSheet: Fermeture du panneau.');
         const sheet = document.getElementById('details-sheet');
         const overlay = document.getElementById('details-sheet-overlay');
         if (!sheet || !overlay) return;
@@ -301,7 +274,6 @@ export async function initializeHistoryLogic() {
     }
     
     function initializeSheetResizing() {
-        console.log('[HistoryLogic] initializeSheetResizing: Initialisation de la logique de redimensionnement.');
         const sheet = document.getElementById('details-sheet');
         const handle = document.querySelector('.details-sheet-handle');
         if (!sheet || !handle) return;
@@ -345,7 +317,6 @@ export async function initializeHistoryLogic() {
     }
     
     function renderRetraitsView(container) {
-       console.log('[HistoryLogic] renderRetraitsView: Affichage de la vue des retraits.');
        if (!container) return;
        const sortedDays = Object.keys(withdrawalsByDay).sort((a, b) => new Date(b) - new Date(a));
     
@@ -471,10 +442,7 @@ export async function initializeHistoryLogic() {
     }
     
     const historyPage = document.getElementById('history-page');
-    if (!historyPage) {
-        console.error("Critical Error: #history-page element not found.");
-        return;
-    }
+    if (!historyPage) { return; }
 
     let currentParams = {};
 
@@ -509,9 +477,7 @@ export async function initializeHistoryLogic() {
     });
 
     historyPage.addEventListener('click', async (e) => {
-        console.log('[HistoryLogic] Clic détecté sur la page. Cible :', e.target);
         const target = e.target;
-
         if (target.closest('#reset-filter-btn')) {
             const filterForm = historyPage.querySelector('#history-filter-form');
             if(filterForm) filterForm.reset();
@@ -531,11 +497,8 @@ export async function initializeHistoryLogic() {
             const viewToActivate = document.getElementById(`${viewToShow}-view`);
             if (viewToActivate) viewToActivate.classList.add('active');
         }
-
-        const detailsButton = target.closest('.details-btn');
-        if (detailsButton && detailsButton.closest('.history-card')) {
-            console.log('[HistoryLogic] Clic sur un bouton "Détails" de la vue Comptages.');
-            const comptageId = detailsButton.closest('.history-card').dataset.comptageId;
+        if (target.closest('.details-btn') && target.closest('.history-card')) {
+            const comptageId = target.closest('.history-card').dataset.comptageId;
             openDetailsSheet(comptageId);
         } else if (target.closest('#details-sheet-close-btn') || target.matches('#details-sheet-overlay')) {
             closeDetailsSheet();
@@ -547,6 +510,18 @@ export async function initializeHistoryLogic() {
                 printWindow.document.close();
                 setTimeout(() => printWindow.print(), 500);
              }
+        } else if (target.closest('#sheet-fullscreen-btn')) {
+            const sheet = document.getElementById('details-sheet');
+            const icon = target.closest('#sheet-fullscreen-btn').querySelector('i');
+            if (sheet.style.height === '90vh') {
+                sheet.style.height = '50vh';
+                icon.classList.remove('fa-compress');
+                icon.classList.add('fa-expand');
+            } else {
+                sheet.style.height = '90vh';
+                icon.classList.remove('fa-expand');
+                icon.classList.add('fa-compress');
+            }
         }
         if (target.closest('.delete-btn') && target.closest('.history-card')) {
              const card = target.closest('.history-card');
@@ -595,8 +570,6 @@ export async function initializeHistoryLogic() {
         }
     });
 
-    console.log('[HistoryLogic] Lancement du premier chargement des données.');
     loadAndRender();
     initializeSheetResizing();
-    console.log('[HistoryLogic] Initialisation terminée.');
 }
