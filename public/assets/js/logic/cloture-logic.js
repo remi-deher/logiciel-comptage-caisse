@@ -121,9 +121,15 @@ export function updateClotureUI(newState) {
 }
 
 function updateSuggestionBanner() {
-    const activeTab = document.querySelector('.tab-link.active');
     const bannerContainer = document.getElementById('history-view-banner-container');
-    if (!activeTab || !bannerContainer) return;
+    // **CORRECTION 1 : Ne rien faire si le bandeau final est déjà affiché**
+    if (!bannerContainer || document.getElementById('final-cloture-banner')) return;
+
+    const activeTab = document.querySelector('.tab-link.active');
+    if (!activeTab) {
+        bannerContainer.innerHTML = ''; // Vide le conteneur s'il n'y a pas d'onglet actif
+        return;
+    }
     
     const activeCaisseId = activeTab.dataset.caisseId;
     
@@ -142,8 +148,8 @@ function updateSuggestionBanner() {
                     <i class="fa-solid fa-eye"></i> Afficher la suggestion
                 </button>
             </div>`;
-    } else if (!document.getElementById('final-cloture-banner')) {
-        bannerContainer.innerHTML = '';
+    } else {
+        bannerContainer.innerHTML = ''; // Vide le conteneur si la caisse active n'est pas clôturée
     }
 }
 
@@ -183,6 +189,57 @@ async function showWithdrawalSuggestion(caisseId) {
     }
 }
 
+// **CORRECTION 2 : Nouvelle fonction pour afficher les suggestions de toutes les caisses**
+async function showGlobalWithdrawalSuggestion() {
+    const modal = document.getElementById('suggestion-modal');
+    const modalTitle = document.getElementById('suggestion-modal-title');
+    const modalBody = document.getElementById('suggestion-modal-body');
+    if (!modal || !modalTitle || !modalBody) return;
+
+    modalTitle.textContent = `Suggestions de Retrait Globales`;
+    modalBody.innerHTML = '<p>Chargement des suggestions pour toutes les caisses clôturées...</p>';
+    modal.classList.add('visible');
+
+    try {
+        const promises = closedCaisses.map(caisseId =>
+            fetch(`index.php?route=calculateur/get_closed_caisse_data&caisse_id=${caisseId}`)
+                .then(res => res.json())
+        );
+
+        const results = await Promise.all(promises);
+
+        let finalHtml = '';
+        results.forEach((result, index) => {
+            const caisseId = closedCaisses[index];
+            finalHtml += `<h4 style="margin-top: 20px; border-bottom: 1px solid var(--color-border); padding-bottom: 5px;">Suggestions pour "${config.nomsCaisses[caisseId]}"</h4>`;
+
+            if (!result.success) {
+                finalHtml += `<p class="error">Impossible de charger la suggestion : ${result.message}</p>`;
+                return;
+            }
+
+            const caisseData = result.data;
+            const suggestionResult = calculateWithdrawalSuggestion(caisseData, config);
+
+            if (suggestionResult.suggestions.length > 0) {
+                const rows = suggestionResult.suggestions.map(s => {
+                    const label = s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`;
+                    return `<tr><td>Retirer ${s.qty} x ${label}</td><td>${formatCurrency(s.total)}</td></tr>`;
+                }).join('');
+                finalHtml += `<table class="suggestion-table"><thead><tr><th>Dénomination</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><div class="suggestion-total">Total à retirer : <span>${formatCurrency(suggestionResult.totalToWithdraw)}</span></div>`;
+            } else {
+                finalHtml += `<p>Aucun retrait n'était nécessaire pour ce comptage.</p>`;
+            }
+        });
+
+        modalBody.innerHTML = finalHtml;
+
+    } catch (error) {
+        modalBody.innerHTML = `<p class="error">Une erreur est survenue lors du chargement des suggestions : ${error.message}</p>`;
+    }
+}
+
+
 export function setupGlobalClotureButton() {
     document.addEventListener('click', (e) => {
         const calculatorPage = document.getElementById('calculator-page');
@@ -204,10 +261,8 @@ export function setupGlobalClotureButton() {
 
         const globalSuggestionBtn = e.target.closest('#show-global-suggestion-btn');
         if(globalSuggestionBtn) {
-            const firstClosedCaisseId = closedCaisses[0];
-            if(firstClosedCaisseId) {
-                showWithdrawalSuggestion(firstClosedCaisseId);
-            }
+            // **CORRECTION 2 (suite) : Appel de la nouvelle fonction**
+            showGlobalWithdrawalSuggestion();
         }
         
         if (e.target.closest('#trigger-final-cloture')) {
