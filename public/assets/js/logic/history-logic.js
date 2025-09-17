@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version Finale Complète avec Panneau Inférieur et nouveaux boutons)
+// Fichier : public/assets/js/logic/history-logic.js (Version Finale Complète avec correctif de la race condition)
 import { sendWsMessage } from './websocket-service.js';
 
 // --- Variables globales pour la page ---
@@ -251,6 +251,8 @@ export async function initializeHistoryLogic() {
         
         renderSheetContent(content, comptageId);
 
+        // --- DÉBUT DU CORRECTIF ---
+        // On attend que le navigateur soit prêt avant de dessiner les graphiques.
         requestAnimationFrame(() => {
             const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
             if (comptage) {
@@ -261,6 +263,7 @@ export async function initializeHistoryLogic() {
                 });
             }
         });
+        // --- FIN DU CORRECTIF ---
     }
 
     function closeDetailsSheet() {
