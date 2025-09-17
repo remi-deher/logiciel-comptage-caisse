@@ -88,7 +88,24 @@ export function updateClotureUI(newState) {
         const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === fieldCaisseId);
         const isLockedByOther = lockInfo && lockInfo.locked_by && String(lockInfo.locked_by) !== String(resourceId);
         
-        field.disabled = isClosed || isLockedByOther;
+        // Réinitialisation des états
+        field.disabled = false;
+        if (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') {
+            field.readOnly = false;
+        }
+
+        if (isLockedByOther) {
+            field.disabled = true;
+        } else if (isClosed) {
+            if (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') {
+                field.readOnly = true;
+            }
+            // On désactive uniquement les boutons d'action (ajout/suppression)
+            if(field.tagName === 'BUTTON' && (field.classList.contains('add-cheque-btn') || field.classList.contains('add-tpe-releve-btn') || field.classList.contains('delete-btn'))){
+                field.disabled = true;
+            }
+        }
+
         const parentContainer = field.closest('.form-group, .compact-input-group, .denom-card, .cheque-section, .tpe-card');
         if (parentContainer) {
             parentContainer.style.opacity = (isClosed || isLockedByOther) ? '0.7' : '1';
