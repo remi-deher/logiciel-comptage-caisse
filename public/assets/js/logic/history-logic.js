@@ -1,16 +1,17 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version Complète, Finale et Corrigée)
+// Fichier : public/assets/js/logic/history-logic.js (Version Finale Complète, Verbosifiée et Corrigée)
 import { sendWsMessage } from './websocket-service.js';
 
-// --- Variables globales pour la page ---
-let fullHistoryData = [];
-let config = {};
-let withdrawalsByDay = {};
+// --- Déclaration des variables globales pour la page ---
+// Ces variables conserveront les données chargées pour éviter de les redemander au serveur inutilement.
+let fullHistoryData = []; // Stockera l'historique complet pour les filtres et comparaisons.
+let config = {}; // Stockera la configuration de l'application (noms des caisses, etc.).
+let withdrawalsByDay = {}; // Stockera les données agrégées pour la vue "Synthèse des Retraits".
+let sheetRepartitionChart = null; // Instance du graphique de répartition dans le panneau.
+let sheetDenominationsChart = null; // Instance du graphique des dénominations.
 let withdrawalChart = null;
 let withdrawalDonutChart = null;
-let modalRepartitionChart = null;
-let modalDenominationsChart = null;
 
-
+// --- Fonctions utilitaires pour le formatage ---
 const formatEuros = (montant) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: config.currencyCode || 'EUR' }).format(montant);
 const formatDateFr = (dateString, options = { dateStyle: 'long', timeStyle: 'short' }) => new Intl.DateTimeFormat('fr-FR', options).format(new Date(dateString));
 const getEcartClass = (ecart) => {
@@ -18,19 +19,25 @@ const getEcartClass = (ecart) => {
     return ecart > 0 ? 'ecart-positif' : 'ecart-negatif';
 };
 
-// --- API ---
+// --- Communication avec l'API (Backend) ---
 async function fetchHistoriqueData(params) {
+    console.log('[HistoryLogic] fetchHistoriqueData: Début de la récupération des données avec les paramètres :', params);
     const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
     const historyPromise = fetch(`index.php?route=historique/get_data&${new URLSearchParams(params)}`).then(res => res.json());
     const [conf, history] = await Promise.all([configPromise, historyPromise]);
     config = conf;
-    if (!history.historique) throw new Error(`La réponse de l'API pour l'historique est invalide.`);
+    if (!history.historique) {
+        console.error('[HistoryLogic] fetchHistoriqueData: Réponse invalide de l\'API.', history);
+        throw new Error(`La réponse de l'API pour l'historique est invalide.`);
+    }
     fullHistoryData = history.historique_complet || [];
+    console.log('[HistoryLogic] fetchHistoriqueData: Données récupérées avec succès.');
     return history;
 }
 
 // --- Logique de traitement des données ---
 function processWithdrawalData(comptages, denominations) {
+    console.log('[HistoryLogic] processWithdrawalData: Traitement des données de retraits.');
     withdrawalsByDay = {};
     const allDenomsValueMap = { ...(denominations.billets || {}), ...(denominations.pieces || {}) };
     if (!comptages) return;
@@ -59,15 +66,15 @@ function processWithdrawalData(comptages, denominations) {
 }
 
 
-// --- Fonctions pour les graphiques de la modale ---
-function renderModalCharts(caisseId, caisseData, caisseResults) {
-    if (modalRepartitionChart) modalRepartitionChart.destroy();
-    if (modalDenominationsChart) modalDenominationsChart.destroy();
+// --- Fonctions pour les graphiques du panneau inférieur ---
+function renderSheetCharts(caisseId, caisseData, caisseResults) {
+    console.log(`[HistoryLogic] renderSheetCharts: Rendu des graphiques pour la caisse ${caisseId}.`);
+    if (sheetRepartitionChart) sheetRepartitionChart.destroy();
+    if (sheetDenominationsChart) sheetDenominationsChart.destroy();
 
     const theme = { theme: { mode: document.body.dataset.theme === 'dark' ? 'dark' : 'light' } };
 
-    // 1. Graphique Donut de Répartition
-    const repartitionContainer = document.getElementById(`modal-repartition-chart-${caisseId}`);
+    const repartitionContainer = document.getElementById(`sheet-repartition-chart-${caisseId}`);
     if (repartitionContainer) {
         const series = [
             parseFloat(caisseResults.total_compte_especes || 0),
@@ -76,50 +83,39 @@ function renderModalCharts(caisseId, caisseData, caisseResults) {
         ];
         if (series.some(val => val > 0)) {
             const optionsRepartition = {
-                ...theme,
-                series: series,
-                labels: ['Espèces', 'Carte Bancaire', 'Chèques'],
-                chart: { type: 'donut', height: 250 },
-                legend: { position: 'bottom' },
+                ...theme, series, labels: ['Espèces', 'Carte Bancaire', 'Chèques'],
+                chart: { type: 'donut', height: 250 }, legend: { position: 'bottom' },
                 dataLabels: { enabled: true, formatter: (val) => `${val.toFixed(1)}%` },
                 tooltip: { y: { formatter: (val) => formatEuros(val) } }
             };
-            modalRepartitionChart = new ApexCharts(repartitionContainer, optionsRepartition);
-            modalRepartitionChart.render();
+            sheetRepartitionChart = new ApexCharts(repartitionContainer, optionsRepartition);
+            sheetRepartitionChart.render();
         } else {
-            repartitionContainer.innerHTML = '<p style="text-align:center; padding: 20px;">Aucune donnée de paiement à afficher.</p>';
+            repartitionContainer.innerHTML = '<p style="text-align:center; padding: 20px;">Aucune donnée de paiement.</p>';
         }
     }
 
-    // 2. Graphique Barres des Dénominations
-    const denominationsContainer = document.getElementById(`modal-denominations-chart-${caisseId}`);
+    const denominationsContainer = document.getElementById(`sheet-denominations-chart-${caisseId}`);
     if (denominationsContainer) {
         const allDenomsMap = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
         const denomData = caisseData.denominations
             .filter(d => parseInt(d.quantite, 10) > 0)
-            .map(d => ({
-                quantite: parseInt(d.quantite, 10),
-                value: parseFloat(allDenomsMap[d.denomination_nom])
-             }))
+            .map(d => ({ quantite: parseInt(d.quantite, 10), value: parseFloat(allDenomsMap[d.denomination_nom]) }))
             .sort((a, b) => b.value - a.value);
         
         if (denomData.length > 0) {
             const optionsDenominations = {
-                ...theme,
-                series: [{ name: 'Valeur', data: denomData.map(d => d.quantite * d.value) }],
+                ...theme, series: [{ name: 'Valeur', data: denomData.map(d => d.quantite * d.value) }],
                 chart: { type: 'bar', height: 250, toolbar: { show: false } },
-                plotOptions: { bar: { horizontal: false } },
-                dataLabels: { enabled: false },
-                xaxis: {
-                    categories: denomData.map(d => d.value >= 1 ? `${d.value}€` : `${d.value*100}c`),
-                },
+                plotOptions: { bar: { horizontal: false } }, dataLabels: { enabled: false },
+                xaxis: { categories: denomData.map(d => d.value >= 1 ? `${d.value}€` : `${d.value*100}c`) },
                 yaxis: { labels: { formatter: (val) => formatEuros(val) } },
                 tooltip: { y: { formatter: (val) => formatEuros(val) } }
             };
-            modalDenominationsChart = new ApexCharts(denominationsContainer, optionsDenominations);
-            modalDenominationsChart.render();
+            sheetDenominationsChart = new ApexCharts(denominationsContainer, optionsDenominations);
+            sheetDenominationsChart.render();
         } else {
-             denominationsContainer.innerHTML = '<p style="text-align:center; padding: 20px;">Aucune dénomination comptée.</p>';
+             denominationsContainer.innerHTML = '<p style="text-align:center; padding: 20px;">Aucune dénomination.</p>';
         }
     }
 }
@@ -127,8 +123,11 @@ function renderModalCharts(caisseId, caisseData, caisseResults) {
 
 // --- Point d'entrée de la logique de la page ---
 export async function initializeHistoryLogic() {
+    console.log('[HistoryLogic] initializeHistoryLogic: Démarrage de l\'initialisation de la page d\'historique.');
     
     function renderCards(container, historique) {
+        console.log('[HistoryLogic] renderCards: Affichage des cartes de comptage.');
+        if (!container) return;
         if (!historique || historique.length === 0) {
             container.innerHTML = `<p style="padding: 20px; text-align: center;">Aucun enregistrement trouvé.</p>`;
             return;
@@ -156,6 +155,8 @@ export async function initializeHistoryLogic() {
     }
 
     function renderPagination(container, currentPage, totalPages) {
+        console.log('[HistoryLogic] renderPagination: Affichage de la pagination.');
+        if (!container) return;
         if (totalPages <= 1) { container.innerHTML = ''; return; }
         let html = '<ul class="pagination">';
         html += `<li class="${currentPage === 1 ? 'disabled' : ''}"><a href="#" data-page="${currentPage - 1}">&laquo;</a></li>`;
@@ -165,9 +166,21 @@ export async function initializeHistoryLogic() {
         container.innerHTML = html;
     }
 
-    function renderModalContent(container, comptageId) {
+    function renderSheetContent(container, comptageId) {
+        console.log(`[HistoryLogic] renderSheetContent: Début du rendu du contenu du panneau pour le comptage ID ${comptageId}.`);
+        if (!container) {
+            console.error('[HistoryLogic] renderSheetContent: Le conteneur est introuvable.');
+            return;
+        }
         const comptage = fullHistoryData.find(c => c.id.toString() === comptageId.toString());
-        if (!comptage) { container.innerHTML = "Erreur: détails non trouvés."; return; }
+        if (!comptage) {
+            container.innerHTML = "Erreur: détails du comptage non trouvés.";
+            console.error(`[HistoryLogic] renderSheetContent: Comptage avec ID ${comptageId} non trouvé dans fullHistoryData.`);
+            return;
+        }
+        
+        document.getElementById('details-sheet-title').textContent = comptage.nom_comptage;
+        document.getElementById('details-sheet-subtitle').textContent = formatDateFr(comptage.date_comptage);
     
         const { combines } = comptage.results;
     
@@ -181,34 +194,19 @@ export async function initializeHistoryLogic() {
     
         const caissesHtml = Object.entries(comptage.caisses_data).map(([caisse_id, data]) => {
             const caisseResults = comptage.results.caisses[caisse_id];
-            if (!caisseResults) return ''; // Sécurité
+            if (!caisseResults) return '';
 
             const kpiHtml = `
                 <div class="caisse-kpi-grid">
-                    <div class="caisse-kpi-card">
-                        <span>Total Compté</span>
-                        <strong>${formatEuros(caisseResults.total_compté)}</strong>
-                    </div>
-                    <div class="caisse-kpi-card">
-                        <span>Recette Théorique</span>
-                        <strong>${formatEuros(caisseResults.recette_theorique)}</strong>
-                    </div>
-                    <div class="caisse-kpi-card ${getEcartClass(caisseResults.ecart)}">
-                        <span>Écart Caisse</span>
-                        <strong class="ecart-value">${formatEuros(caisseResults.ecart)}</strong>
-                    </div>
+                    <div class="caisse-kpi-card"><span>Total Compté</span><strong>${formatEuros(caisseResults.total_compté)}</strong></div>
+                    <div class="caisse-kpi-card"><span>Recette Théorique</span><strong>${formatEuros(caisseResults.recette_theorique)}</strong></div>
+                    <div class="caisse-kpi-card ${getEcartClass(caisseResults.ecart)}"><span>Écart Caisse</span><strong class="ecart-value">${formatEuros(caisseResults.ecart)}</strong></div>
                 </div>`;
 
             const chartsHtml = `
                 <div class="modal-charts-container">
-                    <div class="chart-wrapper">
-                        <h4>Répartition des Paiements</h4>
-                        <div id="modal-repartition-chart-${caisse_id}"></div>
-                    </div>
-                    <div class="chart-wrapper">
-                        <h4>Valeur par Dénomination</h4>
-                        <div id="modal-denominations-chart-${caisse_id}"></div>
-                    </div>
+                    <div class="chart-wrapper"><h4>Répartition</h4><div id="sheet-repartition-chart-${caisse_id}"></div></div>
+                    <div class="chart-wrapper"><h4>Dénominations</h4><div id="sheet-denominations-chart-${caisse_id}"></div></div>
                 </div>`;
 
             let billetsHtml = '', piecesHtml = '';
@@ -216,7 +214,6 @@ export async function initializeHistoryLogic() {
                 const quantite = parseInt(denom.quantite, 10);
                 if (quantite === 0) return;
                 const denomName = denom.denomination_nom;
-
                 if (config.denominations.billets[denomName]) {
                     const value = parseFloat(config.denominations.billets[denomName]);
                     billetsHtml += `<tr><td>Billets ${value} ${config.currencySymbol}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
@@ -226,105 +223,198 @@ export async function initializeHistoryLogic() {
                     piecesHtml += `<tr><td>Pièces ${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
                 }
             });
-
-            const especesTable = (billetsHtml || piecesHtml) ? `
-                <table class="modal-details-table">
-                    <thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead>
-                    <tbody>
-                        ${billetsHtml ? `<tr class="table-subtitle"><td colspan="3">Billets</td></tr>${billetsHtml}` : ''}
-                        ${piecesHtml ? `<tr class="table-subtitle"><td colspan="3">Pièces</td></tr>${piecesHtml}` : ''}
-                    </tbody>
-                </table>` : '<p style="text-align:center; padding: 10px 0;">Aucune espèce comptée.</p>';
+            const especesTable = (billetsHtml || piecesHtml) ? `<table class="modal-details-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Total</th></tr></thead><tbody>${billetsHtml ? `<tr class="table-subtitle"><td colspan="3">Billets</td></tr>${billetsHtml}` : ''}${piecesHtml ? `<tr class="table-subtitle"><td colspan="3">Pièces</td></tr>${piecesHtml}` : ''}</tbody></table>` : '<p style="text-align:center; padding: 10px 0;">Aucune espèce.</p>';
 
             const cheques = data.cheques || [];
-            const chequesHtml = cheques.length > 0 ? `
-                <table class="modal-details-table">
-                    <thead><tr><th>Montant</th><th>Commentaire</th></tr></thead>
-                    <tbody>
-                        ${cheques.map(c => `<tr><td class="text-right">${formatEuros(c.montant)}</td><td>${c.commentaire || ''}</td></tr>`).join('')}
-                    </tbody>
-                </table>` : '<p style="text-align:center; padding: 10px 0;">Aucun chèque enregistré.</p>';
+            const chequesHtml = cheques.length > 0 ? `<table class="modal-details-table"><thead><tr><th>Montant</th><th>Commentaire</th></tr></thead><tbody>${cheques.map(c => `<tr><td class="text-right">${formatEuros(c.montant)}</td><td>${c.commentaire || ''}</td></tr>`).join('')}</tbody></table>` : '<p style="text-align:center; padding: 10px 0;">Aucun chèque.</p>';
 
             let cbHtml = '';
             const tpePourCaisse = Object.entries(config.tpeParCaisse || {}).filter(([,tpe]) => tpe.caisse_id.toString() === caisse_id);
             if (tpePourCaisse.length > 0) {
                 cbHtml = tpePourCaisse.map(([tpeId, tpe]) => {
                     const releves = data.cb[tpeId] || [];
-                    if (releves.length === 0) return `<p style="padding-bottom:10px;">Aucun relevé pour le TPE <strong>${tpe.nom}</strong>.</p>`;
-                    return `
-                        <h5 class="modal-table-subtitle">${tpe.nom}</h5>
-                        <table class="modal-details-table">
-                            <thead><tr><th>Heure</th><th class="text-right">Montant</th></tr></thead>
-                            <tbody>${releves.map(r => `<tr><td>${r.heure_releve || 'N/A'}</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('')}</tbody>
-                        </table>`;
+                    if (releves.length === 0) return `<p style="padding-bottom:10px;">Aucun relevé pour <strong>${tpe.nom}</strong>.</p>`;
+                    return `<h5 class="modal-table-subtitle">${tpe.nom}</h5><table class="modal-details-table"><thead><tr><th>Heure</th><th class="text-right">Montant</th></tr></thead><tbody>${releves.map(r => `<tr><td>${r.heure_releve || 'N/A'}</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('')}</tbody></table>`;
                 }).join('');
             } else {
-                 cbHtml = '<p style="text-align:center; padding: 10px 0;">Aucun TPE configuré pour cette caisse.</p>';
+                 cbHtml = '<p style="text-align:center; padding: 10px 0;">Aucun TPE.</p>';
             }
             
             const allDenomsMap = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
             const retraits = data.retraits || {};
-            const retraitsHtml = Object.keys(retraits).length > 0 ? `
-                <table class="modal-details-table">
-                    <thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead>
-                    <tbody>${Object.entries(retraits).map(([key, quantite]) => {
-                        const value = parseFloat(allDenomsMap[key]);
-                        const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-                        return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(parseInt(quantite, 10) * value)}</td></tr>`;
-                    }).join('')}</tbody>
-                </table>` : '<p style="text-align:center; padding: 10px 0;">Aucun retrait effectué.</p>';
+            const retraitsHtml = Object.keys(retraits).length > 0 ? `<table class="modal-details-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead><tbody>${Object.entries(retraits).map(([key, quantite]) => { const value = parseFloat(allDenomsMap[key]); const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`; return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(parseInt(quantite, 10) * value)}</td></tr>`; }).join('')}</tbody></table>` : '<p style="text-align:center; padding: 10px 0;">Aucun retrait.</p>';
             
             const detailsHtml = `
                 <div class="modal-details-grid">
-                    <div class="details-card">
-                        <div class="details-card-header">
-                            <h5><i class="fa-solid fa-money-bill-wave"></i> Espèces</h5>
-                            <span class="total-amount">${formatEuros(caisseResults.total_compte_especes)}</span>
-                        </div>
-                        <div class="details-card-body">${especesTable}</div>
-                    </div>
-                    <div class="details-card">
-                        <div class="details-card-header">
-                            <h5><i class="fa-solid fa-credit-card"></i> Carte Bancaire</h5>
-                             <span class="total-amount">${formatEuros(caisseResults.total_compte_cb)}</span>
-                        </div>
-                        <div class="details-card-body">${cbHtml}</div>
-                    </div>
-                    ${caisseResults.total_compte_cheques > 0 ? `
-                    <div class="details-card">
-                        <div class="details-card-header">
-                            <h5><i class="fa-solid fa-money-check-dollar"></i> Chèques</h5>
-                            <span class="total-amount">${formatEuros(caisseResults.total_compte_cheques)}</span>
-                        </div>
-                        <div class="details-card-body">${chequesHtml}</div>
-                    </div>` : ''}
-                    ${caisseResults.total_retraits > 0 ? `
-                    <div class="details-card">
-                        <div class="details-card-header">
-                             <h5><i class="fa-solid fa-arrow-down"></i> Retraits</h5>
-                             <span class="total-amount text-danger">${formatEuros(caisseResults.total_retraits)}</span>
-                        </div>
-                        <div class="details-card-body">${retraitsHtml}</div>
-                    </div>` : ''}
+                    <div class="details-card"><div class="details-card-header"><h5><i class="fa-solid fa-money-bill-wave"></i> Espèces</h5><span class="total-amount">${formatEuros(caisseResults.total_compte_especes)}</span></div><div class="details-card-body">${especesTable}</div></div>
+                    <div class="details-card"><div class="details-card-header"><h5><i class="fa-solid fa-credit-card"></i> CB</h5><span class="total-amount">${formatEuros(caisseResults.total_compte_cb)}</span></div><div class="details-card-body">${cbHtml}</div></div>
+                    ${caisseResults.total_compte_cheques > 0 ? `<div class="details-card"><div class="details-card-header"><h5><i class="fa-solid fa-money-check-dollar"></i> Chèques</h5><span class="total-amount">${formatEuros(caisseResults.total_compte_cheques)}</span></div><div class="details-card-body">${chequesHtml}</div></div>` : ''}
+                    ${caisseResults.total_retraits > 0 ? `<div class="details-card"><div class="details-card-header"><h5><i class="fa-solid fa-arrow-down"></i> Retraits</h5><span class="total-amount text-danger">${formatEuros(caisseResults.total_retraits)}</span></div><div class="details-card-body">${retraitsHtml}</div></div>` : ''}
                 </div>`;
 
+            return `<div class="caisse-details-section" style="margin-top: 30px; border-top: 1px solid var(--color-border); padding-top: 20px;"><h3 style="text-align: center;">${config.nomsCaisses[caisse_id] || `Caisse ${caisse_id}`}</h3>${kpiHtml}<div class="modal-details-layout">${chartsHtml}<div class="modal-details-container">${detailsHtml}</div></div></div>`;
+        }).join('');
+    
+        container.innerHTML = `<div id="printable-content">${summaryHtml}${caissesHtml}</div>`;
+        console.log(`[HistoryLogic] renderSheetContent: Fin du rendu du contenu du panneau.`);
+    }
+
+    function openDetailsSheet(comptageId) {
+        console.log(`[HistoryLogic] openDetailsSheet: Tentative d'ouverture du panneau pour le comptage ID ${comptageId}.`);
+        const sheet = document.getElementById('details-sheet');
+        const overlay = document.getElementById('details-sheet-overlay');
+        const content = document.getElementById('details-sheet-content');
+        if (!sheet || !overlay || !content) {
+            console.error("[HistoryLogic] openDetailsSheet: ERREUR - Un ou plusieurs éléments du panneau sont introuvables !");
+            return;
+        }
+
+        content.innerHTML = '<p>Chargement des détails...</p>';
+        sheet.style.height = '50vh';
+        sheet.classList.add('visible');
+        overlay.classList.add('visible');
+        console.log('[HistoryLogic] openDetailsSheet: Panneau et overlay rendus visibles.');
+        
+        renderSheetContent(content, comptageId);
+
+        requestAnimationFrame(() => {
+            const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
+            if (comptage) {
+                Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
+                    if (comptage.results.caisses[caisse_id]) {
+                        renderSheetCharts(caisse_id, data, comptage.results.caisses[caisse_id]);
+                    }
+                });
+            }
+        });
+    }
+
+    function closeDetailsSheet() {
+        console.log('[HistoryLogic] closeDetailsSheet: Fermeture du panneau.');
+        const sheet = document.getElementById('details-sheet');
+        const overlay = document.getElementById('details-sheet-overlay');
+        if (!sheet || !overlay) return;
+        sheet.classList.remove('visible');
+        overlay.classList.remove('visible');
+        if (sheetRepartitionChart) sheetRepartitionChart.destroy();
+        if (sheetDenominationsChart) sheetDenominationsChart.destroy();
+    }
+    
+    function initializeSheetResizing() {
+        console.log('[HistoryLogic] initializeSheetResizing: Initialisation de la logique de redimensionnement.');
+        const sheet = document.getElementById('details-sheet');
+        const handle = document.querySelector('.details-sheet-handle');
+        if (!sheet || !handle) return;
+
+        let isResizing = false;
+        let lastY = 0;
+
+        const startResize = (e) => {
+            isResizing = true;
+            lastY = e.clientY || e.touches[0].clientY;
+            sheet.style.transition = 'none';
+        };
+
+        const doResize = (e) => {
+            if (!isResizing) return;
+            const currentY = e.clientY || e.touches[0].clientY;
+            const delta = lastY - currentY;
+            lastY = currentY;
+            const newHeight = sheet.offsetHeight + delta;
+            
+            const minHeight = window.innerHeight * 0.2;
+            const maxHeight = window.innerHeight * 0.9;
+
+            if (newHeight >= minHeight && newHeight <= maxHeight) {
+                sheet.style.height = `${newHeight}px`;
+            }
+        };
+
+        const stopResize = () => {
+            isResizing = false;
+            sheet.style.transition = '';
+        };
+
+        handle.addEventListener('mousedown', startResize);
+        document.addEventListener('mousemove', doResize);
+        document.addEventListener('mouseup', stopResize);
+        
+        handle.addEventListener('touchstart', startResize, { passive: true });
+        document.addEventListener('touchmove', doResize, { passive: true });
+        document.addEventListener('touchend', stopResize);
+    }
+    
+    function renderRetraitsView(container) {
+       console.log('[HistoryLogic] renderRetraitsView: Affichage de la vue des retraits.');
+       if (!container) return;
+       const sortedDays = Object.keys(withdrawalsByDay).sort((a, b) => new Date(b) - new Date(a));
+    
+        if (sortedDays.length === 0) {
+            container.innerHTML = `<div class="withdrawals-header"><h3>Journal des Retraits</h3></div><p>Aucun retrait trouvé.</p>`;
+            return;
+        }
+    
+        const dayCardsHtml = sortedDays.map(dateKey => {
+            const dayData = withdrawalsByDay[dateKey];
+            if (dayData.totalValue === 0) return '';
             return `
-                <div class="caisse-details-section" style="margin-top: 30px; border-top: 1px solid var(--color-border); padding-top: 20px;">
-                    <h3 style="font-size: 1.8em; text-align: center; border-bottom: 2px solid var(--color-primary); padding-bottom: 10px; margin-bottom: 20px;">${config.nomsCaisses[caisse_id] || `Caisse ${caisse_id}`}</h3>
-                    ${kpiHtml}
-                    <div class="modal-details-layout">
-                        ${chartsHtml}
-                        <div class="modal-details-container">${detailsHtml}</div>
+                <div class="day-card" data-date-key="${dateKey}">
+                    <input type="checkbox" class="day-card-checkbox" data-amount="${dayData.totalValue}" title="Sélectionner">
+                    <div class="day-card-header"><i class="fa-solid fa-calendar-day"></i>${formatDateFr(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                    <div class="day-card-body">
+                        <div class="day-kpi"><span>Montant Retiré</span><strong>${formatEuros(dayData.totalValue)}</strong></div>
+                        <div class="day-kpi"><span>Articles</span><strong>${dayData.totalItems}</strong></div>
                     </div>
+                    <div class="day-card-footer"><button class="action-btn-small details-btn"><i class="fa-solid fa-eye"></i> Voir détails</button></div>
                 </div>`;
         }).join('');
     
         container.innerHTML = `
-            <div class="modal-header">
-                <div><h3>Détails de: ${comptage.nom_comptage}</h3><p>${formatDateFr(comptage.date_comptage)}</p></div>
-                <div class="modal-actions"><button id="print-modal-btn" class="action-btn"><i class="fa-solid fa-print"></i> Imprimer</button><span class="modal-close">&times;</span></div>
-            </div>
-            <div class="modal-body" id="printable-content">${summaryHtml}${caissesHtml}</div>`;
+            <div class="withdrawals-header"><h3>Journal des Retraits</h3><p class="subtitle">Cliquez ou cochez pour plus d'infos.</p></div>
+            <div class="withdrawals-log-wrapper"><div id="withdrawals-log-container">${dayCardsHtml}</div></div>
+            <div class="selection-toolbar" id="day-selection-toolbar"><span id="day-selection-counter">0 jour(s)</span><button id="clear-day-selection-btn" class="btn delete-btn">Désélectionner</button></div>
+            <div id="modal-withdrawal-details" class="modal"><div class="modal-content wide" id="modal-withdrawal-details-content"></div></div>
+        `;
+        
+        attachWithdrawalsEventListeners();
+    }
+
+    function attachWithdrawalsEventListeners() {
+        const historyPage = document.getElementById('history-page');
+        const logContainer = historyPage.querySelector('#withdrawals-log-container');
+        if (logContainer) {
+            logContainer.addEventListener('click', (e) => {
+                const card = e.target.closest('.day-card');
+                if (!card) return;
+                if (e.target.closest('.details-btn')) {
+                    renderWithdrawalDetailsModal(card.dataset.dateKey);
+                } else if (!e.target.matches('.day-card-checkbox')) {
+                    card.querySelector('.day-card-checkbox').click();
+                }
+            });
+            logContainer.addEventListener('change', (e) => {
+                if(e.target.matches('.day-card-checkbox')) {
+                    e.target.closest('.day-card').classList.toggle('selected', e.target.checked);
+                    updateSelectionToolbar();
+                }
+            });
+        }
+    }
+
+    function updateSelectionToolbar() {
+        const historyPage = document.getElementById('history-page');
+        const toolbar = historyPage.querySelector('#day-selection-toolbar');
+        if (!toolbar) return;
+        const counter = toolbar.querySelector('#day-selection-counter');
+        const checkedBoxes = historyPage.querySelectorAll('.day-card-checkbox:checked');
+        if (checkedBoxes.length > 0) {
+            let total = 0;
+            checkedBoxes.forEach(cb => total += parseFloat(cb.dataset.amount));
+            counter.innerHTML = `<strong>${checkedBoxes.length}</strong> jour(s) | Total : <strong>${formatEuros(total)}</strong>`;
+            toolbar.classList.add('visible');
+        } else {
+            toolbar.classList.remove('visible');
+        }
     }
 
     function updateComparisonToolbar() {
@@ -344,34 +434,6 @@ export async function initializeHistoryLogic() {
         }
     }
 
-    function renderComparisonModal() {
-        const historyPage = document.getElementById('history-page');
-        const modal = historyPage.querySelector('#comparison-modal');
-        const content = modal.querySelector('#comparison-modal-content');
-        const checkedIds = [...historyPage.querySelectorAll('.comparison-checkbox:checked')].map(cb => cb.dataset.comptageId);
-        const comptagesToCompare = fullHistoryData.filter(c => checkedIds.includes(c.id.toString())).sort((a,b) => new Date(a.date_comptage) - new Date(b.date_comptage));
-    
-        const headersHtml = comptagesToCompare.map(c => `<th>${c.nom_comptage}<br><small>${formatDateFr(c.date_comptage)}</small></th>`).join('');
-        
-        const rows = [ { label: 'Recette Réelle', key: 'recette_reelle' }, { label: 'Recette Théorique', key: 'recette_theorique' }, { label: 'Écart Total', key: 'ecart' } ];
-        const bodyHtml = rows.map(row => {
-            const cells = comptagesToCompare.map(c => {
-                const value = c.results.combines[row.key];
-                const ecartClass = row.key === 'ecart' ? getEcartClass(value) : '';
-                return `<td class="${ecartClass}">${formatEuros(value)}</td>`;
-            }).join('');
-            return `<tr><td><strong>${row.label}</strong></td>${cells}</tr>`;
-        }).join('');
-    
-        content.innerHTML = `
-            <div class="modal-header"><h3>Comparaison des Comptages</h3><span class="modal-close">&times;</span></div>
-            <div class="modal-body"><div class="table-responsive"><table class="info-table comparison-table">
-                <thead><tr><th>Indicateur</th>${headersHtml}</tr></thead>
-                <tbody>${bodyHtml}</tbody>
-            </table></div></div>`;
-    
-        modal.classList.add('visible');
-    }
 
     function renderWithdrawalDetailsModal(dateKey) {
         const dayData = withdrawalsByDay[dateKey];
@@ -379,6 +441,7 @@ export async function initializeHistoryLogic() {
     
         const modal = document.getElementById('modal-withdrawal-details');
         const content = document.getElementById('modal-withdrawal-details-content');
+        if (!modal || !content) return;
     
         const allDenomsValueMap = { ...config.denominations.billets, ...config.denominations.pieces };
         
@@ -387,262 +450,43 @@ export async function initializeHistoryLogic() {
             acc[d.caisse_nom] = (acc[d.caisse_nom] || 0) + (isNaN(value) ? 0 : value);
             return acc;
         }, {});
-        const donutLabels = Object.keys(byCaisse);
-        const donutSeries = Object.values(byCaisse);
-    
-        const byDenom = dayData.details.reduce((acc, d) => {
-            const value = parseFloat(d.valeur);
-            const quantite = parseInt(d.quantite, 10);
-            if (!acc[d.denomination]) {
-                acc[d.denomination] = { total: 0, quantite: 0 };
-            }
-            acc[d.denomination].total += isNaN(value) ? 0 : value;
-            acc[d.denomination].quantite += isNaN(quantite) ? 0 : quantite;
-            return acc;
-        }, {});
-    
-        const sortedDenoms = Object.entries(byDenom).sort(([denomA], [denomB]) => parseFloat(allDenomsValueMap[denomB]) - parseFloat(allDenomsValueMap[denomA]));
-        const barLabels = sortedDenoms.map(([denom]) => {
-            const value = parseFloat(allDenomsValueMap[denom]);
-            return value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-        });
-        const barSeries = sortedDenoms.map(([, data]) => parseFloat(data.total) || 0);
-        const barQuantities = sortedDenoms.map(([, data]) => parseInt(data.quantite, 10) || 0);
-    
-        const globalTableRows = sortedDenoms.map(([denom, data]) => {
-             const value = parseFloat(allDenomsValueMap[denom]);
-             const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-             return `<tr><td>${label}</td><td class="text-right">${data.quantite}</td><td class="text-right">${formatEuros(data.total)}</td></tr>`;
-        }).join('');
-    
+        
         const caisseTablesHtml = Object.entries(byCaisse).map(([nomCaisse, totalCaisse]) => {
-            const detailsCaisse = dayData.details.filter(d => d.caisse_nom === nomCaisse)
-                .sort((a,b) => allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination]);
+            const detailsCaisse = dayData.details.filter(d => d.caisse_nom === nomCaisse).sort((a,b) => allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination]);
             const rows = detailsCaisse.map(d => {
                 const value = parseFloat(allDenomsValueMap[d.denomination]);
-                const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+                const label = value >= 1 ? `${value}€` : `${value * 100}c`;
                 return `<tr><td>${label}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.valeur)}</td></tr>`;
             }).join('');
-            return `<div class="card">
-                        <h4>Détail pour ${nomCaisse}</h4>
-                        <div class="table-responsive"><table class="info-table">
-                            <thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead>
-                            <tbody>${rows}</tbody>
-                            <tfoot><tr><td colspan="2">Total Caisse</td><td class="text-right">${formatEuros(totalCaisse)}</td></tr></tfoot>
-                        </table></div>
-                    </div>`;
+            return `<div class="card"><h4>Détail pour ${nomCaisse}</h4><div class="table-responsive"><table class="info-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2">Total Caisse</td><td class="text-right">${formatEuros(totalCaisse)}</td></tr></tfoot></table></div></div>`;
         }).join('');
         
         content.innerHTML = `
-            <div class="modal-header">
-                <h3>Analyse des retraits du ${formatDateFr(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
-                <span class="modal-close">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="charts-grid">
-                    <div class="card chart-card"><h4>Répartition par Caisse</h4><div id="donut-chart-container"></div></div>
-                    <div class="card chart-card"><h4>Valeur par Dénomination</h4><div id="bar-chart-container"></div></div>
-                </div>
-                <div class="details-grid">
-                    <div class="card">
-                        <h4>Synthèse Globale</h4>
-                        <div class="table-responsive">
-                            <table class="info-table">
-                                <thead><tr><th>Dénomination</th><th class="text-right">Qté. Totale</th><th class="text-right">Valeur Totale</th></tr></thead>
-                                <tbody>${globalTableRows}</tbody>
-                                <tfoot><tr><td colspan="2">Total Général</td><td class="text-right">${formatEuros(dayData.totalValue)}</td></tr></tfoot>
-                            </table>
-                        </div>
-                    </div>
-                    ${caisseTablesHtml}
-                </div>
-            </div>`;
+            <div class="modal-header"><h3>Détails des retraits du ${formatDateFr(dateKey, {dateStyle: 'full'})}</h3><span class="modal-close">&times;</span></div>
+            <div class="modal-body">${caisseTablesHtml}</div>`;
             
         modal.classList.add('visible');
-    
-        const theme = { theme: { mode: document.body.dataset.theme === 'dark' ? 'dark' : 'light' } };
-    
-        if (withdrawalDonutChart) withdrawalDonutChart.destroy();
-        withdrawalDonutChart = new ApexCharts(document.querySelector("#donut-chart-container"), {
-            ...theme, series: donutSeries, labels: donutLabels, chart: { type: 'donut', height: 250 },
-            legend: { position: 'bottom' }, dataLabels: { enabled: true, formatter: (val) => `${val.toFixed(1)}%` },
-            tooltip: { y: { formatter: (val) => formatEuros(val) } }
-        });
-        withdrawalDonutChart.render();
-    
-        if (withdrawalChart) withdrawalChart.destroy();
-        withdrawalChart = new ApexCharts(document.querySelector("#bar-chart-container"), {
-            ...theme,
-            series: [{ name: 'Valeur retirée', data: barSeries }],
-            chart: { type: 'bar', height: 250, toolbar: { show: false } },
-            plotOptions: { bar: { horizontal: true, dataLabels: { position: 'center' } } },
-            dataLabels: {
-                enabled: true,
-                formatter: (val, opts) => {
-                    const quantite = barQuantities[opts.dataPointIndex];
-                    return `${quantite}x`;
-                },
-                style: { colors: ['#fff'], fontSize: '12px', fontWeight: 'bold' },
-                textAnchor: 'middle',
-                dropShadow: { enabled: true, top: 1, left: 1, blur: 1, opacity: 0.45 }
-            },
-            xaxis: {
-                categories: barLabels,
-                labels: {
-                    formatter: (val) => typeof val === 'number' ? formatEuros(val) : val
-                }
-            },
-            tooltip: {
-                x: {
-                    formatter: (val, opts) => {
-                         return barLabels[opts.dataPointIndex];
-                    }
-                },
-                y: {
-                    title: {
-                        formatter: (seriesName) => seriesName,
-                    },
-                    formatter: (val, opts) => {
-                        const quantite = barQuantities[opts.dataPointIndex];
-                        return `${formatEuros(val)} (${quantite} articles)`;
-                    }
-                }
-            }
-        });
-        withdrawalChart.render();
-    
-        modal.querySelector('.modal-close').onclick = () => {
-            modal.classList.remove('visible');
-            if (withdrawalChart) withdrawalChart.destroy();
-            if (withdrawalDonutChart) withdrawalDonutChart.destroy();
-        };
-        modal.onclick = (e) => { 
-            if (e.target === modal) {
-                modal.classList.remove('visible');
-                if (withdrawalChart) withdrawalChart.destroy();
-                if (withdrawalDonutChart) withdrawalDonutChart.destroy();
-            }
-        };
-    }
-
-    function attachWithdrawalsEventListeners() {
-        const historyPage = document.getElementById('history-page');
-        const container = historyPage.querySelector('#retraits-view');
-        if (!container) return;
-        const logContainer = container.querySelector('#withdrawals-log-container');
-        
-        if (logContainer) {
-            logContainer.addEventListener('click', (e) => {
-                const card = e.target.closest('.day-card');
-                if (!card) return;
-    
-                if (e.target.closest('.details-btn')) {
-                    renderWithdrawalDetailsModal(card.dataset.dateKey);
-                } else if (!e.target.matches('.day-card-checkbox')) {
-                    card.querySelector('.day-card-checkbox').click();
-                }
-            });
-    
-            logContainer.addEventListener('change', (e) => {
-                if(e.target.matches('.day-card-checkbox')) {
-                    e.target.closest('.day-card').classList.toggle('selected', e.target.checked);
-                    updateSelectionToolbar();
-                }
-            });
-        }
-    }
-    
-    function updateSelectionToolbar() {
-        const historyPage = document.getElementById('history-page');
-        const toolbar = historyPage.querySelector('#day-selection-toolbar');
-        if (!toolbar) return;
-        const counter = toolbar.querySelector('#day-selection-counter');
-        const checkedBoxes = historyPage.querySelectorAll('.day-card-checkbox:checked');
-        
-        if (checkedBoxes.length > 0) {
-            let total = 0;
-            checkedBoxes.forEach(cb => total += parseFloat(cb.dataset.amount));
-            counter.innerHTML = `<strong>${checkedBoxes.length}</strong> jour(s) sélectionné(s) | Total : <strong>${formatEuros(total)}</strong>`;
-            toolbar.classList.add('visible');
-        } else {
-            toolbar.classList.remove('visible');
-        }
-    }
-    
-    function renderRetraitsView(container) {
-       const sortedDays = Object.keys(withdrawalsByDay).sort((a, b) => new Date(b) - new Date(a));
-    
-        if (sortedDays.length === 0) {
-            container.innerHTML = `<div class="withdrawals-header"><h3>Journal des Retraits</h3></div><p>Aucun retrait trouvé pour la période sélectionnée.</p>`;
-            return;
-        }
-    
-        const dayCardsHtml = sortedDays.map(dateKey => {
-            const dayData = withdrawalsByDay[dateKey];
-            if (dayData.totalValue === 0) return '';
-            return `
-                <div class="day-card" data-date-key="${dateKey}">
-                    <input type="checkbox" class="day-card-checkbox" data-amount="${dayData.totalValue}" title="Sélectionner ce jour">
-                    <div class="day-card-header"><i class="fa-solid fa-calendar-day"></i>${formatDateFr(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                    <div class="day-card-body">
-                        <div class="day-kpi"><span>Montant Retiré</span><strong>${formatEuros(dayData.totalValue)}</strong></div>
-                        <div class="day-kpi"><span>Articles Retirés</span><strong>${dayData.totalItems}</strong></div>
-                    </div>
-                    <div class="day-card-footer"><button class="action-btn-small details-btn"><i class="fa-solid fa-eye"></i> Voir détails</button></div>
-                </div>`;
-        }).join('');
-    
-        container.innerHTML = `
-            <div class="withdrawals-header">
-                <h3>Journal des Retraits</h3>
-                <p class="subtitle">Cliquez sur un jour pour le détail, ou cochez plusieurs jours pour les additionner.</p>
-            </div>
-            <div class="withdrawals-log-wrapper">
-                <div id="withdrawals-log-container">${dayCardsHtml}</div>
-            </div>
-            <div class="selection-toolbar" id="day-selection-toolbar">
-                 <span id="day-selection-counter">0 jour(s) sélectionné(s)</span>
-                 <button id="clear-day-selection-btn" class="btn delete-btn">Tout désélectionner</button>
-            </div>
-            <div id="modal-withdrawal-details" class="modal"><div class="modal-content wide" id="modal-withdrawal-details-content"></div></div>
-        `;
-        
-        attachWithdrawalsEventListeners();
+        modal.querySelector('.modal-close').onclick = () => modal.classList.remove('visible');
+        modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
     }
     
     const historyPage = document.getElementById('history-page');
-    if (!historyPage) return;
-
-    const controlsContainer = historyPage.querySelector('.filter-section');
-    if(controlsContainer && !document.getElementById('comparison-toolbar')) {
-        controlsContainer.insertAdjacentHTML('afterend', `
-            <div id="comparison-toolbar" class="comparison-toolbar">
-                <span id="comparison-counter"></span>
-                <button id="compare-btn" class="btn new-btn" disabled><i class="fa-solid fa-scale-balanced"></i> Comparer</button>
-            </div>
-        `);
-    }
-    if(!document.getElementById('comparison-modal')) {
-        historyPage.insertAdjacentHTML('beforeend', `<div id="comparison-modal" class="modal"><div class="modal-content wide" id="comparison-modal-content"></div></div>`);
+    if (!historyPage) {
+        console.error("Critical Error: #history-page element not found.");
+        return;
     }
 
-    const filterForm = historyPage.querySelector('#history-filter-form');
-    const resetBtn = historyPage.querySelector('#reset-filter-btn');
-    const paginationNav = historyPage.querySelector('.pagination-nav');
-    const detailsModal = historyPage.querySelector('#details-modal');
-    const modalContent = historyPage.querySelector('#modal-details-content');
-    const viewTabs = historyPage.querySelector('.view-tabs');
-    const comptagesView = historyPage.querySelector('#comptages-view');
-    const retraitsView = historyPage.querySelector('#retraits-view');
-    const retraitsContentContainer = historyPage.querySelector('#retraits-view-content');
     let currentParams = {};
 
     async function loadAndRender(params = {}) {
         currentParams = params;
-        const historyGridContainer = comptagesView.querySelector('.history-grid');
+        const historyGridContainer = historyPage.querySelector('.history-grid');
+        const retraitsContentContainer = historyPage.querySelector('#retraits-view-content');
+        const paginationNav = historyPage.querySelector('.pagination-nav');
         try {
-            historyGridContainer.innerHTML = '<p>Chargement...</p>';
-            retraitsContentContainer.innerHTML = '<p>Chargement...</p>';
+            if(historyGridContainer) historyGridContainer.innerHTML = '<p>Chargement...</p>';
+            if(retraitsContentContainer) retraitsContentContainer.innerHTML = '<p>Chargement...</p>';
+            
             const data = await fetchHistoriqueData(params);
             renderCards(historyGridContainer, data.historique);
             renderPagination(paginationNav, data.page_courante, data.pages_totales);
@@ -650,121 +494,98 @@ export async function initializeHistoryLogic() {
             renderRetraitsView(retraitsContentContainer);
             updateComparisonToolbar();
         } catch (error) {
-            console.error("Erreur lors du chargement :", error);
+            console.error("Erreur de chargement:", error);
             const errorMessage = `<p class="error">Erreur: ${error.message}</p>`;
-            historyGridContainer.innerHTML = errorMessage;
-            retraitsContentContainer.innerHTML = errorMessage;
+            if(historyGridContainer) historyGridContainer.innerHTML = errorMessage;
+            if(retraitsContentContainer) retraitsContentContainer.innerHTML = errorMessage;
         }
     }
-
-    viewTabs.addEventListener('click', (e) => {
-        e.preventDefault();
-        const tab = e.target.closest('.tab-link');
-        if (!tab || tab.classList.contains('active')) return;
-        const viewToShow = tab.dataset.view;
-        viewTabs.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        comptagesView.classList.remove('active');
-        retraitsView.classList.remove('active');
-        document.getElementById(`${viewToShow}-view`).classList.add('active');
+    
+    historyPage.addEventListener('submit', (e) => {
+        if (e.target.matches('#history-filter-form')) {
+            e.preventDefault();
+            loadAndRender(Object.fromEntries(new FormData(e.target).entries()));
+        }
     });
-    
-    filterForm.addEventListener('submit', (e) => { e.preventDefault(); loadAndRender(Object.fromEntries(new FormData(filterForm).entries())); });
-    resetBtn.addEventListener('click', () => { filterForm.reset(); loadAndRender(); });
-    paginationNav.addEventListener('click', (e) => { e.preventDefault(); const link = e.target.closest('a'); if (link && !link.parentElement.classList.contains('disabled')) { loadAndRender({ ...currentParams, p: link.dataset.page }); }});
-    
-    historyPage.addEventListener('click', async (e) => {
-        const target = e.target;
-        
-        if (target.closest('.details-btn') && target.closest('.history-card')) {
-            const comptageId = target.closest('.history-card').dataset.comptageId;
-            
-            renderModalContent(modalContent, comptageId);
-            detailsModal.classList.add('visible');
 
-            // CORRECTION FINALE: Utilisation de requestAnimationFrame
-            requestAnimationFrame(() => {
-                const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
-                if (comptage) {
-                    Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
-                        if (comptage.results.caisses[caisse_id]) {
-                            renderModalCharts(caisse_id, data, comptage.results.caisses[caisse_id]);
-                        }
-                    });
-                }
-            });
+    historyPage.addEventListener('click', async (e) => {
+        console.log('[HistoryLogic] Clic détecté sur la page. Cible :', e.target);
+        const target = e.target;
+
+        if (target.closest('#reset-filter-btn')) {
+            const filterForm = historyPage.querySelector('#history-filter-form');
+            if(filterForm) filterForm.reset();
+            loadAndRender();
+        }
+        const paginationLink = target.closest('.pagination-nav a');
+        if (paginationLink && !paginationLink.parentElement.classList.contains('disabled')) {
+            e.preventDefault();
+            loadAndRender({ ...currentParams, p: paginationLink.dataset.page });
+        }
+        const tabLink = target.closest('.view-tabs .tab-link');
+        if (tabLink && !tabLink.classList.contains('active')) {
+            e.preventDefault();
+            const viewToShow = tabLink.dataset.view;
+            historyPage.querySelectorAll('.view-tabs .tab-link, .view-content').forEach(el => el.classList.remove('active'));
+            tabLink.classList.add('active');
+            const viewToActivate = document.getElementById(`${viewToShow}-view`);
+            if (viewToActivate) viewToActivate.classList.add('active');
         }
 
-        if (target.closest('.delete-btn')) {
+        const detailsButton = target.closest('.details-btn');
+        if (detailsButton && detailsButton.closest('.history-card')) {
+            console.log('[HistoryLogic] Clic sur un bouton "Détails" de la vue Comptages.');
+            const comptageId = detailsButton.closest('.history-card').dataset.comptageId;
+            openDetailsSheet(comptageId);
+        } else if (target.closest('#details-sheet-close-btn') || target.matches('#details-sheet-overlay')) {
+            closeDetailsSheet();
+        } else if (target.closest('#print-details-btn')) {
+             const content = document.getElementById('printable-content')?.innerHTML;
+             if(content) {
+                const printWindow = window.open('', '', 'height=800,width=1000');
+                printWindow.document.write('<html><head><title>Détail</title><link rel="stylesheet" href="assets/css/styles.css"><link rel="stylesheet" href="assets/css/page-historique.css"></head><body class="print-preview">' + content + '</body></html>');
+                printWindow.document.close();
+                setTimeout(() => printWindow.print(), 500);
+             }
+        }
+        if (target.closest('.delete-btn') && target.closest('.history-card')) {
              const card = target.closest('.history-card');
              const comptageId = card.dataset.comptageId;
-             if (confirm("Êtes-vous sûr de vouloir supprimer ce comptage ? Cette action est irréversible.")) {
+             if (confirm("Supprimer ce comptage ?")) {
                 const formData = new FormData();
                 formData.append('id_a_supprimer', comptageId);
                 try {
                     const response = await fetch('index.php?route=historique/delete', { method: 'POST', body: formData });
                     const result = await response.json();
-                    if(!result.success) throw new Error(result.message || 'Erreur inconnue.');
+                    if(!result.success) throw new Error(result.message);
                     card.style.opacity = '0';
                     setTimeout(() => loadAndRender(currentParams), 300);
                 } catch(err) {
-                    alert(`Erreur lors de la suppression : ${err.message}`);
+                    alert(`Erreur: ${err.message}`);
                 }
             }
         }
-        
         if (target.closest('.load-btn')) {
             const comptageId = target.closest('.history-card').dataset.comptageId;
             const comptageData = fullHistoryData.find(c => c.id.toString() === comptageId);
-            if(comptageData && confirm(`Voulez-vous charger le comptage "${comptageData.nom_comptage}" dans le calculateur ? Le contenu non sauvegardé sera perdu.`)) {
+            if(comptageData && confirm(`Charger "${comptageData.nom_comptage}" ? Le travail non sauvegardé sera perdu.`)) {
                 const loadButton = target.closest('.load-btn');
                 loadButton.disabled = true;
-                loadButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Chargement...';
-
+                loadButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
                 try {
                     const formData = new FormData();
                     formData.append('comptage_id', comptageId);
-                    
                     const response = await fetch('index.php?route=calculateur/load_from_history', { method: 'POST', body: formData });
                     const result = await response.json();
-                    
-                    if (!result.success) {
-                        throw new Error(result.message || 'Erreur inconnue lors de la préparation des données.');
-                    }
-
-		            sendWsMessage({ type: 'force_reload_all' })
+                    if (!result.success) { throw new Error(result.message); }
+		            sendWsMessage({ type: 'force_reload_all' });
                     window.location.href = '/calculateur';
-
                 } catch (error) {
-                    alert(`Erreur lors du chargement : ${error.message}`);
+                    alert(`Erreur: ${error.message}`);
                     loadButton.disabled = false;
                     loadButton.innerHTML = '<i class="fa-solid fa-download"></i> Charger';
                 }
             }
-        }
-        
-        if(target.closest('#compare-btn')) {
-            renderComparisonModal();
-        }
-        
-        if(target.closest('#print-modal-btn')) {
-            const content = document.getElementById('printable-content').innerHTML;
-            const printWindow = window.open('', '', 'height=800,width=1000');
-            printWindow.document.write('<html><head><title>Détail du Comptage</title>');
-            printWindow.document.write('<link rel="stylesheet" href="assets/css/styles.css"><link rel="stylesheet" href="assets/css/page-historique.css">');
-            printWindow.document.write('</head><body class="print-preview">');
-            printWindow.document.write(content);
-            printWindow.document.write('</body></html>');
-            printWindow.document.close();
-            setTimeout(() => printWindow.print(), 500);
-        }
-        
-        if(target.closest('#clear-day-selection-btn')) {
-            historyPage.querySelectorAll('.day-card-checkbox:checked').forEach(cb => {
-                cb.checked = false;
-                cb.closest('.day-card').classList.remove('selected');
-            });
-            updateSelectionToolbar();
         }
     });
     
@@ -774,20 +595,8 @@ export async function initializeHistoryLogic() {
         }
     });
 
-    detailsModal.addEventListener('click', (e) => { 
-        if (e.target.classList.contains('modal-close') || e.target.id === 'details-modal') { 
-            detailsModal.classList.remove('visible');
-            if (modalRepartitionChart) modalRepartitionChart.destroy();
-            if (modalDenominationsChart) modalDenominationsChart.destroy();
-        }
-    });
-
-    const comparisonModal = document.getElementById('comparison-modal');
-    comparisonModal.addEventListener('click', (e) => {
-        if (e.target.matches('.modal-close') || e.target === comparisonModal) {
-            comparisonModal.classList.remove('visible');
-        }
-    });
-
+    console.log('[HistoryLogic] Lancement du premier chargement des données.');
     loadAndRender();
+    initializeSheetResizing();
+    console.log('[HistoryLogic] Initialisation terminée.');
 }

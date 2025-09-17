@@ -45,12 +45,23 @@ export function renderHistoriquePage(element) {
                 </div>
         </div>
 
-        <div id="details-modal" class="modal">
-            <div class="modal-content wide">
-                <div id="modal-details-content"></div>
+        <div id="details-sheet-overlay" class="details-sheet-overlay"></div>
+        <div id="details-sheet" class="details-sheet">
+            <div class="details-sheet-handle"></div>
+            <div class="details-sheet-header">
+                <div class="title-container">
+                    <h3 id="details-sheet-title">Détails du comptage</h3>
+                    <p id="details-sheet-subtitle"></p>
+                </div>
+                <div class="details-sheet-actions">
+                    <button id="print-details-btn" class="action-btn"><i class="fa-solid fa-print"></i> Imprimer</button>
+                    <button id="details-sheet-close-btn" class="details-sheet-close-btn">&times;</button>
+                </div>
             </div>
+            <div id="details-sheet-content" class="details-sheet-content">
+                </div>
         </div>
-    </div>
+        </div>
   `;
 
   // Une fois le HTML en place, on lance la logique JavaScript associée
