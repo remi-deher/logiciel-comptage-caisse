@@ -26,6 +26,45 @@ class CalculateurController {
         $this->comptageRepository = new ComptageRepository($pdo);
     }
 
+    // --- DÉBUT DE L'AJOUT DE LA NOUVELLE FONCTION ---
+    public function getClosedCaisseData() {
+        header('Content-Type: application/json');
+        $caisse_id = intval($_GET['caisse_id'] ?? 0);
+        if ($caisse_id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'ID de caisse invalide.']);
+            exit;
+        }
+
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT cd.* FROM comptage_details cd
+                 JOIN comptages c ON cd.comptage_id = c.id
+                 WHERE cd.caisse_id = ? AND c.nom_comptage LIKE 'Clôture Caisse%'
+                 ORDER BY c.date_comptage DESC LIMIT 1"
+            );
+            $stmt->execute([$caisse_id]);
+            $caisseData = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$caisseData) {
+                throw new Exception("Aucun comptage de clôture trouvé pour cette caisse.");
+            }
+
+            $comptage_detail_id = $caisseData['id'];
+            $stmt_denoms = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
+            $stmt_denoms->execute([$comptage_detail_id]);
+            $caisseData['denominations'] = $stmt_denoms->fetchAll(PDO::FETCH_KEY_PAIR);
+
+            echo json_encode(['success' => true, 'data' => $caisseData]);
+
+        } catch (Exception $e) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+    // --- FIN DE L'AJOUT ---
+
     public function getInitialData() {
         header('Content-Type: application/json');
         $stmt_auto = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
@@ -92,7 +131,6 @@ class CalculateurController {
                                 $montant_val = get_numeric_value($releve, 'montant');
                                 if ($montant_val > 0) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
-                                    // --- CORRECTION ---
                                     $heure_releve_raw = $releve['heure'] ?? null;
                                     $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
                                     $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $heure_releve]);
@@ -161,7 +199,6 @@ class CalculateurController {
                             if (is_array($releves)) {
                                 foreach ($releves as $releve) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
-                                    // --- CORRECTION ---
                                     $heure_releve_raw = $releve['heure'] ?? null;
                                     $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
                                     $stmt_cb->execute([$new_comptage_detail_id, $terminal_id, $releve['montant'], $heure_releve]);
@@ -242,7 +279,6 @@ class CalculateurController {
                                 $montant_val = get_numeric_value($releve, 'montant');
                                 if ($montant_val > 0) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
-                                    // --- CORRECTION ---
                                     $heure_releve_raw = $releve['heure'] ?? null;
                                     $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
                                     $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $heure_releve]);
@@ -294,12 +330,14 @@ class CalculateurController {
             $stmt_j1->execute([$nom_comptage_j1, "Préparation pour la journée suivante.", $now]);
             $comptage_id_j1 = $this->pdo->lastInsertId();
             foreach ($this->noms_caisses as $caisse_id => $nom) {
+                
                 $stmt_latest_cloture = $this->pdo->prepare(
                     "SELECT cd.id FROM comptage_details cd 
                      JOIN comptages c ON cd.comptage_id = c.id 
-                     WHERE cd.caisse_id = ? AND c.nom_comptage LIKE 'Clôture Caisse%' 
+                     WHERE cd.caisse_id = ? AND c.nom_comptage LIKE 'Clôture Caisse%' AND DATE(c.date_comptage) = CURDATE()
                      ORDER BY c.id DESC LIMIT 1"
                 );
+
                 $stmt_latest_cloture->execute([$caisse_id]);
                 $latest_detail_id = $stmt_latest_cloture->fetchColumn();
                 if (!$latest_detail_id) continue;
@@ -398,7 +436,6 @@ class CalculateurController {
                 if(is_array($releves)) {
                     foreach ($releves as $releve) {
                         $stmt = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
-                        // --- CORRECTION ---
                         $heure_releve_raw = $releve['heure'] ?? null;
                         $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
                         $stmt->execute([$new_detail_id, $terminal_id, $releve['montant'], $heure_releve]);

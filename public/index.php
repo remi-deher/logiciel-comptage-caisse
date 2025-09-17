@@ -110,6 +110,9 @@ $routes = [
         ]);
     },
     'GET:calculateur/get_initial_data' => [$calculateurController, 'getInitialData'],
+    // --- DÉBUT DE L'AJOUT DE LA NOUVELLE ROUTE ---
+    'GET:calculateur/get_closed_caisse_data' => [$calculateurController, 'getClosedCaisseData'],
+    // --- FIN DE L'AJOUT ---
     'POST:calculateur/save' => [$calculateurController, 'save'],
     'POST:calculateur/autosave' => [$calculateurController, 'autosave'],
     'POST:calculateur/load_from_history' => [$calculateurController, 'loadFromHistory'],

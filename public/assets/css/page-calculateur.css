@@ -15,20 +15,16 @@
 /* --- PANNEAU DE SAISIE THÉORIQUE --- */
 .theoretical-inputs-panel{display:flex;gap:20px;flex-wrap:wrap;background-color:var(--color-surface-alt);padding:20px;border-radius:8px;margin-bottom:25px}.compact-input-group{flex:1 1 200px;display:flex;flex-direction:column;gap:5px}.compact-input-group label{font-size:.9em;font-weight:700;color:var(--color-text-secondary)}.compact-input-group input{font-size:1.2em;font-weight:700;padding:10px 12px;border:1px solid var(--color-border);border-radius:6px;background-color:var(--color-surface)}
 
-/* === NOUVEAU : SECTION ESPÈCES "TIROIR-CAISSE" === */
+/* === SECTION ESPÈCES "TIROIR-CAISSE" === */
 .cash-drawer-section{margin-bottom:30px}
 .cash-drawer-section h4{display:flex;align-items:center;gap:10px;margin-top:0;margin-bottom:15px;font-size:1.3em;padding-bottom:10px;border-bottom:2px solid var(--color-border-light);justify-content:space-between;}
 .cash-drawer-section h4 .section-total { background-color: var(--color-surface-alt); padding: 5px 12px; border-radius: 20px; font-size: 0.9em; color: var(--color-primary); border: 1px solid var(--color-border-light); }
-.cash-drawer-section h4 .subtitle{font-size:.8em;font-weight:400;color:var(--color-text-muted)}
 .denominations-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:15px}
 .denom-card{background-color:var(--color-surface);border:1px solid var(--color-border-light);border-radius:8px;box-shadow:0 2px 10px var(--shadow-color);transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column}
 .denom-card.is-piece{background-color:var(--color-surface-alt)}
 .denom-card-header{padding:10px 15px;text-align:center;font-size:1.2em;font-weight:700;border-bottom:1px solid var(--color-border-light)}
-.denom-card.is-piece .denom-card-header{font-size:1.1em}
 .denom-card-body{padding:15px;display:flex;align-items:center;justify-content:center;gap:10px}
 .denom-card-body .quantity-input{width:60px;font-size:1.5em;text-align:center;font-weight:700;border:none;border-bottom:2px solid var(--color-border);background:0 0;border-radius:0}
-.denom-card-body .quantity-input:focus{outline:0;border-bottom-color:var(--color-primary)}
-.denom-card-body .btn-adjust{background-color:var(--color-surface-alt);border:1px solid var(--color-border);color:var(--color-text-primary);width:35px;height:35px;border-radius:50%;font-size:1.2em;cursor:pointer;transition:background-color .2s,transform .1s}.btn-adjust:hover{background-color:var(--color-surface-alt-hover)}.btn-adjust:active{transform:scale(.9)}
 .denom-card-footer{padding:10px 15px;background-color:var(--color-surface-alt);border-top:1px solid var(--color-border-light);text-align:center;font-size:1.1em;font-weight:700;color:var(--color-text-secondary)}
 
 .totals-summary { border-top: 2px solid var(--color-border); padding-top: 20px; }
@@ -38,18 +34,39 @@
 .totals-summary .summary-line.grand-total{font-size:1.3em;color:var(--color-primary);padding-top:15px;margin-top:10px;border-top:2px solid var(--color-primary)}
 
 /* --- Styles existants (Chèques, CB, etc.) --- */
-.cheque-section,.tpe-grid{/* ... Vos styles existants pour ces sections ... */}
 .cheque-grid {display: grid;grid-template-columns: 1fr;gap: 25px;}
 @media (min-width: 768px) {.cheque-grid {grid-template-columns: 300px 1fr;}}
-.cheque-form-container, .cheque-list-container {padding: 0;}
 .cheque-form-container {background-color: var(--color-surface);border-radius: 8px;border: 1px solid var(--color-border-light); padding: 20px;}
+.tpe-table tbody tr.releve-actif { background-color: rgba(39, 174, 96, 0.1); font-weight: bold; }
+.tpe-table tbody tr.releve-actif td { color: var(--color-success); }
 
-/* NOUVEAU: Style pour le relevé TPE actif */
-.tpe-table tbody tr.releve-actif {
-    background-color: rgba(39, 174, 96, 0.1); /* Vert clair */
+/* --- Styles pour la modale de suggestion --- */
+.suggestion-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+.suggestion-table th, .suggestion-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--color-border-light);
+    text-align: right;
+}
+.suggestion-table th {
+    background-color: var(--color-surface-alt);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+.suggestion-table th:first-child, .suggestion-table td:first-child {
+    text-align: left;
+}
+.suggestion-total {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid var(--color-primary);
+    text-align: right;
+    font-size: 1.2em;
     font-weight: bold;
 }
-
-.tpe-table tbody tr.releve-actif td {
-    color: var(--color-success);
+.suggestion-total span {
+    color: var(--color-primary);
 }

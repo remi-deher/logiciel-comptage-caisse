@@ -3,19 +3,14 @@
 import { initializeCalculator } from '../logic/calculator-logic.js';
 
 export function renderCalculateurPage(element) {
-  // On injecte la structure HTML de base de la page.
-  // Les détails (champs, onglets) seront générés dynamiquement par la logique.
   element.innerHTML = `
     <div class="container" id="calculator-page">
         <div id="history-view-banner-container"></div>
     
         <form id="caisse-form" action="#" method="post">
             <input type="hidden" name="action" value="save">
-
             <div class="tab-selector"></div>
-
             <div class="ecart-display-container"></div>
-
             <div id="caisses-content-container"></div>
             
             <div class="save-section">
@@ -26,7 +21,7 @@ export function renderCalculateurPage(element) {
                 </div>
                 <div class="form-group" style="margin-top: 10px;">
                     <label for="explication">Explication (optionnel)</label>
-                    <textarea id="explication" name="explication" rows="3" placeholder="Ex: jour de marché, erreur de rendu monnaie, etc."></textarea>
+                    <textarea id="explication" name="explication" rows="3" placeholder="Ex: jour de marché, etc."></textarea>
                 </div>
                 <div class="button-group">
                     <button type="submit" class="save-btn">Enregistrer le Comptage</button>
@@ -36,9 +31,17 @@ export function renderCalculateurPage(element) {
         </form>
     </div>
 
-    <div id="modals-container"></div>
+    <div id="suggestion-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="suggestion-modal-title">Suggestion de Retrait</h3>
+                <span class="modal-close" id="suggestion-modal-close">&times;</span>
+            </div>
+            <div class="modal-body" id="suggestion-modal-body">
+                </div>
+        </div>
+    </div>
   `;
 
-  // Une fois le HTML de base en place, on lance la logique JavaScript.
   initializeCalculator();
 }
