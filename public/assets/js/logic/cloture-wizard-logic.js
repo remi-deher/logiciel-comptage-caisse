@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Refactorisé)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé avec l'envoi des données de retrait)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -44,14 +44,56 @@ async function handleNextStep() {
     }
     else if (state.wizardState.currentStep === 4) {
         try {
+            // --- DÉBUT DE LA CORRECTION ---
             const formData = new FormData();
-            // ... (logique pour construire le FormData à partir de 'state')
+            
+            // On ajoute les informations générales
+            formData.append('nom_comptage', state.calculatorData.nom_comptage);
+            formData.append('explication', state.calculatorData.explication);
+
+            // On ajoute les caisses à clôturer
+            state.wizardState.selectedCaisses.forEach(caisseId => {
+                formData.append('caisses_a_cloturer[]', caisseId);
+
+                // On ajoute toutes les données de chaque caisse
+                const caisseData = state.calculatorData.caisse[caisseId] || {};
+                for (const key in caisseData) {
+                    if (key === 'denominations' && typeof caisseData[key] === 'object') {
+                        for (const denom in caisseData[key]) {
+                            formData.append(`caisse[${caisseId}][denominations][${denom}]`, caisseData[key][denom]);
+                        }
+                    } else if (key === 'cheques' && Array.isArray(caisseData[key])) {
+                        caisseData[key].forEach((cheque, index) => {
+                            formData.append(`caisse[${caisseId}][cheques][${index}][montant]`, cheque.montant);
+                            formData.append(`caisse[${caisseId}][cheques][${index}][commentaire]`, cheque.commentaire);
+                        });
+                    } else if (key === 'tpe' && typeof caisseData[key] === 'object') {
+                         for (const terminalId in caisseData[key]) {
+                            (caisseData[key][terminalId] || []).forEach((releve, index) => {
+                                formData.append(`caisse[${caisseId}][tpe][${terminalId}][${index}][montant]`, releve.montant);
+                                formData.append(`caisse[${caisseId}][tpe][${terminalId}][${index}][heure]`, releve.heure);
+                            });
+                         }
+                    } else {
+                        formData.append(`caisse[${caisseId}][${key}]`, caisseData[key]);
+                    }
+                }
+                
+                // On ajoute les données de retrait pour cette caisse
+                const withdrawalData = state.wizardState.confirmedData[caisseId]?.withdrawals || [];
+                withdrawalData.forEach(item => {
+                    formData.append(`retraits[${caisseId}][${item.name}]`, item.qty);
+                });
+            });
+
             await service.submitFinalCloture(formData);
+            // --- FIN DE LA CORRECTION ---
             
             alert('Clôture réussie ! La page va être rechargée.');
             sendWsMessage({ type: 'force_reload_all' });
             state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_caisse_confirmed', caisse_id: id }));
             window.location.href = '/calculateur';
+
         } catch (error) {
             alert(`Erreur: ${error.message}`);
             nextBtn.disabled = false;
@@ -107,11 +149,9 @@ function handleWizardWebSocketMessage(data) {
         state.wsResourceId = data.resourceId.toString();
     }
     
-    // Si on est à l'étape 1, on rafraîchit la liste si l'état des caisses change
     if (data.type === 'cloture_locked_caisses' && state.wizardState.currentStep === 1) {
         ui.renderStep1_Selection(document.querySelector('.wizard-content'), state.config, state.wsResourceId);
     }
-    // ... Gérer d'autres messages si nécessaire
 }
 
 // --- Point d'entrée ---
@@ -128,9 +168,8 @@ export async function initializeClotureWizard() {
         state.tpeState = initialData.tpeState;
 
         setActiveMessageHandler(handleWizardWebSocketMessage);
-        sendWsMessage({ type: 'get_full_state' }); // Demande l'état live
+        sendWsMessage({ type: 'get_full_state' });
 
-        // Logique de navigation passée en paramètre aux écouteurs
         const logic = { handleNextStep, handlePrevStep, handleCancel };
         attachEventListeners(wizardElement, state, logic);
 

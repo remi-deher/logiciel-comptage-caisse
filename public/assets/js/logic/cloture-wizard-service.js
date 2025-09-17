@@ -1,14 +1,11 @@
-// Fichier : public/assets/js/logic/cloture-wizard-service.js
+// Fichier : public/assets/js/logic/cloture-wizard-service.js (Logique de retrait finale basée sur la recette du jour)
 
 import { parseLocaleFloat } from '../utils/formatters.js';
 
 /**
- * Récupère les données initiales nécessaires pour l'assistant :
- * la configuration de l'application et la dernière sauvegarde.
- * @returns {Promise<object>} Un objet contenant la configuration et les données du calculateur.
+ * Récupère les données initiales nécessaires pour l'assistant.
  */
 export async function fetchInitialData() {
-    console.log("[Wizard] Récupération de la configuration et des données...");
     const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
     const dataPromise = fetch('index.php?route=calculateur/get_initial_data').then(res => res.json());
 
@@ -22,7 +19,6 @@ export async function fetchInitialData() {
         for (const caisseId in rawData) {
             if (!isNaN(caisseId)) {
                  calculatorData.caisse[caisseId] = rawData[caisseId];
-                 // S'assurer que les structures de données existent pour éviter les erreurs
                  if (!calculatorData.caisse[caisseId].denominations) calculatorData.caisse[caisseId].denominations = {};
                  if (!calculatorData.caisse[caisseId].tpe) calculatorData.caisse[caisseId].tpe = {};
                  if (!calculatorData.caisse[caisseId].cheques) calculatorData.caisse[caisseId].cheques = [];
@@ -37,13 +33,12 @@ export async function fetchInitialData() {
         tpeState[caisseId] = calculatorData.caisse[caisseId].tpe || {};
     });
 
-    console.log("[Wizard] Données initiales chargées.");
     return { config: configResult, calculatorData, chequesState, tpeState };
 }
 
 /**
  * Calcule la suggestion de retrait d'espèces pour une caisse donnée.
- * @param {object} caisseData - Les données de la caisse (dénominations, fond de caisse).
+ * @param {object} caisseData - Les données de la caisse.
  * @param {object} config - La configuration de l'application.
  * @returns {object} Un objet avec les suggestions et le total à retirer.
  */
@@ -52,77 +47,62 @@ export function calculateWithdrawalSuggestion(caisseData, config) {
 
     const denominationsData = caisseData.denominations || {};
     const allDenoms = { ...(config.denominations?.billets || {}), ...(config.denominations?.pieces || {}) };
-    const minToKeepRules = config.minToKeep || {};
-
-    const targetFundValue = parseLocaleFloat(caisseData.fond_de_caisse);
+    
     const currentQuantities = {};
-    let currentTotalValue = 0;
-
     for (const name in allDenoms) {
         const qty = parseInt(denominationsData[name], 10) || 0;
         if (qty > 0) {
             currentQuantities[name] = qty;
-            currentTotalValue += qty * parseFloat(allDenoms[name]);
         }
     }
 
-    if (currentTotalValue <= targetFundValue) {
+    // --- DÉBUT DE LA NOUVELLE LOGIQUE BASÉE SUR VOTRE EXPLICATION ---
+
+    // 1. Déterminer le montant total à retirer, qui correspond à la recette du jour.
+    const targetWithdrawalAmount = parseLocaleFloat(caisseData.ventes_especes) + parseLocaleFloat(caisseData.retrocession);
+    
+    // Si la recette est nulle ou négative, il n'y a rien à retirer.
+    if (targetWithdrawalAmount <= 0) {
         return { suggestions: [], totalToWithdraw: 0 };
     }
-    
-    // Logique de calcul complexe pour déterminer quoi garder
-    // ... (cette logique est conservée telle quelle car elle est pure)
-    const fundToKeep = {};
-    let fundToKeepValue = 0;
-    const sortedDenoms = Object.keys(allDenoms).sort((a, b) => parseFloat(allDenoms[b]) - parseFloat(allDenoms[a]));
-
-    for (const name of sortedDenoms) {
-        const targetQty = parseInt(minToKeepRules[name], 10) || 0;
-        if (targetQty > 0 && currentQuantities[name]) {
-            const qtyToReserve = Math.min(currentQuantities[name], targetQty);
-            const valueReserved = qtyToReserve * parseFloat(allDenoms[name]);
-            if (fundToKeepValue + valueReserved <= targetFundValue) {
-                fundToKeep[name] = (fundToKeep[name] || 0) + qtyToReserve;
-                fundToKeepValue += valueReserved;
-            }
-        }
-    }
-
-    for (const name of sortedDenoms) {
-        const availableQty = (currentQuantities[name] || 0) - (fundToKeep[name] || 0);
-        if (availableQty > 0) {
-            const value = parseFloat(allDenoms[name]);
-            const remainingValueNeeded = targetFundValue - fundToKeepValue;
-            if (remainingValueNeeded > 0) {
-                const qtyToAdd = Math.min(availableQty, Math.floor(remainingValueNeeded / value));
-                if (qtyToAdd > 0) {
-                    fundToKeep[name] = (fundToKeep[name] || 0) + qtyToAdd;
-                    fundToKeepValue += qtyToAdd * value;
-                }
-            }
-        }
-    }
-    // Fin de la logique complexe
 
     const suggestions = [];
-    let totalToWithdraw = 0;
-    for (const name in currentQuantities) {
-        const qtyToWithdraw = currentQuantities[name] - (fundToKeep[name] || 0);
-        if (qtyToWithdraw > 0) {
-            const value = parseFloat(allDenoms[name]);
-            const withdrawnAmount = qtyToWithdraw * value;
-            suggestions.push({ name, value, qty: qtyToWithdraw, total: withdrawnAmount });
-            totalToWithdraw += withdrawnAmount;
+    let totalWithdrawn = 0;
+    const availableQuantities = { ...currentQuantities };
+
+    // On trie les dénominations de la plus grande à la plus petite.
+    const sortedDenoms = Object.keys(allDenoms).sort((a, b) => parseFloat(allDenoms[b]) - parseFloat(allDenoms[a]));
+
+    // 2. On parcourt les dénominations pour constituer le montant à retirer.
+    for (const name of sortedDenoms) {
+        const value = parseFloat(allDenoms[name]);
+        let qtyAvailable = availableQuantities[name] || 0;
+
+        if (qtyAvailable > 0 && totalWithdrawn < targetWithdrawalAmount) {
+            // On calcule combien il reste à retirer.
+            const remainingToWithdraw = targetWithdrawalAmount - totalWithdrawn;
+            
+            // Combien de cette coupure peut-on retirer pour combler ce reste ?
+            const howManyCanFit = Math.floor(remainingToWithdraw / value);
+            
+            // On ne peut pas retirer plus que ce qu'on a de disponible.
+            const qtyToWithdraw = Math.min(qtyAvailable, howManyCanFit);
+
+            if (qtyToWithdraw > 0) {
+                const withdrawnAmount = qtyToWithdraw * value;
+                suggestions.push({ name, value, qty: qtyToWithdraw, total: withdrawnAmount });
+                totalWithdrawn += withdrawnAmount;
+            }
         }
     }
     
-    return { suggestions, totalToWithdraw };
+    // --- FIN DE LA NOUVELLE LOGIQUE ---
+
+    return { suggestions, totalToWithdraw: totalWithdrawn };
 }
 
 /**
  * Soumet les données finales de clôture à l'API.
- * @param {FormData} formData - Les données du formulaire à envoyer.
- * @returns {Promise<object>} - Le résultat de la réponse de l'API.
  */
 export async function submitFinalCloture(formData) {
     const response = await fetch('index.php?route=cloture/confirm_caisse', { method: 'POST', body: formData });
