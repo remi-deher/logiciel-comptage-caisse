@@ -85,7 +85,7 @@ export function updateClotureUI(newState) {
         if (!fieldCaisseId) return;
 
         const isClosed = closedCaisses.includes(fieldCaisseId);
-        const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === caisseId);
+        const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === fieldCaisseId);
         const isLockedByOther = lockInfo && lockInfo.locked_by && String(lockInfo.locked_by) !== String(resourceId);
         
         field.disabled = isClosed || isLockedByOther;
@@ -116,8 +116,11 @@ function updateSuggestionBanner() {
                 <i class="fa-solid fa-flag-checkered"></i>
                 <div>
                     <strong>Cette caisse est clôturée.</strong>
-                    <p>Le comptage est finalisé. Vous pouvez consulter à nouveau la suggestion de retrait.</p>
+                    <p>Le comptage est finalisé. Vous pouvez consulter les données ou rouvrir la caisse pour modification.</p>
                 </div>
+                <button id="reopen-caisse-btn" class="btn delete-btn" data-caisse-id="${activeCaisseId}">
+                    <i class="fa-solid fa-lock-open"></i> Rouvrir la caisse
+                </button>
                 <button id="show-suggestion-btn" class="btn new-btn" data-caisse-id="${activeCaisseId}">
                     <i class="fa-solid fa-eye"></i> Afficher la suggestion
                 </button>
@@ -168,6 +171,14 @@ export function setupGlobalClotureButton() {
         const calculatorPage = document.getElementById('calculator-page');
         if (!calculatorPage) return;
 
+        const reopenBtn = e.target.closest('#reopen-caisse-btn');
+        if (reopenBtn) {
+            const caisseId = reopenBtn.dataset.caisseId;
+            if (confirm(`Êtes-vous sûr de vouloir rouvrir la caisse "${config.nomsCaisses[caisseId]}" ?`)) {
+                sendWsMessage({ type: 'cloture_reopen', caisse_id: caisseId });
+            }
+        }
+        
         const suggestionBtn = e.target.closest('#show-suggestion-btn');
         if (suggestionBtn) {
             const caisseId = suggestionBtn.dataset.caisseId;
