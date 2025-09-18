@@ -30,11 +30,14 @@ function calculate_results_from_data($data_rows) {
 
         $total_compte_cb = 0;
         if (isset($caisse_data['cb']) && is_array($caisse_data['cb'])) {
-            foreach ($caisse_data['cb'] as $releves) {
-                if (is_array($releves)) {
-                    foreach ($releves as $releve) {
-                        $total_compte_cb += floatval($releve['montant'] ?? 0);
-                    }
+            // $releves_par_terminal est un tableau groupant les relevés par ID de terminal.
+            // Ex: [ '1' => [releveA, releveB], '2' => [releveC] ]
+            foreach ($caisse_data['cb'] as $releves_par_terminal) {
+                if (is_array($releves_par_terminal) && !empty($releves_par_terminal)) {
+                    // Les relevés sont déjà triés par heure grâce à la requête SQL.
+                    // On récupère donc simplement le dernier élément du tableau.
+                    $dernier_releve = end($releves_par_terminal);
+                    $total_compte_cb += floatval($dernier_releve['montant'] ?? 0);
                 }
             }
         }
