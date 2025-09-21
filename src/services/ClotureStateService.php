@@ -23,9 +23,13 @@ class ClotureStateService {
         return $result ?: ['status' => 'open', 'locked_by_ws_id' => null];
     }
 
+    /**
+     * Verrouille une caisse en associant l'ID de la connexion WebSocket.
+     * C'est cette fonction qui assure que seul un utilisateur peut verrouiller une caisse à la fois.
+     */
     public function lockCaisse($caisseId, $lockedBy) {
-        // Première tentative : Mettre à jour la caisse si elle existe et est ouverte.
-        // Cette opération est atomique et empêche les conditions de concurrence.
+        // Tente de mettre à jour si la caisse existe et est ouverte.
+        // Cette opération atomique empêche les conflits.
         $stmt_update = $this->pdo->prepare(
             "UPDATE cloture_status SET status='locked', locked_by_ws_id=?
              WHERE caisse_id = ? AND status = 'open'"
@@ -37,18 +41,15 @@ class ClotureStateService {
             return true;
         }
 
-        // Si la mise à jour a échoué, soit la caisse n'existe pas dans la table,
-        // soit elle n'était pas ouverte. On tente de l'insérer.
+        // Sinon, on tente d'insérer la ligne (si elle n'existait pas).
         try {
             $stmt_insert = $this->pdo->prepare(
                 "INSERT INTO cloture_status (caisse_id, status, locked_by_ws_id)
                  VALUES (?, 'locked', ?)"
             );
-            // L'insertion réussira uniquement si la caisse n'existe pas déjà.
             return $stmt_insert->execute([$caisseId, $lockedBy]);
         } catch (PDOException $e) {
-            // Si l'insertion échoue (typiquement à cause d'une clé dupliquée
-            // si un autre processus l'a insérée entre-temps), la prise de verrou échoue.
+            // L'insertion échoue si un autre processus a déjà verrouillé, c'est la sécurité attendue.
             return false;
         }
     }
@@ -59,9 +60,7 @@ class ClotureStateService {
     }
 
     /**
-     * NOUVEAU / VÉRIFIÉ : Force le déverrouillage d'une caisse, quel que soit l'utilisateur qui l'a verrouillée.
-     * C'est la méthode utilisée pour la nouvelle fonctionnalité.
-     * @param int $caisseId L'identifiant de la caisse.
+     * Force le déverrouillage d'une caisse, utilisé par les autres utilisateurs.
      */
     public function forceUnlockCaisse($caisseId) {
         $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='open', locked_by_ws_id=NULL WHERE caisse_id = ?");
@@ -83,6 +82,10 @@ class ClotureStateService {
         return $status['status'] === 'closed';
     }
 
+    /**
+     * Récupère la liste des caisses verrouillées AVEC l'ID de la connexion qui les a verrouillées.
+     * C'est cette information qui sera envoyée à tous les clients.
+     */
     public function getLockedCaisses() {
         $stmt = $this->pdo->query("SELECT caisse_id, locked_by_ws_id as locked_by FROM cloture_status WHERE status = 'locked'");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -93,10 +96,6 @@ class ClotureStateService {
         return $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
     }
     
-    /**
-     * Réinitialise l'état de la clôture.
-     * CORRECTION : Utilise DELETE au lieu de TRUNCATE pour ne pas causer de commit implicite.
-     */
     public function resetState() {
         $this->pdo->exec("DELETE FROM cloture_status");
     }

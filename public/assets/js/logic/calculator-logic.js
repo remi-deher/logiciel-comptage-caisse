@@ -1,10 +1,10 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé et Fiabilisé)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Corrigée et Fiabilisée)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
-import { initializeCloture, updateUIForClotureMode, updateClotureUI } from './cloture-logic.js';
+import { initializeCloture, updateClotureUI } from './cloture-logic.js';
 
 // --- État global de l'application ---
 let state = {
@@ -44,13 +44,17 @@ function handleWebSocketMessage(data) {
     switch (data.type) {
         case 'welcome':
             state.wsResourceId = data.resourceId.toString();
+            // On passe l'état complet de l'application au module de clôture pour qu'il puisse fonctionner.
             initializeCloture(state.config, state, state.wsResourceId);
             break;
         case 'cloture_locked_caisses':
+            // --- DÉBUT DE LA CORRECTION ---
+            // On met à jour l'état local et on délègue TOUTE la logique d'interface au module de clôture.
+            // L'appel incorrect à updateUIForClotureMode() a été supprimé.
             state.lockedCaisses = data.caisses || [];
             state.closedCaisses = (data.closed_caisses || []).map(String);
             updateClotureUI(data, state.wsResourceId);
-            updateUIForClotureMode(); 
+            // --- FIN DE LA CORRECTION ---
             break;
         case 'full_form_state':
             ui.applyFullFormState(data, state);
@@ -119,8 +123,7 @@ export async function initializeCalculator() {
         attachEventListeners();
         setActiveMessageHandler(handleWebSocketMessage);
         
-        // --- LIGNE SUPPRIMÉE ICI ---
-        // sendWsMessage({ type: 'get_full_state' });
+        sendWsMessage({ type: 'get_full_state' });
 
     } catch (error) {
         console.error("Erreur critique d'initialisation:", error);
