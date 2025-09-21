@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Version finale avec modale "Cartes Interactives")
+// Fichier : public/assets/js/logic/cloture-logic.js (Version finale avec gestion des droits d'écriture)
 
 import { sendWsMessage } from './websocket-service.js';
 import { calculateEcartsForCaisse, calculateWithdrawalSuggestion } from './calculator-service.js';
@@ -314,14 +314,19 @@ export function updateUIForClotureMode() {
     document.querySelectorAll('.caisse-tab-content').forEach(tabContent => {
         const caisseId = tabContent.id.replace('caisse', '');
         const isSelectedForCloture = state.selectedCaisses.includes(caisseId);
+        
+        // --- DÉBUT DE LA CORRECTION ---
+        // Seul l'initiateur est en "mode clôture actif". Les autres ne le sont pas.
+        // On ne verrouille les champs que si l'utilisateur est en mode clôture ET qu'il N'EST PAS l'initiateur du verrou.
+        // Or, ici, on est dans la fonction qui s'applique à l'initiateur. Donc on ne verrouille rien.
         const isLockedByMe = isClotureActive && isSelectedForCloture;
+        // --- FIN DE LA CORRECTION ---
+        
         const isValidated = state.validatedCaisses.has(caisseId);
-        tabContent.querySelectorAll('input, textarea, button').forEach(el => {
-            if (!el.closest('.cloture-validation-area')) {
-                el.readOnly = isLockedByMe;
-                if (el.tagName === 'BUTTON') el.disabled = isLockedByMe;
-            }
-        });
+        
+        // On ne change PAS l'état `readonly` ou `disabled` ici, car c'est la fonction pour l'initiateur.
+        // C'est `updateClotureUI` qui gère le verrouillage pour les autres.
+
         const ecartDisplay = document.getElementById(`ecart-display-caisse${caisseId}`);
         if (!ecartDisplay) return;
         let validationArea = ecartDisplay.querySelector('.cloture-validation-area');
@@ -353,7 +358,12 @@ export function updateUIForClotureMode() {
 }
 
 export function updateClotureUI(wsData, wsResourceId) {
-    if (state.isActive) return;
+    // --- DÉBUT DE LA CORRECTION ---
+    // On retire le `if (state.isActive) return;`.
+    // Cette fonction DOIT s'exécuter pour tout le monde, tout le temps,
+    // afin que l'interface reflète toujours la vérité du serveur.
+    // --- FIN DE LA CORRECTION ---
+
     const lockedCaisses = wsData.caisses || [];
     const closedCaisses = (wsData.closed_caisses || []).map(String);
     document.querySelectorAll('.tab-link').forEach(tab => {
