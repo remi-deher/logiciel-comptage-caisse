@@ -155,9 +155,12 @@ export function startClotureMode(selectedCaisses) {
  * Annule le "Mode Clôture" et restaure l'interface.
  */
 export function cancelClotureMode() {
+    // --- DÉBUT DE LA CORRECTION ---
+    // On utilise "force_unlock" pour être sûr de déverrouiller même si une caisse a été validée (passée en "closed").
     state.selectedCaisses.forEach(id => {
-        sendWsMessage({ type: 'cloture_unlock', caisse_id: id })
+        sendWsMessage({ type: 'cloture_force_unlock', caisse_id: id })
     });
+    // --- FIN DE LA CORRECTION ---
     
     state.isActive = false;
     state.selectedCaisses = [];
@@ -249,11 +252,19 @@ async function handleFinalSubmit() {
             });
         });
         
-        const response = await fetch('index.php?route=cloture/confirm_caisse', { method: 'POST', body: formData });
-        const result = await response.json();
-        if (!result.success) throw new Error(result.message);
-        
-        alert('Clôture réussie !');
+        // Étape 1 : Enregistre les comptages individuels des caisses validées.
+        const responseIndividuelle = await fetch('index.php?route=cloture/confirm_caisse', { method: 'POST', body: formData });
+        const resultIndividuelle = await responseIndividuelle.json();
+        if (!resultIndividuelle.success) throw new Error(resultIndividuelle.message);
+
+        // --- DÉBUT DE LA CORRECTION ---
+        // Étape 2 : Déclenche la clôture générale qui réinitialise l'état.
+        const responseGenerale = await fetch('index.php?route=cloture/confirm_generale', { method: 'POST' });
+        const resultGenerale = await responseGenerale.json();
+        if (!resultGenerale.success) throw new Error(resultGenerale.message);
+        // --- FIN DE LA CORRECTION ---
+
+        alert(resultGenerale.message || 'Clôture générale réussie !');
         sendWsMessage({ type: 'force_reload_all' });
 
     } catch (error) {
@@ -367,13 +378,11 @@ export function updateUIForClotureMode() {
  * Met à jour l'UI en fonction des données WebSocket reçues (verrouillage par d'autres).
  */
 export function updateClotureUI(wsData, wsResourceId) {
-    // Si l'utilisateur est déjà activement en train de clôturer, on ne fait rien pour ne pas interrompre.
     if (state.isActive) return;
 
     const lockedCaisses = wsData.caisses || [];
     const closedCaisses = (wsData.closed_caisses || []).map(String);
     
-    // Met à jour le style des onglets (verrouillé, clôturé, etc.)
     document.querySelectorAll('.tab-link').forEach(tab => {
         const caisseId = tab.dataset.caisseId;
         const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === caisseId);
@@ -397,22 +406,15 @@ export function updateClotureUI(wsData, wsResourceId) {
         formFields.forEach(field => field.disabled = isLockedByOther || isClosed);
     });
 
-    // --- DÉBUT DE LA CORRECTION ---
-    // On vérifie si toutes les caisses connues sont dans la liste des caisses clôturées.
     const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
     const allAreClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => closedCaisses.includes(id));
     
-    // Si c'est le cas, on déclenche manuellement l'affichage du bandeau de finalisation.
     if (allAreClosed) {
         console.log("Toutes les caisses sont détectées comme clôturées. Passage en mode finalisation.");
-        // On simule que l'utilisateur a sélectionné et validé toutes les caisses.
         state.isActive = true;
         state.selectedCaisses = allCaisseIds;
         state.validatedCaisses = new Set(allCaisseIds);
         
-        // On appelle la fonction principale de mise à jour de l'UI qui va maintenant
-        // détecter cet état et afficher le bandeau.
         updateUIForClotureMode(); 
     }
-    // --- FIN DE LA CORRECTION ---
 }
