@@ -45,6 +45,36 @@ export async function fetchClotureState() {
 }
 
 /**
+ * Détermine le statut d'une caisse pour l'affichage à l'étape 1.
+ */
+export function getCaisseStatusInfo(caisseId, stateData, wsResourceId) {
+    const lockedCaisses = stateData.locked_caisses || [];
+    const closedCaisses = (stateData.closed_caisses || []).map(String);
+
+    const isClosed = closedCaisses.includes(String(caisseId));
+    const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === String(caisseId));
+    const isLockedByOther = lockInfo && String(lockInfo.locked_by) !== String(wsResourceId);
+    
+    let statusClass = 'status-libre';
+    let statusText = 'Prête pour la clôture';
+
+    if (isClosed) {
+        statusClass = 'status-cloturee';
+        statusText = 'Déjà clôturée';
+    } else if (isLockedByOther) {
+        statusClass = 'status-verrouillee';
+        statusText = `Utilisée par un collaborateur`;
+    }
+
+    return {
+        statusClass,
+        statusText,
+        isDisabled: isLockedByOther || isClosed
+    };
+}
+
+
+/**
  * Calcule tous les écarts pour une caisse et met à jour l'interface de réconciliation.
  */
 export function calculateAndDisplayAllEcarts(caisseId, state) {
@@ -124,13 +154,13 @@ function updateReconciliationUI(caisseId, type, ecart, totalCompte, state) {
         validateBtn.disabled = true;
     }
 
-    if (state.wizardState.validationStatus[caisseId]?.[type]) {
+    if (state.wizardState.reconciliation.status[caisseId]?.[type]) {
         sectionDiv.classList.add('validated');
         validateBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Validé';
         validateBtn.disabled = true;
     } else {
         sectionDiv.classList.remove('validated');
-        validateBtn.innerHTML = '<i class="fa-solid fa-check"></i> Valider';
+        validateBtn.innerHTML = '<i class="fa-solid fa-check"></i> Valider et Continuer';
     }
 }
 

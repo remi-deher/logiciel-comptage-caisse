@@ -40,12 +40,14 @@
 .caisse-selection-item .reopen-btn { margin-top: 15px; }
 
 /* --- Étape 2: Réconciliation --- */
-.tab-selector { border-bottom: 2px solid var(--color-border-light); margin-bottom: 20px; display: flex; flex-wrap: wrap; }
-.tab-link { background: transparent; border: none; border-bottom: 3px solid transparent; padding: 12px 18px; cursor: pointer; font-size: 1.1em; color: var(--color-text-secondary); }
-.tab-link.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
-.caisse-tab-content { display: none; }
-.caisse-tab-content.active { display: block; }
-.reconciliation-section { background-color: var(--color-surface); border: 1px solid var(--color-border-light); border-left: 5px solid var(--color-border-light); border-radius: 12px; margin-bottom: 25px; overflow: hidden; transition: border-color 0.3s; }
+.reconciliation-progress { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; padding: 15px; background-color: var(--color-surface); border-radius: 8px; }
+.progress-group { display: flex; align-items: center; gap: 10px; }
+.progress-title { font-weight: bold; color: var(--color-text-secondary); font-size: 0.9em; }
+.progress-bar { display: flex; gap: 5px; }
+.progress-item { padding: 8px 15px; border-radius: 20px; background-color: var(--color-surface-alt); border: 1px solid var(--color-border); color: var(--color-text-muted); font-size: 0.9em; transition: all 0.3s; }
+.progress-item.active { background-color: var(--color-primary); color: white; border-color: var(--color-primary); font-weight: bold; }
+.progress-item.done { background-color: var(--color-success); color: white; border-color: var(--color-success); }
+.reconciliation-section { background-color: var(--color-surface); border: 1px solid var(--color-border-light); border-left: 5px solid var(--color-border-light); border-radius: 12px; overflow: hidden; transition: border-color 0.3s; }
 .reconciliation-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background-color: var(--color-surface-alt); border-bottom: 1px solid var(--color-border-light); }
 .reconciliation-header h3 { margin: 0; border: none; font-size: 1.2em; display: flex; align-items: center; gap: 10px; }
 .reconciliation-status { display: flex; align-items: center; gap: 15px; }
@@ -61,19 +63,16 @@
 .reconciliation-section.validated { border-left-color: var(--color-success); }
 .reconciliation-section.validated .reconciliation-header { background-color: rgba(39, 174, 96, 0.1); }
 .reconciliation-section.validated .validate-section-btn { background-color: var(--color-success); color: white; }
-.reconciliation-section.validated .reconciliation-input, .reconciliation-section.validated button { pointer-events: none; opacity: 0.7; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
-.grid-3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
-.grid-item .total-line { font-size: 0.9em; color: var(--color-text-secondary); text-align: right; min-height: 1.2em; }
 .cheque-wizard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
 .card.cheque-card-wizard, .card.tpe-card-wizard { padding: 15px; }
 .cheque-card-wizard h6, .tpe-card-wizard h6 { margin-top: 0; }
 .empty-list { font-style: italic; color: var(--color-text-muted); text-align: center; padding: 10px; }
-.delete-item-btn { background: none; border: none; color: var(--color-danger); cursor: pointer; font-size: 1.1em; margin-left: 10px; }
+.delete-item-btn { background: none; border: none; color: var(--color-danger); cursor: pointer; font-size: 1.1em; margin-left: 10px; padding: 0 5px; }
 ul { list-style: none; padding: 0; }
-ul li { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--color-border-light); }
+ul li { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--color-border-light); }
 
-/* --- Étape 3 & 4 (Styles existants) --- */
+/* --- Étape 3 & 4 --- */
 .withdrawal-summary-card { background-color: var(--color-surface); border: 1px solid var(--color-border-light); border-radius: 12px; overflow: hidden; margin-top: 15px; box-shadow: 0 4px 15px var(--shadow-color); }
 .withdrawal-total-header { padding: 25px 20px; text-align: center; background-color: rgba(231, 76, 60, 0.1); color: var(--color-danger); }
 .withdrawal-total-header.status-ok { background-color: rgba(39, 174, 96, 0.1); color: var(--color-success); }

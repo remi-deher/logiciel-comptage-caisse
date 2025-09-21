@@ -1,8 +1,7 @@
-// Fichier : public/assets/js/router.js (Corrigé pour une gestion centralisée de l'état)
+// Fichier : public/assets/js/router.js (Corrigé)
 
 import { loadPageCSS } from './utils/dom.js';
 import { setActiveMessageHandler } from './main.js';
-import { setClotureReady } from './logic/cloture-logic.js';
 
 // Importation des fonctions qui affichent chaque page de l'application
 import { renderCalculateurPage } from './pages/CalculateurPage.js';
@@ -14,7 +13,6 @@ import { renderChangelogPage } from './pages/ChangelogPage.js';
 import { renderUpdatePage } from './pages/UpdatePage.js';
 import { renderLoginPage } from './pages/LoginPage.js';
 import { renderAdminPage } from './pages/AdminPage.js';
-import { renderClotureWizardPage } from './pages/ClotureWizardPage.js';
 
 const mainContent = document.getElementById('main-content');
 
@@ -29,29 +27,29 @@ const routes = {
     '/update': { render: renderUpdatePage, css: 'update.css' },
     '/login': { render: renderLoginPage, css: 'admin.css' },
     '/admin': { render: renderAdminPage, css: 'admin.css' },
-    '/cloture-wizard': { render: renderClotureWizardPage, css: 'cloture-wizard.css' }
 };
 
 /**
  * Fonction principale de routage.
  */
 export async function handleRouting() {
-    // --- DÉBUT DE LA CORRECTION ---
-    // Si une fonction de "nettoyage" a été définie pour la page précédente, on l'exécute et on attend qu'elle se termine.
     if (mainContent && typeof mainContent.beforePageChange === 'function') {
         await mainContent.beforePageChange();
-        mainContent.beforePageChange = null; // On nettoie pour la prochaine navigation
+        mainContent.beforePageChange = null; 
     }
-    // --- FIN DE LA CORRECTION ---
 
     let path = window.location.pathname;
-    if (path === '' || path === '/index.html' || path.endsWith('index.php')) {
+    // Gère le cas où le serveur est dans un sous-dossier, ou les URLs incluent index.php
+    if (path.includes('index.php')) {
+        path = path.split('index.php').pop() || '/';
+    }
+     if (path === '' || path === '/index.html') {
         path = '/';
     }
     
     const route = routes[path] || { 
         render: (element) => {
-            element.innerHTML = `<div class="container"><h2>Erreur 404</h2><p>La page que vous cherchez n'existe pas.</p></div>`;
+            element.innerHTML = `<div class="container"><h2>Erreur 404</h2><p>La page demandée ('${path}') n'existe pas.</p></div>`;
         },
         css: null
     };
@@ -71,10 +69,14 @@ export async function handleRouting() {
  * Met à jour le style du lien actif dans la barre de navigation.
  */
 function updateActiveNavLink(currentPath) {
-    const navLinks = document.querySelectorAll('.navbar-links a, .user-menu-dropdown a');
+    const navLinks = document.querySelectorAll('.navbar-links a, .mobile-menu a, .user-menu-dropdown a');
     navLinks.forEach(link => {
-        const linkPath = new URL(link.href).pathname;
-        
+        // Normaliser les chemins pour la comparaison
+        let linkPath = new URL(link.href).pathname;
+        if (linkPath.includes('index.php')) {
+            linkPath = linkPath.split('index.php').pop() || '/';
+        }
+
         const isCalculateur = (currentPath === '/' || currentPath === '/calculateur') && (linkPath === '/' || linkPath === '/calculateur');
         
         if (linkPath === currentPath || isCalculateur) {

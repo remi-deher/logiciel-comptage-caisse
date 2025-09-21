@@ -1,316 +1,328 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Version Finale avec correctif de l'import)
+// Fichier : public/assets/js/logic/cloture-logic.js (Version Corrigée)
 
 import { sendWsMessage } from './websocket-service.js';
-// La ligne `import { handleAllCaissesClosed } from './calculator-logic.js';` a été supprimée car la fonction est maintenant dans ce fichier.
-import { calculateWithdrawalSuggestion } from './cloture-wizard-service.js';
+import { calculateEcartsForCaisse, calculateWithdrawalSuggestion } from './calculator-service.js';
 import { formatCurrency } from '../utils/formatters.js';
 
-let config = {};
-let lockedCaisses = [];
-let closedCaisses = [];
-let resourceId = null;
-let isClotureInitialized = false;
+// --- État global du module de clôture ---
+let state = {
+    isActive: false,
+    selectedCaisses: [],
+    validatedCaisses: new Set(),
+    config: {},
+    appState: null,
+    wsResourceId: null
+};
 
+/**
+ * Active ou désactive le bouton de clôture principal en fonction de la connexion WebSocket.
+ */
 export function setClotureReady(isReady) {
     const clotureBtn = document.getElementById('cloture-btn');
-    isClotureInitialized = isReady;
     if (clotureBtn) {
         clotureBtn.disabled = !isReady;
+        clotureBtn.dataset.wsReady = isReady;
         clotureBtn.title = isReady ? "Lancer le processus de clôture" : "Nécessite une connexion en temps réel active.";
     }
 }
 
-// La fonction handleAllCaissesClosed est maintenant ici, donc elle n'a plus besoin d'être importée.
-async function performFinalCloture() {
-    if (!confirm("Êtes-vous sûr de vouloir finaliser la journée ? Cette action créera le comptage 'Clôture Générale' et préparera le fond de caisse pour J+1.")) return;
-    const btn = document.getElementById('trigger-final-cloture');
-    btn.disabled = true;
-    btn.textContent = 'Finalisation...';
+/**
+ * Point d'entrée pour initialiser le module de clôture.
+ */
+export function initializeCloture(appConfig, appState, wsResourceId) {
+    state.config = appConfig;
+    state.appState = appState;
+    state.wsResourceId = wsResourceId;
+    attachClotureEventListeners();
+}
+
+/**
+ * Attache les écouteurs d'événements globaux pour la clôture.
+ */
+function attachClotureEventListeners() {
+    document.body.addEventListener('click', e => {
+        const target = e.target;
+        if (target.closest('#cloture-btn')) {
+            if (state.isActive) {
+                renderFinalSummaryModal();
+            } else {
+                renderSelectionModal();
+            }
+        }
+        if (target.closest('#cloture-selection-modal .modal-close') || target.closest('#cancel-selection-btn')) {
+            document.getElementById('cloture-selection-modal')?.remove();
+        }
+        if (target.closest('#confirm-selection-btn')) {
+            const modal = document.getElementById('cloture-selection-modal');
+            const selected = Array.from(modal.querySelectorAll('input:checked')).map(cb => cb.value);
+            if (selected.length > 0) {
+                startClotureMode(selected);
+                modal.remove();
+            }
+        }
+        if (target.closest('#final-summary-modal .modal-close') || target.closest('#cancel-final-summary')) {
+            document.getElementById('final-summary-modal')?.remove();
+        }
+        if (target.closest('#confirm-final-cloture')) {
+            handleFinalSubmit();
+        }
+    });
+
+    document.getElementById('main-content').addEventListener('click', e => {
+        if (e.target.closest('.validate-caisse-btn')) {
+            const caisseId = e.target.closest('.validate-caisse-btn').dataset.caisseId;
+            validateCaisse(caisseId);
+        }
+    });
+
+    document.body.addEventListener('change', e => {
+        if (e.target.closest('#cloture-selection-modal')) {
+             const modal = document.getElementById('cloture-selection-modal');
+             modal.querySelector('#confirm-selection-btn').disabled = modal.querySelectorAll('input:checked').length === 0;
+        }
+    });
+}
+
+
+/**
+ * Affiche la modale de sélection des caisses à clôturer.
+ */
+function renderSelectionModal() {
+    const lockedCaisses = state.appState.lockedCaisses || [];
+    const closedCaisses = state.appState.closedCaisses || [];
+    const wsId = state.wsResourceId;
+
+    const caisseOptionsHtml = Object.entries(state.config.nomsCaisses).map(([id, nom]) => {
+        const isClosed = closedCaisses.includes(id);
+        const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === id);
+        const isLockedByOther = lockInfo && String(lockInfo.locked_by) !== wsId;
+        const isDisabled = isClosed || isLockedByOther;
+
+        let statusText = 'Disponible';
+        if (isClosed) statusText = 'Déjà clôturée';
+        if (isLockedByOther) statusText = 'Verrouillée par un autre utilisateur';
+
+        return `
+            <li class="caisse-selection-item">
+                <input type="checkbox" id="caisse-select-${id}" value="${id}" ${isDisabled ? 'disabled' : ''}>
+                <label for="caisse-select-${id}" class="${isDisabled ? 'disabled' : ''}">
+                    ${nom} <span class="status">${statusText}</span>
+                </label>
+            </li>`;
+    }).join('');
+
+    const modalHtml = `
+        <div id="cloture-selection-modal" class="modal visible">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Lancer une Clôture</h3>
+                    <span class="modal-close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <p>Sélectionnez la ou les caisses que vous souhaitez clôturer :</p>
+                    <ul class="caisse-selection-list">${caisseOptionsHtml}</ul>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" id="cancel-selection-btn">Annuler</button>
+                    <button class="btn save-btn" id="confirm-selection-btn" disabled>Préparer la clôture</button>
+                </div>
+            </div>
+        </div>`;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+/**
+ * Active le "Mode Clôture" sur l'interface du calculateur.
+ */
+export function startClotureMode(selectedCaisses) {
+    state.isActive = true;
+    state.selectedCaisses = selectedCaisses;
+    state.validatedCaisses.clear();
+
+    selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
+    
+    document.body.classList.add('cloture-mode-active');
+    updateUIForClotureMode();
+}
+
+/**
+ * Annule le "Mode Clôture" et restaure l'interface.
+ */
+export function cancelClotureMode() {
+    state.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
+    
+    state.isActive = false;
+    state.selectedCaisses = [];
+    state.validatedCaisses.clear();
+
+    document.body.classList.remove('cloture-mode-active');
+    updateUIForClotureMode();
+}
+
+
+/**
+ * Marque une caisse comme validée par l'utilisateur.
+ */
+function validateCaisse(caisseId) {
+    state.validatedCaisses.add(caisseId);
+    updateUIForClotureMode();
+}
+
+/**
+ * Affiche la modale de récapitulatif final avant de terminer.
+ */
+function renderFinalSummaryModal() {
+    let totalVentesGlobal = 0, totalRetraitGlobal = 0, fondDeCaisseJ1Global = 0;
+
+    const rowsHtml = state.selectedCaisses.map(id => {
+        const caisseData = state.appState.calculatorData.caisse[id];
+        const { totalVentes, totalCompteEspeces } = calculateEcartsForCaisse(id, state.appState, state.config);
+        const { totalToWithdraw } = calculateWithdrawalSuggestion(caisseData, state.config);
+        const fondDeCaisseJ1 = totalCompteEspeces - totalToWithdraw;
+
+        totalVentesGlobal += totalVentes;
+        totalRetraitGlobal += totalToWithdraw;
+        fondDeCaisseJ1Global += fondDeCaisseJ1;
+
+        return `<tr>
+            <td>${state.config.nomsCaisses[id]}</td>
+            <td>${formatCurrency(totalVentes, state.config)}</td>
+            <td class="text-danger">${formatCurrency(totalToWithdraw, state.config)}</td>
+            <td class="text-success">${formatCurrency(fondDeCaisseJ1, state.config)}</td>
+        </tr>`;
+    }).join('');
+
+    const modalHtml = `
+        <div id="final-summary-modal" class="modal visible">
+            <div class="modal-content wide">
+                <div class="modal-header"><h3>Récapitulatif de la Clôture</h3><span class="modal-close">&times;</span></div>
+                <div class="modal-body">
+                    <p>Vérifiez les totaux avant de finaliser la journée. Cette action est irréversible.</p>
+                    <table class="final-summary-table">
+                        <thead><tr><th>Caisse</th><th>Ventes Totales</th><th>Retrait Espèces</th><th>Fond de Caisse J+1</th></tr></thead>
+                        <tbody>${rowsHtml}</tbody>
+                        <tfoot>
+                            <tr>
+                                <td><strong>TOTAL</strong></td>
+                                <td><strong>${formatCurrency(totalVentesGlobal, state.config)}</strong></td>
+                                <td class="text-danger"><strong>${formatCurrency(totalRetraitGlobal, state.config)}</strong></td>
+                                <td class="text-success"><strong>${formatCurrency(fondDeCaisseJ1Global, state.config)}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn" id="cancel-final-summary">Annuler</button>
+                    <button class="btn save-btn" id="confirm-final-cloture">Confirmer et Terminer</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function handleFinalSubmit() {
+    const modal = document.getElementById('final-summary-modal');
     try {
-        const response = await fetch('index.php?route=cloture/confirm_generale', { method: 'POST' });
+        const formData = new FormData(document.getElementById('caisse-form'));
+        state.selectedCaisses.forEach(id => formData.append('caisses_a_cloturer[]', id));
+        
+        state.selectedCaisses.forEach(id => {
+            const { suggestions } = calculateWithdrawalSuggestion(state.appState.calculatorData.caisse[id], state.config);
+            (suggestions || []).forEach(s => {
+                formData.append(`retraits[${id}][${s.name}]`, s.qty);
+            });
+        });
+        
+        const response = await fetch('index.php?route=cloture/confirm_caisse', { method: 'POST', body: formData });
         const result = await response.json();
         if (!result.success) throw new Error(result.message);
-        alert(result.message);
+        
+        alert('Clôture réussie !');
         sendWsMessage({ type: 'force_reload_all' });
-        window.location.reload();
+
     } catch (error) {
         alert(`Erreur: ${error.message}`);
-        btn.disabled = false;
-        btn.textContent = 'Finaliser la journée';
-    }
-}
-
-export function handleAllCaissesClosed(isAllClosed) {
-    const existingBanner = document.getElementById('final-cloture-banner');
-    const container = document.getElementById('history-view-banner-container');
-    if (isAllClosed && !existingBanner && container) {
-        const bannerHtml = `
-            <div id="final-cloture-banner" class="history-view-banner" style="background-color: rgba(39, 174, 96, 0.1); border-color: var(--color-success);">
-                <i class="fa-solid fa-flag-checkered" style="color: var(--color-success);"></i>
-                <div>
-                    <strong style="color: var(--color-success);">Toutes les caisses sont clôturées !</strong>
-                    <p>Vous pouvez maintenant finaliser la journée ou consulter les suggestions de retrait.</p>
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <button id="show-global-suggestion-btn" class="btn new-btn">
-                        <i class="fa-solid fa-eye"></i> Afficher les Suggestions
-                    </button>
-                    <button id="trigger-final-cloture" class="btn save-btn">Finaliser la journée</button>
-                </div>
-            </div>`;
-        container.innerHTML = bannerHtml;
-    } else if (!isAllClosed && existingBanner) {
-        existingBanner.remove();
+    } finally {
+        modal?.remove();
     }
 }
 
 
-export function updateClotureUI(newState) {
-    if (!newState) return;
-    lockedCaisses = newState.caisses || [];
-    closedCaisses = (newState.closed_caisses || []).map(String);
+/**
+ * Met à jour l'état de l'interface (champs, boutons) en fonction du mode clôture.
+ */
+export function updateUIForClotureMode() {
+    const isClotureActive = state.isActive;
+    const body = document.body;
+    const clotureBtn = document.getElementById('cloture-btn');
+    
+    body.classList.toggle('cloture-mode-active', isClotureActive);
+    
+    if (clotureBtn) {
+        if (isClotureActive) {
+            const allValidated = state.selectedCaisses.length > 0 && state.selectedCaisses.every(id => state.validatedCaisses.has(id));
+            clotureBtn.innerHTML = `<i class="fa-solid fa-flag-checkered"></i> Finaliser (${state.validatedCaisses.size}/${state.selectedCaisses.length})`;
+            clotureBtn.disabled = !allValidated;
+        } else {
+            clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
+            clotureBtn.disabled = clotureBtn.dataset.wsReady !== 'true';
+        }
+    }
+    
+    document.querySelectorAll('.caisse-tab-content').forEach(tabContent => {
+        const caisseId = tabContent.id.replace('caisse', '');
+        const isSelectedForCloture = state.selectedCaisses.includes(caisseId);
+        const isLockedByMe = isClotureActive && isSelectedForCloture;
+        const isValidated = state.validatedCaisses.has(caisseId);
+        
+        tabContent.querySelectorAll('input, textarea, button').forEach(el => {
+            if (!el.closest('.cloture-validation-area')) {
+                el.readOnly = isLockedByMe;
+                if(el.tagName === 'BUTTON') el.disabled = isLockedByMe;
+            }
+        });
 
+        let validationArea = tabContent.querySelector('.cloture-validation-area');
+        if (isLockedByMe && !validationArea) {
+            validationArea = document.createElement('div');
+            validationArea.className = 'cloture-validation-area';
+            tabContent.appendChild(validationArea);
+        } else if (!isLockedByMe && validationArea) {
+            validationArea.remove();
+        }
+
+        if (validationArea) {
+            validationArea.innerHTML = isValidated
+                ? `<p class="validation-message"><i class="fa-solid fa-check-circle"></i> Caisse validée !</p>`
+                : `<button class="btn save-btn validate-caisse-btn" data-caisse-id="${caisseId}">✅ Valider les chiffres de cette caisse</button>`;
+        }
+        
+        const tabLink = document.querySelector(`.tab-link[data-caisse-id="${caisseId}"]`);
+        if(tabLink) {
+            tabLink.classList.remove('awaiting-validation', 'validated');
+            if(isLockedByMe && !isValidated) tabLink.classList.add('awaiting-validation');
+            if(isValidated) tabLink.classList.add('validated');
+        }
+    });
+}
+
+/**
+ * Met à jour l'UI en fonction des données WebSocket reçues (verrouillage par d'autres).
+ */
+export function updateClotureUI(wsData, wsResourceId) {
+    if (state.isActive) return;
+
+    const lockedCaisses = wsData.caisses || [];
+    
     document.querySelectorAll('.tab-link').forEach(tab => {
         const caisseId = tab.dataset.caisseId;
-        tab.classList.remove('cloturee', 'cloture-en-cours');
-        if (closedCaisses.includes(caisseId)) {
-            tab.classList.add('cloturee');
-        } else if (lockedCaisses.some(c => c.caisse_id.toString() === caisseId)) {
-            tab.classList.add('cloture-en-cours');
-        }
+        const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === caisseId);
+        
+        const isLockedByOther = lockInfo && String(lockInfo.locked_by) !== String(wsResourceId);
+        tab.classList.toggle('locked-by-other', isLockedByOther);
+
+        const formFields = document.querySelectorAll(`#caisse${caisseId} input, #caisse${caisseId} button, #caisse${caisseId} textarea`);
+        formFields.forEach(field => field.disabled = isLockedByOther);
     });
-
-    document.querySelectorAll('#caisse-form input, #caisse-form textarea, #caisse-form button').forEach(field => {
-        const fieldCaisseId = field.dataset.caisseId || field.name.match(/caisse\[(\d+)\]/)?.[1];
-        if (!fieldCaisseId) return;
-
-        const isClosed = closedCaisses.includes(fieldCaisseId);
-        const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === fieldCaisseId);
-        const isLockedByOther = lockInfo && lockInfo.locked_by && String(lockInfo.locked_by) !== String(resourceId);
-        
-        // Réinitialisation des états
-        field.disabled = false;
-        if (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') {
-            field.readOnly = false;
-        }
-
-        if (isLockedByOther) {
-            field.disabled = true;
-        } else if (isClosed) {
-            if (field.tagName === 'INPUT' || field.tagName === 'TEXTAREA') {
-                field.readOnly = true;
-            }
-            // On désactive uniquement les boutons d'action (ajout/suppression)
-            if(field.tagName === 'BUTTON' && (field.classList.contains('add-cheque-btn') || field.classList.contains('add-tpe-releve-btn') || field.classList.contains('delete-btn'))){
-                field.disabled = true;
-            }
-        }
-
-        const parentContainer = field.closest('.form-group, .compact-input-group, .denom-card, .cheque-section, .tpe-card');
-        if (parentContainer) {
-            parentContainer.style.opacity = (isClosed || isLockedByOther) ? '0.7' : '1';
-            parentContainer.title = isClosed ? 'Cette caisse est clôturée.' : (isLockedByOther ? 'Cette caisse est en cours de modification.' : '');
-        }
-    });
-
-    updateSuggestionBanner();
-
-    const totalCaisses = Object.keys(config.nomsCaisses || {}).length;
-    const allClosed = totalCaisses > 0 && closedCaisses.length === totalCaisses;
-    handleAllCaissesClosed(allClosed);
-}
-
-function updateSuggestionBanner() {
-    const bannerContainer = document.getElementById('history-view-banner-container');
-    // **CORRECTION 1 : Ne rien faire si le bandeau final est déjà affiché**
-    if (!bannerContainer || document.getElementById('final-cloture-banner')) return;
-
-    const activeTab = document.querySelector('.tab-link.active');
-    if (!activeTab) {
-        bannerContainer.innerHTML = ''; // Vide le conteneur s'il n'y a pas d'onglet actif
-        return;
-    }
-    
-    const activeCaisseId = activeTab.dataset.caisseId;
-    
-    if (closedCaisses.includes(activeCaisseId)) {
-        bannerContainer.innerHTML = `
-            <div class="history-view-banner">
-                <i class="fa-solid fa-flag-checkered"></i>
-                <div>
-                    <strong>Cette caisse est clôturée.</strong>
-                    <p>Le comptage est finalisé. Vous pouvez consulter les données ou rouvrir la caisse pour modification.</p>
-                </div>
-                <button id="reopen-caisse-btn" class="btn delete-btn" data-caisse-id="${activeCaisseId}">
-                    <i class="fa-solid fa-lock-open"></i> Rouvrir la caisse
-                </button>
-                <button id="show-suggestion-btn" class="btn new-btn" data-caisse-id="${activeCaisseId}">
-                    <i class="fa-solid fa-eye"></i> Afficher la suggestion
-                </button>
-            </div>`;
-    } else {
-        bannerContainer.innerHTML = ''; // Vide le conteneur si la caisse active n'est pas clôturée
-    }
-}
-
-async function showWithdrawalSuggestion(caisseId) {
-    const modal = document.getElementById('suggestion-modal');
-    const modalTitle = document.getElementById('suggestion-modal-title');
-    const modalBody = document.getElementById('suggestion-modal-body');
-    if (!modal || !modalTitle || !modalBody) return;
-
-    modalTitle.textContent = `Suggestion pour "${config.nomsCaisses[caisseId]}"`;
-    modalBody.innerHTML = '<p>Chargement de la suggestion...</p>';
-    modal.classList.add('visible');
-
-    try {
-        const response = await fetch(`index.php?route=calculateur/get_closed_caisse_data&caisse_id=${caisseId}`);
-        const result = await response.json();
-        if (!result.success) throw new Error(result.message);
-        
-        const caisseData = result.data;
-        const suggestionResult = calculateWithdrawalSuggestion(caisseData, config);
-
-        let bodyHtml = '';
-        if (suggestionResult.suggestions.length > 0) {
-            const rows = suggestionResult.suggestions.map(s => {
-                const label = s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`;
-                return `<tr><td>Retirer ${s.qty} x ${label}</td><td>${formatCurrency(s.total)}</td></tr>`;
-            }).join('');
-            bodyHtml = `<table class="suggestion-table"><thead><tr><th>Dénomination</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><div class="suggestion-total">Total à retirer : <span>${formatCurrency(suggestionResult.totalToWithdraw)}</span></div>`;
-        } else {
-            bodyHtml = `<p>Aucun retrait n'était nécessaire pour ce comptage.</p>`;
-        }
-        
-        modalBody.innerHTML = bodyHtml;
-
-    } catch (error) {
-        modalBody.innerHTML = `<p class="error">Impossible de charger la suggestion : ${error.message}</p>`;
-    }
-}
-
-// **CORRECTION 2 : Nouvelle fonction pour afficher les suggestions de toutes les caisses**
-async function showGlobalWithdrawalSuggestion() {
-    const modal = document.getElementById('suggestion-modal');
-    const modalTitle = document.getElementById('suggestion-modal-title');
-    const modalBody = document.getElementById('suggestion-modal-body');
-    if (!modal || !modalTitle || !modalBody) return;
-
-    modalTitle.textContent = `Suggestions de Retrait Globales`;
-    modalBody.innerHTML = '<p>Chargement des suggestions pour toutes les caisses clôturées...</p>';
-    modal.classList.add('visible');
-
-    try {
-        const promises = closedCaisses.map(caisseId =>
-            fetch(`index.php?route=calculateur/get_closed_caisse_data&caisse_id=${caisseId}`)
-                .then(res => res.json())
-        );
-
-        const results = await Promise.all(promises);
-
-        let finalHtml = '';
-        results.forEach((result, index) => {
-            const caisseId = closedCaisses[index];
-            finalHtml += `<h4 style="margin-top: 20px; border-bottom: 1px solid var(--color-border); padding-bottom: 5px;">Suggestions pour "${config.nomsCaisses[caisseId]}"</h4>`;
-
-            if (!result.success) {
-                finalHtml += `<p class="error">Impossible de charger la suggestion : ${result.message}</p>`;
-                return;
-            }
-
-            const caisseData = result.data;
-            const suggestionResult = calculateWithdrawalSuggestion(caisseData, config);
-
-            if (suggestionResult.suggestions.length > 0) {
-                const rows = suggestionResult.suggestions.map(s => {
-                    const label = s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`;
-                    return `<tr><td>Retirer ${s.qty} x ${label}</td><td>${formatCurrency(s.total)}</td></tr>`;
-                }).join('');
-                finalHtml += `<table class="suggestion-table"><thead><tr><th>Dénomination</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><div class="suggestion-total">Total à retirer : <span>${formatCurrency(suggestionResult.totalToWithdraw)}</span></div>`;
-            } else {
-                finalHtml += `<p>Aucun retrait n'était nécessaire pour ce comptage.</p>`;
-            }
-        });
-
-        modalBody.innerHTML = finalHtml;
-
-    } catch (error) {
-        modalBody.innerHTML = `<p class="error">Une erreur est survenue lors du chargement des suggestions : ${error.message}</p>`;
-    }
-}
-
-
-export function setupGlobalClotureButton() {
-    document.addEventListener('click', (e) => {
-        const calculatorPage = document.getElementById('calculator-page');
-        if (!calculatorPage) return;
-
-        const reopenBtn = e.target.closest('#reopen-caisse-btn');
-        if (reopenBtn) {
-            const caisseId = reopenBtn.dataset.caisseId;
-            if (confirm(`Êtes-vous sûr de vouloir rouvrir la caisse "${config.nomsCaisses[caisseId]}" ?`)) {
-                sendWsMessage({ type: 'cloture_reopen', caisse_id: caisseId });
-            }
-        }
-        
-        const suggestionBtn = e.target.closest('#show-suggestion-btn');
-        if (suggestionBtn) {
-            const caisseId = suggestionBtn.dataset.caisseId;
-            showWithdrawalSuggestion(caisseId);
-        }
-
-        const globalSuggestionBtn = e.target.closest('#show-global-suggestion-btn');
-        if(globalSuggestionBtn) {
-            // **CORRECTION 2 (suite) : Appel de la nouvelle fonction**
-            showGlobalWithdrawalSuggestion();
-        }
-        
-        if (e.target.closest('#trigger-final-cloture')) {
-            performFinalCloture();
-        }
-
-        if (e.target.matches('#suggestion-modal-close') || e.target.id === 'suggestion-modal') {
-            document.getElementById('suggestion-modal')?.classList.remove('visible');
-        }
-    });
-
-    const tabSelector = document.querySelector('.tab-selector');
-    if (tabSelector) {
-        tabSelector.addEventListener('click', (e) => {
-            if (e.target.classList.contains('tab-link')) {
-                setTimeout(updateSuggestionBanner, 50);
-            }
-        });
-    }
-
-    const clotureBtn = document.getElementById('cloture-btn');
-    if (clotureBtn) {
-        clotureBtn.addEventListener('click', async () => {
-            if (!isClotureInitialized) {
-                alert("La fonction de clôture nécessite une connexion en temps réel active.");
-                return;
-            }
-            clotureBtn.disabled = true;
-            clotureBtn.innerHTML = '<i class="fa-solid fa-save"></i> Sauvegarde...';
-            try {
-                const form = document.getElementById('caisse-form');
-                if (form) {
-                    const formData = new FormData(form);
-                    const response = await fetch('index.php?route=calculateur/autosave', { method: 'POST', body: formData });
-                    const result = await response.json();
-                    if (!result.success) throw new Error(result.message || 'La sauvegarde a échoué.');
-                }
-                window.location.href = '/cloture-wizard';
-            } catch (error) {
-                alert(`Erreur: Impossible de sauvegarder avant la clôture. ${error.message}`);
-                clotureBtn.disabled = false;
-                clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
-            }
-        });
-    }
-}
-
-export function initializeCloture(appConfig, wsResourceId) {
-    config = appConfig;
-    resourceId = wsResourceId;
 }

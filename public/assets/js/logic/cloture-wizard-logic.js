@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Version avec Étape 2 séquentielle)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -17,87 +17,103 @@ const state = {
         currentStep: 1,
         selectedCaisses: [],
         confirmedData: {},
-        // NOUVEAU : Suivi de la validation pour l'étape 2
-        validationStatus: {} // ex: { caisseId: { especes: false, cb: false, cheques: false }}
+        reconciliation: {
+            activeCaisseIndex: 0,
+            activeMethodIndex: 0,
+            paymentMethods: ['especes', 'cb', 'cheques'],
+            status: {}
+        }
     }
 };
 
-/**
- * Vérifie si toutes les sections de toutes les caisses sélectionnées sont validées à l'étape 2.
- */
-function checkAllSectionsValidated() {
+function isReconciliationComplete() {
     return state.wizardState.selectedCaisses.every(caisseId => {
-        const status = state.wizardState.validationStatus[caisseId];
+        const status = state.wizardState.reconciliation.status[caisseId];
         return status && status.especes && status.cb && status.cheques;
     });
 }
 
+function handleNextSubStep() {
+    const { reconciliation, selectedCaisses } = state.wizardState;
+    const currentCaisseId = selectedCaisses[reconciliation.activeCaisseIndex];
+    const currentMethod = reconciliation.paymentMethods[reconciliation.activeMethodIndex];
 
-/** Gère le passage à l'étape suivante */
-async function handleNextStep() {
-    const nextBtn = document.getElementById('wizard-next-btn');
-    nextBtn.disabled = true;
-    nextBtn.innerHTML = 'Chargement...';
+    reconciliation.status[currentCaisseId][currentMethod] = true;
 
-    if (state.wizardState.currentStep === 1) {
-        const selected = document.querySelectorAll('input[name="caisseSelection"]:checked');
-        state.wizardState.selectedCaisses = Array.from(selected).map(cb => cb.value);
-        
-        // Initialiser le statut de validation
-        state.wizardState.validationStatus = {};
-        state.wizardState.selectedCaisses.forEach(id => {
-            state.wizardState.validationStatus[id] = { especes: false, cb: false, cheques: false };
-        });
-
-        state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
-        state.wizardState.currentStep = 2;
-        renderCurrentStep();
+    if (reconciliation.activeMethodIndex < reconciliation.paymentMethods.length - 1) {
+        reconciliation.activeMethodIndex++;
     } 
-    else if (state.wizardState.currentStep === 2) {
-        if (checkAllSectionsValidated()) {
-            state.wizardState.currentStep = 3;
-            renderCurrentStep();
-        } else {
-            alert("Veuillez valider toutes les sections (Espèces, CB, Chèques) pour chaque caisse avant de continuer.");
-            nextBtn.disabled = false;
-        }
+    else if (reconciliation.activeCaisseIndex < selectedCaisses.length - 1) {
+        reconciliation.activeCaisseIndex++;
+        reconciliation.activeMethodIndex = 0;
     }
-    else if (state.wizardState.currentStep === 3) {
-        state.wizardState.currentStep = 4;
-        renderCurrentStep();
-    }
-    else if (state.wizardState.currentStep === 4) {
-        try {
-            const formData = service.prepareFinalFormData(state);
-            await service.submitFinalCloture(formData);
-            
-            alert('Clôture réussie ! La page va être rechargée.');
-            sendWsMessage({ type: 'force_reload_all' });
-            state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_caisse_confirmed', caisse_id: id }));
-            window.location.href = '/calculateur';
 
-        } catch (error) {
-            alert(`Erreur: ${error.message}`);
-            nextBtn.disabled = false;
-        }
-    }
-    
-    // Réinitialise le texte du bouton après l'action
-    ui.updateWizardUI(state.wizardState);
+    renderCurrentStep();
+    ui.updateWizardUI(state.wizardState, isReconciliationComplete());
 }
 
-/** Gère le retour à l'étape précédente */
+async function handleNextStep() {
+    const currentBtn = document.getElementById('wizard-next-btn') || document.getElementById('wizard-finish-btn');
+    if (currentBtn) {
+        currentBtn.disabled = true;
+        currentBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Chargement...';
+    }
+
+    try {
+        if (state.wizardState.currentStep === 1) {
+            const selected = document.querySelectorAll('input[name="caisseSelection"]:checked');
+            state.wizardState.selectedCaisses = Array.from(selected).map(cb => cb.value);
+            
+            state.wizardState.reconciliation.status = {};
+            state.wizardState.selectedCaisses.forEach(id => {
+                state.wizardState.reconciliation.status[id] = { especes: false, cb: false, cheques: false };
+            });
+
+            state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
+            state.wizardState.currentStep = 2;
+        } 
+        else if (state.wizardState.currentStep === 2) {
+            if (isReconciliationComplete()) {
+                state.wizardState.currentStep = 3;
+            } else {
+                throw new Error("Toutes les sections ne sont pas validées.");
+            }
+        }
+        else if (state.wizardState.currentStep === 3) {
+            state.wizardState.currentStep = 4;
+        }
+        else if (state.wizardState.currentStep === 4) {
+            const formData = service.prepareFinalFormData(state);
+            const result = await service.submitFinalCloture(formData);
+            
+            alert(result.message || 'Clôture réussie ! La page va être rechargée.');
+            sendWsMessage({ type: 'force_reload_all' });
+            window.location.href = '/calculateur'; // Redirection de secours
+            return;
+        }
+        
+        renderCurrentStep();
+
+    } catch (error) {
+        alert(`Erreur: ${error.message}`);
+        ui.updateWizardUI(state.wizardState, isReconciliationComplete());
+    }
+}
+
 function handlePrevStep() {
     if (state.wizardState.currentStep === 2) {
         state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
-        state.wizardState.selectedCaisses = [];
-        state.wizardState.validationStatus = {};
+        state.wizardState.reconciliation = {
+            activeCaisseIndex: 0,
+            activeMethodIndex: 0,
+            paymentMethods: ['especes', 'cb', 'cheques'],
+            status: {}
+        };
     }
     state.wizardState.currentStep--;
     renderCurrentStep();
 }
 
-/** Gère l'annulation de l'assistant */
 function handleCancel() {
     if (confirm("Voulez-vous vraiment annuler ? Les caisses verrouillées seront libérées.")) {
         state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
@@ -105,12 +121,11 @@ function handleCancel() {
     }
 }
 
-/** Gère le rendu de l'étape actuelle */
 function renderCurrentStep() {
     const wizardContent = document.querySelector('.wizard-content');
     if (!wizardContent) return;
 
-    ui.updateWizardUI(state.wizardState);
+    ui.updateWizardUI(state.wizardState, isReconciliationComplete());
 
     switch (state.wizardState.currentStep) {
         case 1:
@@ -128,19 +143,14 @@ function renderCurrentStep() {
     }
 }
 
-// --- Gestionnaire WebSocket ---
-
 function handleWizardWebSocketMessage(data) {
     if (data.type === 'welcome') {
         state.wsResourceId = data.resourceId.toString();
     }
-    
     if (data.type === 'cloture_locked_caisses' && state.wizardState.currentStep === 1) {
         ui.renderStep1_Selection(document.querySelector('.wizard-content'), state.config, state.wsResourceId);
     }
 }
-
-// --- Point d'entrée ---
 
 export async function initializeClotureWizard() {
     const wizardElement = document.getElementById('cloture-wizard-page');
@@ -154,15 +164,13 @@ export async function initializeClotureWizard() {
         state.tpeState = initialData.tpeState;
 
         setActiveMessageHandler(handleWizardWebSocketMessage);
-        sendWsMessage({ type: 'get_full_state' });
-
-        const logic = { handleNextStep, handlePrevStep, handleCancel, checkAllSectionsValidated };
+        
+        const logic = { handleNextStep, handlePrevStep, handleCancel, handleNextSubStep };
         attachEventListeners(wizardElement, state, logic);
 
         renderCurrentStep();
     } catch (error) {
         console.error("Erreur critique lors de l'initialisation de l'assistant :", error);
         document.querySelector('.wizard-content').innerHTML = `<p class="error">${error.message}</p>`;
-        document.getElementById('wizard-next-btn').disabled = true;
     }
 }

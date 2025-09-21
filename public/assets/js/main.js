@@ -1,9 +1,8 @@
-// Fichier : public/assets/js/main.js (Corrigé)
+// Fichier : public/assets/js/main.js
 
 import { renderNavbar } from './components/Navbar.js';
 import { renderFooter } from './components/Footer.js';
 import { handleRouting } from './router.js';
-// L'import de setupGlobalClotureButton est retiré d'ici
 import { initializeWebSocket } from './logic/websocket-service.js';
 import { setClotureReady } from './logic/cloture-logic.js';
 
@@ -19,7 +18,6 @@ function globalWsMessageHandler(data) {
 }
 
 function initializeNavbarLogic() {
-    console.log('[Main] Initialisation de la logique de la barre de navigation...');
     const themeSwitcher = document.getElementById('theme-switcher');
     const userMenuToggler = document.getElementById('user-menu-toggler');
     const userMenuDropdown = document.getElementById('user-menu-dropdown');
@@ -38,13 +36,11 @@ function initializeNavbarLogic() {
     if (userMenuToggler && userMenuDropdown) {
         userMenuToggler.addEventListener('click', (e) => {
             e.stopPropagation();
-            const isVisible = userMenuDropdown.classList.toggle('show');
-            userMenuToggler.setAttribute('aria-expanded', isVisible);
+            userMenuDropdown.classList.toggle('show');
         });
         document.addEventListener('click', () => {
             if (userMenuDropdown.classList.contains('show')) {
                 userMenuDropdown.classList.remove('show');
-                userMenuToggler.setAttribute('aria-expanded', 'false');
             }
         });
     }
@@ -52,8 +48,6 @@ function initializeNavbarLogic() {
     if (navbarToggler && mobileMenu) {
         navbarToggler.addEventListener('click', (e) => {
             e.stopPropagation();
-            const isExpanded = navbarToggler.getAttribute('aria-expanded') === 'true';
-            navbarToggler.setAttribute('aria-expanded', !isExpanded);
             mobileMenu.classList.toggle('show');
             if (mobileMenu.innerHTML === '') {
                 const navLinks = document.querySelector('.navbar-links');
@@ -66,32 +60,27 @@ function initializeNavbarLogic() {
 }
 
 async function initialize() {
-    console.log('%c[Main] Démarrage de l\'application...', 'background: #222; color: #bada55');
-
     const appHeader = document.getElementById('app-header');
     const appFooter = document.getElementById('app-footer');
     const app = document.getElementById('app');
 
     if (!appHeader || !appFooter || !app) {
-        console.error('[Main] ERREUR CRITIQUE: Conteneurs principaux manquants.');
+        console.error('ERREUR_CRITIQUE: Conteneurs principaux manquants.');
         return;
     }
 
     renderNavbar(appHeader);
     renderFooter(appFooter);
     initializeNavbarLogic();
-    // L'appel à setupGlobalClotureButton est retiré d'ici
     
    try {
-        console.log('[Main] Initialisation de la connexion WebSocket globale...');
         await initializeWebSocket(globalWsMessageHandler);
-        console.log('[Main] Connexion WebSocket prête.');
         setClotureReady(true); 
     } catch (error) {
-        console.error("Échec de l'initialisation du WebSocket. La collaboration en temps réel sera désactivée.", error);
+        console.error("Échec de l'initialisation du WebSocket. La collaboration sera désactivée.", error);
+        setClotureReady(false);
     }
 
-    console.log('[Main] Démarrage du routage...');
     handleRouting();
 
     app.addEventListener('click', (event) => {
@@ -108,8 +97,6 @@ async function initialize() {
         setActiveMessageHandler(null);
         handleRouting();
     });
-    
-    console.log('%c[Main] Initialisation de l\'application terminée !', 'background: #222; color: #bada55');
 }
 
 document.addEventListener('DOMContentLoaded', initialize);

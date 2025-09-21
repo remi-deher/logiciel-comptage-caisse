@@ -5,7 +5,7 @@ import { initializeCalculator } from '../logic/calculator-logic.js';
 export function renderCalculateurPage(element) {
   element.innerHTML = `
     <div class="container" id="calculator-page">
-        <div id="history-view-banner-container"></div>
+        <div id="cloture-banner-container"></div>
     
         <form id="caisse-form" action="#" method="post">
             <input type="hidden" name="action" value="save">
@@ -29,17 +29,6 @@ export function renderCalculateurPage(element) {
                 </div>
             </div>
         </form>
-    </div>
-
-    <div id="suggestion-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="suggestion-modal-title">Suggestion de Retrait</h3>
-                <span class="modal-close" id="suggestion-modal-close">&times;</span>
-            </div>
-            <div class="modal-body" id="suggestion-modal-body">
-                </div>
-        </div>
     </div>
   `;
 
