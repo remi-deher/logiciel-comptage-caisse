@@ -1,10 +1,9 @@
-// Fichier : public/assets/js/logic/calculator-ui.js (Corrigé et Fiabilisé)
+// Fichier : public/assets/js/logic/calculator-ui.js (Version Finale Complète et Corrigée)
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 
 /**
  * Remplit les champs du formulaire avec les données initiales chargées.
- * C'est la fonction qui manquait et qui causait l'erreur de démarrage.
  */
 export function populateInitialData(calculatorData) {
     if (!calculatorData) return;
@@ -66,7 +65,17 @@ export function renderCalculatorUI(pageElement, config, chequesState, tpeState) 
     Object.entries(config.nomsCaisses).forEach(([id, nom], index) => {
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
-        ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><div id="main-ecart-caisse${id}" class="main-ecart-display"><span class="ecart-label">Écart Espèces</span><span class="ecart-value">0,00 €</span></div><div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div></div>`;
+        
+        // Chaque encart d'écart a maintenant un ID unique lié à l'ID de la caisse.
+        ecartsHtml += `
+            <div id="ecart-display-caisse${id}" class="ecart-display ${isActive}">
+                <div id="main-ecart-caisse${id}" class="main-ecart-display">
+                    <span class="ecart-label">Écart Espèces</span>
+                    <span class="ecart-value">0,00 €</span>
+                </div>
+                <div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div>
+                <div class="cloture-validation-area"></div>
+            </div>`;
 
         const billetsHtml = Object.entries(config.denominations.billets).map(([name, v]) => createDenominationCard(id, name, v, 'bill', config)).join('');
         const piecesLooseHtml = Object.entries(config.denominations.pieces).map(([name, v]) => createDenominationCard(id, name, v, 'piece', config)).join('');
@@ -121,13 +130,10 @@ export function renderCalculatorUI(pageElement, config, chequesState, tpeState) 
     });
 }
 
-/**
- * Affiche et met à jour la liste des chèques pour une caisse.
- */
+
 function renderChequeList(caisseId, chequesState, config) {
     const container = document.getElementById(`cheques_${caisseId}`);
     if(!container) return;
-    // CORRECTION : Remplacement de ${id} par ${caisseId} dans l'attribut name
     container.innerHTML = `
         <div class="theoretical-inputs-panel"><div class="compact-input-group"><label>Encaissement Chèques Théorique</label><input type="text" data-caisse-id="${caisseId}" id="ventes_cheques_${caisseId}" name="caisse[${caisseId}][ventes_cheques]"></div></div>
         <div class="cheque-section"><div class="cheque-grid"><div class="cheque-form-container"><h4><i class="fa-solid fa-plus-circle"></i> Ajouter un chèque</h4><div class="form-group"><label for="cheque-amount-${caisseId}">Montant</label><input type="text" id="cheque-amount-${caisseId}" placeholder="0,00 ${config.currencySymbol}"></div><div class="form-group"><label for="cheque-comment-${caisseId}">Commentaire</label><input type="text" id="cheque-comment-${caisseId}" placeholder="Chèque n°12345"></div><button type="button" class="btn new-btn add-cheque-btn" data-caisse-id="${caisseId}" style="width: 100%;"><i class="fa-solid fa-plus"></i> Ajouter</button></div><div class="cheque-list-container"><div class="cheque-list-header"><h4><i class="fa-solid fa-list-ol"></i> Chèques Encaissés</h4><div class="cheque-total" id="cheque-total-container-${caisseId}"></div></div><div id="cheque-list-${caisseId}" class="cheque-list"></div><div id="cheque-hidden-inputs-${caisseId}"></div></div></div></div>
@@ -150,9 +156,6 @@ function renderChequeList(caisseId, chequesState, config) {
 }
 
 
-/**
- * Affiche et met à jour la liste des relevés TPE pour un terminal.
- */
 function renderTpeList(caisseId, terminalId, tpeState, config) {
     const listContainer = document.getElementById(`tpe-releves-list-${terminalId}-${caisseId}`);
     const hiddenContainer = document.getElementById(`tpe-hidden-inputs-${terminalId}-${caisseId}`);
@@ -173,9 +176,6 @@ function renderTpeList(caisseId, terminalId, tpeState, config) {
     hiddenContainer.innerHTML = releves.map((r, i) => `<input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${i}][montant]" value="${r.montant}"><input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${i}][heure]" value="${r.heure}">`).join('');
 }
 
-/**
- * Applique l'état complet du formulaire reçu via WebSocket.
- */
 export function applyFullFormState(data, state) {
     if (data.cheques) {
         state.chequesState = data.cheques;
@@ -195,9 +195,6 @@ export function applyFullFormState(data, state) {
     }
 }
 
-/**
- * Applique une mise à jour d'un champ unique reçue via WebSocket.
- */
 export function applyLiveUpdate(data) {
     if (data.id && document.activeElement && document.activeElement.id !== data.id) {
         const input = document.getElementById(data.id);
@@ -207,9 +204,6 @@ export function applyLiveUpdate(data) {
     }
 }
 
-/**
- * Met à jour une liste (chèques ou TPE) reçue via WebSocket.
- */
 export function applyListUpdate(data, state) {
     if (data.type === 'cheque_update' && data.caisseId && data.cheques) {
         state.chequesState[data.caisseId] = data.cheques;
@@ -223,17 +217,15 @@ export function applyListUpdate(data, state) {
 }
 
 
-/**
- * Gère les clics sur les éléments interactifs du calculateur.
- */
 export function handleCalculatorClickEvents(e, state) {
     const target = e.target;
     
     const tabLink = target.closest('.tab-link');
     if (tabLink) {
-        document.querySelectorAll('.tab-link, .caisse-tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-link, .caisse-tab-content, .ecart-display').forEach(el => el.classList.remove('active'));
         tabLink.classList.add('active');
         document.getElementById(tabLink.dataset.tab)?.classList.add('active');
+        document.getElementById(`ecart-display-${tabLink.dataset.tab}`)?.classList.add('active');
         return false;
     }
     const paymentTab = target.closest('.payment-tab-link');

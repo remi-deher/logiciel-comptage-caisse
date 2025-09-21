@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Version finale avec gestion des droits d'écriture)
+// Fichier : public/assets/js/logic/cloture-logic.js (Version finale avec gestion des droits d'écriture et validation individuelle)
 
 import { sendWsMessage } from './websocket-service.js';
 import { calculateEcartsForCaisse, calculateWithdrawalSuggestion } from './calculator-service.js';
@@ -303,6 +303,9 @@ export function updateUIForClotureMode() {
             clotureBtn.disabled = clotureBtn.dataset.wsReady !== 'true';
         }
     }
+    
+    // --- DÉBUT DE LA CORRECTION ---
+    // La condition pour afficher le bandeau final est maintenant plus stricte.
     if (finalSummaryContainer) {
         const allValidated = isClotureActive && state.selectedCaisses.length > 0 && state.selectedCaisses.every(id => state.validatedCaisses.has(id));
         if (allValidated) {
@@ -311,59 +314,47 @@ export function updateUIForClotureMode() {
             finalSummaryContainer.innerHTML = '';
         }
     }
-    document.querySelectorAll('.caisse-tab-content').forEach(tabContent => {
-        const caisseId = tabContent.id.replace('caisse', '');
+    
+    document.querySelectorAll('.tab-link').forEach(tab => {
+        const caisseId = tab.dataset.caisseId;
         const isSelectedForCloture = state.selectedCaisses.includes(caisseId);
-        
-        // --- DÉBUT DE LA CORRECTION ---
-        // Seul l'initiateur est en "mode clôture actif". Les autres ne le sont pas.
-        // On ne verrouille les champs que si l'utilisateur est en mode clôture ET qu'il N'EST PAS l'initiateur du verrou.
-        // Or, ici, on est dans la fonction qui s'applique à l'initiateur. Donc on ne verrouille rien.
         const isLockedByMe = isClotureActive && isSelectedForCloture;
-        // --- FIN DE LA CORRECTION ---
-        
         const isValidated = state.validatedCaisses.has(caisseId);
-        
-        // On ne change PAS l'état `readonly` ou `disabled` ici, car c'est la fonction pour l'initiateur.
-        // C'est `updateClotureUI` qui gère le verrouillage pour les autres.
 
         const ecartDisplay = document.getElementById(`ecart-display-caisse${caisseId}`);
         if (!ecartDisplay) return;
-        let validationArea = ecartDisplay.querySelector('.cloture-validation-area');
-        if (isLockedByMe && !validationArea) {
-            validationArea = document.createElement('div');
-            validationArea.className = 'cloture-validation-area';
-            ecartDisplay.appendChild(validationArea);
-        } else if (!isLockedByMe && validationArea) {
-            validationArea.remove();
-        }
+        
+        // On cible la div spécifique à la validation dans l'encart de la caisse.
+        const validationArea = ecartDisplay.querySelector('.cloture-validation-area');
         if (validationArea) {
-            validationArea.innerHTML = isValidated ? `<p class="validation-message"><i class="fa-solid fa-check-circle"></i> Caisse validée !</p>` : `<button class="btn save-btn validate-caisse-btn" data-caisse-id="${caisseId}">✅ Valider les chiffres de cette caisse</button>`;
-        }
-        const tabLink = document.querySelector(`.tab-link[data-caisse-id="${caisseId}"]`);
-        if (tabLink) {
-            tabLink.classList.remove('cloture-en-cours', 'cloturee');
-            const statusSpan = tabLink.querySelector('.tab-status-text');
-            if (statusSpan) statusSpan.remove();
-            if (isLockedByMe && !isValidated) {
-                tabLink.classList.add('cloture-en-cours');
-                tabLink.insertAdjacentHTML('beforeend', '<span class="tab-status-text">(En cours)</span>');
+            if (isLockedByMe) {
+                validationArea.innerHTML = isValidated ? 
+                    `<p class="validation-message"><i class="fa-solid fa-check-circle"></i> Caisse validée !</p>` : 
+                    `<button class="btn save-btn validate-caisse-btn" data-caisse-id="${caisseId}">✅ Valider les chiffres de cette caisse</button>`;
+            } else {
+                validationArea.innerHTML = '';
             }
-            if (isValidated) {
-                tabLink.classList.add('cloturee');
-                tabLink.insertAdjacentHTML('beforeend', '<span class="tab-status-text">(Validée)</span>');
+        }
+        
+        if (tab) {
+            tab.classList.remove('cloture-en-cours', 'cloturee');
+            const statusSpan = tab.querySelector('.tab-status-text');
+            if (statusSpan) statusSpan.remove();
+
+            if (isLockedByMe && !isValidated) {
+                tab.classList.add('cloture-en-cours');
+                tab.insertAdjacentHTML('beforeend', '<span class="tab-status-text">(En cours)</span>');
+            } else if (isValidated) {
+                tab.classList.add('cloturee');
+                tab.insertAdjacentHTML('beforeend', '<span class="tab-status-text">(Validée)</span>');
             }
         }
     });
+    // --- FIN DE LA CORRECTION ---
 }
 
 export function updateClotureUI(wsData, wsResourceId) {
-    // --- DÉBUT DE LA CORRECTION ---
-    // On retire le `if (state.isActive) return;`.
-    // Cette fonction DOIT s'exécuter pour tout le monde, tout le temps,
-    // afin que l'interface reflète toujours la vérité du serveur.
-    // --- FIN DE LA CORRECTION ---
-
+    if (state.isActive) return;
     const lockedCaisses = wsData.caisses || [];
     const closedCaisses = (wsData.closed_caisses || []).map(String);
     document.querySelectorAll('.tab-link').forEach(tab => {
@@ -387,7 +378,6 @@ export function updateClotureUI(wsData, wsResourceId) {
     const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
     const allAreClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => closedCaisses.includes(id));
     if (allAreClosed) {
-        console.log("Toutes les caisses sont détectées comme clôturées. Passage en mode finalisation.");
         state.isActive = true;
         state.selectedCaisses = allCaisseIds;
         state.validatedCaisses = new Set(allCaisseIds);
