@@ -58,6 +58,7 @@ class HistoriqueController {
         $historique_complet = $this->fetchComptagesDetails($all_comptage_ids);
 
         echo json_encode([
+            'success' => true,
             'historique' => $historique_page,
             'historique_complet' => $historique_complet,
             'page_courante' => $page,

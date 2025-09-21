@@ -30,6 +30,11 @@ export function initializeWebSocket(onMessageHandler) {
                 statusIndicator.classList.add('connected');
                 statusText.textContent = 'Connecté';
                 console.log('%c[WebSocket] Connexion établie avec succès.', 'color: green; font-weight: bold;');
+                
+                // --- CORRECTION AJOUTÉE ICI ---
+                // On envoie la demande d'état initial seulement APRÈS la confirmation de connexion.
+                sendWsMessage({ type: 'get_full_state' });
+                
                 resolve(wsConnection);
             };
 
@@ -66,12 +71,10 @@ export function initializeWebSocket(onMessageHandler) {
 }
 
 export function sendWsMessage(message) {
-    // CORRECTION : On vérifie d'abord que la connexion n'est pas nulle avant de vérifier son état.
     if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
         console.log('%c[WebSocket] Message Envoyé >>', 'color: orange; font-weight: bold;', message);
         wsConnection.send(JSON.stringify(message));
     } else {
-        // Ce message est maintenant plus informatif et n'affichera plus "undefined".
         console.warn('[WebSocket] Tentative d\'envoi de message, mais la connexion n\'est pas (encore) ouverte. État actuel :', wsConnection?.readyState);
     }
 }

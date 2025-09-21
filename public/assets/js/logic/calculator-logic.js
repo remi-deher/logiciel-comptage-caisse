@@ -119,7 +119,9 @@ export async function initializeCalculator() {
         attachEventListeners();
         setActiveMessageHandler(handleWebSocketMessage);
         
-        sendWsMessage({ type: 'get_full_state' });
+        // --- LIGNE SUPPRIMÉE ICI ---
+        // sendWsMessage({ type: 'get_full_state' });
+
     } catch (error) {
         console.error("Erreur critique d'initialisation:", error);
         document.getElementById('main-content').innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;

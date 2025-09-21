@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Version Corrigée)
+// Fichier : public/assets/js/logic/cloture-logic.js (Version avec meilleure intégration UI et verbalisation)
 
 import { sendWsMessage } from './websocket-service.js';
 import { calculateEcartsForCaisse, calculateWithdrawalSuggestion } from './calculator-service.js';
@@ -30,6 +30,7 @@ export function setClotureReady(isReady) {
  * Point d'entrée pour initialiser le module de clôture.
  */
 export function initializeCloture(appConfig, appState, wsResourceId) {
+    console.log("INITIALISATION DU MODULE DE CLÔTURE");
     state.config = appConfig;
     state.appState = appState;
     state.wsResourceId = wsResourceId;
@@ -40,37 +41,47 @@ export function initializeCloture(appConfig, appState, wsResourceId) {
  * Attache les écouteurs d'événements globaux pour la clôture.
  */
 function attachClotureEventListeners() {
+    console.log("Attache des écouteurs d'événements pour la clôture.");
     document.body.addEventListener('click', e => {
         const target = e.target;
         if (target.closest('#cloture-btn')) {
+            console.log("%cCLIC DÉTECTÉ : Bouton de Clôture principal", "color: blue; font-weight: bold;");
             if (state.isActive) {
+                console.log("-> Mode clôture déjà actif. Lancement de la modale de résumé final.");
                 renderFinalSummaryModal();
             } else {
+                console.log("-> Mode clôture inactif. Lancement de la modale de sélection des caisses.");
                 renderSelectionModal();
             }
         }
         if (target.closest('#cloture-selection-modal .modal-close') || target.closest('#cancel-selection-btn')) {
+            console.log("CLIC DÉTECTÉ : Annulation de la sélection des caisses.");
             document.getElementById('cloture-selection-modal')?.remove();
         }
         if (target.closest('#confirm-selection-btn')) {
             const modal = document.getElementById('cloture-selection-modal');
             const selected = Array.from(modal.querySelectorAll('input:checked')).map(cb => cb.value);
+            console.log(`CLIC DÉTECTÉ : Confirmation de la sélection avec ${selected.length} caisse(s) :`, selected);
             if (selected.length > 0) {
                 startClotureMode(selected);
                 modal.remove();
             }
         }
         if (target.closest('#final-summary-modal .modal-close') || target.closest('#cancel-final-summary')) {
+            console.log("CLIC DÉTECTÉ : Annulation du résumé final.");
             document.getElementById('final-summary-modal')?.remove();
         }
         if (target.closest('#confirm-final-cloture')) {
+            console.log("%cCLIC DÉTECTÉ : Confirmation de la clôture finale.", "color: green; font-weight: bold;");
             handleFinalSubmit();
         }
     });
 
-    document.getElementById('main-content').addEventListener('click', e => {
+    // Écouteur déplacé vers une zone plus stable que main-content qui peut être redessiné
+    document.getElementById('app').addEventListener('click', e => {
         if (e.target.closest('.validate-caisse-btn')) {
             const caisseId = e.target.closest('.validate-caisse-btn').dataset.caisseId;
+            console.log(`CLIC DÉTECTÉ : Validation de la caisse ID ${caisseId}.`);
             validateCaisse(caisseId);
         }
     });
@@ -78,7 +89,9 @@ function attachClotureEventListeners() {
     document.body.addEventListener('change', e => {
         if (e.target.closest('#cloture-selection-modal')) {
              const modal = document.getElementById('cloture-selection-modal');
-             modal.querySelector('#confirm-selection-btn').disabled = modal.querySelectorAll('input:checked').length === 0;
+             const count = modal.querySelectorAll('input:checked').length;
+             console.log(`Changement dans la sélection : ${count} caisse(s) sélectionnée(s).`);
+             modal.querySelector('#confirm-selection-btn').disabled = count === 0;
         }
     });
 }
@@ -88,15 +101,18 @@ function attachClotureEventListeners() {
  * Affiche la modale de sélection des caisses à clôturer.
  */
 function renderSelectionModal() {
+    console.log("--- Fonction renderSelectionModal ---");
     const lockedCaisses = state.appState.lockedCaisses || [];
     const closedCaisses = state.appState.closedCaisses || [];
     const wsId = state.wsResourceId;
+    console.log("État actuel des caisses :", { lockedCaisses, closedCaisses, myWsId: wsId });
 
     const caisseOptionsHtml = Object.entries(state.config.nomsCaisses).map(([id, nom]) => {
         const isClosed = closedCaisses.includes(id);
         const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === id);
         const isLockedByOther = lockInfo && String(lockInfo.locked_by) !== wsId;
         const isDisabled = isClosed || isLockedByOther;
+        console.log(`- Caisse '${nom}' (ID ${id}): Fermée=${isClosed}, VerrouilléeParAutre=${isLockedByOther}`);
 
         let statusText = 'Disponible';
         if (isClosed) statusText = 'Déjà clôturée';
@@ -130,19 +146,23 @@ function renderSelectionModal() {
         </div>`;
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    console.log("Modale de sélection affichée.");
 }
 
 /**
  * Active le "Mode Clôture" sur l'interface du calculateur.
  */
 export function startClotureMode(selectedCaisses) {
+    console.log("%c--- DÉBUT DU MODE CLÔTURE ---", "background-color: #8a2be2; color: white; padding: 2px 5px;");
     state.isActive = true;
     state.selectedCaisses = selectedCaisses;
     state.validatedCaisses.clear();
 
-    selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
+    selectedCaisses.forEach(id => {
+        console.log(`Envoi WebSocket : Verrouillage de la caisse ID ${id}`);
+        sendWsMessage({ type: 'cloture_lock', caisse_id: id });
+    });
     
-    document.body.classList.add('cloture-mode-active');
     updateUIForClotureMode();
 }
 
@@ -150,13 +170,16 @@ export function startClotureMode(selectedCaisses) {
  * Annule le "Mode Clôture" et restaure l'interface.
  */
 export function cancelClotureMode() {
-    state.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
+    console.warn("%c--- ANNULATION DU MODE CLÔTURE ---", "background-color: #7f8c8d; color: white; padding: 2px 5px;");
+    state.selectedCaisses.forEach(id => {
+        console.log(`Envoi WebSocket : Déverrouillage de la caisse ID ${id}`);
+        sendWsMessage({ type: 'cloture_unlock', caisse_id: id })
+    });
     
     state.isActive = false;
     state.selectedCaisses = [];
     state.validatedCaisses.clear();
 
-    document.body.classList.remove('cloture-mode-active');
     updateUIForClotureMode();
 }
 
@@ -165,6 +188,7 @@ export function cancelClotureMode() {
  * Marque une caisse comme validée par l'utilisateur.
  */
 function validateCaisse(caisseId) {
+    console.log(`Validation de la caisse ${caisseId} enregistrée.`);
     state.validatedCaisses.add(caisseId);
     updateUIForClotureMode();
 }
@@ -173,6 +197,7 @@ function validateCaisse(caisseId) {
  * Affiche la modale de récapitulatif final avant de terminer.
  */
 function renderFinalSummaryModal() {
+    console.log("--- Fonction renderFinalSummaryModal ---");
     let totalVentesGlobal = 0, totalRetraitGlobal = 0, fondDeCaisseJ1Global = 0;
 
     const rowsHtml = state.selectedCaisses.map(id => {
@@ -180,6 +205,7 @@ function renderFinalSummaryModal() {
         const { totalVentes, totalCompteEspeces } = calculateEcartsForCaisse(id, state.appState, state.config);
         const { totalToWithdraw } = calculateWithdrawalSuggestion(caisseData, state.config);
         const fondDeCaisseJ1 = totalCompteEspeces - totalToWithdraw;
+        console.log(`- Caisse ID ${id}: Ventes=${totalVentes}, Retrait=${totalToWithdraw}, FDC J+1=${fondDeCaisseJ1}`);
 
         totalVentesGlobal += totalVentes;
         totalRetraitGlobal += totalToWithdraw;
@@ -219,13 +245,16 @@ function renderFinalSummaryModal() {
             </div>
         </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    console.log("Modale de résumé final affichée.");
 }
 
 async function handleFinalSubmit() {
+    console.log("--- Fonction handleFinalSubmit ---");
     const modal = document.getElementById('final-summary-modal');
     try {
         const formData = new FormData(document.getElementById('caisse-form'));
         state.selectedCaisses.forEach(id => formData.append('caisses_a_cloturer[]', id));
+        console.log("Préparation des données à envoyer au serveur...");
         
         state.selectedCaisses.forEach(id => {
             const { suggestions } = calculateWithdrawalSuggestion(state.appState.calculatorData.caisse[id], state.config);
@@ -234,14 +263,18 @@ async function handleFinalSubmit() {
             });
         });
         
+        console.log("Envoi de la requête de clôture finale à l'API...");
         const response = await fetch('index.php?route=cloture/confirm_caisse', { method: 'POST', body: formData });
         const result = await response.json();
+        console.log("Réponse de l'API :", result);
         if (!result.success) throw new Error(result.message);
         
         alert('Clôture réussie !');
+        console.log("Envoi WebSocket : Forcer le rechargement de tous les clients.");
         sendWsMessage({ type: 'force_reload_all' });
 
     } catch (error) {
+        console.error("ERREUR lors de la soumission finale :", error);
         alert(`Erreur: ${error.message}`);
     } finally {
         modal?.remove();
@@ -250,18 +283,34 @@ async function handleFinalSubmit() {
 
 
 /**
- * Met à jour l'état de l'interface (champs, boutons) en fonction du mode clôture.
+ * Met à jour l'état de l'interface (champs, boutons, bandeaux, onglets) en fonction du mode clôture.
  */
 export function updateUIForClotureMode() {
+    console.log("Mise à jour de l'interface pour le mode clôture.");
     const isClotureActive = state.isActive;
-    const body = document.body;
+    const bannerContainer = document.getElementById('cloture-banner-container');
     const clotureBtn = document.getElementById('cloture-btn');
     
-    body.classList.toggle('cloture-mode-active', isClotureActive);
+    if (bannerContainer) {
+        if (isClotureActive) {
+            bannerContainer.innerHTML = `
+                <div class="cloture-mode-banner">
+                    <i class="fa-solid fa-lock"></i>
+                    <div>
+                        <strong>Mode Clôture Activé</strong>
+                        <p>Vérifiez et validez les chiffres de chaque caisse sélectionnée avant de finaliser.</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            bannerContainer.innerHTML = '';
+        }
+    }
     
     if (clotureBtn) {
         if (isClotureActive) {
             const allValidated = state.selectedCaisses.length > 0 && state.selectedCaisses.every(id => state.validatedCaisses.has(id));
+            console.log(`Bouton Finaliser : ${state.validatedCaisses.size}/${state.selectedCaisses.length} validées. Cliquable = ${allValidated}`);
             clotureBtn.innerHTML = `<i class="fa-solid fa-flag-checkered"></i> Finaliser (${state.validatedCaisses.size}/${state.selectedCaisses.length})`;
             clotureBtn.disabled = !allValidated;
         } else {
@@ -283,11 +332,15 @@ export function updateUIForClotureMode() {
             }
         });
 
-        let validationArea = tabContent.querySelector('.cloture-validation-area');
+        const ecartDisplay = document.getElementById(`ecart-display-caisse${caisseId}`);
+        if (!ecartDisplay) return;
+
+        let validationArea = ecartDisplay.querySelector('.cloture-validation-area');
+
         if (isLockedByMe && !validationArea) {
             validationArea = document.createElement('div');
             validationArea.className = 'cloture-validation-area';
-            tabContent.appendChild(validationArea);
+            ecartDisplay.appendChild(validationArea);
         } else if (!isLockedByMe && validationArea) {
             validationArea.remove();
         }
@@ -300,12 +353,22 @@ export function updateUIForClotureMode() {
         
         const tabLink = document.querySelector(`.tab-link[data-caisse-id="${caisseId}"]`);
         if(tabLink) {
-            tabLink.classList.remove('awaiting-validation', 'validated');
-            if(isLockedByMe && !isValidated) tabLink.classList.add('awaiting-validation');
-            if(isValidated) tabLink.classList.add('validated');
+            tabLink.classList.remove('cloture-en-cours', 'cloturee');
+            const statusSpan = tabLink.querySelector('.tab-status-text');
+            if (statusSpan) statusSpan.remove();
+
+            if(isLockedByMe && !isValidated) {
+                tabLink.classList.add('cloture-en-cours');
+                tabLink.insertAdjacentHTML('beforeend', '<span class="tab-status-text">(En cours)</span>');
+            }
+            if(isValidated) {
+                tabLink.classList.add('cloturee');
+                 tabLink.insertAdjacentHTML('beforeend', '<span class="tab-status-text">(Validée)</span>');
+            }
         }
     });
 }
+
 
 /**
  * Met à jour l'UI en fonction des données WebSocket reçues (verrouillage par d'autres).
@@ -314,15 +377,28 @@ export function updateClotureUI(wsData, wsResourceId) {
     if (state.isActive) return;
 
     const lockedCaisses = wsData.caisses || [];
+    const closedCaisses = (wsData.closed_caisses || []).map(String);
     
     document.querySelectorAll('.tab-link').forEach(tab => {
         const caisseId = tab.dataset.caisseId;
         const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === caisseId);
+        const isClosed = closedCaisses.includes(caisseId);
         
         const isLockedByOther = lockInfo && String(lockInfo.locked_by) !== String(wsResourceId);
         tab.classList.toggle('locked-by-other', isLockedByOther);
+        tab.classList.toggle('cloturee', isClosed);
+
+        const statusSpan = tab.querySelector('.tab-status-text');
+        if (statusSpan) statusSpan.remove();
+
+        if (isLockedByOther) {
+             tab.insertAdjacentHTML('beforeend', '<span class="tab-status-text">(Verrouillée)</span>');
+        }
+        if(isClosed) {
+             tab.insertAdjacentHTML('beforeend', '<span class="tab-status-text">(Clôturée)</span>');
+        }
 
         const formFields = document.querySelectorAll(`#caisse${caisseId} input, #caisse${caisseId} button, #caisse${caisseId} textarea`);
-        formFields.forEach(field => field.disabled = isLockedByOther);
+        formFields.forEach(field => field.disabled = isLockedByOther || isClosed);
     });
 }

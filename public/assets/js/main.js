@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/main.js
+// Fichier : public/assets/js/main.js (Corrigé)
 
 import { renderNavbar } from './components/Navbar.js';
 import { renderFooter } from './components/Footer.js';
@@ -73,15 +73,17 @@ async function initialize() {
     renderFooter(appFooter);
     initializeNavbarLogic();
     
-   try {
+    // CORRECTION : On charge la logique de la page AVANT de se connecter.
+    handleRouting();
+
+    // On se connecte au WebSocket une fois que le gestionnaire de message est en place.
+    try {
         await initializeWebSocket(globalWsMessageHandler);
         setClotureReady(true); 
     } catch (error) {
         console.error("Échec de l'initialisation du WebSocket. La collaboration sera désactivée.", error);
         setClotureReady(false);
     }
-
-    handleRouting();
 
     app.addEventListener('click', (event) => {
         const link = event.target.closest('a');

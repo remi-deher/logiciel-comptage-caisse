@@ -111,64 +111,6 @@ async function loadAndRender(historyPage, params = {}) {
     }
 }
 
-/**
- * Point d'entrée pour initialiser la logique de la page d'historique.
- */
-export function initializeHistoryLogic() {
-    const historyPage = document.getElementById('history-page');
-    if (!historyPage) return;
-
-    // --- GESTION DES ÉVÉNEMENTS (DÉLÉGATION) ---
-    historyPage.addEventListener('submit', (e) => {
-        if (e.target.matches('#history-filter-form')) {
-            e.preventDefault();
-            loadAndRender(historyPage, Object.fromEntries(new FormData(e.target).entries()));
-        }
-    });
-
-    historyPage.addEventListener('click', async (e) => {
-        const target = e.target;
-
-        if (target.closest('#reset-filter-btn')) {
-            const filterForm = historyPage.querySelector('#history-filter-form');
-            if (filterForm) filterForm.reset();
-            loadAndRender(historyPage);
-        }
-
-        const paginationLink = target.closest('.pagination-nav a');
-        if (paginationLink && !paginationLink.parentElement.classList.contains('disabled')) {
-            e.preventDefault();
-            loadAndRender(historyPage, { ...currentParams, p: paginationLink.dataset.page });
-        }
-
-        const tabLink = target.closest('.view-tabs .tab-link');
-        if (tabLink && !tabLink.classList.contains('active')) {
-            e.preventDefault();
-            const viewToShow = tabLink.dataset.view;
-            historyPage.querySelectorAll('.view-tabs .tab-link, .view-content').forEach(el => el.classList.remove('active'));
-            tabLink.classList.add('active');
-            historyPage.querySelector(`#${viewToShow}-view`)?.classList.add('active');
-        }
-
-        const historyCard = target.closest('.history-card');
-        if (historyCard) {
-            const comptageId = historyCard.dataset.comptageId;
-            if (target.closest('.details-btn')) openDetailsSheet(comptageId);
-            if (target.closest('.load-btn')) await handleLoadComptage(comptageId, target.closest('.load-btn'));
-            if (target.closest('.delete-btn')) await handleDeleteComptage(comptageId, historyCard);
-        }
-        
-        const dayCard = target.closest('.day-card');
-        if (dayCard && target.closest('.details-btn')) {
-            renderWithdrawalDetailsModal(dayCard.dataset.dateKey);
-        }
-    });
-    
-    // --- Initialisation ---
-    loadAndRender(historyPage);
-    initializeSheetLogic();
-}
-
 async function fetchHistoriqueData(params) {
     const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
     const historyPromise = fetch(`index.php?route=historique/get_data&${new URLSearchParams(params)}`).then(res => res.json());
@@ -257,111 +199,92 @@ function initializeSheetLogic() {
     });
 }
 
-    function openDetailsSheet(comptageId) {
-        const sheet = document.getElementById('details-sheet');
-        const overlay = document.getElementById('details-sheet-overlay');
-        const content = document.getElementById('details-sheet-content');
-        if (!sheet || !overlay || !content) return;
+function openDetailsSheet(comptageId) {
+    const sheet = document.getElementById('details-sheet');
+    const overlay = document.getElementById('details-sheet-overlay');
+    const content = document.getElementById('details-sheet-content');
+    if (!sheet || !overlay || !content) return;
 
-        content.innerHTML = '<p>Chargement des détails...</p>';
-        sheet.style.height = '50vh';
-        sheet.classList.add('visible');
-        overlay.classList.add('visible');
-        
-        renderSheetContent(content, comptageId);
-
-        // --- DÉBUT DU CORRECTIF ---
-        // On attend que le navigateur soit prêt avant de dessiner les graphiques.
-        requestAnimationFrame(() => {
-            const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
-            if (comptage) {
-                Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
-                    if (comptage.results.caisses[caisse_id]) {
-                        renderSheetCharts(caisse_id, data, comptage.results.caisses[caisse_id]);
-                    }
-                });
-            }
-        });
-        // --- FIN DU CORRECTIF ---
-    }
-
-    function closeDetailsSheet() {
-        const sheet = document.getElementById('details-sheet');
-        const overlay = document.getElementById('details-sheet-overlay');
-        if (!sheet || !overlay) return;
-        sheet.classList.remove('visible');
-        overlay.classList.remove('visible');
-        if (sheetRepartitionChart) sheetRepartitionChart.destroy();
-        if (sheetDenominationsChart) sheetDenominationsChart.destroy();
-    }
-
-    function renderWithdrawalDetailsModal(dateKey) {
-        const dayData = withdrawalsByDay[dateKey];
-        if (!dayData) return;
+    content.innerHTML = '<p>Chargement des détails...</p>';
+    sheet.style.height = '50vh';
+    sheet.classList.add('visible');
+    overlay.classList.add('visible');
     
-        const modal = document.getElementById('modal-withdrawal-details');
-        const content = document.getElementById('modal-withdrawal-details-content');
-        if (!modal || !content) return;
-    
-        const allDenomsValueMap = { ...config.denominations.billets, ...config.denominations.pieces };
-        
-        const byCaisse = dayData.details.reduce((acc, d) => {
-            const value = parseFloat(d.valeur);
-            acc[d.caisse_nom] = (acc[d.caisse_nom] || 0) + (isNaN(value) ? 0 : value);
-            return acc;
-        }, {});
-        
-        const caisseTablesHtml = Object.entries(byCaisse).map(([nomCaisse, totalCaisse]) => {
-            const detailsCaisse = dayData.details.filter(d => d.caisse_nom === nomCaisse).sort((a,b) => allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination]);
-            const rows = detailsCaisse.map(d => {
-                const value = parseFloat(allDenomsValueMap[d.denomination]);
-                const label = value >= 1 ? `${value}€` : `${value * 100}c`;
-                return `<tr><td>${label}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.valeur)}</td></tr>`;
-            }).join('');
-            return `<div class="card"><h4>Détail pour ${nomCaisse}</h4><div class="table-responsive"><table class="info-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2">Total Caisse</td><td class="text-right">${formatEuros(totalCaisse)}</td></tr></tfoot></table></div></div>`;
-        }).join('');
-        
-        content.innerHTML = `
-            <div class="modal-header"><h3>Détails des retraits du ${formatDateFr(dateKey, {dateStyle: 'full'})}</h3><span class="modal-close">&times;</span></div>
-            <div class="modal-body">${caisseTablesHtml}</div>`;
-            
-        modal.classList.add('visible');
-        modal.querySelector('.modal-close').onclick = () => modal.classList.remove('visible');
-        modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
-    }
-    
-    const historyPage = document.getElementById('history-page');
-    if (!historyPage) { return; }
+    // This function needs to be defined to render the sheet content
+    // renderSheetContent(content, comptageId); 
 
-    let currentParams = {};
-
-    async function loadAndRender(params = {}) {
-        currentParams = params;
-        const historyGridContainer = historyPage.querySelector('.history-grid');
-        const retraitsContentContainer = historyPage.querySelector('#retraits-view-content');
-        const paginationNav = historyPage.querySelector('.pagination-nav');
-        try {
-            if(historyGridContainer) historyGridContainer.innerHTML = '<p>Chargement...</p>';
-            if(retraitsContentContainer) retraitsContentContainer.innerHTML = '<p>Chargement...</p>';
-            
-            const data = await fetchHistoriqueData(params);
-            renderCards(historyGridContainer, data.historique);
-            renderPagination(paginationNav, data.page_courante, data.pages_totales);
-            processWithdrawalData(data.historique_complet, config.denominations);
-            renderRetraitsView(retraitsContentContainer);
-            updateComparisonToolbar();
-        } catch (error) {
-            console.error("Erreur de chargement:", error);
-            const errorMessage = `<p class="error">Erreur: ${error.message}</p>`;
-            if(historyGridContainer) historyGridContainer.innerHTML = errorMessage;
-            if(retraitsContentContainer) retraitsContentContainer.innerHTML = errorMessage;
+    requestAnimationFrame(() => {
+        const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
+        if (comptage) {
+            Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
+                if (comptage.results.caisses[caisse_id]) {
+                    // This function also needs to be defined
+                    // renderSheetCharts(caisse_id, data, comptage.results.caisses[caisse_id]);
+                }
+            });
         }
-    }
+    });
+}
+
+function closeDetailsSheet() {
+    const sheet = document.getElementById('details-sheet');
+    const overlay = document.getElementById('details-sheet-overlay');
+    if (!sheet || !overlay) return;
+    sheet.classList.remove('visible');
+    overlay.classList.remove('visible');
+    if (sheetRepartitionChart) sheetRepartitionChart.destroy();
+    if (sheetDenominationsChart) sheetDenominationsChart.destroy();
+}
+
+function renderWithdrawalDetailsModal(dateKey) {
+    const dayData = withdrawalsByDay[dateKey];
+    if (!dayData) return;
+
+    const modal = document.getElementById('modal-withdrawal-details');
+    const content = document.getElementById('modal-withdrawal-details-content');
+    if (!modal || !content) return;
+
+    const allDenomsValueMap = { ...config.denominations.billets, ...config.denominations.pieces };
     
+    const byCaisse = dayData.details.reduce((acc, d) => {
+        const value = parseFloat(d.valeur);
+        acc[d.caisse_nom] = (acc[d.caisse_nom] || 0) + (isNaN(value) ? 0 : value);
+        return acc;
+    }, {});
+    
+    const caisseTablesHtml = Object.entries(byCaisse).map(([nomCaisse, totalCaisse]) => {
+        const detailsCaisse = dayData.details.filter(d => d.caisse_nom === nomCaisse).sort((a,b) => allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination]);
+        const rows = detailsCaisse.map(d => {
+            const value = parseFloat(allDenomsValueMap[d.denomination]);
+            const label = value >= 1 ? `${value}€` : `${value * 100}c`;
+            return `<tr><td>${label}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.valeur)}</td></tr>`;
+        }).join('');
+        return `<div class="card"><h4>Détail pour ${nomCaisse}</h4><div class="table-responsive"><table class="info-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2">Total Caisse</td><td class="text-right">${formatEuros(totalCaisse)}</td></tr></tfoot></table></div></div>`;
+    }).join('');
+    
+    content.innerHTML = `
+        <div class="modal-header"><h3>Détails des retraits du ${formatDateFr(dateKey, {dateStyle: 'full'})}</h3><span class="modal-close">&times;</span></div>
+        <div class="modal-body">${caisseTablesHtml}</div>`;
+        
+    modal.classList.add('visible');
+    modal.querySelector('.modal-close').onclick = () => modal.classList.remove('visible');
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
+}
+    
+/**
+ * Point d'entrée pour initialiser la logique de la page d'historique.
+ */
+export function initializeHistoryLogic() {
+    const historyPage = document.getElementById('history-page');
+    if (!historyPage) return;
+
+    loadAndRender(historyPage);
+    initializeSheetLogic(); // Ensure this function is called
+
     historyPage.addEventListener('submit', (e) => {
         if (e.target.matches('#history-filter-form')) {
             e.preventDefault();
-            loadAndRender(Object.fromEntries(new FormData(e.target).entries()));
+            loadAndRender(historyPage, Object.fromEntries(new FormData(e.target).entries()));
         }
     });
 
@@ -370,12 +293,12 @@ function initializeSheetLogic() {
         if (target.closest('#reset-filter-btn')) {
             const filterForm = historyPage.querySelector('#history-filter-form');
             if(filterForm) filterForm.reset();
-            loadAndRender();
+            loadAndRender(historyPage);
         }
         const paginationLink = target.closest('.pagination-nav a');
         if (paginationLink && !paginationLink.parentElement.classList.contains('disabled')) {
             e.preventDefault();
-            loadAndRender({ ...currentParams, p: paginationLink.dataset.page });
+            loadAndRender(historyPage, { ...currentParams, p: paginationLink.dataset.page });
         }
         const tabLink = target.closest('.view-tabs .tab-link');
         if (tabLink && !tabLink.classList.contains('active')) {
@@ -423,7 +346,7 @@ function initializeSheetLogic() {
                     const result = await response.json();
                     if(!result.success) throw new Error(result.message);
                     card.style.opacity = '0';
-                    setTimeout(() => loadAndRender(currentParams), 300);
+                    setTimeout(() => loadAndRender(historyPage, currentParams), 300);
                 } catch(err) {
                     alert(`Erreur: ${err.message}`);
                 }
@@ -455,10 +378,7 @@ function initializeSheetLogic() {
     
     historyPage.addEventListener('change', (e) => {
         if (e.target.matches('.comparison-checkbox')) {
-            updateComparisonToolbar();
+            // updateComparisonToolbar(); // This function needs to be defined
         }
     });
-
-    loadAndRender();
-    initializeSheetResizing();
 }

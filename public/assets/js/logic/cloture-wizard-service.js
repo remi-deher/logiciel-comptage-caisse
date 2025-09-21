@@ -263,3 +263,15 @@ export async function submitFinalCloture(formData) {
     }
     return result;
 }
+
+/**
+ * Déclenche la Clôture Générale sur le serveur.
+ */
+export async function submitClotureGenerale() {
+    const response = await fetch('index.php?route=cloture/confirm_generale', { method: 'POST' });
+    const result = await response.json();
+    if (!result.success) {
+        throw new Error(result.message || 'Une erreur est survenue lors de la clôture générale.');
+    }
+    return result;
+}

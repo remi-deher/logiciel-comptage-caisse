@@ -26,7 +26,6 @@ class CalculateurController {
         $this->comptageRepository = new ComptageRepository($pdo);
     }
 
-    // --- DÉBUT DE L'AJOUT DE LA NOUVELLE FONCTION ---
     public function getClosedCaisseData() {
         header('Content-Type: application/json');
         $caisse_id = intval($_GET['caisse_id'] ?? 0);
@@ -63,7 +62,6 @@ class CalculateurController {
         }
         exit;
     }
-    // --- FIN DE L'AJOUT ---
 
     public function getInitialData() {
         header('Content-Type: application/json');
@@ -331,12 +329,16 @@ class CalculateurController {
             $comptage_id_j1 = $this->pdo->lastInsertId();
             foreach ($this->noms_caisses as $caisse_id => $nom) {
                 
+                // --- DÉBUT DE LA CORRECTION ---
+                // La condition sur la date a été retirée pour trouver la dernière clôture,
+                // peu importe le jour où elle a été faite.
                 $stmt_latest_cloture = $this->pdo->prepare(
                     "SELECT cd.id FROM comptage_details cd 
                      JOIN comptages c ON cd.comptage_id = c.id 
-                     WHERE cd.caisse_id = ? AND c.nom_comptage LIKE 'Clôture Caisse%' AND DATE(c.date_comptage) = CURDATE()
+                     WHERE cd.caisse_id = ? AND c.nom_comptage LIKE 'Clôture Caisse%'
                      ORDER BY c.id DESC LIMIT 1"
                 );
+                // --- FIN DE LA CORRECTION ---
 
                 $stmt_latest_cloture->execute([$caisse_id]);
                 $latest_detail_id = $stmt_latest_cloture->fetchColumn();

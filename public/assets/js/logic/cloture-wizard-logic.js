@@ -56,7 +56,7 @@ async function handleNextStep() {
     const currentBtn = document.getElementById('wizard-next-btn') || document.getElementById('wizard-finish-btn');
     if (currentBtn) {
         currentBtn.disabled = true;
-        currentBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Chargement...';
+        currentBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Traitement...';
     }
 
     try {
@@ -83,12 +83,20 @@ async function handleNextStep() {
             state.wizardState.currentStep = 4;
         }
         else if (state.wizardState.currentStep === 4) {
+            // Étape 1 : Sauvegarde des clôtures individuelles
+            console.log("Étape 1/2 : Envoi des données de clôtures individuelles...");
             const formData = service.prepareFinalFormData(state);
-            const result = await service.submitFinalCloture(formData);
+            await service.submitFinalCloture(formData);
+            console.log("Clôtures individuelles enregistrées avec succès.");
+
+            // Étape 2 : Déclenchement de la clôture générale
+            console.log("Étape 2/2 : Déclenchement de la Clôture Générale...");
+            const finalResult = await service.submitClotureGenerale();
+            console.log("Clôture générale terminée avec succès.");
             
-            alert(result.message || 'Clôture réussie ! La page va être rechargée.');
+            alert(finalResult.message || 'Clôture générale réussie ! La page va être rechargée.');
             sendWsMessage({ type: 'force_reload_all' });
-            window.location.href = '/calculateur'; // Redirection de secours
+            window.location.href = '/calculateur';
             return;
         }
         
@@ -96,6 +104,7 @@ async function handleNextStep() {
 
     } catch (error) {
         alert(`Erreur: ${error.message}`);
+        // Réactive le bouton en cas d'erreur pour permettre une nouvelle tentative
         ui.updateWizardUI(state.wizardState, isReconciliationComplete());
     }
 }

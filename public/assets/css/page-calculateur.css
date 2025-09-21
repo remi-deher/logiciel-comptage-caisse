@@ -1,13 +1,57 @@
 /* Fichier : public/assets/css/page-calculateur.css (Version Complète et Mise à Jour) */
 
+/* --- NOUVEAU BANDEAU MODE CLÔTURE --- */
+.cloture-mode-banner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background-color: rgba(138, 43, 226, 0.1); /* Violet léger */
+    color: #8a2be2; /* Violet */
+    padding: 15px 20px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(138, 43, 226, 0.3);
+}
+.cloture-mode-banner i {
+    font-size: 1.8em;
+}
+.cloture-mode-banner div {
+    flex-grow: 1;
+}
+.cloture-mode-banner strong {
+    font-size: 1.1em;
+    display: block;
+}
+.cloture-mode-banner p {
+    margin: 4px 0 0;
+    font-size: 0.9em;
+}
+
+
 /* --- BANDEAU MODE CONSULTATION --- */
 .history-view-banner{display:flex;align-items:center;gap:20px;background-color:rgba(52,152,219,.1);color:var(--color-text-primary);padding:15px 20px;border-radius:12px;margin-bottom:25px;border:1px solid rgba(52,152,219,.3)}.history-view-banner i{font-size:1.8em;color:var(--color-primary)}.history-view-banner div{flex-grow:1}.history-view-banner strong{font-size:1.1em;display:block}.history-view-banner p{margin:4px 0 0;font-size:.9em;color:var(--color-text-secondary)}
 
-/* --- ONGLETS DE SÉLECTION DE CAISSE --- */
-.tab-selector{border-bottom:2px solid var(--color-border-light);margin-bottom:20px;display:flex;flex-wrap:wrap}.tab-link{background-color:transparent;border:none;border-bottom:3px solid transparent;padding:12px 18px;cursor:pointer;font-size:1.1em;color:var(--color-text-secondary);transition:all .2s;font-weight:600}.tab-link:hover{color:var(--color-primary)}.tab-link.active{color:var(--color-primary);border-bottom-color:var(--color-primary)}.caisse-tab-content{display:none}.caisse-tab-content.active{display:block;animation:fadeIn .5s}.tab-link.cloture-en-cours{color:#8a2be2!important}.tab-link.cloturee{background-color:#8a2be2;color:#fff;border-color:#7a1fb9}
+/* --- ONGLETS DE SÉLECTION DE CAISSE (Styles de clôture ajoutés) --- */
+.tab-selector{border-bottom:2px solid var(--color-border-light);margin-bottom:20px;display:flex;flex-wrap:wrap}
+.tab-link{background-color:transparent;border:none;border-bottom:3px solid transparent;padding:12px 18px;cursor:pointer;font-size:1.1em;color:var(--color-text-secondary);transition:all .2s;font-weight:600}
+.tab-link:hover{color:var(--color-primary)}
+.tab-link.active{color:var(--color-primary);border-bottom-color:var(--color-primary)}
+.caisse-tab-content{display:none}.caisse-tab-content.active{display:block;animation:fadeIn .5s}
+/* NOUVEAUX STYLES POUR LES ONGLETS */
+.tab-link.cloture-en-cours { border-bottom-color: #8a2be2 !important; color: #8a2be2 !important; }
+.tab-link.cloturee { background-color: #f0e8f9; color: #8a2be2; border-bottom-color: transparent !important; }
 
-/* --- INDICATEUR D'ÉCART FLOTTANT --- */
-.ecart-display-container{text-align:center;margin-bottom:20px;transition:all .3s ease;position:sticky;top:80px;z-index:99;background-color:var(--color-surface)}.ecart-display{display:none;padding:15px;border:2px solid var(--color-border-light);border-radius:12px;transition:opacity .5s;opacity:0;background-color:var(--color-surface)}.ecart-display.active{display:block;opacity:1}.main-ecart-display{padding:10px;border-radius:8px;margin-bottom:10px;transition:background-color .3s,border-color .3s}.main-ecart-display .ecart-label{display:block;font-size:1em;font-weight:700;color:var(--color-text-secondary)}.main-ecart-display .ecart-value{display:block;font-size:2.2em;font-weight:700}.main-ecart-display.ecart-ok{background-color:rgba(39,174,96,.1)}.main-ecart-display.ecart-ok .ecart-value{color:var(--color-success)}.main-ecart-display.ecart-positif{background-color:rgba(243,156,18,.1)}.main-ecart-display.ecart-positif .ecart-value{color:var(--color-warning)}.main-ecart-display.ecart-negatif{background-color:rgba(192,57,43,.1)}.main-ecart-display.ecart-negatif .ecart-value{color:var(--color-danger)}.secondary-ecarts{display:flex;justify-content:center;gap:20px;font-size:.9em}.secondary-ecart-item span{color:var(--color-text-secondary)}.secondary-ecart-item strong{font-weight:700}.secondary-ecart-item.ecart-ok strong{color:var(--color-success)}.secondary-ecart-item.ecart-positif strong{color:var(--color-warning)}.secondary-ecart-item.ecart-negatif strong{color:var(--color-danger)}
+
+/* --- INDICATEUR D'ÉCART FLOTTANT (Avec zone de validation) --- */
+.ecart-display-container{text-align:center;margin-bottom:20px;transition:all .3s ease;position:sticky;top:80px;z-index:99;background-color:var(--color-surface)}
+.ecart-display{display:none;padding:15px;border:2px solid var(--color-border-light);border-radius:12px;transition:opacity .5s;opacity:0;background-color:var(--color-surface)}
+.ecart-display.active{display:block;opacity:1}
+.main-ecart-display{padding:10px;border-radius:8px;margin-bottom:10px;transition:background-color .3s,border-color .3s}.main-ecart-display .ecart-label{display:block;font-size:1em;font-weight:700;color:var(--color-text-secondary)}.main-ecart-display .ecart-value{display:block;font-size:2.2em;font-weight:700}.main-ecart-display.ecart-ok{background-color:rgba(39,174,96,.1)}.main-ecart-display.ecart-ok .ecart-value{color:var(--color-success)}.main-ecart-display.ecart-positif{background-color:rgba(243,156,18,.1)}.main-ecart-display.ecart-positif .ecart-value{color:var(--color-warning)}.main-ecart-display.ecart-negatif{background-color:rgba(192,57,43,.1)}.main-ecart-display.ecart-negatif .ecart-value{color:var(--color-danger)}
+.secondary-ecarts{display:flex;justify-content:center;gap:20px;font-size:.9em}.secondary-ecart-item span{color:var(--color-text-secondary)}.secondary-ecart-item strong{font-weight:700}.secondary-ecart-item.ecart-ok strong{color:var(--color-success)}.secondary-ecart-item.ecart-positif strong{color:var(--color-warning)}.secondary-ecart-item.ecart-negatif strong{color:var(--color-danger)}
+
+/* NOUVELLE ZONE DE VALIDATION */
+.cloture-validation-area { margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--color-border); }
+.validation-message { color: var(--color-success); font-weight: bold; }
 
 /* --- ONGLETS DES MODES DE PAIEMENT --- */
 .payment-method-tabs{margin-top:20px;border:1px solid var(--color-border-light);border-radius:12px;overflow:hidden;background-color:var(--color-surface)}.payment-method-selector{display:flex;background-color:var(--color-surface-alt);padding:var(--space-sm);gap:var(--space-sm)}.payment-tab-link{flex:1;padding:12px;background-color:transparent;border:none;border-radius:8px;font-size:1em;font-weight:600;color:var(--color-text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}.payment-tab-link.active{background-color:var(--color-surface);color:var(--color-primary);box-shadow:0 2px 8px rgba(0,0,0,.1)}.payment-tab-content{display:none;padding:25px}.payment-tab-content.active{display:block;animation:fadeIn .5s}@keyframes fadeIn{from{opacity:0}to{opacity:1}}
