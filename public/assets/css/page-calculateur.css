@@ -114,3 +114,80 @@
 .suggestion-total span {
     color: var(--color-primary);
 }
+
+/* --- NOUVEAU BANDEAU DE FINALISATION DE CLÔTURE --- */
+.cloture-final-summary-banner {
+    background-color: rgba(39, 174, 96, 0.08); /* Vert très léger */
+    border: 1px solid rgba(39, 174, 96, 0.3);
+    border-radius: 12px;
+    margin-bottom: 25px;
+    padding: 25px;
+    animation: fadeIn .5s;
+}
+
+.cloture-final-summary-banner .banner-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.cloture-final-summary-banner .banner-header h4 {
+    border: none;
+    margin: 0 0 5px 0;
+    font-size: 1.5em;
+    color: var(--color-success);
+}
+
+.cloture-final-summary-banner .banner-header p {
+    margin: 0;
+    font-size: 1em;
+    color: var(--color-text-secondary);
+}
+
+.cloture-final-summary-banner .summary-table-container {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    overflow-x: auto;
+}
+
+.cloture-final-summary-banner .final-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.cloture-final-summary-banner .final-summary-table th,
+.cloture-final-summary-banner .final-summary-table td {
+    padding: 12px 15px;
+    text-align: right;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.cloture-final-summary-banner .final-summary-table th {
+    background-color: var(--color-surface-alt);
+}
+.cloture-final-summary-banner .final-summary-table th:first-child,
+.cloture-final-summary-banner .final-summary-table td:first-child {
+    text-align: left;
+}
+
+.cloture-final-summary-banner .final-summary-table tfoot td {
+    font-weight: bold;
+    font-size: 1.1em;
+    border-bottom: none;
+}
+
+.cloture-final-summary-banner .text-danger { color: var(--color-danger); }
+.cloture-final-summary-banner .text-success { color: var(--color-success); }
+
+
+.cloture-final-summary-banner .banner-actions {
+    text-align: center;
+}
+
+.cloture-final-summary-banner .banner-actions .btn {
+    padding: 12px 30px;
+    font-size: 1.2em;
+    font-weight: bold;
+}

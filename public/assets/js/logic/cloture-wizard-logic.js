@@ -61,18 +61,34 @@ async function handleNextStep() {
 
     try {
         if (state.wizardState.currentStep === 1) {
+            // --- DÉBUT DE LA CORRECTION ---
             const selected = document.querySelectorAll('input[name="caisseSelection"]:checked');
             state.wizardState.selectedCaisses = Array.from(selected).map(cb => cb.value);
-            
-            state.wizardState.reconciliation.status = {};
-            state.wizardState.selectedCaisses.forEach(id => {
-                state.wizardState.reconciliation.status[id] = { especes: false, cb: false, cheques: false };
-            });
 
-            state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
-            state.wizardState.currentStep = 2;
-        } 
-        else if (state.wizardState.currentStep === 2) {
+            const allCheckboxes = document.querySelectorAll('input[name="caisseSelection"]');
+            const allDisabled = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(cb => cb.disabled);
+
+            if (state.wizardState.selectedCaisses.length > 0) {
+                // Cas normal : au moins une caisse est sélectionnée
+                state.wizardState.reconciliation.status = {};
+                state.wizardState.selectedCaisses.forEach(id => {
+                    state.wizardState.reconciliation.status[id] = { especes: false, cb: false, cheques: false };
+                });
+                state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
+                state.wizardState.currentStep = 2;
+            } else if (allDisabled) {
+                // Cas spécial : aucune caisse sélectionnable, car toutes sont déjà clôturées
+                // On peuple les caisses en arrière-plan et on saute à la fin
+                state.wizardState.selectedCaisses = Object.keys(state.config.nomsCaisses);
+                state.wizardState.currentStep = 4;
+            } else {
+                // Cas où l'utilisateur n'a rien coché alors qu'il le pouvait
+                ui.updateWizardUI(state.wizardState, isReconciliationComplete()); // Réactive le bouton
+                return; // On arrête tout
+            }
+            // --- FIN DE LA CORRECTION ---
+
+        } else if (state.wizardState.currentStep === 2) {
             if (isReconciliationComplete()) {
                 state.wizardState.currentStep = 3;
             } else {

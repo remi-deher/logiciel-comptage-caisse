@@ -31,7 +31,15 @@ export function updateWizardUI(wizardState, isReconciliationComplete) {
 
     switch(wizardState.currentStep) {
         case 1:
-            nextBtn.disabled = document.querySelectorAll('input[name="caisseSelection"]:checked').length === 0;
+            // --- DÉBUT DE LA CORRECTION ---
+            const allCheckboxes = document.querySelectorAll('input[name="caisseSelection"]');
+            const anyChecked = document.querySelectorAll('input[name="caisseSelection"]:checked').length > 0;
+            const allDisabled = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(cb => cb.disabled);
+
+            // Le bouton est actif si au moins une caisse est cochée,
+            // OU si toutes les caisses sont désactivées (car déjà clôturées).
+            nextBtn.disabled = !anyChecked && !allDisabled;
+            // --- FIN DE LA CORRECTION ---
             break;
         case 2:
             nextBtn.disabled = !isReconciliationComplete;

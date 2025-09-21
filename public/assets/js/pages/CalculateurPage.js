@@ -6,7 +6,11 @@ export function renderCalculateurPage(element) {
   element.innerHTML = `
     <div class="container" id="calculator-page">
         <div id="cloture-banner-container"></div>
-    
+
+
+        <div id="cloture-final-summary-banner-container"></div>
+
+
         <form id="caisse-form" action="#" method="post">
             <input type="hidden" name="action" value="save">
             <div class="tab-selector"></div>
