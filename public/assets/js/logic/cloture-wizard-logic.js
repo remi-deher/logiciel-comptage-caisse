@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé avec l'envoi des données de retrait)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -17,26 +17,50 @@ const state = {
         currentStep: 1,
         selectedCaisses: [],
         confirmedData: {},
+        // NOUVEAU : Suivi de la validation pour l'étape 2
+        validationStatus: {} // ex: { caisseId: { especes: false, cb: false, cheques: false }}
     }
 };
 
-// --- Logique de navigation ---
+/**
+ * Vérifie si toutes les sections de toutes les caisses sélectionnées sont validées à l'étape 2.
+ */
+function checkAllSectionsValidated() {
+    return state.wizardState.selectedCaisses.every(caisseId => {
+        const status = state.wizardState.validationStatus[caisseId];
+        return status && status.especes && status.cb && status.cheques;
+    });
+}
+
 
 /** Gère le passage à l'étape suivante */
 async function handleNextStep() {
     const nextBtn = document.getElementById('wizard-next-btn');
     nextBtn.disabled = true;
+    nextBtn.innerHTML = 'Chargement...';
 
     if (state.wizardState.currentStep === 1) {
         const selected = document.querySelectorAll('input[name="caisseSelection"]:checked');
         state.wizardState.selectedCaisses = Array.from(selected).map(cb => cb.value);
+        
+        // Initialiser le statut de validation
+        state.wizardState.validationStatus = {};
+        state.wizardState.selectedCaisses.forEach(id => {
+            state.wizardState.validationStatus[id] = { especes: false, cb: false, cheques: false };
+        });
+
         state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
         state.wizardState.currentStep = 2;
         renderCurrentStep();
     } 
     else if (state.wizardState.currentStep === 2) {
-        state.wizardState.currentStep = 3;
-        renderCurrentStep();
+        if (checkAllSectionsValidated()) {
+            state.wizardState.currentStep = 3;
+            renderCurrentStep();
+        } else {
+            alert("Veuillez valider toutes les sections (Espèces, CB, Chèques) pour chaque caisse avant de continuer.");
+            nextBtn.disabled = false;
+        }
     }
     else if (state.wizardState.currentStep === 3) {
         state.wizardState.currentStep = 4;
@@ -44,50 +68,8 @@ async function handleNextStep() {
     }
     else if (state.wizardState.currentStep === 4) {
         try {
-            // --- DÉBUT DE LA CORRECTION ---
-            const formData = new FormData();
-            
-            // On ajoute les informations générales
-            formData.append('nom_comptage', state.calculatorData.nom_comptage);
-            formData.append('explication', state.calculatorData.explication);
-
-            // On ajoute les caisses à clôturer
-            state.wizardState.selectedCaisses.forEach(caisseId => {
-                formData.append('caisses_a_cloturer[]', caisseId);
-
-                // On ajoute toutes les données de chaque caisse
-                const caisseData = state.calculatorData.caisse[caisseId] || {};
-                for (const key in caisseData) {
-                    if (key === 'denominations' && typeof caisseData[key] === 'object') {
-                        for (const denom in caisseData[key]) {
-                            formData.append(`caisse[${caisseId}][denominations][${denom}]`, caisseData[key][denom]);
-                        }
-                    } else if (key === 'cheques' && Array.isArray(caisseData[key])) {
-                        caisseData[key].forEach((cheque, index) => {
-                            formData.append(`caisse[${caisseId}][cheques][${index}][montant]`, cheque.montant);
-                            formData.append(`caisse[${caisseId}][cheques][${index}][commentaire]`, cheque.commentaire);
-                        });
-                    } else if (key === 'tpe' && typeof caisseData[key] === 'object') {
-                         for (const terminalId in caisseData[key]) {
-                            (caisseData[key][terminalId] || []).forEach((releve, index) => {
-                                formData.append(`caisse[${caisseId}][tpe][${terminalId}][${index}][montant]`, releve.montant);
-                                formData.append(`caisse[${caisseId}][tpe][${terminalId}][${index}][heure]`, releve.heure);
-                            });
-                         }
-                    } else {
-                        formData.append(`caisse[${caisseId}][${key}]`, caisseData[key]);
-                    }
-                }
-                
-                // On ajoute les données de retrait pour cette caisse
-                const withdrawalData = state.wizardState.confirmedData[caisseId]?.withdrawals || [];
-                withdrawalData.forEach(item => {
-                    formData.append(`retraits[${caisseId}][${item.name}]`, item.qty);
-                });
-            });
-
+            const formData = service.prepareFinalFormData(state);
             await service.submitFinalCloture(formData);
-            // --- FIN DE LA CORRECTION ---
             
             alert('Clôture réussie ! La page va être rechargée.');
             sendWsMessage({ type: 'force_reload_all' });
@@ -99,6 +81,9 @@ async function handleNextStep() {
             nextBtn.disabled = false;
         }
     }
+    
+    // Réinitialise le texte du bouton après l'action
+    ui.updateWizardUI(state.wizardState);
 }
 
 /** Gère le retour à l'étape précédente */
@@ -106,6 +91,7 @@ function handlePrevStep() {
     if (state.wizardState.currentStep === 2) {
         state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
         state.wizardState.selectedCaisses = [];
+        state.wizardState.validationStatus = {};
     }
     state.wizardState.currentStep--;
     renderCurrentStep();
@@ -131,13 +117,13 @@ function renderCurrentStep() {
             ui.renderStep1_Selection(wizardContent, state.config, state.wsResourceId);
             break;
         case 2:
-            ui.renderStep2_Counting(wizardContent, state.wizardState, state.calculatorData, state.tpeState, state.chequesState, state.config);
+            ui.renderStep2_Reconciliation(wizardContent, state);
             break;
         case 3:
-            ui.renderStep3_Summary(wizardContent, state.wizardState, state.calculatorData, state.config);
+            ui.renderStep3_Summary(wizardContent, state);
             break;
         case 4:
-            ui.renderStep4_Finalization(wizardContent, state.wizardState, state.calculatorData, state.tpeState, state.chequesState, state.config);
+            ui.renderStep4_Finalization(wizardContent, state);
             break;
     }
 }
@@ -170,7 +156,7 @@ export async function initializeClotureWizard() {
         setActiveMessageHandler(handleWizardWebSocketMessage);
         sendWsMessage({ type: 'get_full_state' });
 
-        const logic = { handleNextStep, handlePrevStep, handleCancel };
+        const logic = { handleNextStep, handlePrevStep, handleCancel, checkAllSectionsValidated };
         attachEventListeners(wizardElement, state, logic);
 
         renderCurrentStep();

@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-wizard-ui.js (Complet et Corrigé)
+// Fichier : public/assets/js/logic/cloture-wizard-ui.js
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 import * as service from './cloture-wizard-service.js';
@@ -13,31 +13,39 @@ export function updateWizardUI(wizardState) {
             stepEl.classList.add('active');
         }
     });
+    
+    const wizardNav = document.querySelector('.wizard-navigation');
+    const prevBtnHtml = `<button id="wizard-prev-btn" class="btn"><i class="fa-solid fa-arrow-left"></i> Précédent</button>`;
+    const nextBtnHtml = `<button id="wizard-next-btn" class="btn save-btn">Suivant <i class="fa-solid fa-arrow-right"></i></button>`;
+    const finishBtnHtml = `<button id="wizard-finish-btn" class="btn save-btn" disabled>Terminer la Journée <i class="fa-solid fa-flag-checkered"></i></button>`;
+
+    let navHtml = `<button id="wizard-cancel-btn" class="btn delete-btn"><i class="fa-solid fa-xmark"></i> Annuler</button><div>`;
+    if (wizardState.currentStep > 1) navHtml += prevBtnHtml;
+    if (wizardState.currentStep < 4) navHtml += nextBtnHtml;
+    else navHtml += finishBtnHtml;
+    navHtml += `</div>`;
+    wizardNav.innerHTML = navHtml;
 
     const nextBtn = document.getElementById('wizard-next-btn');
-    const prevBtn = document.getElementById('wizard-prev-btn');
-
-    prevBtn.style.display = wizardState.currentStep > 1 ? 'inline-block' : 'none';
+    if (!nextBtn) return;
 
     switch(wizardState.currentStep) {
         case 1:
-            nextBtn.textContent = 'Suivant';
-            nextBtn.disabled = true;
+            nextBtn.innerHTML = 'Suivant <i class="fa-solid fa-arrow-right"></i>';
+            nextBtn.disabled = document.querySelectorAll('input[name="caisseSelection"]:checked').length === 0;
             break;
         case 2:
-            nextBtn.textContent = 'Valider les comptages';
-            nextBtn.disabled = false;
+            nextBtn.innerHTML = 'Valider les comptages <i class="fa-solid fa-arrow-right"></i>';
+            const allValidated = Object.values(wizardState.validationStatus).every(caisse => caisse.especes && caisse.cb && caisse.cheques);
+            nextBtn.disabled = !allValidated;
             break;
         case 3:
-            nextBtn.textContent = 'Confirmer et Finaliser';
+            nextBtn.innerHTML = 'Confirmer et Finaliser <i class="fa-solid fa-arrow-right"></i>';
             nextBtn.disabled = false;
-            break;
-        case 4:
-            nextBtn.textContent = 'Terminer la Journée';
-            nextBtn.disabled = true;
             break;
     }
 }
+
 
 /**
  * Affiche l'étape 1 : Sélection des caisses.
@@ -45,8 +53,7 @@ export function updateWizardUI(wizardState) {
 export async function renderStep1_Selection(container, config, wsResourceId) {
     container.innerHTML = '<p style="text-align:center;">Chargement de l\'état des caisses...</p>';
     try {
-        const response = await fetch('index.php?route=cloture/get_state');
-        const stateData = await response.json();
+        const stateData = await service.fetchClotureState();
         if (!stateData.success) throw new Error("Impossible de récupérer l'état des caisses.");
         
         const lockedCaisses = stateData.locked_caisses || [];
@@ -59,35 +66,26 @@ export async function renderStep1_Selection(container, config, wsResourceId) {
             const isDisabled = isLockedByOther || isClosed;
 
             let statusClass = 'status-libre';
-            let statusIcon = 'fa-check-circle';
             let statusText = 'Prête pour la clôture';
 
             if (isClosed) {
                 statusClass = 'status-cloturee';
-                statusIcon = 'fa-flag-checkered';
                 statusText = 'Déjà clôturée';
             } else if (isLockedByOther) {
                 statusClass = 'status-verrouillee';
-                statusIcon = 'fa-lock';
                 statusText = 'Utilisée par un autre collaborateur';
             }
             
-            const actionHtml = isClosed
-                ? `<div class="caisse-action-footer"><button type="button" class="btn reopen-btn js-reopen-caisse" data-caisse-id="${id}"><i class="fa-solid fa-lock-open"></i> Rouvrir</button></div>`
-                : `<input type="checkbox" name="caisseSelection" value="${id}" ${isDisabled ? 'disabled' : ''}>`;
-
-            const wrapperTag = isClosed ? 'div' : 'label';
-
             return `
-                <${wrapperTag} class="caisse-selection-item ${statusClass}" title="${statusText}">
-                    ${!isClosed ? actionHtml : ''}
+                <label class="caisse-selection-item ${statusClass}" title="${statusText}">
+                    <input type="checkbox" name="caisseSelection" value="${id}" ${isDisabled ? 'disabled' : ''}>
                     <div class="caisse-info">
-                        <i class="fa-solid ${statusIcon}"></i>
+                        <i class="fa-solid fa-cash-register"></i>
                         <span>${nom}</span>
                         <small class="caisse-status-text">${statusText}</small>
-                        ${isClosed ? actionHtml : ''}
                     </div>
-                </${wrapperTag}>`;
+                     ${isClosed ? `<button type="button" class="btn reopen-btn js-reopen-caisse" data-caisse-id="${id}"><i class="fa-solid fa-lock-open"></i> Rouvrir</button>` : ''}
+                </label>`;
         }).join('');
 
         container.innerHTML = `
@@ -113,99 +111,152 @@ export async function renderStep1_Selection(container, config, wsResourceId) {
 }
 
 /**
- * Affiche l'étape 2 : Comptage.
+ * Affiche l'étape 2 : Réconciliation guidée.
  */
-export function renderStep2_Counting(container, wizardState, calculatorData, tpeState, chequesState, config) {
-    let tabsHtml = '', contentHtml = '', ecartsHtml = '';
+export function renderStep2_Reconciliation(container, state) {
+    const { wizardState, calculatorData, tpeState, chequesState, config } = state;
+
+    let tabsHtml = '', contentHtml = '';
     wizardState.selectedCaisses.forEach((id, index) => {
         const nom = config.nomsCaisses[id];
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}_wizard">${nom}</button>`;
-        ecartsHtml += `<div id="ecart-display-caisse${id}_wizard" class="ecart-display ${isActive}"><span class="ecart-value"></span><p class="ecart-explanation"></p></div>`;
         
         const caisseData = calculatorData.caisse[id] || {};
-        const denominationsData = caisseData.denominations || {};
-        const tpeRelevesPourCaisse = tpeState[id] || {};
-
-        const buildTextInput = (name, value) => `<input type="text" id="${name}_${id}_wizard" name="caisse[${id}][${name}]" data-caisse-id="${id}" value="${value || ''}">`;
-        const buildDenomInput = (name, value) => `<input type="number" id="${name}_${id}_wizard" name="caisse[${id}][denominations][${name}]" data-caisse-id="${id}" value="${value || ''}" min="0">`;
-        
-        const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group"><label>${v} ${config.currencySymbol}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
-        const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label>${buildDenomInput(name, denominationsData[name])}<span class="total-line" id="total_${name}_${id}_wizard"></span></div>`).join('');
-        
-        const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([, tpe]) => tpe.caisse_id.toString() === id) : [];
-        
-        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
-            const releves = tpeRelevesPourCaisse[tpeId] || [];
-            const totalTpe = releves.reduce((sum, releve) => sum + parseLocaleFloat(releve.montant), 0);
-            return `<div class="form-group"><label>${tpe.nom} (Total)</label><input type="text" id="tpe_total_${tpeId}_${id}_wizard" value="${formatCurrency(totalTpe, config)}" readonly></div>`;
-        }).join('');
-
-        contentHtml += `
-            <div id="caisse${id}_wizard" class="caisse-tab-content ${isActive}">
-                <div class="grid grid-4" style="margin-bottom:20px;">
-                    <div class="form-group"><label>Fond de Caisse</label>${buildTextInput('fond_de_caisse', caisseData.fond_de_caisse)}</div>
-                    <div class="form-group"><label>Ventes Espèces</label>${buildTextInput('ventes_especes', caisseData.ventes_especes)}</div>
-                    <div class="form-group"><label>Ventes CB</label>${buildTextInput('ventes_cb', caisseData.ventes_cb)}</div>
-                    <div class="form-group"><label>Ventes Chèques</label>${buildTextInput('ventes_cheques', caisseData.ventes_cheques)}</div>
-                </div>
-                 <div class="form-group">
-                    <label>Rétrocessions (en Espèces)</label>
-                    ${buildTextInput('retrocession', caisseData.retrocession)}
-                </div>
-                <div class="payment-method-tabs">
-                    <div class="payment-method-selector">
-                        <button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>
-                        <button type="button" class="payment-tab-link" data-payment-tab="cb_${id}"><i class="fa-solid fa-credit-card"></i> Carte Bancaire</button>
-                        <button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button>
-                    </div>
-                    <div id="especes_${id}" class="payment-tab-content active"><h4>Billets</h4><div class="grid">${billets}</div><h4 style="margin-top:20px;">Pièces</h4><div class="grid">${pieces}</div></div>
-                    <div id="cb_${id}" class="payment-tab-content"><div class="grid">${tpeHtml || '<p>Aucun TPE pour cette caisse.</p>'}</div></div>
-                    <div id="cheques_${id}" class="payment-tab-content">
-                        <div class="cheque-input-section">
-                             <div class="form-group"><label for="cheque-amount-${id}-wizard">Montant du chèque</label><input type="text" id="cheque-amount-${id}-wizard" placeholder="0,00"></div>
-                             <div class="form-group"><label for="cheque-comment-${id}-wizard">Commentaire (optionnel)</label><input type="text" id="cheque-comment-${id}-wizard" placeholder="Ex: Chèque n°123"></div>
-                             <button type="button" class="btn new-btn add-cheque-btn-wizard" data-caisse-id="${id}"><i class="fa-solid fa-plus"></i> Ajouter</button>
-                        </div>
-                        <div class="cheque-list-section">
-                             <h4>Liste des chèques</h4>
-                             <div id="cheque-list-${id}-wizard" class="cheque-list"></div>
-                             <div class="cheque-total">Total des chèques: <span id="cheque-total-${id}-wizard">0,00 €</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
+        contentHtml += `<div id="caisse${id}_wizard" class="caisse-tab-content ${isActive}">
+            ${createReconciliationSection('especes', id, caisseData, config)}
+            ${createReconciliationSection('cb', id, caisseData, config)}
+            ${createReconciliationSection('cheques', id, caisseData, config)}
+        </div>`;
     });
-    container.innerHTML = `<div class="wizard-step-content"><h3>Vérifiez les comptages</h3><div class="tab-selector">${tabsHtml}</div><div class="ecart-display-container">${ecartsHtml}</div><div id="caisses-content-container">${contentHtml}</div></div>`;
-    
-    // Initial calculation and rendering for dynamic parts
+
+    container.innerHTML = `
+        <div class="wizard-step-content">
+            <h3>Étape 2 : Réconciliation des Caisses</h3>
+            <p class="subtitle" style="text-align:center; margin-top:-20px; margin-bottom:20px;">
+                Vérifiez et ajustez les montants pour chaque mode de paiement. L'écart doit être à 0.00€ pour pouvoir valider une section.
+            </p>
+            <div class="tab-selector">${tabsHtml}</div>
+            <div id="caisses-content-container">${contentHtml}</div>
+        </div>`;
+
     wizardState.selectedCaisses.forEach(id => {
-        // You would typically call a calculation function here
-        // and render dynamic lists like cheques
+        const caisseData = calculatorData.caisse[id] || {};
+        
+        document.getElementById(`details-especes-${id}`).innerHTML = createEspecesDetails(id, caisseData.denominations, config);
+        document.getElementById(`details-cb-${id}`).innerHTML = createCbDetails(id, tpeState[id], config);
+        document.getElementById(`details-cheques-${id}`).innerHTML = createChequesDetails(id, chequesState[id], config);
+        
+        service.calculateAndDisplayAllEcarts(id, state);
     });
 }
 
-/**
- * Affiche l'étape 3 : Synthèse des retraits.
- */
-export function renderStep3_Summary(container, wizardState, calculatorData, config) {
-    let summaryHtml = wizardState.selectedCaisses.map(id => {
-        const suggestions = service.calculateWithdrawalSuggestion(calculatorData.caisse[id], config);
-        wizardState.confirmedData[id] = { withdrawals: suggestions.suggestions, totalToWithdraw: suggestions.totalToWithdraw };
+
+function createReconciliationSection(type, caisseId, caisseData, config) {
+    const icons = { especes: 'fa-money-bill-wave', cb: 'fa-credit-card', cheques: 'fa-money-check-dollar' };
+    const titles = { especes: 'Espèces', cb: 'Carte Bancaire', cheques: 'Chèques' };
+    
+    let aSaisirHtml = '';
+    if (type === 'especes') {
+        aSaisirHtml = `
+            <div class="form-group"><label>1. Ventes Espèces Théoriques</label><input type="text" class="reconciliation-input" data-caisse-id="${caisseId}" data-type="especes" name="caisse[${caisseId}][ventes_especes]" value="${caisseData.ventes_especes || ''}"></div>
+            <div class="form-group"><label>2. Rétrocessions</label><input type="text" class="reconciliation-input" data-caisse-id="${caisseId}" data-type="especes" name="caisse[${caisseId}][retrocession]" value="${caisseData.retrocession || ''}"></div>
+             <div class="form-group"><label>3. Fond de Caisse Initial</label><input type="text" class="reconciliation-input" data-caisse-id="${caisseId}" data-type="especes" name="caisse[${caisseId}][fond_de_caisse]" value="${caisseData.fond_de_caisse || ''}"></div>`;
+    } else {
+        aSaisirHtml = `<div class="form-group"><label>1. Ventes ${titles[type]} Théoriques</label><input type="text" class="reconciliation-input" data-caisse-id="${caisseId}" data-type="${type}" name="caisse[${caisseId}][ventes_${type}]" value="${caisseData[`ventes_${type}`] || ''}"></div>`;
+    }
+
+    return `
+        <div class="reconciliation-section" id="section-${type}-${caisseId}">
+            <div class="reconciliation-header">
+                <h3><i class="fa-solid ${icons[type]}"></i> ${titles[type]}</h3>
+                <div class="reconciliation-status" id="status-${type}-${caisseId}">
+                    <span class="ecart-value">--.-- €</span>
+                    <button type="button" class="btn validate-section-btn" data-caisse-id="${caisseId}" data-type="${type}" disabled>
+                        <i class="fa-solid fa-check"></i> Valider
+                    </button>
+                </div>
+            </div>
+            <div class="reconciliation-body">
+                <div class="reconciliation-panel">
+                    <h4>À Saisir</h4>
+                    ${aSaisirHtml}
+                </div>
+                <div class="reconciliation-panel">
+                    <h4>Compté (calculé)</h4>
+                    <div class="reconciliation-counted" id="counted-${type}-${caisseId}">0,00 €</div>
+                </div>
+            </div>
+            <div class="reconciliation-details" id="details-${type}-${caisseId}"></div>
+        </div>`;
+}
+
+function createEspecesDetails(caisseId, denominationsData, config) {
+    const buildDenomInput = (name, value) => `<input type="number" class="reconciliation-input" data-caisse-id="${caisseId}" data-type="especes" name="caisse[${caisseId}][denominations][${name}]" value="${value || ''}" min="0">`;
+    const billets = Object.entries(config.denominations.billets).map(([name, v]) => `<div class="form-group grid-item"><label>${v} ${config.currencySymbol}</label>${buildDenomInput(name, denominationsData ? denominationsData[name] : '')}<span class="total-line" id="total_${name}_${caisseId}_wizard"></span></div>`).join('');
+    const pieces = Object.entries(config.denominations.pieces).map(([name, v]) => `<div class="form-group grid-item"><label>${v >= 1 ? v + ' ' + config.currencySymbol : (v * 100) + ' cts'}</label>${buildDenomInput(name, denominationsData ? denominationsData[name] : '')}<span class="total-line" id="total_${name}_${caisseId}_wizard"></span></div>`).join('');
+    return `<h5>Détail des Espèces</h5><div class="grid">${billets}</div><h5 style="margin-top:20px;">Pièces</h5><div class="grid">${pieces}</div>`;
+}
+
+function createCbDetails(caisseId, tpeData, config) {
+    const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === caisseId) : [];
+    if (tpePourCaisse.length === 0) return '<h5>Détail CB</h5><p>Aucun TPE configuré pour cette caisse.</p>';
+    
+    const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `
+        <div class="card tpe-card-wizard">
+            <h6>${tpe.nom}</h6>
+            <div id="tpe-list-${tpeId}-${caisseId}">${createTpeReleveList(tpeData[tpeId], config, caisseId, tpeId)}</div>
+            <div class="form-group-inline">
+                <input type="text" class="reconciliation-input" id="tpe-amount-${tpeId}-${caisseId}" placeholder="Montant">
+                <button type="button" class="btn new-btn add-tpe-btn" data-caisse-id="${caisseId}" data-tpe-id="${tpeId}">+</button>
+            </div>
+        </div>`
+    ).join('');
+    return `<h5>Détail des Relevés TPE</h5><div class="grid-3">${tpeHtml}</div>`;
+}
+
+function createChequesDetails(caisseId, cheques, config) {
+    return `
+        <h5>Détail des Chèques</h5>
+        <div class="cheque-wizard-grid">
+            <div class="card cheque-card-wizard">
+                <div id="cheque-list-${caisseId}">${createChequeList(cheques, config, caisseId)}</div>
+            </div>
+            <div class="card cheque-card-wizard">
+                 <h6>Ajouter un chèque</h6>
+                 <div class="form-group"><label>Montant</label><input type="text" class="reconciliation-input" id="cheque-amount-${caisseId}"></div>
+                 <div class="form-group"><label>Commentaire</label><input type="text" class="reconciliation-input" id="cheque-comment-${caisseId}"></div>
+                 <button type="button" class="btn new-btn add-cheque-btn" data-caisse-id="${caisseId}" style="width:100%">Ajouter Chèque</button>
+            </div>
+        </div>`;
+}
+
+export function createTpeReleveList(releves, config, caisseId, tpeId) {
+    if (!releves || releves.length === 0) return '<p class="empty-list">Aucun relevé.</p>';
+    return `<ul>${releves.map((r, index) => `<li>${formatCurrency(parseLocaleFloat(r.montant), config)} <button type="button" class="delete-item-btn delete-tpe-btn" data-caisse-id="${caisseId}" data-tpe-id="${tpeId}" data-index="${index}">&times;</button></li>`).join('')}</ul>`;
+}
+
+export function createChequeList(cheques, config, caisseId) {
+     if (!cheques || cheques.length === 0) return '<p class="empty-list">Aucun chèque.</p>';
+    return `<ul>${cheques.map((c, index) => `<li>${formatCurrency(parseLocaleFloat(c.montant), config)} <small>(${c.commentaire || 'N/A'})</small> <button type="button" class="delete-item-btn delete-cheque-btn" data-caisse-id="${caisseId}" data-index="${index}">&times;</button></li>`).join('')}</ul>`;
+}
+
+export function renderStep3_Summary(container, state) {
+    let summaryHtml = state.wizardState.selectedCaisses.map(id => {
+        const suggestions = service.calculateWithdrawalSuggestion(state.calculatorData.caisse[id], state.config);
+        state.wizardState.confirmedData[id] = { withdrawals: suggestions.suggestions, totalToWithdraw: suggestions.totalToWithdraw };
         
         const suggestionTableHtml = suggestions.suggestions.length === 0
-            ? `<div class="withdrawal-summary-card"><div class="withdrawal-total-header status-ok"><div class="total-amount">${formatCurrency(0, config)}</div><div class="total-label">Aucun retrait nécessaire</div></div><div class="withdrawal-details-list"><div class="detail-item-empty">Le fond de caisse correspond à la cible.</div></div></div>`
-            : `<div class="withdrawal-summary-card"><div class="withdrawal-total-header"><div class="total-amount">${formatCurrency(suggestions.totalToWithdraw, config)}</div><div class="total-label">Total à retirer de la caisse</div></div><div class="withdrawal-details-list">${suggestions.suggestions.map(s => `<div class="detail-item"><span class="detail-item-label"><i class="fa-solid fa-money-bill-wave item-icon"></i> Retirer ${s.qty} x ${s.value >= 1 ? `${s.value} ${config.currencySymbol}` : `${s.value * 100} cts`}</span><span class="detail-item-value">${formatCurrency(s.total, config)}</span></div>`).join('')}</div></div>`;
+            ? `<div class="withdrawal-summary-card"><div class="withdrawal-total-header status-ok"><div class="total-amount">${formatCurrency(0, state.config)}</div><div class="total-label">Aucun retrait nécessaire</div></div><div class="withdrawal-details-list"><div class="detail-item-empty">Le fond de caisse correspond à la cible.</div></div></div>`
+            : `<div class="withdrawal-summary-card"><div class="withdrawal-total-header"><div class="total-amount">${formatCurrency(suggestions.totalToWithdraw, state.config)}</div><div class="total-label">Total à retirer de la caisse</div></div><div class="withdrawal-details-list">${suggestions.suggestions.map(s => `<div class="detail-item"><span class="detail-item-label"><i class="fa-solid fa-money-bill-wave item-icon"></i> Retirer ${s.qty} x ${s.value >= 1 ? `${s.value} ${state.config.currencySymbol}` : `${s.value * 100} cts`}</span><span class="detail-item-value">${formatCurrency(s.total, state.config)}</span></div>`).join('')}</div></div>`;
 
-        return `<div class="card"><h4>Synthèse des retraits pour ${config.nomsCaisses[id]}</h4>${suggestionTableHtml}</div>`;
+        return `<div class="card"><h4>Synthèse des retraits pour ${state.config.nomsCaisses[id]}</h4>${suggestionTableHtml}</div>`;
     }).join('');
-    container.innerHTML = `<div class="wizard-step-content"><h3>Synthèse des Opérations de Retrait</h3>${summaryHtml}</div>`;
+    container.innerHTML = `<div class="wizard-step-content"><h3>Étape 3 : Synthèse des Opérations de Retrait</h3>${summaryHtml}</div>`;
 }
 
-/**
- * Affiche l'étape 4 : Finalisation.
- */
-export function renderStep4_Finalization(container, wizardState, calculatorData, tpeState, chequesState, config) {
+export function renderStep4_Finalization(container, state) {
+    const { wizardState, calculatorData, config } = state;
     let grandTotalVentes = 0, grandTotalCompteEspeces = 0, grandTotalRetraits = 0, grandTotalEcartEspeces = 0, rowsHtml = '';
     let grandTotalCompteCB = 0, grandTotalCompteCheques = 0;
 
@@ -213,27 +264,15 @@ export function renderStep4_Finalization(container, wizardState, calculatorData,
         const nomCaisse = config.nomsCaisses[id] || `Caisse ${id}`;
         const caisseData = calculatorData.caisse[id] || {};
         const confirmedData = wizardState.confirmedData[id] || {};
+        const { ecartEspeces, totalCompteEspeces, totalCompteCb, totalCompteCheques } = service.calculateEcartsForCaisse(id, state);
+        
         const ventesEspeces = parseLocaleFloat(caisseData.ventes_especes) + parseLocaleFloat(caisseData.retrocession);
         const ventesCb = parseLocaleFloat(caisseData.ventes_cb);
         const ventesCheques = parseLocaleFloat(caisseData.ventes_cheques);
         const totalVentesCaisse = ventesEspeces + ventesCb + ventesCheques;
         const retrait = confirmedData.totalToWithdraw || 0;
         
-        let totalCompteEspeces = 0;
-        const allDenoms = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
-        for (const name in caisseData.denominations) {
-            totalCompteEspeces += (parseInt(caisseData.denominations[name], 10) || 0) * (parseFloat(allDenoms[name]) || 0);
-        }
-        
-        let totalCompteCb = 0;
-        if(tpeState[id]) {
-            for(const tpeId in tpeState[id]) {
-                totalCompteCb += (tpeState[id][tpeId] || []).reduce((sum, r) => sum + parseLocaleFloat(r.montant), 0);
-            }
-        }
-        const totalCompteCheques = (chequesState[id] || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
         const totalCompteCaisse = totalCompteEspeces + totalCompteCb + totalCompteCheques;
-        const ecartEspeces = (totalCompteEspeces - parseLocaleFloat(caisseData.fond_de_caisse)) - (parseLocaleFloat(caisseData.ventes_especes) + parseLocaleFloat(caisseData.retrocession));
         const fondDeCaisseJ1 = totalCompteEspeces - retrait;
         
         grandTotalVentes += totalVentesCaisse;
@@ -242,7 +281,7 @@ export function renderStep4_Finalization(container, wizardState, calculatorData,
         grandTotalCompteCheques += totalCompteCheques;
         grandTotalRetraits += retrait;
         grandTotalEcartEspeces += ecartEspeces;
-        rowsHtml += `<tr><td><strong>${nomCaisse}</strong></td><td>${formatCurrency(totalVentesCaisse, config)}</td><td>${formatCurrency(totalCompteCaisse, config)}</td><td class="ecart-${Math.abs(ecartEspeces) < 0.01 ? 'ok' : (ecartEspeces > 0 ? 'positif' : 'negatif')}">${formatCurrency(ecartEspeces, config)}</td><td class="text-danger">${formatCurrency(retrait, config)}</td><td class="text-success">${formatCurrency(fondDeCaisseJ1, config)}</td></tr>`;
+        rowsHtml += `<tr><td><strong>${nomCaisse}</strong></td><td>${formatCurrency(totalVentesCaisse, config)}</td><td>${formatCurrency(totalCompteCaisse, config)}</td><td class="text-success">${formatCurrency(ecartEspeces, config)}</td><td class="text-danger">${formatCurrency(retrait, config)}</td><td class="text-success">${formatCurrency(fondDeCaisseJ1, config)}</td></tr>`;
     });
 
     const grandTotalCompte = grandTotalCompteEspeces + grandTotalCompteCB + grandTotalCompteCheques;
@@ -250,18 +289,17 @@ export function renderStep4_Finalization(container, wizardState, calculatorData,
         <div class="wizard-step-content">
             <h3><i class="fa-solid fa-flag-checkered"></i> Synthèse Finale</h3>
             <p class="subtitle" style="text-align:center; margin-top:-20px; margin-bottom: 30px;">Veuillez vérifier les totaux avant de finaliser la journée.</p>
-            <div class="card" style="padding:0;">
+            <div class="card" style="padding:0; overflow-x: auto;">
                 <table class="final-summary-table">
                     <thead><tr><th>Caisse</th><th>Ventes Totales</th><th>Compté Total</th><th>Écart Espèces</th><th>Retrait Espèces</th><th>Fond de Caisse J+1</th></tr></thead>
                     <tbody>${rowsHtml}</tbody>
-                    <tfoot><tr><td><strong>TOTAL GÉNÉRAL</strong></td><td><strong>${formatCurrency(grandTotalVentes, config)}</strong></td><td><strong>${formatCurrency(grandTotalCompte, config)}</strong></td><td class="ecart-${Math.abs(grandTotalEcartEspeces) < 0.01 ? 'ok' : (grandTotalEcartEspeces > 0 ? 'positif' : 'negatif')}"><strong>${formatCurrency(grandTotalEcartEspeces, config)}</strong></td><td class="text-danger"><strong>${formatCurrency(grandTotalRetraits, config)}</strong></td><td class="text-success"><strong>${formatCurrency(grandTotalCompteEspeces - grandTotalRetraits, config)}</strong></td></tr></tfoot>
+                    <tfoot><tr><td><strong>TOTAL GÉNÉRAL</strong></td><td><strong>${formatCurrency(grandTotalVentes, config)}</strong></td><td><strong>${formatCurrency(grandTotalCompte, config)}</strong></td><td class="text-success"><strong>${formatCurrency(grandTotalEcartEspeces, config)}</strong></td><td class="text-danger"><strong>${formatCurrency(grandTotalRetraits, config)}</strong></td><td class="text-success"><strong>${formatCurrency(grandTotalCompteEspeces - grandTotalRetraits, config)}</strong></td></tr></tfoot>
                 </table>
             </div>
             <div class="next-steps-info">
                 <h4>Que se passe-t-il après avoir finalisé ?</h4>
                 <ul>
-                    <li><i class="fa-solid fa-check-circle"></i> Un comptage "Clôture Générale" sera créé dans l'historique avec les chiffres de ce tableau.</li>
-                    <li><i class="fa-solid fa-check-circle"></i> Un nouveau comptage "Fond de caisse J+1" sera automatiquement généré pour démarrer la journée de demain.</li>
+                    <li><i class="fa-solid fa-check-circle"></i> Un comptage "Clôture" sera créé dans l'historique pour chaque caisse.</li>
                     <li><i class="fa-solid fa-check-circle"></i> L'état des caisses sera réinitialisé.</li>
                 </ul>
             </div>

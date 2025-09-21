@@ -1,9 +1,9 @@
-// Fichier : public/assets/js/logic/cloture-wizard-service.js (Logique de retrait finale basée sur la recette du jour)
+// Fichier : public/assets/js/logic/cloture-wizard-service.js (Corrigé et Fiabilisé)
 
-import { parseLocaleFloat } from '../utils/formatters.js';
+import { parseLocaleFloat, formatCurrency } from '../utils/formatters.js';
 
 /**
- * Récupère les données initiales nécessaires pour l'assistant.
+ * Récupère les données initiales nécessaires pour l'assistant (configuration et dernière sauvegarde).
  */
 export async function fetchInitialData() {
     const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
@@ -17,7 +17,7 @@ export async function fetchInitialData() {
         calculatorData.nom_comptage = rawData.nom_comptage;
         calculatorData.explication = rawData.explication;
         for (const caisseId in rawData) {
-            if (!isNaN(caisseId)) {
+            if (!isNaN(caisseId) && configResult.nomsCaisses[caisseId]) {
                  calculatorData.caisse[caisseId] = rawData[caisseId];
                  if (!calculatorData.caisse[caisseId].denominations) calculatorData.caisse[caisseId].denominations = {};
                  if (!calculatorData.caisse[caisseId].tpe) calculatorData.caisse[caisseId].tpe = {};
@@ -28,19 +28,115 @@ export async function fetchInitialData() {
     
     const chequesState = {};
     const tpeState = {};
-    Object.keys(calculatorData.caisse).forEach(caisseId => {
-        chequesState[caisseId] = calculatorData.caisse[caisseId].cheques || [];
-        tpeState[caisseId] = calculatorData.caisse[caisseId].tpe || {};
+    Object.keys(configResult.nomsCaisses).forEach(caisseId => {
+        chequesState[caisseId] = calculatorData.caisse[caisseId]?.cheques || [];
+        tpeState[caisseId] = calculatorData.caisse[caisseId]?.tpe || {};
     });
 
     return { config: configResult, calculatorData, chequesState, tpeState };
 }
 
 /**
+ * Récupère l'état actuel des caisses (verrouillées, clôturées).
+ */
+export async function fetchClotureState() {
+    const response = await fetch('index.php?route=cloture/get_state');
+    return await response.json();
+}
+
+/**
+ * Calcule tous les écarts pour une caisse et met à jour l'interface de réconciliation.
+ */
+export function calculateAndDisplayAllEcarts(caisseId, state) {
+    const {
+        ecartEspeces, totalCompteEspeces,
+        ecartCb, totalCompteCb,
+        ecartCheques, totalCompteCheques
+    } = calculateEcartsForCaisse(caisseId, state);
+
+    updateReconciliationUI(caisseId, 'especes', ecartEspeces, totalCompteEspeces, state);
+    updateReconciliationUI(caisseId, 'cb', ecartCb, totalCompteCb, state);
+    updateReconciliationUI(caisseId, 'cheques', ecartCheques, totalCompteCheques, state);
+}
+
+/**
+ * Calcule les écarts pour tous les types de paiement d'une caisse donnée.
+ * @returns {object} Un objet contenant tous les écarts et totaux comptés.
+ */
+export function calculateEcartsForCaisse(caisseId, state) {
+    const { calculatorData, config, tpeState, chequesState } = state;
+    const caisseData = calculatorData.caisse[caisseId] || {};
+
+    // --- Calcul Espèces ---
+    let totalCompteEspeces = 0;
+    const allDenoms = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
+    for (const name in allDenoms) {
+        const quantite = parseInt(caisseData.denominations?.[name], 10) || 0;
+        totalCompteEspeces += quantite * parseFloat(allDenoms[name]);
+    }
+    const fondDeCaisse = parseLocaleFloat(caisseData.fond_de_caisse);
+    const ventesTheoriquesEspeces = parseLocaleFloat(caisseData.ventes_especes) + parseLocaleFloat(caisseData.retrocession);
+    const ecartEspeces = totalCompteEspeces - fondDeCaisse - ventesTheoriquesEspeces;
+
+    // --- Calcul Carte Bancaire ---
+    let totalCompteCb = 0;
+    const caisseTPE = tpeState[caisseId] || {};
+    for (const tpeId in caisseTPE) {
+        totalCompteCb += (caisseTPE[tpeId] || []).reduce((sum, r) => sum + parseLocaleFloat(r.montant), 0);
+    }
+    const ventesTheoriquesCb = parseLocaleFloat(caisseData.ventes_cb);
+    const ecartCb = totalCompteCb - ventesTheoriquesCb;
+
+    // --- Calcul Chèques ---
+    const totalCompteCheques = (chequesState[caisseId] || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
+    const ventesTheoriquesCheques = parseLocaleFloat(caisseData.ventes_cheques);
+    const ecartCheques = totalCompteCheques - ventesTheoriquesCheques;
+
+    return {
+        ecartEspeces, totalCompteEspeces,
+        ecartCb, totalCompteCb,
+        ecartCheques, totalCompteCheques
+    };
+}
+
+/**
+ * Met à jour l'interface d'une section de réconciliation (UI).
+ */
+function updateReconciliationUI(caisseId, type, ecart, totalCompte, state) {
+    const { config } = state;
+    const statusDiv = document.getElementById(`status-${type}-${caisseId}`);
+    const countedDiv = document.getElementById(`counted-${type}-${caisseId}`);
+    const sectionDiv = document.getElementById(`section-${type}-${caisseId}`);
+    if (!statusDiv || !countedDiv || !sectionDiv) return;
+    
+    const ecartValueSpan = statusDiv.querySelector('.ecart-value');
+    const validateBtn = statusDiv.querySelector('.validate-section-btn');
+
+    countedDiv.textContent = formatCurrency(totalCompte, config);
+    ecartValueSpan.textContent = formatCurrency(ecart, config);
+    
+    ecartValueSpan.className = 'ecart-value'; // Reset classes
+    if (Math.abs(ecart) < 0.01) {
+        ecartValueSpan.classList.add('ecart-ok');
+        validateBtn.disabled = false;
+    } else {
+        ecartValueSpan.classList.add(ecart > 0 ? 'ecart-positif' : 'ecart-negatif');
+        validateBtn.disabled = true;
+    }
+
+    if (state.wizardState.validationStatus[caisseId]?.[type]) {
+        sectionDiv.classList.add('validated');
+        validateBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Validé';
+        validateBtn.disabled = true;
+    } else {
+        sectionDiv.classList.remove('validated');
+        validateBtn.innerHTML = '<i class="fa-solid fa-check"></i> Valider';
+    }
+}
+
+
+/**
  * Calcule la suggestion de retrait d'espèces pour une caisse donnée.
- * @param {object} caisseData - Les données de la caisse.
- * @param {object} config - La configuration de l'application.
- * @returns {object} Un objet avec les suggestions et le total à retirer.
  */
 export function calculateWithdrawalSuggestion(caisseData, config) {
     if (!caisseData) return { suggestions: [], totalToWithdraw: 0 };
@@ -51,55 +147,80 @@ export function calculateWithdrawalSuggestion(caisseData, config) {
     const currentQuantities = {};
     for (const name in allDenoms) {
         const qty = parseInt(denominationsData[name], 10) || 0;
-        if (qty > 0) {
-            currentQuantities[name] = qty;
-        }
+        if (qty > 0) currentQuantities[name] = qty;
     }
 
-    // --- DÉBUT DE LA NOUVELLE LOGIQUE BASÉE SUR VOTRE EXPLICATION ---
-
-    // 1. Déterminer le montant total à retirer, qui correspond à la recette du jour.
     const targetWithdrawalAmount = parseLocaleFloat(caisseData.ventes_especes) + parseLocaleFloat(caisseData.retrocession);
-    
-    // Si la recette est nulle ou négative, il n'y a rien à retirer.
-    if (targetWithdrawalAmount <= 0) {
-        return { suggestions: [], totalToWithdraw: 0 };
-    }
+    if (targetWithdrawalAmount <= 0) return { suggestions: [], totalToWithdraw: 0 };
 
     const suggestions = [];
     let totalWithdrawn = 0;
-    const availableQuantities = { ...currentQuantities };
-
-    // On trie les dénominations de la plus grande à la plus petite.
     const sortedDenoms = Object.keys(allDenoms).sort((a, b) => parseFloat(allDenoms[b]) - parseFloat(allDenoms[a]));
 
-    // 2. On parcourt les dénominations pour constituer le montant à retirer.
     for (const name of sortedDenoms) {
         const value = parseFloat(allDenoms[name]);
-        let qtyAvailable = availableQuantities[name] || 0;
-
+        let qtyAvailable = currentQuantities[name] || 0;
         if (qtyAvailable > 0 && totalWithdrawn < targetWithdrawalAmount) {
-            // On calcule combien il reste à retirer.
             const remainingToWithdraw = targetWithdrawalAmount - totalWithdrawn;
-            
-            // Combien de cette coupure peut-on retirer pour combler ce reste ?
             const howManyCanFit = Math.floor(remainingToWithdraw / value);
-            
-            // On ne peut pas retirer plus que ce qu'on a de disponible.
             const qtyToWithdraw = Math.min(qtyAvailable, howManyCanFit);
 
             if (qtyToWithdraw > 0) {
-                const withdrawnAmount = qtyToWithdraw * value;
-                suggestions.push({ name, value, qty: qtyToWithdraw, total: withdrawnAmount });
-                totalWithdrawn += withdrawnAmount;
+                suggestions.push({ name, value, qty: qtyToWithdraw, total: qtyToWithdraw * value });
+                totalWithdrawn += qtyToWithdraw * value;
             }
         }
     }
     
-    // --- FIN DE LA NOUVELLE LOGIQUE ---
-
     return { suggestions, totalToWithdraw: totalWithdrawn };
 }
+
+/**
+ * Prépare le FormData pour l'envoi final des données de clôture.
+ */
+export function prepareFinalFormData(state) {
+    const { wizardState, calculatorData, tpeState, chequesState } = state;
+    const formData = new FormData();
+
+    formData.append('nom_comptage', calculatorData.nom_comptage);
+    formData.append('explication', calculatorData.explication);
+
+    wizardState.selectedCaisses.forEach(caisseId => {
+        formData.append('caisses_a_cloturer[]', caisseId);
+        const caisseData = calculatorData.caisse[caisseId] || {};
+        for (const key in caisseData) {
+            if (key !== 'denominations' && key !== 'cheques' && key !== 'tpe') {
+                 formData.append(`caisse[${caisseId}][${key}]`, caisseData[key]);
+            }
+        }
+        
+        const denominationsData = caisseData.denominations || {};
+        for (const denom in denominationsData) {
+            formData.append(`caisse[${caisseId}][denominations][${denom}]`, denominationsData[denom]);
+        }
+        
+        const chequesData = chequesState[caisseId] || [];
+        chequesData.forEach((cheque, i) => {
+            formData.append(`caisse[${caisseId}][cheques][${i}][montant]`, cheque.montant);
+            formData.append(`caisse[${caisseId}][cheques][${i}][commentaire]`, cheque.commentaire);
+        });
+
+        const tpeData = tpeState[caisseId] || {};
+        for (const tId in tpeData) {
+            (tpeData[tId] || []).forEach((r, i) => {
+                formData.append(`caisse[${caisseId}][tpe][${tId}][${i}][montant]`, r.montant);
+                formData.append(`caisse[${caisseId}][tpe][${tId}][${i}][heure]`, r.heure);
+            });
+        }
+        
+        const withdrawalData = wizardState.confirmedData[caisseId]?.withdrawals || [];
+        withdrawalData.forEach(item => {
+            formData.append(`retraits[${caisseId}][${item.name}]`, item.qty);
+        });
+    });
+    return formData;
+}
+
 
 /**
  * Soumet les données finales de clôture à l'API.
