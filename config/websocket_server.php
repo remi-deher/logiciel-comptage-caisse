@@ -1,5 +1,5 @@
 <?php
-// Fichier : config/websocket_server.php (Version Finale Complète et Corrigée)
+// Fichier : config/websocket_server.php (Corrigé pour l'initialisation de l'état au démarrage)
 
 // Port d'écoute du serveur WebSocket
 $port = '8081';
@@ -48,8 +48,35 @@ class CaisseServer implements MessageComponentInterface {
         $this->connect();
         $this->clotureStateService = new ClotureStateService($this->pdo);
 
+        // --- DÉBUT DE LA CORRECTION ---
+        // On charge l'état depuis la BDD dès le démarrage du serveur
+        $this->loadInitialStateFromDb();
+        // --- FIN DE LA CORRECTION ---
+
         echo "Serveur WebSocket démarré sur le port {$GLOBALS['port']}.\n";
     }
+
+    // --- DÉBUT DE L'AJOUT ---
+    /**
+     * Charge l'état initial des caisses depuis la base de données au démarrage du serveur.
+     */
+    private function loadInitialStateFromDb() {
+        echo "Chargement de l'état initial des caisses depuis la base de données...\n";
+        try {
+            $this->executeDbAction(function() {
+                $this->updateAndCacheClotureState();
+                echo "État initial chargé avec succès.\n";
+            });
+        } catch (Exception $e) {
+            echo "Erreur lors du chargement de l'état initial : " . $e->getMessage() . "\n";
+            $this->clotureState = [
+                'type' => 'cloture_locked_caisses',
+                'caisses' => [],
+                'closed_caisses' => []
+            ];
+        }
+    }
+    // --- FIN DE L'AJOUT ---
 
     private function connect() {
         echo "Tentative de connexion à la base de données...\n";
@@ -97,13 +124,7 @@ class CaisseServer implements MessageComponentInterface {
         $this->clients->attach($conn);
         echo "NOUVELLE CONNEXION : Client ID {$conn->resourceId}\n";
         
-        $this->executeDbAction(function() use ($conn) {
-            if ($this->clotureState === null) {
-                echo "CLIENT-{$conn->resourceId} : Premier client, chargement de l'état initial des caisses.\n";
-                $this->updateAndCacheClotureState();
-            }
-        });
-
+        // Pas besoin de recharger l'état ici si un client se connecte, c'est déjà en mémoire.
         $conn->send(json_encode(['type' => 'welcome', 'resourceId' => $conn->resourceId]));
     }
 
@@ -177,7 +198,6 @@ class CaisseServer implements MessageComponentInterface {
         $this->clients->detach($conn);
 
         $this->executeDbAction(function() use ($conn) {
-            // Déverrouillage automatique des caisses verrouillées par cette connexion
             $this->clotureStateService->forceUnlockByConnectionId((string)$conn->resourceId);
             
             if (count($this->clients) === 0) {
@@ -185,9 +205,8 @@ class CaisseServer implements MessageComponentInterface {
                  $this->formState = [];
                  $this->chequesState = [];
                  $this->tpeState = [];
-                 $this->clotureState = null;
+                 // On ne réinitialise PAS clotureState, on veut garder l'état de la BDD.
              } else {
-                 // On notifie les autres clients du changement d'état
                  $this->updateAndCacheClotureState();
                  $this->broadcastClotureStateToAll();
              }
