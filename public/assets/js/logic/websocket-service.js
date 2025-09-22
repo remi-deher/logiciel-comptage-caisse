@@ -29,13 +29,8 @@ export function initializeWebSocket(onMessageHandler) {
                 statusIndicator.classList.remove('disconnected', 'error');
                 statusIndicator.classList.add('connected');
                 statusText.textContent = 'Connecté';
-                console.log('%c[WebSocket] Connexion établie avec succès.', 'color: green; font-weight: bold;');
-                
-                // --- CORRECTION AJOUTÉE ICI ---
-                // On envoie la demande d'état initial seulement APRÈS la confirmation de connexion.
-                sendWsMessage({ type: 'get_full_state' });
-                
-                resolve(wsConnection);
+                console.log('%c[WebSocket] Connexion établie. En attente du message de bienvenue...', 'color: green; font-weight: bold;');
+                // La promesse n'est plus résolue ici. On attend le message 'welcome'.
             };
 
             wsConnection.onerror = (error) => {
@@ -57,8 +52,19 @@ export function initializeWebSocket(onMessageHandler) {
                 const parsedData = JSON.parse(event.data);
                 console.log('%c[WebSocket] Message Reçu <<', 'color: blue; font-weight: bold;', parsedData);
 
-                if (typeof onMessageHandler === 'function') {
-                    onMessageHandler(parsedData);
+                // On traite le message 'welcome' de manière spéciale pour résoudre la promesse
+                if (parsedData.type === 'welcome' && parsedData.resourceId) {
+                    console.log('%c[WebSocket] Message de bienvenue reçu. Initialisation terminée.', 'color: green; font-weight: bold;');
+                    // On passe d'abord le message au gestionnaire principal
+                    if (typeof onMessageHandler === 'function') {
+                        onMessageHandler(parsedData);
+                    }
+                    // Ensuite, on résout la promesse pour signaler que tout est prêt.
+                    resolve(wsConnection);
+                } else {
+                    if (typeof onMessageHandler === 'function') {
+                        onMessageHandler(parsedData);
+                    }
                 }
             };
 

@@ -73,17 +73,9 @@ async function initialize() {
     renderFooter(appFooter);
     initializeNavbarLogic();
     
-    // CORRECTION : On charge la logique de la page AVANT de se connecter.
+    // Le routeur se chargera de lancer la logique de chaque page,
+    // y compris l'initialisation du WebSocket pour le calculateur.
     handleRouting();
-
-    // On se connecte au WebSocket une fois que le gestionnaire de message est en place.
-    try {
-        await initializeWebSocket(globalWsMessageHandler);
-        setClotureReady(true); 
-    } catch (error) {
-        console.error("Échec de l'initialisation du WebSocket. La collaboration sera désactivée.", error);
-        setClotureReady(false);
-    }
 
     app.addEventListener('click', (event) => {
         const link = event.target.closest('a');

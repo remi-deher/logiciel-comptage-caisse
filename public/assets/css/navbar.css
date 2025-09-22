@@ -28,15 +28,45 @@
 .status-indicator.connected { background-color: var(--color-success); }
 .status-indicator.disconnected { background-color: var(--color-danger); }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background-color: white; margin-right: 8px; }
+
+/* --- DÉBUT DES MODIFICATIONS POUR LE BOUTON DE CLÔTURE --- */
 .cloture-btn {
-    background-color: #8a2be2; color: white; border: none; padding: 8px 15px;
-    border-radius: 6px; font-weight: bold; cursor: pointer;
+    background-color: #8a2be2; /* Violet par défaut */
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
+
+.cloture-btn.mode-validation {
+    background-color: var(--color-success); /* Vert pour la validation */
+}
+
+.cloture-btn.mode-finalisation {
+    background-color: var(--color-primary); /* Bleu pour la finalisation */
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
 .cloture-btn:disabled {
     background-color: #7f8c8d;
     opacity: 0.6;
     cursor: not-allowed;
+    animation: none;
 }
+/* --- FIN DES MODIFICATIONS --- */
+
 .theme-switch-btn {
     background-color: var(--color-surface-alt); border: 1px solid var(--color-border-light);
     color: var(--color-text-secondary); width: 40px; height: 40px;
@@ -72,14 +102,10 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
     padding: 10px 15px;
     border-radius: 6px;
 }
-
-/* On cache le bouton mobile par défaut */
 .navbar-toggler { display: none; }
 .mobile-menu { display: none; }
 
-/* Styles pour les écrans de 1024px et moins (tablettes et mobiles) */
 @media (max-width: 1024px) {
-    /* On cache les liens de bureau et on affiche le bouton "burger" */
     .navbar-links { display: none; }
     .navbar-toggler {
         display: block;
@@ -89,8 +115,6 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
         cursor: pointer;
         color: var(--color-text-primary);
     }
-
-    /* Styles pour le conteneur du menu mobile quand il est affiché */
     .mobile-menu.show {
         display: flex;
         flex-direction: column;
@@ -104,8 +128,6 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
         padding: 10px;
         gap: 5px;
     }
-    
-    /* Styles pour les liens dans le menu mobile */
     .mobile-menu a {
         display: block;
         padding: 12px 20px;
@@ -117,17 +139,9 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
         align-items: center;
         gap: 15px;
     }
-
-    .mobile-menu a:hover {
-        background-color: var(--color-surface-alt-hover);
-    }
-
-    .mobile-menu a.active {
-        background-color: var(--color-primary);
-        color: white;
-    }
+    .mobile-menu a:hover { background-color: var(--color-surface-alt-hover); }
+    .mobile-menu a.active { background-color: var(--color-primary); color: white; }
 }
-
 .user-menu-dropdown a {
     display: flex;
     align-items: center;
@@ -139,24 +153,20 @@ body[data-theme="dark"] .theme-switch-btn .fa-moon { display: none; }
     text-decoration: none;
     font-weight: 500;
 }
-
 .user-menu-dropdown a:hover {
     background-color: var(--color-surface-alt-hover);
     color: var(--color-text-primary);
 }
-
 .user-menu-dropdown a .fa-fw {
-    width: 20px; /* Aligne les icônes */
+    width: 20px;
     text-align: center;
 }
-
 .dropdown-divider {
     height: 1px;
     background-color: var(--color-border-light);
-    margin: 8px 5px; /* Marge légèrement réduite pour un look plus compact */
+    margin: 8px 5px;
 }
-
 .dropdown-logout-link:hover {
-    background-color: rgba(192, 57, 43, 0.1); /* Fond rouge léger au survol */
-    color: var(--color-danger); /* Texte en rouge au survol */
+    background-color: rgba(192, 57, 43, 0.1);
+    color: var(--color-danger);
 }

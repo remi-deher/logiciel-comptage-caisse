@@ -1,10 +1,10 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Corrigée et Fiabilisée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Corrigée et Verborisée)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
 import { setActiveMessageHandler } from '../main.js';
-import { sendWsMessage } from './websocket-service.js';
-import { initializeCloture, updateClotureUI } from './cloture-logic.js';
+import { initializeWebSocket, sendWsMessage } from './websocket-service.js';
+import { initializeCloture, setClotureReady, updateClotureUI } from './cloture-logic.js';
 
 // --- État global de l'application ---
 let state = {
@@ -41,20 +41,23 @@ async function handleAutosave() {
 }
 
 function handleWebSocketMessage(data) {
+    console.log(`%c[CALC-LOGIC] Message WebSocket reçu de type: ${data.type}`, 'color: #16a085');
+
     switch (data.type) {
         case 'welcome':
             state.wsResourceId = data.resourceId.toString();
-            // On passe l'état complet de l'application au module de clôture pour qu'il puisse fonctionner.
+            console.log(`%c[CALC-LOGIC] <<< WELCOME reçu. Mon ID de ressource est maintenant: ${state.wsResourceId}`, 'background: #27ae60; color: white; padding: 2px 5px;');
             initializeCloture(state.config, state, state.wsResourceId);
             break;
         case 'cloture_locked_caisses':
-            // --- DÉBUT DE LA CORRECTION ---
-            // On met à jour l'état local et on délègue TOUTE la logique d'interface au module de clôture.
-            // L'appel incorrect à updateUIForClotureMode() a été supprimé.
+            console.log(`%c[CALC-LOGIC] <<< CLOTURE_LOCKED_CAISSES reçu. Mon ID de ressource est actuellement: ${state.wsResourceId}`, 'background: #f39c12; color: white; padding: 2px 5px;');
+            if (!state.wsResourceId) {
+                console.error("[CALC-LOGIC] ERREUR CRITIQUE : L'état de clôture a été reçu avant l'ID du client. Le verrouillage ne peut pas être appliqué.");
+                return;
+            }
             state.lockedCaisses = data.caisses || [];
             state.closedCaisses = (data.closed_caisses || []).map(String);
             updateClotureUI(data, state.wsResourceId);
-            // --- FIN DE LA CORRECTION ---
             break;
         case 'full_form_state':
             ui.applyFullFormState(data, state);
@@ -123,10 +126,17 @@ export async function initializeCalculator() {
         attachEventListeners();
         setActiveMessageHandler(handleWebSocketMessage);
         
+        // On attend que la connexion soit entièrement initialisée (y compris la réception du 'welcome')
+        await initializeWebSocket(handleWebSocketMessage);
+        
+        // Maintenant que nous sommes sûrs d'avoir notre ID, on peut demander l'état complet.
+        console.log(`%c[CALC-LOGIC] WebSocket initialisé. Envoi de get_full_state.`, 'background: #9b59b6; color: white;');
         sendWsMessage({ type: 'get_full_state' });
+        setClotureReady(true);
 
     } catch (error) {
         console.error("Erreur critique d'initialisation:", error);
         document.getElementById('main-content').innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;
+        setClotureReady(false);
     }
 }
