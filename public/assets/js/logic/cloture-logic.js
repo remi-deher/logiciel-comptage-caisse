@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Version de DÉBOGAGE complète et corrigée)
+// Fichier : public/assets/js/logic/cloture-logic.js (Corrigé avec une logique de verrouillage basée sur la confirmation du serveur)
 
 import { sendWsMessage } from './websocket-service.js';
 import { calculateEcartsForCaisse, calculateWithdrawalSuggestion } from './calculator-service.js';
@@ -16,8 +16,7 @@ let state = {
 
 // --- Fonctions Principales ---
 
-export function setClotureReady(isReady) {
-    console.log(`%c[CLOTURE-LOGIC] setClotureReady: Définir le bouton de clôture comme ${isReady ? 'PRÊT' : 'NON PRÊT'}`, 'color: #e67e22');
+function setClotureReady(isReady) {
     const clotureBtn = document.getElementById('cloture-btn');
     if (clotureBtn) {
         clotureBtn.disabled = !isReady;
@@ -26,69 +25,64 @@ export function setClotureReady(isReady) {
     }
 }
 
-export function initializeCloture(appConfig, appState, wsResourceId) {
-    console.log('%c[CLOTURE-LOGIC] INITIALISATION du module de clôture...', 'background: #2c3e50; color: white; padding: 2px 5px;');
+function initializeCloture(appConfig, appState, wsResourceId) {
     state.config = appConfig;
     state.appState = appState;
     state.wsResourceId = wsResourceId;
-    console.log('[CLOTURE-LOGIC] État initial:', state);
     attachClotureEventListeners();
 }
 
 // --- Gestion des Événements ---
 
 function attachClotureEventListeners() {
-    console.log('%c[CLOTURE-LOGIC] Attachement des écouteurs d\'événements...', 'color: #9b59b6');
-    // Un seul écouteur global pour tous les clics liés à la clôture
+    // Un seul écouteur pour le corps de la page gère tous les clics liés à la clôture
     document.body.addEventListener('click', e => {
         const target = e.target;
         const clotureBtn = target.closest('#cloture-btn');
         const modal = document.getElementById('cloture-selection-modal');
 
-        // Cas 1 : Clic sur le bouton principal de la barre de navigation
+        // Clic sur le bouton de clôture principal
         if (clotureBtn) {
-            console.log('%c[CLIC DÉTECTÉ] Bouton principal de clôture.', 'color: red; font-weight: bold');
-            console.log(`[CLOTURE-LOGIC] État actuel du mode clôture (isActive): ${state.isActive}`);
+            // Le comportement du bouton principal (Valider/Finaliser) est géré dans handleActiveClotureClick
             if (state.isActive) {
                 handleActiveClotureClick(clotureBtn);
             } else {
+            // Si le mode clôture n'est pas actif, on ouvre la modale de sélection
                 renderSelectionModal();
             }
-            return; // Action traitée
+            return;
         }
 
-        // Cas 2 : Actions à l'intérieur de la modale (si elle existe)
+        // Clics à l'intérieur de la modale de sélection
         if (modal) {
             if (target.closest('.modal-close') || target.closest('#cancel-selection-btn')) {
-                console.log('[CLIC DÉTECTÉ] Fermeture de la modale de sélection.');
                 modal.remove();
             }
+            // Quand l'utilisateur confirme son choix de caisses
             if (target.closest('#confirm-selection-btn')) {
-                console.log('[CLIC DÉTECTÉ] Confirmation de la sélection des caisses.');
                 const selected = Array.from(modal.querySelectorAll('input:checked')).map(cb => cb.value);
                 if (selected.length > 0) {
-                    startClotureMode(selected);
+                    // On envoie la demande de verrouillage au serveur et c'est tout.
+                    // Le passage en mode clôture se fera à la réception du message WebSocket de confirmation.
+                    selected.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
                     modal.remove();
                 }
             }
             if (target.closest('#select-all-btn')) {
-                console.log('[CLIC DÉTECTÉ] Tout sélectionner.');
                 modal.querySelectorAll('input[name="caisseSelection"]:not(:disabled)').forEach(cb => cb.checked = true);
                 updateSelectionCount();
             }
             if (target.closest('#deselect-all-btn')) {
-                console.log('[CLIC DÉTECTÉ] Tout désélectionner.');
                 modal.querySelectorAll('input[name="caisseSelection"]:checked').forEach(cb => cb.checked = false);
                 updateSelectionCount();
             }
+            // Gestion du bouton pour forcer la réouverture d'une caisse
             if (target.closest('.js-reopen-caisse')) {
-                console.log('[CLIC DÉTECTÉ] Rouvrir/Déverrouiller une caisse.');
                 e.stopPropagation(); e.preventDefault();
                 const caisseId = target.dataset.caisseId;
                 const caisseNom = state.config.nomsCaisses[caisseId] || `la caisse ${caisseId}`;
                 if (confirm(`Voulez-vous vraiment forcer le déverrouillage de "${caisseNom}" ?`)) {
                     const messageType = target.dataset.type === 'closed' ? 'cloture_reopen' : 'cloture_force_unlock';
-                    console.log(`[WEBSOCKET ENVOI] Type: ${messageType}, Caisse ID: ${caisseId}`);
                     sendWsMessage({ type: messageType, caisse_id: caisseId });
                     target.textContent = 'Déverrouillage...';
                     setTimeout(() => modal.remove(), 500);
@@ -96,57 +90,51 @@ function attachClotureEventListeners() {
             }
         }
     });
-    
-    // Changement sur une checkbox dans la modale
+
+    // Coche/décoche une case dans la modale
     document.body.addEventListener('change', e => {
         if (e.target.matches('input[name="caisseSelection"]')) {
              updateSelectionCount();
         }
     });
 
-    // Clic sur le bouton de finalisation sur le bandeau
+    // Clic sur le bouton de confirmation final (bandeau vert)
     const calculatorPage = document.getElementById('calculator-page');
     if (calculatorPage) {
         calculatorPage.addEventListener('click', e => {
             if (e.target.closest('#confirm-final-cloture-banner')) {
-                console.log('[CLIC DÉTECTÉ] Confirmation finale sur le bandeau.');
                 handleFinalSubmit();
             }
         });
     }
 
-    // Écouteur pour le changement d'onglet (pour mettre à jour le bouton de validation)
+    // Changement d'onglet de caisse pendant le mode clôture
     const tabSelector = document.querySelector('.tab-selector');
     if (tabSelector) {
         tabSelector.addEventListener('click', e => {
             if (e.target.classList.contains('tab-link') && state.isActive) {
-                console.log('[CLIC DÉTECTÉ] Changement d\'onglet en mode clôture.');
                 setTimeout(updateUIForClotureMode, 0);
             }
         });
     }
 }
 
-
 function handleActiveClotureClick(button) {
-    console.log('%c[CLOTURE-LOGIC] handleActiveClotureClick: Gestion du clic sur le bouton de clôture actif.', 'color: #e67e22');
     const allValidated = state.selectedCaisses.length > 0 && state.selectedCaisses.every(id => state.validatedCaisses.has(id));
-    console.log(`[CLOTURE-LOGIC] Toutes les caisses sont-elles validées ? ${allValidated}`);
 
+    // Si toutes les caisses sélectionnées pour cette session sont validées
     if (allValidated) {
-        console.log('[CLOTURE-LOGIC] Action: Affichage du bandeau de finalisation.');
         renderFinalSummaryBanner();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
+        // Sinon, on essaie de valider la caisse actuellement affichée
         const activeTab = document.querySelector('.tab-link.active');
         if (activeTab) {
             const caisseIdToValidate = activeTab.dataset.caisseId;
-            console.log(`[CLOTURE-LOGIC] Caisse active détectée : ID ${caisseIdToValidate}`);
             if (state.selectedCaisses.includes(caisseIdToValidate) && !state.validatedCaisses.has(caisseIdToValidate)) {
-                console.log(`[CLOTURE-LOGIC] Action: Validation de la caisse ${caisseIdToValidate}.`);
                 validateCaisse(caisseIdToValidate);
             } else {
-                console.log('[CLOTURE-LOGIC] Action: Proposer l\'annulation du mode clôture.');
+                // Si la caisse affichée n'est pas à valider, on propose d'annuler
                 if (confirm("Voulez-vous annuler le mode clôture en cours ?")) {
                     cancelClotureMode();
                 }
@@ -157,33 +145,25 @@ function handleActiveClotureClick(button) {
 
 // --- Logique du Mode Clôture ---
 
-export function startClotureMode(selectedCaisses) {
-    console.log('%c[CLOTURE-LOGIC] DÉMARRAGE du mode clôture.', 'background: #27ae60; color: white; padding: 2px 5px;');
-    console.log('[CLOTURE-LOGIC] Caisses sélectionnées:', selectedCaisses);
+function startClotureMode(caissesLockedByMe) {
     state.isActive = true;
-    state.selectedCaisses = selectedCaisses;
+    state.selectedCaisses = caissesLockedByMe;
     state.validatedCaisses.clear();
-    selectedCaisses.forEach(id => {
-        console.log(`[WEBSOCKET ENVOI] Type: cloture_lock, Caisse ID: ${id}`);
-        sendWsMessage({ type: 'cloture_lock', caisse_id: id });
-    });
     updateUIForClotureMode();
 }
 
-export function cancelClotureMode() {
-    console.warn('%c[CLOTURE-LOGIC] ANNULATION du mode clôture.', 'background: #c0392b; color: white; padding: 2px 5px;');
-    state.selectedCaisses.forEach(id => {
-        console.log(`[WEBSOCKET ENVOI] Type: cloture_force_unlock, Caisse ID: ${id}`);
-        sendWsMessage({ type: 'cloture_force_unlock', caisse_id: id });
-    });
+function cancelClotureMode() {
+    // On demande au serveur de déverrouiller les caisses de cette session
+    state.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_force_unlock', caisse_id: id }));
+    // On réinitialise l'état local
     state.isActive = false;
     state.selectedCaisses = [];
     state.validatedCaisses.clear();
+    // On met à jour l'interface pour revenir à la normale
     updateUIForClotureMode();
 }
 
 function validateCaisse(caisseId) {
-    console.log(`%c[CLOTURE-LOGIC] Validation de la caisse ${caisseId}`, 'color: #27ae60');
     state.validatedCaisses.add(caisseId);
     updateUIForClotureMode();
 }
@@ -202,16 +182,18 @@ async function handleFinalSubmit() {
             const { suggestions } = calculateWithdrawalSuggestion(state.appState.calculatorData.caisse[id], state.config);
             (suggestions || []).forEach(s => formData.append(`retraits[${id}][${s.name}]`, s.qty));
         });
-        
+
+        // Etape 1: Sauvegarde les données des caisses validées et les marque comme "closed"
         const responseIndividuelle = await fetch('index.php?route=cloture/confirm_caisse', { method: 'POST', body: formData });
         if (!responseIndividuelle.ok) throw new Error('Erreur lors de la confirmation des caisses.');
 
+        // Etape 2: Lance la clôture générale (qui ne fonctionnera que si toutes les caisses sont bien "closed")
         const responseGenerale = await fetch('index.php?route=cloture/confirm_generale', { method: 'POST' });
         const resultGenerale = await responseGenerale.json();
         if (!resultGenerale.success) throw new Error(resultGenerale.message);
 
         alert(resultGenerale.message || 'Clôture générale réussie !');
-        sendWsMessage({ type: 'force_reload_all' });
+        sendWsMessage({ type: 'force_reload_all' }); // Recharge pour tous les utilisateurs
 
     } catch (error) {
         alert(`Erreur: ${error.message}`);
@@ -237,7 +219,6 @@ function updateSelectionCount() {
 }
 
 function renderSelectionModal() {
-    console.log('[CLOTURE-LOGIC] Affichage de la modale de sélection.');
     const lockedCaisses = state.appState.lockedCaisses || [];
     const closedCaisses = state.appState.closedCaisses || [];
     const wsId = state.wsResourceId;
@@ -282,10 +263,7 @@ function renderSelectionModal() {
     const modalHtml = `
         <div id="cloture-selection-modal" class="modal visible">
             <div class="modal-content wide">
-                <div class="modal-header">
-                    <h3>Lancer une Clôture</h3>
-                    <span class="modal-close">&times;</span>
-                </div>
+                <div class="modal-header"><h3>Lancer une Clôture</h3><span class="modal-close">&times;</span></div>
                 <div class="modal-body">
                     <div class="selection-header">
                         <div class="color-key">
@@ -303,18 +281,14 @@ function renderSelectionModal() {
                 </div>
                 <div class="modal-footer">
                     <button class="btn" id="cancel-selection-btn">Annuler</button>
-                    <button class="btn save-btn" id="confirm-selection-btn" disabled>
-                        Démarrer la Clôture <span class="count" id="selection-count" style="display: none;">0</span>
-                    </button>
+                    <button class="btn save-btn" id="confirm-selection-btn" disabled>Démarrer la Clôture <span class="count" id="selection-count" style="display: none;">0</span></button>
                 </div>
             </div>
         </div>`;
-    
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
 function renderFinalSummaryBanner() {
-    console.log('[CLOTURE-LOGIC] Affichage du bandeau de finalisation.');
     const container = document.getElementById('cloture-final-summary-banner-container');
     if (!container) return;
     let totalVentesGlobal = 0, totalRetraitGlobal = 0, fondDeCaisseJ1Global = 0;
@@ -331,16 +305,16 @@ function renderFinalSummaryBanner() {
     container.innerHTML = `<div class="cloture-final-summary-banner"><div class="banner-header"><h4><i class="fa-solid fa-flag-checkered"></i> Prêt pour la clôture finale</h4><p>Vérifiez les totaux ci-dessous. Cette action est irréversible et créera les écritures pour le jour suivant.</p></div><div class="summary-table-container"><table class="final-summary-table"><thead><tr><th>Caisse</th><th>Ventes Totales</th><th>Retrait Espèces</th><th>Fond de Caisse J+1</th></tr></thead><tbody>${rowsHtml}</tbody><tfoot><tr><td><strong>TOTAL</strong></td><td><strong>${formatCurrency(totalVentesGlobal, state.config)}</strong></td><td class="text-danger"><strong>${formatCurrency(totalRetraitGlobal, state.config)}</strong></td><td class="text-success"><strong>${formatCurrency(fondDeCaisseJ1Global, state.config)}</strong></td></tr></tfoot></table></div><div class="banner-actions"><button class="btn save-btn" id="confirm-final-cloture-banner">Confirmer et Terminer la Journée</button></div></div>`;
 }
 
-export function updateUIForClotureMode() {
-    console.log('%c[CLOTURE-LOGIC] updateUIForClotureMode: Mise à jour de l\'interface principale pour l\'initiateur.', 'color: #3498db');
-    console.log('[CLOTURE-LOGIC] État pour la MàJ:', { isActive: state.isActive, selected: state.selectedCaisses, validated: Array.from(state.validatedCaisses) });
+function updateUIForClotureMode() {
     const isClotureActive = state.isActive;
     const bannerContainer = document.getElementById('cloture-banner-container');
     const finalSummaryContainer = document.getElementById('cloture-final-summary-banner-container');
     const clotureBtn = document.getElementById('cloture-btn');
+    
     if (bannerContainer) {
         bannerContainer.innerHTML = isClotureActive ? `<div class="cloture-mode-banner"><i class="fa-solid fa-lock"></i><div><strong>Mode Clôture Activé</strong><p>Vérifiez et validez les chiffres de chaque caisse sélectionnée avant de finaliser.</p></div></div>` : '';
     }
+    
     if (clotureBtn) {
         clotureBtn.classList.remove('mode-validation', 'mode-finalisation');
         if (isClotureActive) {
@@ -353,7 +327,7 @@ export function updateUIForClotureMode() {
                 const activeTab = document.querySelector('.tab-link.active');
                 const activeCaisseId = activeTab ? activeTab.dataset.caisseId : null;
                 const activeCaisseNom = activeCaisseId ? state.config.nomsCaisses[activeCaisseId] : '';
-                
+
                 if (activeCaisseId && state.selectedCaisses.includes(activeCaisseId) && !state.validatedCaisses.has(activeCaisseId)) {
                     clotureBtn.classList.add('mode-validation');
                     clotureBtn.innerHTML = `✅ Valider ${activeCaisseNom}`;
@@ -368,12 +342,13 @@ export function updateUIForClotureMode() {
             clotureBtn.disabled = clotureBtn.dataset.wsReady !== 'true';
         }
     }
+
     document.querySelectorAll('.tab-link').forEach(tab => {
         const caisseId = tab.dataset.caisseId;
         const isSelectedForCloture = state.selectedCaisses.includes(caisseId);
         const isLockedByMe = isClotureActive && isSelectedForCloture;
         const isValidated = state.validatedCaisses.has(caisseId);
-        
+
         if (tab) {
             tab.classList.remove('cloture-en-cours', 'cloturee');
             const statusSpan = tab.querySelector('.tab-status-text');
@@ -395,24 +370,36 @@ export function updateUIForClotureMode() {
     }
 }
 
-export function updateClotureUI(wsData, wsResourceId) {
-    console.log('%c[CLOTURE-LOGIC] updateClotureUI: Réception d\'un état de clôture depuis le WebSocket.', 'color: #f1c40f');
-    console.log('[CLOTURE-LOGIC] Données reçues:', wsData);
-    console.log(`[CLOTURE-LOGIC] Mon ID de ressource: ${wsResourceId}`);
-
-    if (!wsResourceId) {
-        console.error("[CLOTURE-LOGIC] Mon ID de ressource est NULL. Impossible de déterminer l'état de verrouillage.");
-        return;
-    }
+function updateClotureUI(wsData, wsResourceId) {
+    if (!wsResourceId) return;
 
     const lockedCaisses = wsData.caisses || [];
     const closedCaisses = (wsData.closed_caisses || []).map(String);
+
+    // --- DÉBUT DE LA CORRECTION ---
+    // C'est cette fonction qui devient le point d'entrée pour activer/désactiver le mode clôture
+    const caissesLockedByMe = lockedCaisses
+        .filter(c => String(c.locked_by) === String(wsResourceId))
+        .map(c => c.caisse_id.toString());
+
+    if (caissesLockedByMe.length > 0 && !state.isActive) {
+        // Le serveur confirme qu'on a verrouillé des caisses, on peut démarrer le mode clôture
+        startClotureMode(caissesLockedByMe);
+    } else if (caissesLockedByMe.length === 0 && state.isActive) {
+        // Le serveur nous informe qu'on n'a plus de caisses verrouillées, on quitte le mode clôture
+        cancelClotureMode();
+    }
+    // --- FIN DE LA CORRECTION ---
+
     document.querySelectorAll('.tab-link').forEach(tab => {
         const caisseId = tab.dataset.caisseId;
         const lockInfo = lockedCaisses.find(c => c.caisse_id.toString() === caisseId);
         const isClosed = closedCaisses.includes(caisseId);
         const isLockedByOther = lockInfo && String(lockInfo.locked_by) !== String(wsResourceId);
         
+        // On ne désactive les champs que si c'est qqn d'autre qui verrouille ou si c'est clôturé
+        const shouldBeDisabled = isLockedByOther || isClosed;
+
         tab.classList.toggle('locked-by-other', isLockedByOther);
         tab.classList.toggle('cloturee', isClosed);
         const statusSpan = tab.querySelector('.tab-status-text');
@@ -423,19 +410,32 @@ export function updateClotureUI(wsData, wsResourceId) {
         if (isClosed) {
             tab.insertAdjacentHTML('beforeend', '<span class="tab-status-text">(Clôturée)</span>');
         }
-        
+
         const formFields = document.querySelectorAll(`#caisse${caisseId} input, #caisse${caisseId} button, #caisse${caisseId} textarea`);
-        formFields.forEach(field => field.disabled = isLockedByOther || isClosed);
+        formFields.forEach(field => {
+            // On ne touche pas aux boutons de la modale de clôture eux-mêmes
+            if (!field.closest('#cloture-selection-modal')) {
+                field.disabled = shouldBeDisabled;
+            }
+        });
     });
 
-    if (state.isActive) return;
+    // Logique pour le bouton finaliser
+    if (state.config && state.config.nomsCaisses) {
+        const allCaisseIds = Object.keys(state.config.nomsCaisses);
+        const allAreClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => closedCaisses.includes(id));
 
-    const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
-    const allAreClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => closedCaisses.includes(id));
-    if (allAreClosed) {
-        state.isActive = true;
-        state.selectedCaisses = allCaisseIds;
-        state.validatedCaisses = new Set(allCaisseIds);
-        updateUIForClotureMode();
+        if (allAreClosed) {
+            state.isActive = true;
+            state.selectedCaisses = allCaisseIds;
+            state.validatedCaisses = new Set(allCaisseIds);
+            updateUIForClotureMode();
+        }
     }
 }
+
+export {
+    setClotureReady,
+    initializeCloture,
+    updateClotureUI
+};

@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Corrigée et Verborisée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé pour la persistance de l'état)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
@@ -107,7 +107,7 @@ function attachEventListeners() {
     const form = document.getElementById('caisse-form');
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        await handleAutosave(); 
+        await handleAutosave();
     });
 }
 
@@ -121,15 +121,13 @@ export async function initializeCalculator() {
 
         ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.chequesState, state.tpeState);
         ui.populateInitialData(state.calculatorData);
-        
+
         service.calculateAll(state.config, state);
         attachEventListeners();
         setActiveMessageHandler(handleWebSocketMessage);
-        
-        // On attend que la connexion soit entièrement initialisée (y compris la réception du 'welcome')
+
         await initializeWebSocket(handleWebSocketMessage);
-        
-        // Maintenant que nous sommes sûrs d'avoir notre ID, on peut demander l'état complet.
+
         console.log(`%c[CALC-LOGIC] WebSocket initialisé. Envoi de get_full_state.`, 'background: #9b59b6; color: white;');
         sendWsMessage({ type: 'get_full_state' });
         setClotureReady(true);

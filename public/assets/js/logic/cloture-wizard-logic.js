@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Version avec Étape 2 séquentielle)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé avec attente de confirmation)
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -69,25 +69,26 @@ async function handleNextStep() {
             const allDisabled = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(cb => cb.disabled);
 
             if (state.wizardState.selectedCaisses.length > 0) {
-                // Cas normal : au moins une caisse est sélectionnée
-                state.wizardState.reconciliation.status = {};
-                state.wizardState.selectedCaisses.forEach(id => {
-                    state.wizardState.reconciliation.status[id] = { especes: false, cb: false, cheques: false };
-                });
+                // On envoie le message de verrouillage mais on n'avance pas d'étape ici.
+                // Le gestionnaire WebSocket s'en chargera à la réception de la confirmation.
                 state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
-                state.wizardState.currentStep = 2;
+                // On affiche un message d'attente à l'utilisateur
+                const wizardContent = document.querySelector('.wizard-content');
+                if(wizardContent) {
+                    wizardContent.innerHTML = '<p style="text-align:center; padding: 40px 0;"><i class="fa-solid fa-lock fa-2x"></i><br><br>Verrouillage des caisses en cours...</p>';
+                }
             } else if (allDisabled) {
-                // Cas spécial : aucune caisse sélectionnable, car toutes sont déjà clôturées
-                // On peuple les caisses en arrière-plan et on saute à la fin
+                // Si toutes les caisses sont déjà clôturées, on saute à la fin
                 state.wizardState.selectedCaisses = Object.keys(state.config.nomsCaisses);
                 state.wizardState.currentStep = 4;
+                renderCurrentStep();
             } else {
-                // Cas où l'utilisateur n'a rien coché alors qu'il le pouvait
-                ui.updateWizardUI(state.wizardState, isReconciliationComplete()); // Réactive le bouton
-                return; // On arrête tout
+                // L'utilisateur n'a rien coché
+                ui.updateWizardUI(state.wizardState, isReconciliationComplete()); 
+                return;
             }
             // --- FIN DE LA CORRECTION ---
-
+            
         } else if (state.wizardState.currentStep === 2) {
             if (isReconciliationComplete()) {
                 state.wizardState.currentStep = 3;
@@ -96,31 +97,37 @@ async function handleNextStep() {
             }
         }
         else if (state.wizardState.currentStep === 3) {
-            state.wizardState.currentStep = 4;
-        }
-        else if (state.wizardState.currentStep === 4) {
-            // Étape 1 : Sauvegarde des clôtures individuelles
-            console.log("Étape 1/2 : Envoi des données de clôtures individuelles...");
             const formData = service.prepareFinalFormData(state);
             await service.submitFinalCloture(formData);
-            console.log("Clôtures individuelles enregistrées avec succès.");
 
-            // Étape 2 : Déclenchement de la clôture générale
-            console.log("Étape 2/2 : Déclenchement de la Clôture Générale...");
+            const currentClotureState = await service.fetchClotureState();
+            const allCaisseIds = Object.keys(state.config.nomsCaisses);
+            const closedCaisseIds = (currentClotureState.closed_caisses || []).map(String);
+
+            if (allCaisseIds.length > 0 && allCaisseIds.every(id => closedCaisseIds.includes(id))) {
+                state.wizardState.currentStep = 4;
+            } else {
+                alert('Les caisses sélectionnées ont été clôturées. La clôture générale sera possible lorsque toutes les autres caisses seront également fermées.');
+                sendWsMessage({ type: 'force_reload_all' });
+                window.location.href = '/calculateur';
+                return;
+            }
+        }
+        else if (state.wizardState.currentStep === 4) {
             const finalResult = await service.submitClotureGenerale();
-            console.log("Clôture générale terminée avec succès.");
-            
             alert(finalResult.message || 'Clôture générale réussie ! La page va être rechargée.');
             sendWsMessage({ type: 'force_reload_all' });
             window.location.href = '/calculateur';
             return;
         }
         
-        renderCurrentStep();
+        // On ne render que si on n'a pas redirigé
+        if (state.wizardState.currentStep !== 1) {
+            renderCurrentStep();
+        }
 
     } catch (error) {
         alert(`Erreur: ${error.message}`);
-        // Réactive le bouton en cas d'erreur pour permettre une nouvelle tentative
         ui.updateWizardUI(state.wizardState, isReconciliationComplete());
     }
 }
@@ -172,9 +179,29 @@ function handleWizardWebSocketMessage(data) {
     if (data.type === 'welcome') {
         state.wsResourceId = data.resourceId.toString();
     }
-    if (data.type === 'cloture_locked_caisses' && state.wizardState.currentStep === 1) {
-        ui.renderStep1_Selection(document.querySelector('.wizard-content'), state.config, state.wsResourceId);
+    // --- DÉBUT DE LA CORRECTION ---
+    if (data.type === 'cloture_locked_caisses') {
+        // Si on est à l'étape 1 et qu'on a sélectionné des caisses, on attend la confirmation de verrouillage
+        if (state.wizardState.currentStep === 1 && state.wizardState.selectedCaisses.length > 0) {
+            const lockedCaisseIds = (data.caisses || []).map(c => c.caisse_id.toString());
+            const allSelectedAreNowLocked = state.wizardState.selectedCaisses.every(id => lockedCaisseIds.includes(id));
+
+            if (allSelectedAreNowLocked) {
+                console.log("Verrouillage confirmé par le serveur. Passage à l'étape 2.");
+                state.wizardState.reconciliation.status = {};
+                state.wizardState.selectedCaisses.forEach(id => {
+                    state.wizardState.reconciliation.status[id] = { especes: false, cb: false, cheques: false };
+                });
+                state.wizardState.currentStep = 2;
+                renderCurrentStep();
+            }
+        } 
+        // Sinon, si on est à l'étape 1 sans attendre, on rafraîchit simplement la vue
+        else if (state.wizardState.currentStep === 1) {
+            ui.renderStep1_Selection(document.querySelector('.wizard-content'), state.config, state.wsResourceId);
+        }
     }
+    // --- FIN DE LA CORRECTION ---
 }
 
 export async function initializeClotureWizard() {

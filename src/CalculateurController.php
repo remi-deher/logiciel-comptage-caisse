@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Final, refactorisé et corrigé)
+// Fichier : src/CalculateurController.php (Final, refactorisé et sécurisé)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -236,7 +236,7 @@ class CalculateurController {
         }
         exit;
     }
-    
+
     public function cloture() {
         header('Content-Type: application/json');
         try {
@@ -308,6 +308,21 @@ class CalculateurController {
 
     public function cloture_generale() {
         header('Content-Type: application/json');
+
+        // --- DÉBUT DE LA MODIFICATION : VÉRIFICATION DE SÉCURITÉ ---
+        $allCaisseIdsCount = count($this->noms_caisses);
+        $closedCaissesCount = count($this->clotureStateService->getClosedCaisses());
+
+        if ($allCaisseIdsCount !== $closedCaissesCount) {
+            http_response_code(400); // Bad Request
+            echo json_encode([
+                'success' => false,
+                'message' => "Action impossible : Toutes les {$allCaisseIdsCount} caisses ne sont pas encore clôturées. Seulement {$closedCaissesCount} le sont."
+            ]);
+            exit;
+        }
+        // --- FIN DE LA MODIFICATION ---
+
         $backupResult = $this->backupService->createBackup();
         if (!$backupResult['success']) {
             http_response_code(500);
@@ -328,17 +343,13 @@ class CalculateurController {
             $stmt_j1->execute([$nom_comptage_j1, "Préparation pour la journée suivante.", $now]);
             $comptage_id_j1 = $this->pdo->lastInsertId();
             foreach ($this->noms_caisses as $caisse_id => $nom) {
-                
-                // --- DÉBUT DE LA CORRECTION ---
-                // La condition sur la date a été retirée pour trouver la dernière clôture,
-                // peu importe le jour où elle a été faite.
+
                 $stmt_latest_cloture = $this->pdo->prepare(
-                    "SELECT cd.id FROM comptage_details cd 
-                     JOIN comptages c ON cd.comptage_id = c.id 
+                    "SELECT cd.id FROM comptage_details cd
+                     JOIN comptages c ON cd.comptage_id = c.id
                      WHERE cd.caisse_id = ? AND c.nom_comptage LIKE 'Clôture Caisse%'
                      ORDER BY c.id DESC LIMIT 1"
                 );
-                // --- FIN DE LA CORRECTION ---
 
                 $stmt_latest_cloture->execute([$caisse_id]);
                 $latest_detail_id = $stmt_latest_cloture->fetchColumn();
@@ -384,7 +395,7 @@ class CalculateurController {
         }
         exit;
     }
-    
+
     private function loadComptageDataByDetailId($detail_id) {
         $data = [];
         $stmt = $this->pdo->prepare("SELECT * FROM comptage_details WHERE id = ?");
@@ -425,7 +436,7 @@ class CalculateurController {
         }
         return $data;
     }
-    
+
     private function copyDetailsToNewRecord($new_detail_id, $source_data) {
         if (!empty($source_data['denominations'])) {
             foreach ($source_data['denominations'] as $denom_name => $quantity) {
