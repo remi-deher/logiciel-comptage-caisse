@@ -74,7 +74,6 @@ async function handleNextStep() {
     } catch (error) {
         alert(`Erreur : ${error.message}`);
     } finally {
-        // Ne désactive le spinner que si on n'a pas déclenché une attente (étape de chargement)
         if(!(wizardState.currentStep === 2 && wizardState.selectedCaisses.length > 0)) {
             ui.setNavigationLoading(false);
         }

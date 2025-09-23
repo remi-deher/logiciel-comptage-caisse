@@ -42,27 +42,12 @@ function renderStep1_Selection(modalElement, state) {
         modalElement.innerHTML = `
             <div class="modal-content wide">
                 <div class="modal-header"><h3>Étape 1 : Sélection des Caisses</h3><span class="modal-close" id="wizard-cancel-btn">&times;</span></div>
-                <div class="modal-body">
-                    <div class="selection-controls">
-                        <div class="color-key">
-                            <div><span class="color-dot color-libre"></span> Libre</div>
-                            <div><span class="color-dot color-verrouillee"></span> En cours</div>
-                            <div><span class="color-dot color-cloturee"></span> Clôturée</div>
-                        </div>
-                        <div class="button-group">
-                            <button type="button" id="select-all-btn" class="btn action-btn">Tout sélectionner</button>
-                            <button type="button" id="deselect-all-btn" class="btn action-btn">Tout désélectionner</button>
-                        </div>
-                    </div>
-                    <div class="caisse-selection-grid">${caissesHtml}</div>
-                </div>
+                <div class="modal-body"><div class="caisse-selection-grid">${caissesHtml}</div></div>
                 <div class="modal-footer">
                     <button class="btn delete-btn" id="wizard-cancel-btn">Annuler</button>
                     <button class="btn save-btn" id="wizard-next-btn" disabled>Démarrer la Clôture</button>
                 </div>
             </div>`;
-    }).catch(error => {
-        modalElement.innerHTML = `<div class="modal-content"><p class="error">${error.message}</p></div>`;
     });
 }
 
