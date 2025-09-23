@@ -14,6 +14,7 @@
     display: flex;
     justify-content: center;
     gap: 10px;
+    flex-wrap: wrap;
 }
 .step-item {
     display: flex;
@@ -31,6 +32,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.3s ease;
 }
 .step-item.active {
     color: var(--color-primary);
@@ -40,10 +42,12 @@
     color: white;
     border-color: var(--color-primary);
 }
+
 .wizard-content {
     padding: 20px 0;
     min-height: 400px;
 }
+
 .wizard-navigation {
     display: flex;
     justify-content: space-between;
@@ -56,42 +60,68 @@
     gap: 10px;
 }
 
-/* Styles pour l'étape 1 */
+/* --- Styles pour l'Étape 1 : Sélection des Caisses --- */
 .selection-controls {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
     margin-bottom: 20px;
 }
-.color-key { display: flex; gap: 15px; }
+
+.color-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    font-size: 0.9em;
+}
+.color-key div { display: flex; align-items: center; gap: 8px; }
 .color-dot { width: 14px; height: 14px; border-radius: 50%; }
 .color-dot.color-libre { background-color: var(--color-success); }
 .color-dot.color-verrouillee { background-color: var(--color-warning); }
 .color-dot.color-cloturee { background-color: #8a2be2; }
-.caisse-selection-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
-.caisse-selection-item { position: relative; }
-.caisse-selection-item input { display: none; }
+
+.caisse-selection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+}
+
+.caisse-selection-item {
+    position: relative;
+    display: block;
+}
+.caisse-selection-item input[type="checkbox"] { display: none; }
+
 .caisse-selection-item .caisse-info {
     background-color: var(--color-surface);
     border: 2px solid var(--color-border-light);
     border-left-width: 5px;
     border-radius: 8px;
     padding: 20px;
+    transition: all 0.2s ease;
     cursor: pointer;
-    transition: all 0.2s;
 }
 .caisse-selection-item.status-libre .caisse-info { border-left-color: var(--color-success); }
 .caisse-selection-item.status-verrouillee .caisse-info { border-left-color: var(--color-warning); }
 .caisse-selection-item.status-cloturee .caisse-info { border-left-color: #8a2be2; }
-.caisse-selection-item.disabled .caisse-info { opacity: 0.6; cursor: not-allowed; }
-.caisse-selection-item input:checked + .caisse-info {
+.caisse-selection-item.disabled .caisse-info {
+    opacity: 0.65;
+    cursor: not-allowed;
+    background-color: var(--color-surface-alt);
+}
+.caisse-selection-item:not(.disabled) input:checked + .caisse-info {
     border-color: var(--color-primary);
     box-shadow: 0 4px 15px var(--shadow-color);
     transform: translateY(-5px);
 }
 
-/* Styles pour l'étape 2 */
-.reconciliation-progress { margin-bottom: 20px; }
+.caisse-info span { font-weight: bold; }
+.caisse-info .caisse-status-text { font-size: 0.9em; color: var(--color-text-secondary); display: block; margin-top: 5px; }
+
+/* --- Styles pour l'Étape 2 : Réconciliation --- */
+.reconciliation-progress { margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
 .progress-bar { display: flex; gap: 5px; background: var(--color-surface-alt); padding: 5px; border-radius: 8px; }
 .progress-item {
     flex: 1;
@@ -105,4 +135,3 @@
 }
 .progress-item.active { background: var(--color-primary); color: white; }
 .progress-item.done { background: var(--color-success); color: white; }
-.reconciliation-section.validated { opacity: 0.5; pointer-events: none; }
