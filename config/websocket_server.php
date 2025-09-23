@@ -1,8 +1,8 @@
 <?php
-// Fichier : config/websocket_server.php (Corrigé pour l'initialisation de l'état au démarrage)
+// Fichier : config/websocket_server.php (Version Finale Complète et Corrigée)
 
 // Port d'écoute du serveur WebSocket
-$port = '8081';
+$port = '8081'; // Assurez-vous que ce port est correct
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 require_once __DIR__ . '/../src/services/ClotureStateService.php';
@@ -48,18 +48,11 @@ class CaisseServer implements MessageComponentInterface {
         $this->connect();
         $this->clotureStateService = new ClotureStateService($this->pdo);
 
-        // --- DÉBUT DE LA CORRECTION ---
-        // On charge l'état depuis la BDD dès le démarrage du serveur
         $this->loadInitialStateFromDb();
-        // --- FIN DE LA CORRECTION ---
 
         echo "Serveur WebSocket démarré sur le port {$GLOBALS['port']}.\n";
     }
 
-    // --- DÉBUT DE L'AJOUT ---
-    /**
-     * Charge l'état initial des caisses depuis la base de données au démarrage du serveur.
-     */
     private function loadInitialStateFromDb() {
         echo "Chargement de l'état initial des caisses depuis la base de données...\n";
         try {
@@ -76,7 +69,6 @@ class CaisseServer implements MessageComponentInterface {
             ];
         }
     }
-    // --- FIN DE L'AJOUT ---
 
     private function connect() {
         echo "Tentative de connexion à la base de données...\n";
@@ -123,8 +115,6 @@ class CaisseServer implements MessageComponentInterface {
     public function onOpen(ConnectionInterface $conn) {
         $this->clients->attach($conn);
         echo "NOUVELLE CONNEXION : Client ID {$conn->resourceId}\n";
-        
-        // Pas besoin de recharger l'état ici si un client se connecte, c'est déjà en mémoire.
         $conn->send(json_encode(['type' => 'welcome', 'resourceId' => $conn->resourceId]));
     }
 
@@ -205,7 +195,6 @@ class CaisseServer implements MessageComponentInterface {
                  $this->formState = [];
                  $this->chequesState = [];
                  $this->tpeState = [];
-                 // On ne réinitialise PAS clotureState, on veut garder l'état de la BDD.
              } else {
                  $this->updateAndCacheClotureState();
                  $this->broadcastClotureStateToAll();

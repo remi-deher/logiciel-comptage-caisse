@@ -26,7 +26,6 @@ export function handleValidateCaisse(caisseId, state) {
     ui.renderStep(3, globalState);
 }
 
-
 /**
  * Détermine l'action à effectuer lors du clic sur le bouton de clôture principal.
  */
@@ -58,14 +57,18 @@ function handleNextStep() {
         const selected = document.querySelectorAll('input[name="caisseSelection"]:checked');
         wizardState.selectedCaisses = Array.from(selected).map(cb => cb.value);
         if (wizardState.selectedCaisses.length > 0) {
+            ui.setNavigationLoading(true);
             wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
-            ui.closeAllModals();
+            // On ne ferme pas la modale ici, on attend la confirmation du WebSocket.
         }
     } else if (wizardState.currentStep === 3) { // Après confirmation des retraits
+        ui.setNavigationLoading(true);
         const formData = service.prepareFinalFormData(globalState);
         service.submitFinalCloture(formData).then(() => {
             sendWsMessage({ type: 'force_reload_all' });
             ui.closeAllModals();
+        }).finally(() => {
+            ui.setNavigationLoading(false);
         });
     }
 }
@@ -76,6 +79,7 @@ function handleNextStep() {
 function handleCancel() {
     const { wizardState } = globalState;
     if (wizardState && wizardState.selectedCaisses) {
+        // Annule le verrouillage si des caisses avaient été sélectionnées
         wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
     }
     ui.closeAllModals();
@@ -83,19 +87,38 @@ function handleCancel() {
 
 /**
  * Gère les messages WebSocket pertinents pour la clôture.
+ * C'est la correction clé : on vérifie si le verrouillage a réussi.
  */
 export function handleWebSocketMessage(data, mainState) {
     globalState = mainState;
+    // Ne rien faire si la logique de l'assistant n'est pas active
     if (!globalState.wizardState) return false;
 
-    // Rafraîchit la modale de sélection si elle est ouverte
     if (data.type === 'cloture_locked_caisses') {
         const selectionModal = document.getElementById('cloture-selection-modal');
+        // On ne traite ce message que si la modale de sélection est visible
         if (selectionModal && selectionModal.classList.contains('visible')) {
-            ui.renderStep(1, globalState);
+            const lockedCaisseIds = (data.caisses || []).map(c => c.caisse_id.toString());
+            
+            // On vérifie si les caisses qu'on a demandé à verrouiller le sont maintenant
+            const allSelectedAreNowLocked = globalState.wizardState.selectedCaisses.every(id => lockedCaisseIds.includes(id));
+
+            if (globalState.wizardState.selectedCaisses.length > 0 && allSelectedAreNowLocked) {
+                // Succès ! On ferme la modale.
+                ui.closeAllModals();
+                // On laisse le message être traité par le handler principal (calculator-logic)
+                // pour mettre à jour l'UI principale (bandeau de validation, etc.).
+                return false; 
+            } else {
+                // C'est une mise à jour générale (ex: un autre utilisateur a agi), 
+                // on rafraîchit simplement la modale sans la fermer.
+                ui.renderStep(1, globalState);
+                ui.setNavigationLoading(false); // Arrête le spinner au cas où
+                return true; // On a géré le message, on arrête la propagation.
+            }
         }
-        return true;
     }
+    // Pour tous les autres messages, on laisse le handler principal décider.
     return false;
 }
 

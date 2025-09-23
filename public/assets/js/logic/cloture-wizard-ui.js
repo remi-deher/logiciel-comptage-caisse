@@ -27,6 +27,15 @@ function renderStep1_Selection(modalElement, state) {
         
         const caissesHtml = Object.entries(config.nomsCaisses).map(([id, nom]) => {
             const { statusClass, statusText, isDisabled } = service.getCaisseStatusInfo(id, stateData, wsResourceId);
+            
+            // --- MODIFIÉ : Logique d'affichage des boutons d'action ---
+            let actionButton = '';
+            if (statusClass === 'status-cloturee') {
+                actionButton = `<button type="button" class="btn reopen-btn js-reopen-caisse" data-caisse-id="${id}"><i class="fa-solid fa-lock-open"></i> Rouvrir</button>`;
+            } else if (statusClass === 'status-verrouillee') {
+                actionButton = `<button type="button" class="btn reopen-btn js-force-unlock-caisse" data-caisse-id="${id}"><i class="fa-solid fa-unlock"></i> Forcer</button>`;
+            }
+
             return `
                 <label class="caisse-selection-item ${statusClass}" title="${statusText}">
                     <input type="checkbox" name="caisseSelection" value="${id}" ${isDisabled ? 'disabled' : ''}>
@@ -34,8 +43,8 @@ function renderStep1_Selection(modalElement, state) {
                         <i class="fa-solid fa-cash-register"></i>
                         <span>${nom}</span>
                         <small class="caisse-status-text">${statusText}</small>
+                        ${actionButton}
                     </div>
-                     ${statusClass === 'status-cloturee' ? `<button type="button" class="btn reopen-btn js-reopen-caisse" data-caisse-id="${id}"><i class="fa-solid fa-lock-open"></i> Rouvrir</button>` : ''}
                 </label>`;
         }).join('');
 

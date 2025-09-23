@@ -12,12 +12,8 @@ import { parseLocaleFloat } from '../utils/formatters.js';
  */
 export function attachEventListeners(state, logic) {
     
-    // On utilise la délégation sur document.body pour que les écouteurs
-    // fonctionnent même lorsque le contenu des modales est recréé.
-    
     document.body.addEventListener('click', (e) => {
         const target = e.target;
-        const processModal = document.getElementById('cloture-process-modal');
 
         // Boutons de navigation principaux
         if (target.closest('#wizard-next-btn')) logic.handleNextStep();
@@ -25,14 +21,20 @@ export function attachEventListeners(state, logic) {
         if (target.closest('#wizard-cancel-btn')) logic.handleCancel();
         if (target.closest('#wizard-finish-btn')) logic.handleNextStep();
         
-        // Bouton de réouverture de caisse (Étape 1)
-        if (target.matches('.js-reopen-caisse')) {
-            const caisseId = target.dataset.caisseId;
+        // --- NOUVEAU : Gestion des boutons de réouverture et de forçage ---
+        if (target.closest('.js-reopen-caisse')) {
+            const caisseId = target.closest('.js-reopen-caisse').dataset.caisseId;
             if (confirm(`Voulez-vous vraiment rouvrir la caisse "${state.config.nomsCaisses[caisseId]}" ?`)) {
                 sendWsMessage({ type: 'cloture_reopen', caisse_id: caisseId });
-                ui.closeAllModals();
             }
         }
+        if (target.closest('.js-force-unlock-caisse')) {
+            const caisseId = target.closest('.js-force-unlock-caisse').dataset.caisseId;
+            if (confirm(`Voulez-vous vraiment forcer le déverrouillage de la caisse "${state.config.nomsCaisses[caisseId]}" ? Cela pourrait interrompre un autre utilisateur.`)) {
+                sendWsMessage({ type: 'cloture_force_unlock', caisse_id: caisseId });
+            }
+        }
+        // --- FIN NOUVEAU ---
         
         // Bouton pour valider une sous-étape de la réconciliation (Étape 2)
         if (target.matches('.validate-section-btn')) {
@@ -48,12 +50,10 @@ export function attachEventListeners(state, logic) {
             ui.updateWizardUI(state.wizardState, false);
         }
 
-        // --- CORRECTION ---
         // Ajout de l'écouteur manquant pour la case à cocher finale (Étape 4)
         if (target.id === 'final-confirmation-checkbox') {
             ui.updateWizardUI(state.wizardState, true);
         }
-        // --- FIN DE LA CORRECTION ---
 
         // Écouteur pour les saisies dans la réconciliation (Étape 2)
         if (state.wizardState && state.wizardState.currentStep === 2 && target.matches('.reconciliation-input')) {
