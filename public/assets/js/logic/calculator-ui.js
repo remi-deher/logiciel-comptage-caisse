@@ -1,6 +1,118 @@
 // Fichier : public/assets/js/logic/calculator-ui.js (Version Finale Complète et Corrigée)
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
+import * as service from './calculator-service.js';
+import * as cloture from './cloture-logic.js';
+import { sendWsMessage } from './websocket-service.js';
+
+// --- NOUVEAU ---
+/**
+ * Met à jour l'état visuel et interactif d'une caisse (verrouillage, validation).
+ * @param {string} caisseId - L'ID de la caisse à mettre à jour.
+ * @param {string} status - 'open', 'locked_by_me', 'locked_by_other', 'closed'.
+ * @param {object} state - L'état global de l'application.
+ */
+export function updateCaisseLockState(caisseId, status, state) {
+    const tabLink = document.querySelector(`.tab-link[data-caisse-id="${caisseId}"]`);
+    const caisseContent = document.getElementById(`caisse${caisseId}`);
+    const validationArea = document.querySelector(`#ecart-display-caisse${caisseId} .cloture-validation-area`);
+
+    if (!tabLink || !caisseContent || !validationArea) return;
+
+    // Réinitialise tous les états visuels
+    tabLink.classList.remove('cloture-en-cours', 'cloturee');
+    validationArea.innerHTML = '';
+    caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = false);
+
+    switch (status) {
+        case 'locked_by_me':
+            tabLink.classList.add('cloture-en-cours');
+            const ecarts = service.calculateEcartsForCaisse(caisseId, state, state.config);
+            const isJuste = Math.abs(ecarts.ecartEspeces) < 0.01 && Math.abs(ecarts.ecartCb) < 0.01 && Math.abs(ecarts.ecartCheques) < 0.01;
+            
+            validationArea.innerHTML = `
+                <p>Cette caisse est en cours de clôture. Vérifiez les chiffres puis validez.</p>
+                <button class="btn save-btn" id="validate-caisse-${caisseId}-btn" ${!isJuste ? 'disabled' : ''} title="${!isJuste ? 'Tous les écarts doivent être à zéro pour valider.' : 'Valider cette caisse'}">
+                    <i class="fa-solid fa-check"></i> Valider la Caisse
+                </button>`;
+            
+            document.getElementById(`validate-caisse-${caisseId}-btn`).addEventListener('click', () => {
+                cloture.handleValidateCaisse(caisseId, state);
+            });
+            break;
+
+        case 'locked_by_other':
+            tabLink.classList.add('cloture-en-cours');
+            caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = true);
+            validationArea.innerHTML = `<p><i class="fa-solid fa-lock"></i> Caisse verrouillée par un autre utilisateur.</p>`;
+            break;
+
+        case 'closed':
+            tabLink.classList.add('cloturee');
+            caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = true);
+            validationArea.innerHTML = `<p class="validation-message"><i class="fa-solid fa-check-circle"></i> Caisse clôturée.</p>`;
+            break;
+    }
+}
+
+/**
+ * Affiche la bannière de résumé final lorsque toutes les caisses sont fermées.
+ * @param {object} state - L'état global de l'application.
+ */
+export function showFinalSummaryBanner(state) {
+    const container = document.getElementById('cloture-final-summary-banner-container');
+    if (!container) return;
+
+    let totalRetraits = 0;
+    const caissesSummaryHtml = Object.keys(state.config.nomsCaisses).map(caisseId => {
+        const caisseData = state.calculatorData.caisse[caisseId];
+        const suggestions = service.calculateWithdrawalSuggestion(caisseData, state.config);
+        totalRetraits += suggestions.totalToWithdraw;
+        return `
+            <tr>
+                <td>${state.config.nomsCaisses[caisseId]}</td>
+                <td>${formatCurrency(suggestions.totalToWithdraw, state.config)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="cloture-final-summary-banner">
+            <div class="banner-header">
+                <h4><i class="fa-solid fa-flag-checkered"></i> Prêt pour la finalisation</h4>
+                <p>Toutes les caisses sont clôturées. Le retrait total à effectuer est de <strong>${formatCurrency(totalRetraits, state.config)}</strong>.</p>
+            </div>
+            <div class="summary-table-container">
+                <table class="final-summary-table">
+                    <thead>
+                        <tr>
+                            <th>Caisse</th>
+                            <th>Retrait Suggéré</th>
+                        </tr>
+                    </thead>
+                    <tbody>${caissesSummaryHtml}</tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total Général</td>
+                            <td>${formatCurrency(totalRetraits, state.config)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="banner-actions">
+                <button id="finalize-day-btn" class="btn save-btn">Confirmer et Finaliser la Journée</button>
+            </div>
+        </div>`;
+
+    document.getElementById('finalize-day-btn').addEventListener('click', async () => {
+        if (confirm("Êtes-vous sûr de vouloir finaliser la journée ? Cette action est irréversible.")) {
+            const result = await service.submitClotureGenerale();
+            alert(result.message);
+            sendWsMessage({ type: 'force_reload_all' });
+        }
+    });
+}
+
 
 /**
  * Remplit les champs du formulaire avec les données initiales chargées.
@@ -66,7 +178,6 @@ export function renderCalculatorUI(pageElement, config, chequesState, tpeState) 
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
         
-        // Chaque encart d'écart a maintenant un ID unique lié à l'ID de la caisse.
         ecartsHtml += `
             <div id="ecart-display-caisse${id}" class="ecart-display ${isActive}">
                 <div id="main-ecart-caisse${id}" class="main-ecart-display">

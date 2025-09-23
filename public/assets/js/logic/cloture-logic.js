@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Version Finale Complète)
+// Fichier : public/assets/js/logic/cloture-logic.js (Version Finale Complète et Corrigée)
 
 import { sendWsMessage } from './websocket-service.js';
 import * as service from './cloture-wizard-service.js';
@@ -9,153 +9,98 @@ import { attachEventListeners as attachWizardEventListeners } from './cloture-wi
 let globalState = {};
 
 /**
- * Vérifie si toutes les sections de toutes les caisses sélectionnées ont été validées.
- * @returns {boolean}
+ * Gère le clic sur le bouton "Valider la Caisse".
+ * Ouvre la modale de suggestion de retrait pour une seule caisse.
+ * @param {string} caisseId - L'ID de la caisse à valider.
+ * @param {object} state - L'état global de l'application.
  */
-function isReconciliationComplete() {
-    const { wizardState } = globalState;
-    if (!wizardState.selectedCaisses || wizardState.selectedCaisses.length === 0) return false;
-
-    return wizardState.selectedCaisses.every(caisseId => {
-        const status = wizardState.reconciliation.status[caisseId];
-        return status && status.especes && status.cb && status.cheques;
-    });
+export function handleValidateCaisse(caisseId, state) {
+    globalState = state;
+    globalState.wizardState = {
+        currentStep: 3, // On passe directement à l'étape des retraits
+        selectedCaisses: [caisseId], // L'action ne concerne que cette caisse
+        confirmedData: {},
+        reconciliation: { status: {} } // Initialisation pour éviter les erreurs
+    };
+    // Affiche la modale des retraits (étape 3 de l'ancien assistant)
+    ui.renderStep(3, globalState);
 }
 
+
 /**
- * Gère la navigation vers l'étape suivante de l'assistant.
+ * Détermine l'action à effectuer lors du clic sur le bouton de clôture principal.
  */
-async function handleNextStep() {
-    const { wizardState } = globalState;
-    ui.setNavigationLoading(true); // Active le spinner
+async function handleClotureAction() {
+    const allCaisseIds = Object.keys(globalState.config.nomsCaisses || {});
+    const closedCaisses = globalState.closedCaisses || [];
+    const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => closedCaisses.includes(id));
 
-    try {
-        if (wizardState.currentStep === 1) {
-            const selected = document.querySelectorAll('input[name="caisseSelection"]:checked');
-            wizardState.selectedCaisses = Array.from(selected).map(cb => cb.value);
-
-            if (wizardState.selectedCaisses.length > 0) {
-                wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
-                wizardState.currentStep = 2;
-                ui.renderStep(2, globalState, true);
-            } else {
-                alert("Veuillez sélectionner au moins une caisse pour démarrer la clôture.");
-                ui.setNavigationLoading(false); // Désactive le spinner si erreur
-            }
-        } else if (wizardState.currentStep === 2) {
-            if (isReconciliationComplete()) {
-                wizardState.currentStep = 3;
-                ui.renderStep(3, globalState);
-            }
-        } else if (wizardState.currentStep === 3) {
-            const formData = service.prepareFinalFormData(globalState);
-            await service.submitFinalCloture(formData);
-            
-            const clotureState = await service.fetchClotureState();
-            const allCaisseIds = Object.keys(globalState.config.nomsCaisses);
-            const closedCaisseIds = (clotureState.closed_caisses || []).map(String);
-
-            if (allCaisseIds.every(id => closedCaisseIds.includes(id))) {
-                wizardState.currentStep = 4;
-                ui.renderStep(4, globalState);
-            } else {
-                alert('Les caisses sélectionnées ont été clôturées. La clôture générale sera possible une fois toutes les caisses fermées.');
-                sendWsMessage({ type: 'force_reload_all' });
-                ui.closeAllModals();
-            }
-        } else if (wizardState.currentStep === 4) {
-            ui.showFinalConfirmModal(async () => {
-                const result = await service.submitClotureGenerale();
-                alert(result.message);
-                sendWsMessage({ type: 'force_reload_all' });
-                ui.closeAllModals();
-            });
-        }
-    } catch (error) {
-        alert(`Erreur : ${error.message}`);
-    } finally {
-        if(!(wizardState.currentStep === 2 && wizardState.selectedCaisses.length > 0)) {
-            ui.setNavigationLoading(false);
-        }
+    if (allClosed) {
+        // Si tout est fermé, on affiche la bannière finale
+        ui.showFinalSummaryBanner(globalState);
+    } else {
+        // Sinon, on ouvre la modale de sélection de caisse
+        globalState.wizardState = {
+            currentStep: 1,
+            selectedCaisses: [],
+        };
+        ui.renderStep(1, globalState);
     }
 }
 
 /**
- * Gère le retour à l'étape précédente.
+ * Gère la navigation vers l'étape suivante dans les modales.
  */
-function handlePrevStep() {
+function handleNextStep() {
     const { wizardState } = globalState;
-    if (wizardState.currentStep > 1) {
-        if (wizardState.currentStep === 2) {
-            wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
+
+    if (wizardState.currentStep === 1) { // Après sélection des caisses
+        const selected = document.querySelectorAll('input[name="caisseSelection"]:checked');
+        wizardState.selectedCaisses = Array.from(selected).map(cb => cb.value);
+        if (wizardState.selectedCaisses.length > 0) {
+            wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
+            ui.closeAllModals();
         }
-        wizardState.currentStep--;
-        ui.renderStep(wizardState.currentStep, globalState);
+    } else if (wizardState.currentStep === 3) { // Après confirmation des retraits
+        const formData = service.prepareFinalFormData(globalState);
+        service.submitFinalCloture(formData).then(() => {
+            sendWsMessage({ type: 'force_reload_all' });
+            ui.closeAllModals();
+        });
     }
 }
 
 /**
- * Gère l'annulation complète du processus de clôture.
+ * Gère l'annulation depuis une modale.
  */
 function handleCancel() {
     const { wizardState } = globalState;
-    if (confirm("Voulez-vous annuler ? Les caisses verrouillées seront libérées.")) {
-        if (wizardState && wizardState.selectedCaisses) {
-            wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
-        }
-        ui.closeAllModals();
+    if (wizardState && wizardState.selectedCaisses) {
+        wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_unlock', caisse_id: id }));
     }
+    ui.closeAllModals();
 }
 
 /**
- * Gère la validation d'une sous-étape de la réconciliation.
- */
-function handleNextSubStep() {
-    const { reconciliation, selectedCaisses } = globalState.wizardState;
-    const currentCaisseId = selectedCaisses[reconciliation.activeCaisseIndex];
-    const currentMethod = reconciliation.paymentMethods[reconciliation.activeMethodIndex];
-
-    reconciliation.status[currentCaisseId][currentMethod] = true;
-
-    if (reconciliation.activeMethodIndex < reconciliation.paymentMethods.length - 1) {
-        reconciliation.activeMethodIndex++;
-    } else if (reconciliation.activeCaisseIndex < selectedCaisses.length - 1) {
-        reconciliation.activeCaisseIndex++;
-        reconciliation.activeMethodIndex = 0;
-    }
-    
-    ui.renderStep(2, globalState);
-}
-
-/**
- * Gère les messages WebSocket pertinents pour l'assistant.
- * @returns {boolean} - True si le message a été géré, sinon false.
+ * Gère les messages WebSocket pertinents pour la clôture.
  */
 export function handleWebSocketMessage(data, mainState) {
     globalState = mainState;
-    const { wizardState } = globalState;
-    if (!wizardState) return false;
+    if (!globalState.wizardState) return false;
 
-    if (data.type === 'cloture_locked_caisses' && wizardState.currentStep === 2) {
-        const lockedIds = (data.caisses || []).map(c => c.caisse_id.toString());
-        const allSelectedAreLocked = wizardState.selectedCaisses.every(id => lockedIds.includes(id));
-
-        if (allSelectedAreLocked) {
-            console.log("Confirmation de verrouillage reçue. Affichage de la réconciliation.");
-            wizardState.reconciliation.status = {};
-            wizardState.selectedCaisses.forEach(id => {
-                wizardState.reconciliation.status[id] = { especes: false, cb: false, cheques: false };
-            });
-            ui.renderStep(2, globalState, false);
+    // Rafraîchit la modale de sélection si elle est ouverte
+    if (data.type === 'cloture_locked_caisses') {
+        const selectionModal = document.getElementById('cloture-selection-modal');
+        if (selectionModal && selectionModal.classList.contains('visible')) {
+            ui.renderStep(1, globalState);
         }
         return true;
     }
-    
     return false;
 }
 
 /**
- * Met à jour l'état du bouton de clôture principal.
+ * Met à jour l'état du bouton de clôture principal dans la barre de navigation.
  */
 export function updateClotureButtonState(isReady, mainState) {
     const clotureBtn = document.getElementById('cloture-btn');
@@ -183,17 +128,8 @@ export function initializeClotureModals(mainState) {
     globalState = mainState;
     
     const clotureBtn = document.getElementById('cloture-btn');
-    clotureBtn.addEventListener('click', () => {
-        globalState.wizardState = {
-            currentStep: 1, selectedCaisses: [], confirmedData: {},
-            reconciliation: {
-                activeCaisseIndex: 0, activeMethodIndex: 0,
-                paymentMethods: ['especes', 'cb', 'cheques'], status: {}
-            }
-        };
-        ui.renderStep(1, globalState);
-    });
+    clotureBtn.addEventListener('click', handleClotureAction);
 
-    const logic = { handleNextStep, handlePrevStep, handleCancel, handleNextSubStep };
+    const logic = { handleNextStep, handleCancel };
     attachWizardEventListeners(globalState, logic);
 }

@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète et Corrigée)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
@@ -13,7 +13,8 @@ let state = {
     calculatorData: { caisse: {} },
     chequesState: {},
     tpeState: {},
-    closedCaisses: [], // Ajout pour suivre les caisses clôturées
+    lockedCaisses: [], // --- NOUVEAU ---
+    closedCaisses: [],
     isDirty: false
 };
 
@@ -39,27 +40,44 @@ async function handleAutosave() {
     }
 }
 
+// --- NOUVEAU ---
+/**
+ * Met à jour l'état de verrouillage de l'interface utilisateur pour toutes les caisses.
+ */
+function updateAllCaisseLocks() {
+    Object.keys(state.config.nomsCaisses).forEach(caisseId => {
+        const lockInfo = state.lockedCaisses.find(c => String(c.caisse_id) === String(caisseId));
+        const isClosed = state.closedCaisses.includes(String(caisseId));
+        
+        let status = 'open';
+        if (isClosed) {
+            status = 'closed';
+        } else if (lockInfo) {
+            status = String(lockInfo.locked_by) === String(state.wsResourceId) ? 'locked_by_me' : 'locked_by_other';
+        }
+        
+        ui.updateCaisseLockState(caisseId, status, state);
+    });
+}
+
+
 /**
  * Gestionnaire de messages WebSocket principal.
- * Il reçoit TOUS les messages et les délègue au module approprié.
  */
 function handleWebSocketMessage(data) {
-    // 1. Donne la priorité au module de clôture pour traiter le message
     const wasHandledByCloture = cloture.handleWebSocketMessage(data, state);
-    if (wasHandledByCloture) {
-        return; // Si le module de clôture a géré le message, on s'arrête.
-    }
+    if (wasHandledByCloture) return;
 
-    // 2. Traite les messages standards du calculateur
     switch (data.type) {
         case 'welcome':
             state.wsResourceId = data.resourceId.toString();
-            cloture.updateClotureButtonState(true, state); // Active le bouton
+            cloture.updateClotureButtonState(true, state);
             break;
         case 'cloture_locked_caisses':
-            // Met à jour l'état des caisses clôturées pour l'UI principale
+            state.lockedCaisses = data.caisses || [];
             state.closedCaisses = (data.closed_caisses || []).map(String);
             cloture.updateClotureButtonState(true, state);
+            updateAllCaisseLocks(); // Met à jour l'UI de toutes les caisses
             break;
         case 'full_form_state':
             ui.applyFullFormState(data, state);
@@ -75,7 +93,7 @@ function handleWebSocketMessage(data) {
             service.calculateAll(state.config, state);
             break;
         case 'reload_page':
-            alert("Les données ont été actualisées par un autre utilisateur. La page va être rechargée.");
+            alert("Les données ont été actualisées. La page va être rechargée.");
             window.location.reload();
             break;
     }
@@ -113,9 +131,6 @@ function attachEventListeners() {
     });
 }
 
-/**
- * Point d'entrée principal pour la page du calculateur.
- */
 export async function initializeCalculator() {
     try {
         const initialData = await service.fetchInitialData();
@@ -129,12 +144,8 @@ export async function initializeCalculator() {
         service.calculateAll(state.config, state);
         attachEventListeners();
 
-        // Initialise la logique des modales de clôture en lui passant l'état global
         cloture.initializeClotureModals(state);
-
-        // Définit notre nouveau gestionnaire de messages "chef d'orchestre"
         setActiveMessageHandler(handleWebSocketMessage);
-
         await initializeWebSocket(handleWebSocketMessage);
         sendWsMessage({ type: 'get_full_state' });
 

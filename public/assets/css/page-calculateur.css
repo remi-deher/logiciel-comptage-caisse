@@ -117,3 +117,41 @@
 .suggestion-table th:first-child, .suggestion-table td:first-child { text-align: left; }
 .suggestion-total { margin-top: 20px; padding-top: 15px; border-top: 2px solid var(--color-primary); text-align: right; font-size: 1.2em; font-weight: bold; }
 .suggestion-total span { color: var(--color-primary); }
+
+
+/* --- STYLES POUR LES ÉTATS DE CLÔTURE --- */
+.tab-link.cloture-en-cours {
+    border-bottom-color: #8a2be2 !important; /* Violet */
+    color: #8a2be2 !important;
+    background-color: rgba(138, 43, 226, 0.05);
+}
+
+.tab-link.cloturee {
+    background-color: #f0f0f0;
+    color: #95a5a6;
+    border-bottom-color: transparent !important;
+    cursor: not-allowed;
+}
+
+body[data-theme="dark"] .tab-link.cloturee {
+    background-color: var(--color-surface-alt);
+}
+
+.cloture-validation-area {
+    margin-top: 15px;
+    padding: 15px;
+    border-top: 1px dashed var(--color-border);
+    background-color: var(--color-surface-alt);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.cloture-validation-area p {
+    margin: 0 0 10px 0;
+    font-weight: bold;
+    color: var(--color-text-secondary);
+}
+
+.cloture-validation-area .validation-message {
+    color: var(--color-success);
+}
