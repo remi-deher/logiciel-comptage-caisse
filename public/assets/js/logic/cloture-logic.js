@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Version Finale Complète et Corrigée)
+// Fichier : public/assets/js/logic/cloture-logic.js (Version Finale Complète)
 
 import { sendWsMessage } from './websocket-service.js';
 import * as service from './cloture-wizard-service.js';
@@ -25,6 +25,7 @@ export function handleValidateCaisse(caisseId, state) {
     // Affiche la modale des retraits (étape 3 de l'ancien assistant)
     ui.renderStep(3, globalState);
 }
+
 
 /**
  * Détermine l'action à effectuer lors du clic sur le bouton de clôture principal.
@@ -65,7 +66,8 @@ function handleNextStep() {
         ui.setNavigationLoading(true);
         const formData = service.prepareFinalFormData(globalState);
         service.submitFinalCloture(formData).then(() => {
-            sendWsMessage({ type: 'force_reload_all' });
+            // On demande un rafraîchissement dynamique au lieu de recharger
+            sendWsMessage({ type: 'state_changed_refresh_ui' });
             ui.closeAllModals();
         }).finally(() => {
             ui.setNavigationLoading(false);
@@ -87,7 +89,6 @@ function handleCancel() {
 
 /**
  * Gère les messages WebSocket pertinents pour la clôture.
- * C'est la correction clé : on vérifie si le verrouillage a réussi.
  */
 export function handleWebSocketMessage(data, mainState) {
     globalState = mainState;

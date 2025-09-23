@@ -176,8 +176,11 @@ async function handleLoadComptage(comptageId, buttonElement) {
             const response = await fetch('index.php?route=calculateur/load_from_history', { method: 'POST', body: formData });
             const result = await response.json();
             if (!result.success) throw new Error(result.message);
-            sendWsMessage({ type: 'force_reload_all' });
+            
+            // Notifie les autres clients et navigue vers la page sans recharger
+            sendWsMessage({ type: 'state_changed_refresh_ui' });
             window.location.href = '/calculateur';
+
         } catch (error) {
             alert(`Erreur lors du chargement : ${error.message}`);
             buttonElement.disabled = false;
@@ -210,7 +213,7 @@ function openDetailsSheet(comptageId) {
     sheet.classList.add('visible');
     overlay.classList.add('visible');
     
-    // This function needs to be defined to render the sheet content
+    // La fonction renderSheetContent doit être définie pour afficher le contenu
     // renderSheetContent(content, comptageId); 
 
     requestAnimationFrame(() => {
@@ -218,7 +221,7 @@ function openDetailsSheet(comptageId) {
         if (comptage) {
             Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
                 if (comptage.results.caisses[caisse_id]) {
-                    // This function also needs to be defined
+                    // La fonction renderSheetCharts doit aussi être définie
                     // renderSheetCharts(caisse_id, data, comptage.results.caisses[caisse_id]);
                 }
             });
@@ -279,7 +282,7 @@ export function initializeHistoryLogic() {
     if (!historyPage) return;
 
     loadAndRender(historyPage);
-    initializeSheetLogic(); // Ensure this function is called
+    initializeSheetLogic();
 
     historyPage.addEventListener('submit', (e) => {
         if (e.target.matches('#history-filter-form')) {
@@ -338,47 +341,18 @@ export function initializeHistoryLogic() {
         if (target.closest('.delete-btn') && target.closest('.history-card')) {
              const card = target.closest('.history-card');
              const comptageId = card.dataset.comptageId;
-             if (confirm("Supprimer ce comptage ?")) {
-                const formData = new FormData();
-                formData.append('id_a_supprimer', comptageId);
-                try {
-                    const response = await fetch('index.php?route=historique/delete', { method: 'POST', body: formData });
-                    const result = await response.json();
-                    if(!result.success) throw new Error(result.message);
-                    card.style.opacity = '0';
-                    setTimeout(() => loadAndRender(historyPage, currentParams), 300);
-                } catch(err) {
-                    alert(`Erreur: ${err.message}`);
-                }
-            }
+             handleDeleteComptage(comptageId, card);
         }
         if (target.closest('.load-btn')) {
-            const comptageId = target.closest('.history-card').dataset.comptageId;
-            const comptageData = fullHistoryData.find(c => c.id.toString() === comptageId);
-            if(comptageData && confirm(`Charger "${comptageData.nom_comptage}" ? Le travail non sauvegardé sera perdu.`)) {
-                const loadButton = target.closest('.load-btn');
-                loadButton.disabled = true;
-                loadButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-                try {
-                    const formData = new FormData();
-                    formData.append('comptage_id', comptageId);
-                    const response = await fetch('index.php?route=calculateur/load_from_history', { method: 'POST', body: formData });
-                    const result = await response.json();
-                    if (!result.success) { throw new Error(result.message); }
-		            sendWsMessage({ type: 'force_reload_all' });
-                    window.location.href = '/calculateur';
-                } catch (error) {
-                    alert(`Erreur: ${error.message}`);
-                    loadButton.disabled = false;
-                    loadButton.innerHTML = '<i class="fa-solid fa-download"></i> Charger';
-                }
-            }
+            const loadButton = target.closest('.load-btn');
+            const comptageId = loadButton.closest('.history-card').dataset.comptageId;
+            handleLoadComptage(comptageId, loadButton);
         }
     });
     
     historyPage.addEventListener('change', (e) => {
         if (e.target.matches('.comparison-checkbox')) {
-            // updateComparisonToolbar(); // This function needs to be defined
+            // updateComparisonToolbar(); // Cette fonction doit être définie
         }
     });
 }

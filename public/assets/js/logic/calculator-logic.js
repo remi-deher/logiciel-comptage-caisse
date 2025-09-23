@@ -4,7 +4,7 @@ import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
 import { setActiveMessageHandler } from '../main.js';
 import { initializeWebSocket, sendWsMessage } from './websocket-service.js';
-import * as cloture from './cloture-logic.js'; // Importe l'ensemble du module de clôture
+import * as cloture from './cloture-logic.js';
 
 // État global de la page du calculateur
 let state = {
@@ -13,10 +13,36 @@ let state = {
     calculatorData: { caisse: {} },
     chequesState: {},
     tpeState: {},
-    lockedCaisses: [], // --- NOUVEAU ---
+    lockedCaisses: [],
     closedCaisses: [],
     isDirty: false
 };
+
+async function refreshCalculatorData() {
+    console.log("Rafraîchissement des données du calculateur...");
+    try {
+        const initialData = await service.fetchInitialData();
+        state.config = initialData.config;
+        state.calculatorData = initialData.calculatorData;
+        state.chequesState = initialData.chequesState;
+        state.tpeState = initialData.tpeState;
+
+        // Re-génère l'interface avec les nouvelles données
+        ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.chequesState, state.tpeState);
+        ui.populateInitialData(state.calculatorData);
+        service.calculateAll(state.config, state);
+
+        // Ré-attache les écouteurs d'événements aux nouveaux éléments du DOM
+        attachEventListeners();
+
+        // Une fois l'interface fraîche, on demande l'état des verrous
+        sendWsMessage({ type: 'get_full_state' });
+
+    } catch (error) {
+        console.error("Erreur lors du rafraîchissement des données:", error);
+        document.getElementById('main-content').innerHTML = `<div class="container error"><p>Impossible de rafraîchir les données : ${error.message}</p></div>`;
+    }
+}
 
 async function handleAutosave() {
     if (!state.isDirty) return;
@@ -40,10 +66,6 @@ async function handleAutosave() {
     }
 }
 
-// --- NOUVEAU ---
-/**
- * Met à jour l'état de verrouillage de l'interface utilisateur pour toutes les caisses.
- */
 function updateAllCaisseLocks() {
     Object.keys(state.config.nomsCaisses).forEach(caisseId => {
         const lockInfo = state.lockedCaisses.find(c => String(c.caisse_id) === String(caisseId));
@@ -60,10 +82,6 @@ function updateAllCaisseLocks() {
     });
 }
 
-
-/**
- * Gestionnaire de messages WebSocket principal.
- */
 function handleWebSocketMessage(data) {
     const wasHandledByCloture = cloture.handleWebSocketMessage(data, state);
     if (wasHandledByCloture) return;
@@ -77,7 +95,7 @@ function handleWebSocketMessage(data) {
             state.lockedCaisses = data.caisses || [];
             state.closedCaisses = (data.closed_caisses || []).map(String);
             cloture.updateClotureButtonState(true, state);
-            updateAllCaisseLocks(); // Met à jour l'UI de toutes les caisses
+            updateAllCaisseLocks();
             break;
         case 'full_form_state':
             ui.applyFullFormState(data, state);
@@ -92,9 +110,8 @@ function handleWebSocketMessage(data) {
             ui.applyListUpdate(data, state);
             service.calculateAll(state.config, state);
             break;
-        case 'reload_page':
-            alert("Les données ont été actualisées. La page va être rechargée.");
-            window.location.reload();
+        case 'state_changed_refresh_ui':
+            refreshCalculatorData();
             break;
     }
 }
@@ -103,26 +120,15 @@ function attachEventListeners() {
     const page = document.getElementById('calculator-page');
     if (!page) return;
 
+    // Supprime l'ancien écouteur pour éviter les doublons lors du rafraîchissement
+    page.removeEventListener('click', handlePageClick);
+    page.removeEventListener('input', handlePageInput);
+
     window.addEventListener('beforeunload', () => { if (state.isDirty) handleAutosave(); });
 
-    page.addEventListener('input', e => {
-        if (e.target.matches('input, textarea')) {
-            state.isDirty = true;
-            document.getElementById('autosave-status').textContent = 'Modifications non enregistrées.';
-            service.calculateAll(state.config, state);
-            if (e.target.matches('input[type="text"], input[type="number"]')) {
-                 sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
-            }
-        }
-    });
-
-    page.addEventListener('click', e => {
-        const handled = ui.handleCalculatorClickEvents(e, state);
-        if(handled) {
-            state.isDirty = true;
-            service.calculateAll(state.config, state);
-        }
-    });
+    // Attache les nouveaux écouteurs centralisés
+    page.addEventListener('input', handlePageInput);
+    page.addEventListener('click', handlePageClick);
 
     const form = document.getElementById('caisse-form');
     form.addEventListener('submit', async (e) => {
@@ -131,23 +137,42 @@ function attachEventListeners() {
     });
 }
 
+// Fonction de gestion des "input" déléguée
+function handlePageInput(e) {
+    if (e.target.matches('input, textarea')) {
+        state.isDirty = true;
+        document.getElementById('autosave-status').textContent = 'Modifications non enregistrées.';
+        service.calculateAll(state.config, state);
+        if (e.target.matches('input[type="text"], input[type="number"]')) {
+             sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
+        }
+    }
+}
+
+// Fonction de gestion des clics déléguée
+function handlePageClick(e) {
+    const validateBtn = e.target.closest('.js-validate-caisse-btn');
+    if (validateBtn) {
+        e.preventDefault();
+        const caisseId = validateBtn.dataset.caisseId;
+        cloture.handleValidateCaisse(caisseId, state);
+        return;
+    }
+    
+    const handled = ui.handleCalculatorClickEvents(e, state);
+    if(handled) {
+        state.isDirty = true;
+        service.calculateAll(state.config, state);
+    }
+}
+
 export async function initializeCalculator() {
     try {
-        const initialData = await service.fetchInitialData();
-        state.config = initialData.config;
-        state.calculatorData = initialData.calculatorData;
-        state.chequesState = initialData.chequesState;
-        state.tpeState = initialData.tpeState;
-
-        ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.chequesState, state.tpeState);
-        ui.populateInitialData(state.calculatorData);
-        service.calculateAll(state.config, state);
-        attachEventListeners();
+        await refreshCalculatorData();
 
         cloture.initializeClotureModals(state);
         setActiveMessageHandler(handleWebSocketMessage);
         await initializeWebSocket(handleWebSocketMessage);
-        sendWsMessage({ type: 'get_full_state' });
 
     } catch (error) {
         console.error("Erreur critique d'initialisation:", error);

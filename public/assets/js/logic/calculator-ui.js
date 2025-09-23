@@ -2,10 +2,8 @@
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 import * as service from './calculator-service.js';
-import * as cloture from './cloture-logic.js';
 import { sendWsMessage } from './websocket-service.js';
 
-// --- NOUVEAU ---
 /**
  * Met à jour l'état visuel et interactif d'une caisse (verrouillage, validation).
  * @param {string} caisseId - L'ID de la caisse à mettre à jour.
@@ -19,37 +17,35 @@ export function updateCaisseLockState(caisseId, status, state) {
 
     if (!tabLink || !caisseContent || !validationArea) return;
 
-    // Réinitialise tous les états visuels
     tabLink.classList.remove('cloture-en-cours', 'cloturee');
     validationArea.innerHTML = '';
-    caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = false);
+    // Désactive tous les champs par défaut, puis les réactive si nécessaire
+    caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = true);
 
     switch (status) {
+        case 'open':
+            caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = false);
+            break;
         case 'locked_by_me':
+            caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = false);
             tabLink.classList.add('cloture-en-cours');
             const ecarts = service.calculateEcartsForCaisse(caisseId, state, state.config);
             const isJuste = Math.abs(ecarts.ecartEspeces) < 0.01 && Math.abs(ecarts.ecartCb) < 0.01 && Math.abs(ecarts.ecartCheques) < 0.01;
             
             validationArea.innerHTML = `
                 <p>Cette caisse est en cours de clôture. Vérifiez les chiffres puis validez.</p>
-                <button class="btn save-btn" id="validate-caisse-${caisseId}-btn" ${!isJuste ? 'disabled' : ''} title="${!isJuste ? 'Tous les écarts doivent être à zéro pour valider.' : 'Valider cette caisse'}">
+                <button class="btn save-btn js-validate-caisse-btn" data-caisse-id="${caisseId}" ${!isJuste ? 'disabled' : ''} title="${!isJuste ? 'Tous les écarts doivent être à zéro pour valider.' : 'Valider cette caisse'}">
                     <i class="fa-solid fa-check"></i> Valider la Caisse
                 </button>`;
-            
-            document.getElementById(`validate-caisse-${caisseId}-btn`).addEventListener('click', () => {
-                cloture.handleValidateCaisse(caisseId, state);
-            });
             break;
 
         case 'locked_by_other':
             tabLink.classList.add('cloture-en-cours');
-            caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = true);
             validationArea.innerHTML = `<p><i class="fa-solid fa-lock"></i> Caisse verrouillée par un autre utilisateur.</p>`;
             break;
 
         case 'closed':
             tabLink.classList.add('cloturee');
-            caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = true);
             validationArea.innerHTML = `<p class="validation-message"><i class="fa-solid fa-check-circle"></i> Caisse clôturée.</p>`;
             break;
     }
@@ -57,7 +53,6 @@ export function updateCaisseLockState(caisseId, status, state) {
 
 /**
  * Affiche la bannière de résumé final lorsque toutes les caisses sont fermées.
- * @param {object} state - L'état global de l'application.
  */
 export function showFinalSummaryBanner(state) {
     const container = document.getElementById('cloture-final-summary-banner-container');
@@ -84,19 +79,9 @@ export function showFinalSummaryBanner(state) {
             </div>
             <div class="summary-table-container">
                 <table class="final-summary-table">
-                    <thead>
-                        <tr>
-                            <th>Caisse</th>
-                            <th>Retrait Suggéré</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Caisse</th><th>Retrait Suggéré</th></tr></thead>
                     <tbody>${caissesSummaryHtml}</tbody>
-                    <tfoot>
-                        <tr>
-                            <td>Total Général</td>
-                            <td>${formatCurrency(totalRetraits, state.config)}</td>
-                        </tr>
-                    </tfoot>
+                    <tfoot><tr><td>Total Général</td><td>${formatCurrency(totalRetraits, state.config)}</td></tr></tfoot>
                 </table>
             </div>
             <div class="banner-actions">
@@ -108,7 +93,7 @@ export function showFinalSummaryBanner(state) {
         if (confirm("Êtes-vous sûr de vouloir finaliser la journée ? Cette action est irréversible.")) {
             const result = await service.submitClotureGenerale();
             alert(result.message);
-            sendWsMessage({ type: 'force_reload_all' });
+            sendWsMessage({ type: 'state_changed_refresh_ui' });
         }
     });
 }
