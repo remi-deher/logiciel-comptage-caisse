@@ -6,10 +6,7 @@ export function renderCalculateurPage(element) {
   element.innerHTML = `
     <div class="container" id="calculator-page">
         <div id="cloture-banner-container"></div>
-
-
         <div id="cloture-final-summary-banner-container"></div>
-
 
         <form id="caisse-form" action="#" method="post">
             <input type="hidden" name="action" value="save">
@@ -33,6 +30,10 @@ export function renderCalculateurPage(element) {
                 </div>
             </div>
         </form>
+
+        <div id="cloture-selection-modal" class="modal"></div>
+        <div id="cloture-process-modal" class="modal"></div>
+        <div id="cloture-final-confirm-modal" class="modal"></div>
     </div>
   `;
 

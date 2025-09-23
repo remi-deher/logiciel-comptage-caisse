@@ -23,9 +23,15 @@ define('ROOT_PATH', dirname(__DIR__));
 if (file_exists(ROOT_PATH . '/config/config.php')) {
     require_once ROOT_PATH . '/config/config.php';
 } else {
-    http_response_code(503); // Service Unavailable
-    echo json_encode(['success' => false, 'message' => "Erreur critique : Fichier de configuration manquant."]);
-    exit;
+    // Si la config n'existe pas, et qu'on n'est pas déjà dans le dossier d'installation
+    if (is_dir(ROOT_PATH . '/public/install') && strpos($_SERVER['REQUEST_URI'], '/install') === false) {
+        header('Location: install/');
+        exit;
+    } elseif (!is_dir(ROOT_PATH . '/public/install')) {
+        http_response_code(503); // Service Unavailable
+        echo json_encode(['success' => false, 'message' => "Erreur critique : Fichier de configuration manquant et dossier d'installation introuvable."]);
+        exit;
+    }
 }
 
 $noms_caisses = $noms_caisses ?? [];
@@ -110,9 +116,7 @@ $routes = [
         ]);
     },
     'GET:calculateur/get_initial_data' => [$calculateurController, 'getInitialData'],
-    // --- DÉBUT DE L'AJOUT DE LA NOUVELLE ROUTE ---
     'GET:calculateur/get_closed_caisse_data' => [$calculateurController, 'getClosedCaisseData'],
-    // --- FIN DE L'AJOUT ---
     'POST:calculateur/save' => [$calculateurController, 'save'],
     'POST:calculateur/autosave' => [$calculateurController, 'autosave'],
     'POST:calculateur/load_from_history' => [$calculateurController, 'loadFromHistory'],

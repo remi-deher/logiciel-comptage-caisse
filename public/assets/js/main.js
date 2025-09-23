@@ -3,8 +3,9 @@
 import { renderNavbar } from './components/Navbar.js';
 import { renderFooter } from './components/Footer.js';
 import { handleRouting } from './router.js';
-import { initializeWebSocket } from './logic/websocket-service.js';
-import { setClotureReady } from './logic/cloture-logic.js';
+// L'import de websocket-service ici n'est plus nécessaire car chaque page gère sa connexion.
+
+// La ligne incorrecte qui importait 'setClotureReady' a été supprimée.
 
 export let activeMessageHandler = null;
 export function setActiveMessageHandler(handler) {
@@ -73,8 +74,7 @@ async function initialize() {
     renderFooter(appFooter);
     initializeNavbarLogic();
     
-    // Le routeur se chargera de lancer la logique de chaque page,
-    // y compris l'initialisation du WebSocket pour le calculateur.
+    // Le routeur se chargera de lancer la logique de chaque page.
     handleRouting();
 
     app.addEventListener('click', (event) => {
@@ -82,13 +82,13 @@ async function initialize() {
         if (link && link.origin === window.location.origin && !link.hasAttribute('target')) {
             event.preventDefault();
             history.pushState(null, '', link.href);
-            setActiveMessageHandler(null);
+            setActiveMessageHandler(null); // Réinitialise le gestionnaire de messages au changement de page
             handleRouting();
         }
     });
 
     window.addEventListener('popstate', () => {
-        setActiveMessageHandler(null);
+        setActiveMessageHandler(null); // Réinitialise aussi lors de l'utilisation des boutons précédent/suivant du navigateur
         handleRouting();
     });
 }

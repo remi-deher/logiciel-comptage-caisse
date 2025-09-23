@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-wizard-logic.js (Corrigé avec attente de confirmation)
+// Fichier : public/assets/js/logic/cloture-wizard-logic.js
 
 import { setActiveMessageHandler } from '../main.js';
 import { sendWsMessage } from './websocket-service.js';
@@ -6,7 +6,6 @@ import * as service from './cloture-wizard-service.js';
 import * as ui from './cloture-wizard-ui.js';
 import { attachEventListeners } from './cloture-wizard-events.js';
 
-// --- État global de l'assistant ---
 const state = {
     config: {},
     wsResourceId: null,
@@ -61,7 +60,6 @@ async function handleNextStep() {
 
     try {
         if (state.wizardState.currentStep === 1) {
-            // --- DÉBUT DE LA CORRECTION ---
             const selected = document.querySelectorAll('input[name="caisseSelection"]:checked');
             state.wizardState.selectedCaisses = Array.from(selected).map(cb => cb.value);
 
@@ -69,25 +67,19 @@ async function handleNextStep() {
             const allDisabled = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(cb => cb.disabled);
 
             if (state.wizardState.selectedCaisses.length > 0) {
-                // On envoie le message de verrouillage mais on n'avance pas d'étape ici.
-                // Le gestionnaire WebSocket s'en chargera à la réception de la confirmation.
                 state.wizardState.selectedCaisses.forEach(id => sendWsMessage({ type: 'cloture_lock', caisse_id: id }));
-                // On affiche un message d'attente à l'utilisateur
                 const wizardContent = document.querySelector('.wizard-content');
                 if(wizardContent) {
                     wizardContent.innerHTML = '<p style="text-align:center; padding: 40px 0;"><i class="fa-solid fa-lock fa-2x"></i><br><br>Verrouillage des caisses en cours...</p>';
                 }
             } else if (allDisabled) {
-                // Si toutes les caisses sont déjà clôturées, on saute à la fin
                 state.wizardState.selectedCaisses = Object.keys(state.config.nomsCaisses);
                 state.wizardState.currentStep = 4;
                 renderCurrentStep();
             } else {
-                // L'utilisateur n'a rien coché
                 ui.updateWizardUI(state.wizardState, isReconciliationComplete()); 
                 return;
             }
-            // --- FIN DE LA CORRECTION ---
             
         } else if (state.wizardState.currentStep === 2) {
             if (isReconciliationComplete()) {
@@ -121,7 +113,6 @@ async function handleNextStep() {
             return;
         }
         
-        // On ne render que si on n'a pas redirigé
         if (state.wizardState.currentStep !== 1) {
             renderCurrentStep();
         }
@@ -179,9 +170,7 @@ function handleWizardWebSocketMessage(data) {
     if (data.type === 'welcome') {
         state.wsResourceId = data.resourceId.toString();
     }
-    // --- DÉBUT DE LA CORRECTION ---
     if (data.type === 'cloture_locked_caisses') {
-        // Si on est à l'étape 1 et qu'on a sélectionné des caisses, on attend la confirmation de verrouillage
         if (state.wizardState.currentStep === 1 && state.wizardState.selectedCaisses.length > 0) {
             const lockedCaisseIds = (data.caisses || []).map(c => c.caisse_id.toString());
             const allSelectedAreNowLocked = state.wizardState.selectedCaisses.every(id => lockedCaisseIds.includes(id));
@@ -196,12 +185,10 @@ function handleWizardWebSocketMessage(data) {
                 renderCurrentStep();
             }
         } 
-        // Sinon, si on est à l'étape 1 sans attendre, on rafraîchit simplement la vue
         else if (state.wizardState.currentStep === 1) {
             ui.renderStep1_Selection(document.querySelector('.wizard-content'), state.config, state.wsResourceId);
         }
     }
-    // --- FIN DE LA CORRECTION ---
 }
 
 export async function initializeClotureWizard() {

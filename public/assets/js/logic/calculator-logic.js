@@ -1,21 +1,19 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Verborisé et Corrigé pour la race condition)
+// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
 import { setActiveMessageHandler } from '../main.js';
 import { initializeWebSocket, sendWsMessage } from './websocket-service.js';
-// On importe maintenant tout l'objet pour plus de clarté
-import * as cloture from './cloture-logic.js';
+import * as cloture from './cloture-logic.js'; // Importe l'ensemble du module de clôture
 
-// --- État global de l'application ---
+// État global de la page du calculateur
 let state = {
     config: {},
     wsResourceId: null,
     calculatorData: { caisse: {} },
     chequesState: {},
     tpeState: {},
-    lockedCaisses: [],
-    closedCaisses: [],
+    closedCaisses: [], // Ajout pour suivre les caisses clôturées
     isDirty: false
 };
 
@@ -41,27 +39,29 @@ async function handleAutosave() {
     }
 }
 
+/**
+ * Gestionnaire de messages WebSocket principal.
+ * Il reçoit TOUS les messages et les délègue au module approprié.
+ */
 function handleWebSocketMessage(data) {
-    console.log(`%c[CALC-LOGIC] Message WebSocket reçu de type: ${data.type}`, 'color: #16a085', data);
+    // 1. Donne la priorité au module de clôture pour traiter le message
+    const wasHandledByCloture = cloture.handleWebSocketMessage(data, state);
+    if (wasHandledByCloture) {
+        return; // Si le module de clôture a géré le message, on s'arrête.
+    }
 
+    // 2. Traite les messages standards du calculateur
     switch (data.type) {
         case 'welcome':
             state.wsResourceId = data.resourceId.toString();
-            console.log(`%c[CALC-LOGIC] <<< WELCOME reçu. Mon ID de ressource est maintenant: ${state.wsResourceId}`, 'background: #27ae60; color: white; padding: 2px 5px;');
-            
-            cloture.initializeCloture(state.config, state, state.wsResourceId);
-            
-            console.log('%c[CALC-LOGIC] Activation du bouton de clôture.', 'color: green; font-weight: bold;');
-            cloture.setClotureReady(true);
+            cloture.updateClotureButtonState(true, state); // Active le bouton
             break;
         case 'cloture_locked_caisses':
-            console.log(`%c[CALC-LOGIC] <<< CLOTURE_LOCKED_CAISSES reçu.`, 'background: #f39c12; color: white; padding: 2px 5px;');
-            state.lockedCaisses = data.caisses || [];
+            // Met à jour l'état des caisses clôturées pour l'UI principale
             state.closedCaisses = (data.closed_caisses || []).map(String);
-            cloture.updateClotureUI(data, state.wsResourceId);
+            cloture.updateClotureButtonState(true, state);
             break;
         case 'full_form_state':
-            console.log(`%c[CALC-LOGIC] <<< FULL_FORM_STATE reçu. Application de l'état complet.`, 'background: #9b59b6; color: white; padding: 2px 5px;');
             ui.applyFullFormState(data, state);
             service.calculateAll(state.config, state);
             break;
@@ -113,33 +113,34 @@ function attachEventListeners() {
     });
 }
 
+/**
+ * Point d'entrée principal pour la page du calculateur.
+ */
 export async function initializeCalculator() {
     try {
-        console.log('[CALC-LOGIC] Initialisation de la page Calculateur...');
         const initialData = await service.fetchInitialData();
         state.config = initialData.config;
         state.calculatorData = initialData.calculatorData;
         state.chequesState = initialData.chequesState;
         state.tpeState = initialData.tpeState;
-        console.log('[CALC-LOGIC] Données initiales chargées:', {config: state.config, data: state.calculatorData});
 
         ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.chequesState, state.tpeState);
         ui.populateInitialData(state.calculatorData);
-        console.log('[CALC-LOGIC] Interface rendue.');
-
         service.calculateAll(state.config, state);
         attachEventListeners();
+
+        // Initialise la logique des modales de clôture en lui passant l'état global
+        cloture.initializeClotureModals(state);
+
+        // Définit notre nouveau gestionnaire de messages "chef d'orchestre"
         setActiveMessageHandler(handleWebSocketMessage);
-        console.log('[CALC-LOGIC] Écouteurs d\'événements attachés et gestionnaire de messages activé.');
 
         await initializeWebSocket(handleWebSocketMessage);
-
-        console.log('[CALC-LOGIC] WebSocket initialisé. Envoi de get_full_state.');
         sendWsMessage({ type: 'get_full_state' });
 
     } catch (error) {
         console.error("Erreur critique d'initialisation:", error);
         document.getElementById('main-content').innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;
-        cloture.setClotureReady(false);
+        cloture.updateClotureButtonState(false, state);
     }
 }

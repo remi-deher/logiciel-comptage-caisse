@@ -13,6 +13,7 @@ import { renderChangelogPage } from './pages/ChangelogPage.js';
 import { renderUpdatePage } from './pages/UpdatePage.js';
 import { renderLoginPage } from './pages/LoginPage.js';
 import { renderAdminPage } from './pages/AdminPage.js';
+import { renderClotureWizardPage } from './pages/ClotureWizardPage.js'; // <-- NOUVEL IMPORT
 
 const mainContent = document.getElementById('main-content');
 
@@ -27,6 +28,7 @@ const routes = {
     '/update': { render: renderUpdatePage, css: 'update.css' },
     '/login': { render: renderLoginPage, css: 'admin.css' },
     '/admin': { render: renderAdminPage, css: 'admin.css' },
+    '/cloture-wizard': { render: renderClotureWizardPage, css: 'cloture-wizard.css' }, // <-- NOUVELLE ROUTE
 };
 
 /**
