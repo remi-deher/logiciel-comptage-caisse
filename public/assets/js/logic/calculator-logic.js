@@ -27,15 +27,12 @@ async function refreshCalculatorData() {
         state.chequesState = initialData.chequesState;
         state.tpeState = initialData.tpeState;
 
-        // Re-génère l'interface avec les nouvelles données
         ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.chequesState, state.tpeState);
         ui.populateInitialData(state.calculatorData);
         service.calculateAll(state.config, state);
 
-        // Ré-attache les écouteurs d'événements aux nouveaux éléments du DOM
         attachEventListeners();
-
-        // Une fois l'interface fraîche, on demande l'état des verrous
+        
         sendWsMessage({ type: 'get_full_state' });
 
     } catch (error) {
@@ -96,6 +93,16 @@ function handleWebSocketMessage(data) {
             state.closedCaisses = (data.closed_caisses || []).map(String);
             cloture.updateClotureButtonState(true, state);
             updateAllCaisseLocks();
+
+            // --- CORRECTION CLÉ : Affichage proactif de la bannière ---
+            const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
+            const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(id));
+            if (allClosed) {
+                ui.showFinalSummaryBanner(state);
+            } else {
+                const container = document.getElementById('cloture-final-summary-banner-container');
+                if (container) container.innerHTML = ''; // Cache la bannière si une caisse est rouverte
+            }
             break;
         case 'full_form_state':
             ui.applyFullFormState(data, state);
@@ -120,13 +127,11 @@ function attachEventListeners() {
     const page = document.getElementById('calculator-page');
     if (!page) return;
 
-    // Supprime l'ancien écouteur pour éviter les doublons lors du rafraîchissement
     page.removeEventListener('click', handlePageClick);
     page.removeEventListener('input', handlePageInput);
 
     window.addEventListener('beforeunload', () => { if (state.isDirty) handleAutosave(); });
 
-    // Attache les nouveaux écouteurs centralisés
     page.addEventListener('input', handlePageInput);
     page.addEventListener('click', handlePageClick);
 
@@ -137,7 +142,6 @@ function attachEventListeners() {
     });
 }
 
-// Fonction de gestion des "input" déléguée
 function handlePageInput(e) {
     if (e.target.matches('input, textarea')) {
         state.isDirty = true;
@@ -149,7 +153,6 @@ function handlePageInput(e) {
     }
 }
 
-// Fonction de gestion des clics déléguée
 function handlePageClick(e) {
     const validateBtn = e.target.closest('.js-validate-caisse-btn');
     if (validateBtn) {
@@ -170,7 +173,13 @@ export async function initializeCalculator() {
     try {
         await refreshCalculatorData();
 
-        cloture.initializeClotureModals(state);
+        // Centralise la logique de clôture et l'écouteur du bouton principal
+        cloture.initializeClotureEventListeners(state);
+        const clotureBtn = document.getElementById('cloture-btn');
+        if (clotureBtn) {
+            clotureBtn.addEventListener('click', () => cloture.handleClotureAction(state));
+        }
+
         setActiveMessageHandler(handleWebSocketMessage);
         await initializeWebSocket(handleWebSocketMessage);
 
