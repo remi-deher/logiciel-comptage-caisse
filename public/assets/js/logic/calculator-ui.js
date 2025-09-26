@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-ui.js (Version Finale Complète et Corrigée)
+// Fichier : public/assets/js/logic/calculator-ui.js (Complet et Final)
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 import * as service from './calculator-service.js';
@@ -13,121 +13,115 @@ import { sendWsMessage } from './websocket-service.js';
 export function updateCaisseLockState(caisseId, status, state) {
     const tabLink = document.querySelector(`.tab-link[data-caisse-id="${caisseId}"]`);
     const caisseContent = document.getElementById(`caisse${caisseId}`);
-    const validationArea = document.querySelector(`#ecart-display-caisse${caisseId} .cloture-validation-area`);
+    const clotureSection = document.getElementById(`cloture-section-${caisseId}`);
 
-    if (!tabLink || !caisseContent || !validationArea) return;
+    if (!tabLink || !caisseContent || !clotureSection) return;
 
-    tabLink.classList.remove('cloture-en-cours', 'cloturee');
-    validationArea.innerHTML = '';
-    // Désactive tous les champs par défaut, puis les réactive si nécessaire
-    caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = true);
-
+    // 1. Réinitialisation des états visuels
+    const isActive = tabLink.classList.contains('active');
+    tabLink.className = 'tab-link'; // Enlève toutes les classes de statut
+    if (isActive) tabLink.classList.add('active');
+    
+    caisseContent.querySelectorAll('input, textarea, .add-cheque-btn, .add-tpe-releve-btn, .delete-cheque-btn, .delete-tpe-releve-btn').forEach(el => el.disabled = false);
+    clotureSection.innerHTML = `<button type="button" class="btn new-btn cloture-start-btn" data-caisse-id="${caisseId}"><i class="fa-solid fa-lock-open"></i> Démarrer la clôture de cette caisse</button>`;
+    
+    // 2. Application du nouveau statut
     switch (status) {
-        case 'open':
-            caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = false);
-            break;
         case 'locked_by_me':
-            caisseContent.querySelectorAll('input, button, textarea').forEach(el => el.disabled = false);
-            tabLink.classList.add('cloture-en-cours');
-            const ecarts = service.calculateEcartsForCaisse(caisseId, state, state.config);
-            const isJuste = Math.abs(ecarts.ecartEspeces) < 0.01 && Math.abs(ecarts.ecartCb) < 0.01 && Math.abs(ecarts.ecartCheques) < 0.01;
-            
-            validationArea.innerHTML = `
-                <p>Cette caisse est en cours de clôture. Vérifiez les chiffres puis validez.</p>
-                <button class="btn save-btn js-validate-caisse-btn" data-caisse-id="${caisseId}" ${!isJuste ? 'disabled' : ''} title="${!isJuste ? 'Tous les écarts doivent être à zéro pour valider.' : 'Valider cette caisse'}">
-                    <i class="fa-solid fa-check"></i> Valider la Caisse
-                </button>`;
+            tabLink.classList.add('status-locked-by-me');
+            caisseContent.querySelectorAll('input, textarea, .add-cheque-btn, .add-tpe-releve-btn, .delete-cheque-btn, .delete-tpe-releve-btn').forEach(el => el.disabled = true);
+            clotureSection.innerHTML = renderClotureSectionForInitiator(caisseId, state);
+            clotureSection.querySelectorAll('.retrait-input').forEach(el => el.disabled = false); // Réactive seulement les inputs de retrait
             break;
 
         case 'locked_by_other':
-            tabLink.classList.add('cloture-en-cours');
-            validationArea.innerHTML = `<p><i class="fa-solid fa-lock"></i> Caisse verrouillée par un autre utilisateur.</p>`;
+            tabLink.classList.add('status-locked-by-other');
+            caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
+            const lockInfo = state.lockedCaisses.find(c => String(c.caisse_id) === String(caisseId));
+            const locker = lockInfo ? `par l'utilisateur #${lockInfo.locked_by}` : '';
+            clotureSection.innerHTML = `<div class="cloture-locked-info"><i class="fa-solid fa-lock"></i> Caisse verrouillée ${locker}.</div>`;
             break;
 
         case 'closed':
-            tabLink.classList.add('cloturee');
-            validationArea.innerHTML = `<p class="validation-message"><i class="fa-solid fa-check-circle"></i> Caisse clôturée.</p>`;
+            tabLink.classList.add('status-closed');
+            caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
+            clotureSection.innerHTML = `<div class="cloture-validated-info"><i class="fa-solid fa-check-circle"></i> Caisse clôturée.</div>`;
             break;
     }
+}
+
+/**
+ * Génère le HTML pour la section de retrait lorsque l'utilisateur a verrouillé la caisse.
+ */
+function renderClotureSectionForInitiator(caisseId, state) {
+    const suggestions = service.calculateWithdrawalSuggestion(state.calculatorData.caisse[caisseId], state.config);
+    const minToKeep = state.config.minToKeep || {};
+
+    let rowsHtml = suggestions.suggestions.map(s => {
+        const currentDenomQty = parseInt(state.calculatorData.caisse[caisseId]?.denominations?.[s.name] || 0);
+        const minQtyToKeep = parseInt(minToKeep[s.name] || 0);
+        const maxAllowedToWithdraw = Math.max(0, currentDenomQty - minQtyToKeep);
+
+        return `
+            <tr>
+                <td>${s.value >= 1 ? `${s.value} ${state.config.currencySymbol}` : `${s.value * 100} cts`}</td>
+                <td class="text-center">${currentDenomQty}</td>
+                <td class="text-center">${minQtyToKeep}</td>
+                <td>
+                    <input type="number" class="retrait-input" data-caisse-id="${caisseId}" name="retraits[${caisseId}][${s.name}]" value="${s.qty}" min="0" max="${maxAllowedToWithdraw}">
+                </td>
+                <td class="text-right" id="total-retrait-${s.name}-${caisseId}">${formatCurrency(s.total, state.config)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    return `
+        <h4><i class="fa-solid fa-right-from-bracket"></i> Retraits et Finalisation</h4>
+        <p>Ajustez les quantités à retirer pour préparer le fond de caisse de demain.</p>
+        <div class="table-responsive">
+            <table class="suggestion-table">
+                <thead>
+                    <tr>
+                        <th>Dénomination</th>
+                        <th class="text-center">Qté en caisse</th>
+                        <th class="text-center">Qté min. à garder</th>
+                        <th>Qté à retirer</th>
+                        <th class="text-right">Total retiré</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="4"><strong>Total des retraits</strong></td>
+                        <td class="text-right" id="total-global-retrait-${caisseId}"><strong>${formatCurrency(suggestions.totalToWithdraw, state.config)}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div class="cloture-actions">
+            <button type="button" class="btn delete-btn cloture-cancel-btn" data-caisse-id="${caisseId}"><i class="fa-solid fa-unlock"></i> Annuler</button>
+            <button type="button" class="btn save-btn cloture-validate-btn" data-caisse-id="${caisseId}"><i class="fa-solid fa-check"></i> Valider la clôture</button>
+        </div>
+    `;
 }
 
 /**
  * Affiche la bannière de résumé final lorsque toutes les caisses sont fermées.
  */
-export function showFinalSummaryBanner(state) {
+export function showFinalSummaryBanner() {
     const container = document.getElementById('cloture-final-summary-banner-container');
     if (!container) return;
-
-    let totalRetraits = 0;
-    const caissesSummaryHtml = Object.keys(state.config.nomsCaisses).map(caisseId => {
-        const caisseData = state.calculatorData.caisse[caisseId];
-        const suggestions = service.calculateWithdrawalSuggestion(caisseData, state.config);
-        totalRetraits += suggestions.totalToWithdraw;
-        return `
-            <tr>
-                <td>${state.config.nomsCaisses[caisseId]}</td>
-                <td>${formatCurrency(suggestions.totalToWithdraw, state.config)}</td>
-            </tr>
-        `;
-    }).join('');
-
     container.innerHTML = `
         <div class="cloture-final-summary-banner">
             <div class="banner-header">
-                <h4><i class="fa-solid fa-flag-checkered"></i> Prêt pour la finalisation</h4>
-                <p>Toutes les caisses sont clôturées. Le retrait total à effectuer est de <strong>${formatCurrency(totalRetraits, state.config)}</strong>.</p>
-            </div>
-            <div class="summary-table-container">
-                <table class="final-summary-table">
-                    <thead><tr><th>Caisse</th><th>Retrait Suggéré</th></tr></thead>
-                    <tbody>${caissesSummaryHtml}</tbody>
-                    <tfoot><tr><td>Total Général</td><td>${formatCurrency(totalRetraits, state.config)}</td></tr></tfoot>
-                </table>
+                <h4><i class="fa-solid fa-flag-checkered"></i> Journée Prête pour Finalisation</h4>
+                <p>Toutes les caisses ont été clôturées. Vous pouvez maintenant archiver la journée.</p>
             </div>
             <div class="banner-actions">
-                <button id="finalize-day-btn" class="btn save-btn">Confirmer et Finaliser la Journée</button>
+                <button id="finalize-day-btn" class="btn save-btn">Finaliser et Archiver la Journée</button>
             </div>
         </div>`;
-
-    document.getElementById('finalize-day-btn').addEventListener('click', async () => {
-        if (confirm("Êtes-vous sûr de vouloir finaliser la journée ? Cette action est irréversible.")) {
-            const result = await service.submitClotureGenerale();
-            alert(result.message);
-            sendWsMessage({ type: 'state_changed_refresh_ui' });
-        }
-    });
 }
-
-
-/**
- * Remplit les champs du formulaire avec les données initiales chargées.
- */
-export function populateInitialData(calculatorData) {
-    if (!calculatorData) return;
-
-    document.getElementById('nom_comptage').value = calculatorData.nom_comptage || '';
-    document.getElementById('explication').value = calculatorData.explication || '';
-
-    for (const caisseId in calculatorData.caisse) {
-        const caisseData = calculatorData.caisse[caisseId];
-        if (caisseData) {
-            ['fond_de_caisse', 'ventes_especes', 'retrocession', 'ventes_cb', 'ventes_cheques'].forEach(key => {
-                const field = document.getElementById(`${key}_${caisseId}`);
-                if (field && caisseData[key] !== undefined) {
-                    field.value = caisseData[key];
-                }
-            });
-
-            if (caisseData.denominations) {
-                Object.entries(caisseData.denominations).forEach(([denom, qty]) => {
-                    const denomField = document.getElementById(`${denom}_${caisseId}`);
-                    if (denomField) denomField.value = qty;
-                });
-            }
-        }
-    }
-}
-
 
 /**
  * Crée le HTML pour une carte de dénomination (billet ou pièce).
@@ -170,7 +164,6 @@ export function renderCalculatorUI(pageElement, config, chequesState, tpeState) 
                     <span class="ecart-value">0,00 €</span>
                 </div>
                 <div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div>
-                <div class="cloture-validation-area"></div>
             </div>`;
 
         const billetsHtml = Object.entries(config.denominations.billets).map(([name, v]) => createDenominationCard(id, name, v, 'bill', config)).join('');
@@ -212,6 +205,8 @@ export function renderCalculatorUI(pageElement, config, chequesState, tpeState) 
                     <div id="cb_${id}" class="payment-tab-content"><div class="theoretical-inputs-panel"><div class="compact-input-group"><label>Encaissement CB Théorique</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div></div>${tpeSectionHtml}</div>
                     <div id="cheques_${id}" class="payment-tab-content"></div>
                 </div>
+                <div class="cloture-section-container" id="cloture-section-${id}">
+                    </div>
             </div>`;
     });
     tabSelector.innerHTML = tabsHtml; 
@@ -226,6 +221,34 @@ export function renderCalculatorUI(pageElement, config, chequesState, tpeState) 
     });
 }
 
+/**
+ * Remplit les champs du formulaire avec les données initiales chargées.
+ */
+export function populateInitialData(calculatorData) {
+    if (!calculatorData) return;
+
+    document.getElementById('nom_comptage').value = calculatorData.nom_comptage || '';
+    document.getElementById('explication').value = calculatorData.explication || '';
+
+    for (const caisseId in calculatorData.caisse) {
+        const caisseData = calculatorData.caisse[caisseId];
+        if (caisseData) {
+            ['fond_de_caisse', 'ventes_especes', 'retrocession', 'ventes_cb', 'ventes_cheques'].forEach(key => {
+                const field = document.getElementById(`${key}_${caisseId}`);
+                if (field && caisseData[key] !== undefined) {
+                    field.value = caisseData[key];
+                }
+            });
+
+            if (caisseData.denominations) {
+                Object.entries(caisseData.denominations).forEach(([denom, qty]) => {
+                    const denomField = document.getElementById(`${denom}_${caisseId}`);
+                    if (denomField) denomField.value = qty;
+                });
+            }
+        }
+    }
+}
 
 function renderChequeList(caisseId, chequesState, config) {
     const container = document.getElementById(`cheques_${caisseId}`);
@@ -250,7 +273,6 @@ function renderChequeList(caisseId, chequesState, config) {
     totalContainerParent.innerHTML = `Total (${cheques.length} chèque${cheques.length > 1 ? 's' : ''}): <span id="cheque-total-${caisseId}">${formatCurrency(totalCheques, config)}</span>`;
     hiddenInputsContainer.innerHTML = cheques.map((cheque, index) => `<input type="hidden" name="caisse[${caisseId}][cheques][${index}][montant]" value="${cheque.montant}"><input type="hidden" name="caisse[${caisseId}][cheques][${index}][commentaire]" value="${cheque.commentaire}">`).join('');
 }
-
 
 function renderTpeList(caisseId, terminalId, tpeState, config) {
     const listContainer = document.getElementById(`tpe-releves-list-${terminalId}-${caisseId}`);
@@ -292,7 +314,8 @@ export function applyFullFormState(data, state) {
 }
 
 export function applyLiveUpdate(data) {
-    if (data.id && document.activeElement && document.activeElement.id !== data.id) {
+    const activeElement = document.activeElement;
+    if (data.id && activeElement && activeElement.id !== data.id) {
         const input = document.getElementById(data.id);
         if (input) {
             input.value = data.value;
@@ -312,7 +335,6 @@ export function applyListUpdate(data, state) {
     }
 }
 
-
 export function handleCalculatorClickEvents(e, state) {
     const target = e.target;
     
@@ -322,7 +344,8 @@ export function handleCalculatorClickEvents(e, state) {
         tabLink.classList.add('active');
         document.getElementById(tabLink.dataset.tab)?.classList.add('active');
         document.getElementById(`ecart-display-${tabLink.dataset.tab}`)?.classList.add('active');
-        return false;
+        service.calculateAll(state.config, state); // Recalculate to update main ecart display
+        return false; // Not a state change, just UI
     }
     const paymentTab = target.closest('.payment-tab-link');
     if(paymentTab) {
@@ -330,7 +353,8 @@ export function handleCalculatorClickEvents(e, state) {
         container.querySelectorAll('.payment-tab-link, .payment-tab-content').forEach(el => el.classList.remove('active'));
         paymentTab.classList.add('active');
         container.querySelector(`#${paymentTab.dataset.paymentTab}`)?.classList.add('active');
-        return true;
+        service.calculateAll(state.config, state); // Recalculate to update main ecart display
+        return false; // Not a state change, just UI
     }
     const addChequeBtn = target.closest('.add-cheque-btn');
     if (addChequeBtn) {

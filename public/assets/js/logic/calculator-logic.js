@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Version Finale Complète et Corrigée)
+// Fichier : public/assets/js/logic/calculator-logic.js (Complet et Adapté)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
@@ -77,32 +77,28 @@ function updateAllCaisseLocks() {
         
         ui.updateCaisseLockState(caisseId, status, state);
     });
+
+    const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
+    const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(id));
+    
+    if (allClosed) {
+        ui.showFinalSummaryBanner(state);
+    } else {
+        const container = document.getElementById('cloture-final-summary-banner-container');
+        if (container) container.innerHTML = '';
+    }
 }
 
 function handleWebSocketMessage(data) {
-    const wasHandledByCloture = cloture.handleWebSocketMessage(data, state);
-    if (wasHandledByCloture) return;
-
     switch (data.type) {
         case 'welcome':
             state.wsResourceId = data.resourceId.toString();
-            cloture.updateClotureButtonState(true, state);
+            sendWsMessage({ type: 'get_full_state' });
             break;
         case 'cloture_locked_caisses':
             state.lockedCaisses = data.caisses || [];
             state.closedCaisses = (data.closed_caisses || []).map(String);
-            cloture.updateClotureButtonState(true, state);
             updateAllCaisseLocks();
-
-            // --- CORRECTION CLÉ : Affichage proactif de la bannière ---
-            const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
-            const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(id));
-            if (allClosed) {
-                ui.showFinalSummaryBanner(state);
-            } else {
-                const container = document.getElementById('cloture-final-summary-banner-container');
-                if (container) container.innerHTML = ''; // Cache la bannière si une caisse est rouverte
-            }
             break;
         case 'full_form_state':
             ui.applyFullFormState(data, state);
@@ -117,51 +113,59 @@ function handleWebSocketMessage(data) {
             ui.applyListUpdate(data, state);
             service.calculateAll(state.config, state);
             break;
-        case 'state_changed_refresh_ui':
-            refreshCalculatorData();
-            break;
+        case 'force_reload_all':
+             window.location.reload();
+             break;
     }
 }
 
 function attachEventListeners() {
     const page = document.getElementById('calculator-page');
-    if (!page) return;
+    if (!page._eventListenersAttached) {
+        page.addEventListener('input', handlePageInput);
+        page.addEventListener('click', handlePageClick);
+        
+        const form = document.getElementById('caisse-form');
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            handleAutosave(); 
+        });
 
-    page.removeEventListener('click', handlePageClick);
-    page.removeEventListener('input', handlePageInput);
-
-    window.addEventListener('beforeunload', () => { if (state.isDirty) handleAutosave(); });
-
-    page.addEventListener('input', handlePageInput);
-    page.addEventListener('click', handlePageClick);
-
-    const form = document.getElementById('caisse-form');
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await handleAutosave();
-    });
+        window.addEventListener('beforeunload', () => { if (state.isDirty) handleAutosave(); });
+        page._eventListenersAttached = true;
+    }
 }
 
 function handlePageInput(e) {
-    if (e.target.matches('input, textarea')) {
-        state.isDirty = true;
-        document.getElementById('autosave-status').textContent = 'Modifications non enregistrées.';
-        service.calculateAll(state.config, state);
-        if (e.target.matches('input[type="text"], input[type="number"]')) {
-             sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
-        }
+    state.isDirty = true;
+    document.getElementById('autosave-status').textContent = 'Modifications non enregistrées.';
+    service.calculateAll(state.config, state);
+    if (e.target.matches('input[type="text"], input[type="number"], textarea')) {
+         sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
     }
 }
 
 function handlePageClick(e) {
-    const validateBtn = e.target.closest('.js-validate-caisse-btn');
-    if (validateBtn) {
-        e.preventDefault();
-        const caisseId = validateBtn.dataset.caisseId;
-        cloture.handleValidateCaisse(caisseId, state);
+    const target = e.target;
+    
+    // Logique pour les boutons de clôture
+    if (target.closest('.cloture-start-btn')) {
+        cloture.startClotureCaisse(target.closest('.cloture-start-btn').dataset.caisseId, state);
         return;
     }
-    
+    if (target.closest('.cloture-cancel-btn')) {
+        cloture.cancelClotureCaisse(target.closest('.cloture-cancel-btn').dataset.caisseId, state);
+        return;
+    }
+    if (target.closest('.cloture-validate-btn')) {
+        cloture.validateClotureCaisse(target.closest('.cloture-validate-btn').dataset.caisseId, state);
+        return;
+    }
+    if (target.closest('#finalize-day-btn')) {
+        cloture.finalizeDay();
+        return;
+    }
+
     const handled = ui.handleCalculatorClickEvents(e, state);
     if(handled) {
         state.isDirty = true;
@@ -171,21 +175,23 @@ function handlePageClick(e) {
 
 export async function initializeCalculator() {
     try {
-        await refreshCalculatorData();
+        const initialData = await service.fetchInitialData();
+        state.config = initialData.config;
+        state.calculatorData = initialData.calculatorData;
+        state.chequesState = initialData.chequesState;
+        state.tpeState = initialData.tpeState;
 
-        // Centralise la logique de clôture et l'écouteur du bouton principal
-        cloture.initializeClotureEventListeners(state);
-        const clotureBtn = document.getElementById('cloture-btn');
-        if (clotureBtn) {
-            clotureBtn.addEventListener('click', () => cloture.handleClotureAction(state));
-        }
+        ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.chequesState, state.tpeState);
+        ui.populateInitialData(state.calculatorData);
+        service.calculateAll(state.config, state);
 
+        attachEventListeners();
+        
         setActiveMessageHandler(handleWebSocketMessage);
         await initializeWebSocket(handleWebSocketMessage);
 
     } catch (error) {
         console.error("Erreur critique d'initialisation:", error);
         document.getElementById('main-content').innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;
-        cloture.updateClotureButtonState(false, state);
     }
 }

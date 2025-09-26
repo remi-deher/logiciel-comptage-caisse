@@ -13,7 +13,7 @@ import { renderChangelogPage } from './pages/ChangelogPage.js';
 import { renderUpdatePage } from './pages/UpdatePage.js';
 import { renderLoginPage } from './pages/LoginPage.js';
 import { renderAdminPage } from './pages/AdminPage.js';
-import { renderClotureWizardPage } from './pages/ClotureWizardPage.js'; // <-- NOUVEL IMPORT
+// La ligne important ClotureWizardPage a été supprimée
 
 const mainContent = document.getElementById('main-content');
 
@@ -28,7 +28,7 @@ const routes = {
     '/update': { render: renderUpdatePage, css: 'update.css' },
     '/login': { render: renderLoginPage, css: 'admin.css' },
     '/admin': { render: renderAdminPage, css: 'admin.css' },
-    '/cloture-wizard': { render: renderClotureWizardPage, css: 'cloture-wizard.css' }, // <-- NOUVELLE ROUTE
+    // La route pour /cloture-wizard a été supprimée
 };
 
 /**

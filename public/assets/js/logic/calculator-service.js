@@ -1,9 +1,9 @@
-// Fichier : public/assets/js/logic/calculator-service.js (Corrigé et Fiabilisé)
+// Fichier : public/assets/js/logic/calculator-service.js (Complet et Corrigé)
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 
 /**
- * Récupère les données initiales nécessaires pour l'application (configuration et dernière sauvegarde).
+ * Récupère les données initiales (configuration et dernière sauvegarde).
  */
 export async function fetchInitialData() {
     const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
@@ -36,12 +36,47 @@ export async function fetchInitialData() {
     return { config: configResult, calculatorData, chequesState, tpeState };
 }
 
+/**
+ * Prépare le FormData pour la clôture d'une seule caisse.
+ */
+export function prepareSingleCaisseClotureData(caisseId, state) {
+    const form = document.getElementById('caisse-form');
+    const formData = new FormData(form);
+    
+    formData.append('caisse_id_a_cloturer', caisseId);
+
+    const retraitInputs = document.querySelectorAll(`.retrait-input[data-caisse-id="${caisseId}"]`);
+    retraitInputs.forEach(input => {
+        formData.append(input.name, input.value);
+    });
+
+    return formData;
+}
 
 /**
- * Calcule les écarts et totaux pour UNE SEULE caisse à partir de l'état de l'application.
+ * Soumet les données de clôture d'une seule caisse au serveur.
  */
-export function calculateEcartsForCaisse(caisseId, appState, config) {
-    const { calculatorData, chequesState, tpeState } = appState;
+export async function submitSingleCaisseCloture(formData) {
+    const response = await fetch('index.php?route=cloture/confirm_caisse', {
+        method: 'POST',
+        body: formData
+    });
+    return await response.json();
+}
+
+/**
+ * Soumet la demande de clôture générale finale.
+ */
+export async function submitClotureGenerale() {
+    const response = await fetch('index.php?route=cloture/confirm_generale', { method: 'POST' });
+    return await response.json();
+}
+
+/**
+ * Calcule les écarts pour tous les types de paiement d'une caisse donnée.
+ */
+export function calculateEcartsForCaisse(caisseId, appState) {
+    const { calculatorData, config, chequesState, tpeState } = appState;
     const caisseData = calculatorData.caisse[caisseId] || {};
 
     let totalCompteEspeces = 0;
@@ -58,8 +93,8 @@ export function calculateEcartsForCaisse(caisseId, appState, config) {
     let totalCompteCb = 0;
     if (tpeState[caisseId]) {
         for (const terminalId in tpeState[caisseId]) {
-            const releves = tpeState[caisseId][terminalId];
-            if (releves && releves.length > 0) {
+            const releves = tpeState[caisseId][terminalId] || [];
+            if (releves.length > 0) {
                 const dernierReleve = releves[releves.length - 1];
                 totalCompteCb += parseLocaleFloat(dernierReleve.montant);
             }
@@ -72,18 +107,11 @@ export function calculateEcartsForCaisse(caisseId, appState, config) {
     const ventesCheques = parseLocaleFloat(caisseData.ventes_cheques);
     const ecartCheques = totalCompteCheques - ventesCheques;
 
-    const totalVentes = ventesEspeces + retrocession + ventesCb + ventesCheques;
-
-    return {
-        totalCompteEspeces, ecartEspeces,
-        totalCompteCb, ecartCb,
-        totalCompteCheques, ecartCheques,
-        totalVentes
-    };
+    return { totalCompteEspeces, ecartEspeces, totalCompteCb, ecartCb, totalCompteCheques, ecartCheques };
 }
 
 /**
- * Calcule la suggestion de retrait d'espèces pour une caisse donnée.
+ * Calcule la suggestion de retrait d'espèces pour une caisse.
  */
 export function calculateWithdrawalSuggestion(caisseData, config) {
     if (!caisseData) return { suggestions: [], totalToWithdraw: 0 };
@@ -116,7 +144,6 @@ export function calculateWithdrawalSuggestion(caisseData, config) {
     return { suggestions, totalToWithdraw: totalWithdrawn };
 }
 
-
 /**
  * Calcule tous les totaux pour TOUTES les caisses et met à jour l'affichage.
  */
@@ -125,18 +152,21 @@ export function calculateAll(config, appState) {
     
     Object.keys(config.nomsCaisses).forEach(id => {
         const caisseData = appState.calculatorData.caisse[id] || {};
-        caisseData.fond_de_caisse = document.getElementById(`fond_de_caisse_${id}`).value;
-        caisseData.ventes_especes = document.getElementById(`ventes_especes_${id}`).value;
-        caisseData.retrocession = document.getElementById(`retrocession_${id}`).value;
-        caisseData.ventes_cb = document.getElementById(`ventes_cb_${id}`).value;
-        caisseData.ventes_cheques = document.getElementById(`ventes_cheques_${id}`).value;
+        const formElements = document.getElementById('caisse-form').elements;
+
+        caisseData.fond_de_caisse = formElements[`caisse[${id}][fond_de_caisse]`]?.value;
+        caisseData.ventes_especes = formElements[`caisse[${id}][ventes_especes]`]?.value;
+        caisseData.retrocession = formElements[`caisse[${id}][retrocession]`]?.value;
+        caisseData.ventes_cb = formElements[`caisse[${id}][ventes_cb]`]?.value;
+        caisseData.ventes_cheques = formElements[`caisse[${id}][ventes_cheques]`]?.value;
+        
         caisseData.denominations = caisseData.denominations || {};
         Object.keys({ ...config.denominations.billets, ...config.denominations.pieces }).forEach(name => {
-            const input = document.getElementById(`${name}_${id}`);
+            const input = formElements[`caisse[${id}][denominations][${name}]`];
             if (input) caisseData.denominations[name] = input.value;
         });
 
-        const results = calculateEcartsForCaisse(id, appState, config);
+        const results = calculateEcartsForCaisse(id, appState);
         
         let totalBillets = 0, totalPieces = 0;
         Object.entries(config.denominations.billets).forEach(([name, value]) => {
