@@ -1,5 +1,16 @@
 ## Outils Web comptage de caisse
 
+## DISCLAIMER
+
+BEAUCOUP DE BUG EN 5.0
+
+Préférez utiliser la branche oldest pour le déploiement qui est un produit plus stable
+la 5.0 est un passage vers une SPA ce qui implique des grosse modifications et un produit non stable
+Je travaile uniquement en poussant mon code en branche main au fil de l'eau donc bien se baser sur les releases
+pour un déploiement en production
+
+Je travaille actuellement sur mon temps libre pour patcher la 5.0 en fonction des retours utilisateurs
+
 ## Fonctionnalité importante
 
 * Prend en charge plusieurs caisse
