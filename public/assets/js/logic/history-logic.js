@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version finale avec gestion des graphiques vides et correction TPE)
+// Fichier : public/assets/js/logic/history-logic.js (Version avec pagination adaptative et gestion des graphiques vides)
 import { sendWsMessage } from './websocket-service.js';
 
 // --- État et Configuration Globale ---
@@ -47,11 +47,60 @@ function renderCards(container, historique) {
 }
 
 function renderPagination(container, currentPage, totalPages) {
-    if (!container) return;
-    if (totalPages <= 1) { container.innerHTML = ''; return; }
+    if (!container || totalPages <= 1) {
+        if (container) container.innerHTML = '';
+        return;
+    }
+
     let html = '<ul class="pagination">';
+    const maxVisiblePages = 7; // Nombre max de boutons de page affichés (ex: 1 ... 4 5 6 ... 10)
+
+    // Bouton Précédent
     html += `<li class="${currentPage === 1 ? 'disabled' : ''}"><a href="#" data-page="${currentPage - 1}">&laquo;</a></li>`;
-    for (let i = 1; i <= totalPages; i++) { html += `<li class="${i === currentPage ? 'active' : ''}"><a href="#" data-page="${i}">${i}</a></li>`; }
+
+    if (totalPages <= maxVisiblePages) {
+        // Affiche toutes les pages si le total est inférieur au max
+        for (let i = 1; i <= totalPages; i++) {
+            html += `<li class="${i === currentPage ? 'active' : ''}"><a href="#" data-page="${i}">${i}</a></li>`;
+        }
+    } else {
+        // Logique pour afficher les ellipses (...)
+        let startPage = Math.max(2, currentPage - 2);
+        let endPage = Math.min(totalPages - 1, currentPage + 2);
+
+        if (currentPage <= 4) {
+            startPage = 2;
+            endPage = Math.min(totalPages - 1, maxVisiblePages - 2);
+        }
+
+        if (currentPage > totalPages - 4) {
+            startPage = Math.max(2, totalPages - (maxVisiblePages - 3));
+            endPage = totalPages - 1;
+        }
+
+        // Première page
+        html += `<li class="${1 === currentPage ? 'active' : ''}"><a href="#" data-page="1">1</a></li>`;
+
+        // Ellipse de début
+        if (startPage > 2) {
+            html += `<li><span class="ellipsis">&hellip;</span></li>`;
+        }
+
+        // Pages du milieu
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<li class="${i === currentPage ? 'active' : ''}"><a href="#" data-page="${i}">${i}</a></li>`;
+        }
+
+        // Ellipse de fin
+        if (endPage < totalPages - 1) {
+            html += `<li><span class="ellipsis">&hellip;</span></li>`;
+        }
+
+        // Dernière page
+        html += `<li class="${totalPages === currentPage ? 'active' : ''}"><a href="#" data-page="${totalPages}">${totalPages}</a></li>`;
+    }
+
+    // Bouton Suivant
     html += `<li class="${currentPage === totalPages ? 'disabled' : ''}"><a href="#" data-page="${currentPage + 1}">&raquo;</a></li>`;
     html += '</ul>';
     container.innerHTML = html;
@@ -282,13 +331,10 @@ function renderSheetContent(container, comptageId) {
 
         const chequesHtml = (data.cheques || []).map(c => `<tr><td>${c.commentaire || 'N/A'}</td><td class="text-right">${formatEuros(c.montant)}</td></tr>`).join('');
         
-        // --- DÉBUT DE LA CORRECTION ---
         const tpeHtml = Object.entries(data.cb || {}).map(([terminalId, releves]) => {
-             // On accède à l'objet directement avec la clé `terminalId`
              const terminalName = (config.tpeParCaisse[terminalId] || {}).nom || `TPE #${terminalId}`;
              return (releves || []).map(r => `<tr><td>${terminalName} (${r.heure || 'N/A'})</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('');
         }).join('');
-        // --- FIN DE LA CORRECTION ---
         
         return `
             <div class="card" style="margin-bottom: 20px;">
@@ -430,7 +476,7 @@ export function initializeHistoryLogic() {
         const paginationLink = target.closest('.pagination-nav a');
         if (paginationLink && !paginationLink.parentElement.classList.contains('disabled')) {
             e.preventDefault();
-            loadAndRender(historyPage, { ...currentParams, p: paginationLink.dataset.page });
+            loadAndRender(historyPage, { ...currentParams, p: parseInt(paginationLink.dataset.page) });
         }
         const tabLink = target.closest('.view-tabs .tab-link');
         if (tabLink && !tabLink.classList.contains('active')) {
