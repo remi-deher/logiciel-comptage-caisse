@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Final, refactorisé et sécurisé pour la nouvelle clôture)
+// Fichier : src/CalculateurController.php (Corrigé pour l'autosave multi-utilisateurs)
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -100,7 +100,8 @@ class CalculateurController {
             $this->pdo->beginTransaction();
             $nom_comptage = trim($_POST['nom_comptage'] ?? '');
             if ($is_autosave) {
-                $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
+                // La ligne supprimant les anciennes sauvegardes a été retirée ici
+                // pour permettre un fonctionnement correct en multi-utilisateurs.
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {
                 $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;
@@ -129,7 +130,6 @@ class CalculateurController {
                                 $montant_val = get_numeric_value($releve, 'montant');
                                 if ($montant_val > 0) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
-                                    // CORRECTION : On nettoie la valeur de l'heure avant de l'insérer
                                     $heure_releve_raw = $releve['heure'] ?? null;
                                     $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
                                     $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $heure_releve]);

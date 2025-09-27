@@ -27,24 +27,12 @@ async function refreshCalculatorData() {
         state.lockedCaisses = initialData.clotureState.lockedCaisses;
         state.closedCaisses = (initialData.clotureState.closedCaisses || []).map(String);
 
-        // 1. On crée la structure HTML de la page
         ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config);
-        
-        // 2. On remplit cette structure avec toutes les données (champs et listes)
         ui.populateInitialData(state.calculatorData, state.config);
-
-        // 3. On attache les écouteurs d'événements maintenant que tout est en place
         attachEventListeners();
-        
-        // 4. On lance les premiers calculs
         service.calculateAll(state.config, state);
-        
-        // 5. On met à jour l'état visuel des caisses (ouvert/fermé)
         ui.updateAllCaisseLocks(state);
-        
         updateClotureButtonState();
-
-        // 6. On se connecte au WebSocket pour les mises à jour en temps réel
         sendWsMessage({ type: 'get_full_state' });
 
     } catch (error) {
@@ -66,7 +54,7 @@ async function handleAutosave() {
         const response = await fetch('index.php?route=calculateur/autosave', {
             method: 'POST',
             body: new FormData(form),
-            keepalive: true
+            keepalive: true // Important pour les sauvegardes en quittant la page
         });
         const result = await response.json();
         if (!result.success) throw new Error(result.message);
@@ -227,6 +215,14 @@ export async function initializeCalculator() {
         await refreshCalculatorData();
         setActiveMessageHandler(handleWebSocketMessage);
         await initializeWebSocket(handleWebSocketMessage);
+        
+        // On attache la fonction d'autosave au routeur pour qu'elle soit
+        // exécutée avant chaque changement de page interne à l'application.
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+            mainContent.beforePageChange = handleAutosave;
+        }
+
     } catch (error) {
         console.error("Erreur critique d'initialisation:", error.stack);
         const mainContent = document.getElementById('main-content');
