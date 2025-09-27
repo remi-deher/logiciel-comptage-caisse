@@ -20,7 +20,7 @@ export function updateCaisseLockState(caisseId, status, state) {
     tabLink.className = 'tab-link';
     if (isActive) tabLink.classList.add('active');
     
-    ecartDisplay.classList.remove('cloture-mode');
+    ecartDisplay.classList.remove('cloture-mode', 'cloture-closed');
     
     if (clotureDetailsContainer.dataset.caisseId === caisseId) {
         clotureDetailsContainer.innerHTML = '';
@@ -39,18 +39,23 @@ export function updateCaisseLockState(caisseId, status, state) {
                 clotureDetailsContainer.style.display = 'block';
                 clotureDetailsContainer.dataset.caisseId = caisseId;
             }
-            // L'initiateur peut toujours modifier, donc on ne désactive rien ici.
-            // Les autres clients sont gérés via le statut 'locked_by_other'
             break;
 
         case 'locked_by_other':
             tabLink.classList.add('status-locked-by-other');
-            caisseContent.querySelectorAll('input, textarea, button:not(.payment-tab-link)').forEach(el => el.disabled = true);
+            caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
             break;
             
         case 'closed':
             tabLink.classList.add('status-closed');
-	    caisseContent.querySelectorAll('input, textarea, button:not(.payment-tab-link)').forEach(el => el.disabled = true);
+            if (isActive) {
+                ecartDisplay.classList.add('cloture-closed'); // Nouvelle classe pour le style violet
+                clotureDetailsContainer.innerHTML = renderClotureSectionForClosed(caisseId, state);
+                clotureDetailsContainer.style.display = 'block';
+                clotureDetailsContainer.dataset.caisseId = caisseId;
+            }
+            // On désactive tout SAUF les onglets de paiement
+            caisseContent.querySelectorAll('input, textarea, button:not(.payment-tab-link)').forEach(el => el.disabled = true);
             break;
     }
 }
@@ -109,6 +114,48 @@ function renderClotureSectionForInitiator(caisseId, state) {
         </div>
     `;
 }
+
+/**
+ * Génère le HTML pour la section d'une caisse déjà clôturée.
+ */
+function renderClotureSectionForClosed(caisseId, state) {
+    const suggestions = service.calculateWithdrawalSuggestion(state.calculatorData.caisse[caisseId], state.config);
+    
+    const rowsHtml = suggestions.suggestions.map(s => `
+        <tr>
+            <td>${s.value >= 1 ? `${s.value} ${state.config.currencySymbol}` : `${s.value * 100} cts`}</td>
+            <td class="text-center">${s.qty}</td>
+            <td class="text-right">${formatCurrency(s.total, state.config)}</td>
+        </tr>
+    `).join('');
+
+    return `
+        <h4><i class="fa-solid fa-check-circle"></i> Caisse Clôturée - Récapitulatif des retraits</h4>
+        <p>Cette caisse a été validée. Voici le résumé des retraits enregistrés.</p>
+        <div class="table-responsive">
+            <table class="suggestion-table">
+                <thead>
+                    <tr>
+                        <th>Dénomination</th>
+                        <th class="text-center">Qté à retirer</th>
+                        <th class="text-right">Valeur</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml.length > 0 ? rowsHtml : `<tr><td colspan="3" class="text-center">Aucun retrait enregistré pour cette clôture.</td></tr>`}</tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2"><strong>Total des retraits</strong></td>
+                        <td class="text-right"><strong>${formatCurrency(suggestions.totalToWithdraw, state.config)}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div class="cloture-actions">
+            <button type="button" class="btn action-btn cloture-reopen-btn" data-caisse-id="${caisseId}"><i class="fa-solid fa-rotate-left"></i> Réouvrir la caisse</button>
+        </div>
+    `;
+}
+
 
 /**
  * Affiche la nouvelle bannière de finalisation avec le bouton "Voir les suggestions".

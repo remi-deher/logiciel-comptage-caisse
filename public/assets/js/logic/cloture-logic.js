@@ -22,6 +22,15 @@ export function cancelClotureCaisse(caisseId, state) {
 }
 
 /**
+ * Demande la réouverture d'une caisse déjà clôturée.
+ */
+export function reopenCaisse(caisseId, state) {
+    if (confirm(`Voulez-vous réouvrir la caisse "${state.config.nomsCaisses[caisseId]}" ?\n\nCela la rendra de nouveau modifiable.`)) {
+        sendWsMessage({ type: 'cloture_reopen', caisse_id: caisseId });
+    }
+}
+
+/**
  * Gère la validation finale d'une caisse.
  */
 export async function validateClotureCaisse(caisseId, state) {
@@ -40,8 +49,6 @@ export async function validateClotureCaisse(caisseId, state) {
 
             alert(`La caisse "${caisseNom}" a été clôturée avec succès.`);
             
-            // **LA CORRECTION CLÉ EST ICI**
-            // On notifie le serveur WebSocket que l'état a changé.
             sendWsMessage({ type: 'cloture_state_changed' });
 
         } catch (error) {
@@ -69,7 +76,6 @@ export async function finalizeDay() {
             if (!result.success) throw new Error(result.message);
 
             alert(result.message);
-            // La finalisation de la journée recharge la page pour tout le monde, ce qui est un comportement attendu.
             sendWsMessage({ type: 'force_reload_all' });
 
         } catch (error) {

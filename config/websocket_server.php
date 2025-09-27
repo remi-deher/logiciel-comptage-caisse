@@ -158,6 +158,11 @@ class CaisseServer implements MessageComponentInterface {
                     $actionProcessed = true;
                     break;
                 
+                case 'cloture_reopen':
+                    $this->clotureStateService->reopenCaisse($data['caisse_id']);
+                    $actionProcessed = true;
+                    break;
+
                 case 'cloture_state_changed':
                     $actionProcessed = true;
                     break;

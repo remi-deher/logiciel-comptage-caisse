@@ -1,4 +1,3 @@
-
 /* Fichier : public/assets/css/page-calculateur.css (Complet et Corrigé) */
 
 /* --- BANDEAUX DE CLÔTURE --- */
@@ -28,14 +27,12 @@
 .caisse-tab-content{display:none}.caisse-tab-content.active{display:block;animation:fadeIn .5s}
 
 /* --- STYLES POUR LE MODE CLÔTURE AMÉLIORÉ --- */
-/* Style pour l'onglet de la caisse que l'utilisateur est en train de clôturer */
 .tab-link.status-locked-by-me {
-    color: #8a2be2 !important; /* Texte en violet */
+    color: #8a2be2 !important;
     font-weight: bold;
-    border-bottom-color: #8a2be2 !important; /* Bordure violette pour l'onglet actif */
+    border-bottom-color: #8a2be2 !important;
 }
 
-/* Style pour l'encart des écarts en mode clôture */
 .ecart-display.cloture-mode {
     background-color: rgba(138, 43, 226, 0.05);
     border: 2px solid rgba(138, 43, 226, 0.4);
@@ -44,7 +41,16 @@
     color: #8a2be2;
 }
 
-/* Conteneur pour la section des retraits qui apparaît sous les écarts */
+/* NOUVEAU STYLE POUR LA CAISSE CLOTUREE */
+.ecart-display.cloture-closed {
+    background-color: rgba(138, 43, 226, 0.1);
+    border: 2px solid rgba(138, 43, 226, 0.6);
+}
+.ecart-display.cloture-closed .main-ecart-display .ecart-label {
+    color: #8a2be2;
+}
+
+
 #cloture-details-container {
     margin-top: -10px;
     margin-bottom: 25px;
@@ -69,11 +75,10 @@
 }
 
 .tab-link.status-closed {
-    background-color: #8a2be2 !important; /* Fond violet */
-    color: #ffffff !important;           /* Texte blanc */
+    background-color: #8a2be2 !important;
+    color: #ffffff !important;
     border-bottom-color: transparent !important;
     border-radius: 8px 8px 0 0;
-    cursor: not-allowed;
 }
 
 /* --- STYLES RESTANTS DE LA PAGE CALCULATEUR --- */

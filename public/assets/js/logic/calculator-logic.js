@@ -123,6 +123,10 @@ function handlePageClick(e) {
         cloture.validateClotureCaisse(target.closest('.cloture-validate-btn').dataset.caisseId, state);
         return;
     }
+    if (target.closest('.cloture-reopen-btn')) {
+        cloture.reopenCaisse(target.closest('.cloture-reopen-btn').dataset.caisseId, state);
+        return;
+    }
     if (target.closest('#finalize-day-btn')) {
         cloture.finalizeDay();
         return;
