@@ -6,9 +6,6 @@ import { sendWsMessage } from './websocket-service.js';
 
 /**
  * Met à jour l'état visuel et interactif d'une caisse (verrouillage, validation).
- * @param {string} caisseId - L'ID de la caisse à mettre à jour.
- * @param {string} status - 'open', 'locked_by_me', 'locked_by_other', 'closed'.
- * @param {object} state - L'état global de l'application.
  */
 export function updateCaisseLockState(caisseId, status, state) {
     const tabLink = document.querySelector(`.tab-link[data-caisse-id="${caisseId}"]`);
@@ -20,10 +17,11 @@ export function updateCaisseLockState(caisseId, status, state) {
 
     // 1. Réinitialisation
     const isActive = tabLink.classList.contains('active');
-    tabLink.className = 'tab-link'; // Enlève toutes les classes de statut
+    tabLink.className = 'tab-link';
     if (isActive) tabLink.classList.add('active');
     
     ecartDisplay.classList.remove('cloture-mode');
+    
     if (clotureDetailsContainer.dataset.caisseId === caisseId) {
         clotureDetailsContainer.innerHTML = '';
         clotureDetailsContainer.style.display = 'none';
@@ -35,15 +33,14 @@ export function updateCaisseLockState(caisseId, status, state) {
     switch (status) {
         case 'locked_by_me':
             tabLink.classList.add('status-locked-by-me');
-            if(isActive) ecartDisplay.classList.add('cloture-mode');
-            
-            caisseContent.querySelectorAll('input:not(.retrait-input), textarea, .add-cheque-btn, .add-tpe-releve-btn, .delete-cheque-btn, .delete-tpe-releve-btn').forEach(el => el.disabled = true);
-            
-            if(isActive) {
+            if (isActive) {
+                ecartDisplay.classList.add('cloture-mode');
                 clotureDetailsContainer.innerHTML = renderClotureSectionForInitiator(caisseId, state);
                 clotureDetailsContainer.style.display = 'block';
                 clotureDetailsContainer.dataset.caisseId = caisseId;
             }
+            // L'initiateur peut toujours modifier, donc on ne désactive rien ici.
+            // Les autres clients sont gérés via le statut 'locked_by_other'
             break;
 
         case 'locked_by_other':
@@ -183,7 +180,7 @@ export function renderWithdrawalSummaryModal(state) {
                 <div class="table-responsive">
                     <table class="suggestion-table">
                         <thead>
-                            <tr><th>Dénomination</th><th class="text-center">Quantité à retirer</th><th class="text-right">Valeur</th></tr>
+                            <tr><th>Dénomination</th><th class="text-center">Quantité</th><th class="text-right">Valeur</th></tr>
                         </thead>
                         <tbody>${rowsHtml.length > 0 ? rowsHtml : `<tr><td colspan="3" class="text-center">Aucun retrait suggéré pour cette caisse.</td></tr>`}</tbody>
                     </table>
@@ -363,7 +360,7 @@ export function handleCalculatorClickEvents(e, state) {
         tabLink.classList.add('active');
         document.getElementById(tabLink.dataset.tab)?.classList.add('active');
         document.getElementById(`ecart-display-${tabLink.dataset.tab}`)?.classList.add('active');
-        updateAllCaisseLocks(); // Mettre à jour l'affichage de la clôture
+        updateAllCaisseLocks();
         service.calculateAll(state.config, state);
         return false;
     }

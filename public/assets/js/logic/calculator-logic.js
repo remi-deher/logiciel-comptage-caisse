@@ -85,12 +85,12 @@ function attachEventListeners() {
             if (activeTab) {
                 const caisseId = activeTab.dataset.caisseId;
                 const isClosed = state.closedCaisses.includes(caisseId);
-                const isLocked = state.lockedCaisses.some(c => c.caisse_id == caisseId);
+                const isLockedByOther = state.lockedCaisses.some(c => c.caisse_id == caisseId && c.locked_by != state.wsResourceId);
 
-                if (!isClosed && !isLocked) {
+                if (!isClosed && !isLockedByOther) {
                     cloture.startClotureCaisse(caisseId, state);
                 } else {
-                    alert("Cette caisse est déjà en cours de clôture ou a été clôturée. Vous ne pouvez pas redémarrer le processus.");
+                    alert("Cette caisse est déjà clôturée ou est en cours de modification par un autre utilisateur.");
                 }
             }
         });
@@ -161,6 +161,7 @@ function handleWebSocketMessage(data) {
         case 'full_form_state':
             ui.applyFullFormState(data, state);
             service.calculateAll(state.config, state);
+            updateAllCaisseLocks(); // Mettre à jour l'UI de clôture après chargement de l'état
             break;
         case 'update':
             ui.applyLiveUpdate(data);
