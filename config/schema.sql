@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS `comptage_details` (
   `ventes_cheques` decimal(10,2) DEFAULT 0.00,
   `retrocession` decimal(10,2) DEFAULT 0.00,
   `retrocession_cb` decimal(10,2) DEFAULT 0.00,
+  `retrocession_cheques` decimal(10,2) DEFAULT 0.00,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`comptage_id`) REFERENCES `comptages`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`caisse_id`) REFERENCES `caisses`(`id`)
@@ -115,7 +116,7 @@ CREATE TABLE IF NOT EXISTS `reserve_demandes` (
   `statut` ENUM('EN_ATTENTE', 'TRAITEE', 'ANNULEE') NOT NULL DEFAULT 'EN_ATTENTE',
   `notes_demandeur` TEXT DEFAULT NULL,
   `date_traitement` DATETIME NULL,
-  `approbateur_nom` VARCHAR(255) NULL,
+  `approbateur_nom` VARCHAR(255) NULL, 
   PRIMARY KEY (`id`),
   FOREIGN KEY (`caisse_id`) REFERENCES `caisses`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
