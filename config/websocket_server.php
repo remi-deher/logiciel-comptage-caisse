@@ -2,7 +2,7 @@
 // Fichier : config/websocket_server.php (Version Finale Complète et Corrigée)
 
 // Port d'écoute du serveur WebSocket
-$port = '8081'; // Assurez-vous que ce port est correct
+$port = '8081'; // Assurez-vous que ce port est correct et ouvert sur votre pare-feu
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 require_once __DIR__ . '/../src/services/ClotureStateService.php';
@@ -157,23 +157,16 @@ class CaisseServer implements MessageComponentInterface {
                     $this->clotureStateService->unlockCaisse($data['caisse_id']);
                     $actionProcessed = true;
                     break;
-                case 'cloture_force_unlock':
-                    $this->clotureStateService->forceUnlockCaisse($data['caisse_id']);
+                
+                case 'cloture_state_changed':
                     $actionProcessed = true;
                     break;
-                case 'cloture_reopen':
-                    $this->clotureStateService->reopenCaisse($data['caisse_id']);
-                    $actionProcessed = true;
-                    break;
-                case 'cloture_caisse_confirmed':
-                    $this->clotureStateService->confirmCaisse($data['caisse_id']);
-                    $actionProcessed = true;
-                    break;
+
 		        case 'force_reload_all':
                     $this->formState = [];
                     $this->chequesState = [];
                     $this->tpeState = [];
-                    $this->broadcast(json_encode(['type' => 'reload_page']), null); // Envoyer à tous
+                    $this->broadcast(json_encode(['type' => 'force_reload_all']), null);
                     break;
             }
 
@@ -195,6 +188,7 @@ class CaisseServer implements MessageComponentInterface {
                  $this->formState = [];
                  $this->chequesState = [];
                  $this->tpeState = [];
+                 $this->clotureState = null;
              } else {
                  $this->updateAndCacheClotureState();
                  $this->broadcastClotureStateToAll();

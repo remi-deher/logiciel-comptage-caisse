@@ -2,7 +2,7 @@
 // Fichier : config/websocket_server.php (Version Finale Complète et Corrigée)
 
 // Port d'écoute du serveur WebSocket
-$port = '8080';
+$port = '8080'; // Assurez-vous que ce port est correct et ouvert sur votre pare-feu
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 require_once __DIR__ . '/../src/services/ClotureStateService.php';
@@ -48,7 +48,26 @@ class CaisseServer implements MessageComponentInterface {
         $this->connect();
         $this->clotureStateService = new ClotureStateService($this->pdo);
 
+        $this->loadInitialStateFromDb();
+
         echo "Serveur WebSocket démarré sur le port {$GLOBALS['port']}.\n";
+    }
+
+    private function loadInitialStateFromDb() {
+        echo "Chargement de l'état initial des caisses depuis la base de données...\n";
+        try {
+            $this->executeDbAction(function() {
+                $this->updateAndCacheClotureState();
+                echo "État initial chargé avec succès.\n";
+            });
+        } catch (Exception $e) {
+            echo "Erreur lors du chargement de l'état initial : " . $e->getMessage() . "\n";
+            $this->clotureState = [
+                'type' => 'cloture_locked_caisses',
+                'caisses' => [],
+                'closed_caisses' => []
+            ];
+        }
     }
 
     private function connect() {
@@ -96,14 +115,6 @@ class CaisseServer implements MessageComponentInterface {
     public function onOpen(ConnectionInterface $conn) {
         $this->clients->attach($conn);
         echo "NOUVELLE CONNEXION : Client ID {$conn->resourceId}\n";
-        
-        $this->executeDbAction(function() use ($conn) {
-            if ($this->clotureState === null) {
-                echo "CLIENT-{$conn->resourceId} : Premier client, chargement de l'état initial des caisses.\n";
-                $this->updateAndCacheClotureState();
-            }
-        });
-
         $conn->send(json_encode(['type' => 'welcome', 'resourceId' => $conn->resourceId]));
     }
 
@@ -146,23 +157,16 @@ class CaisseServer implements MessageComponentInterface {
                     $this->clotureStateService->unlockCaisse($data['caisse_id']);
                     $actionProcessed = true;
                     break;
-                case 'cloture_force_unlock':
-                    $this->clotureStateService->forceUnlockCaisse($data['caisse_id']);
+                
+                case 'cloture_state_changed':
                     $actionProcessed = true;
                     break;
-                case 'cloture_reopen':
-                    $this->clotureStateService->reopenCaisse($data['caisse_id']);
-                    $actionProcessed = true;
-                    break;
-                case 'cloture_caisse_confirmed':
-                    $this->clotureStateService->confirmCaisse($data['caisse_id']);
-                    $actionProcessed = true;
-                    break;
+
 		        case 'force_reload_all':
                     $this->formState = [];
                     $this->chequesState = [];
                     $this->tpeState = [];
-                    $this->broadcast(json_encode(['type' => 'reload_page']), null); // Envoyer à tous
+                    $this->broadcast(json_encode(['type' => 'force_reload_all']), null);
                     break;
             }
 
@@ -177,7 +181,6 @@ class CaisseServer implements MessageComponentInterface {
         $this->clients->detach($conn);
 
         $this->executeDbAction(function() use ($conn) {
-            // Déverrouillage automatique des caisses verrouillées par cette connexion
             $this->clotureStateService->forceUnlockByConnectionId((string)$conn->resourceId);
             
             if (count($this->clients) === 0) {
@@ -187,7 +190,6 @@ class CaisseServer implements MessageComponentInterface {
                  $this->tpeState = [];
                  $this->clotureState = null;
              } else {
-                 // On notifie les autres clients du changement d'état
                  $this->updateAndCacheClotureState();
                  $this->broadcastClotureStateToAll();
              }
