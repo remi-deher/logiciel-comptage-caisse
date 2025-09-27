@@ -30,8 +30,12 @@ function calculate_results_from_data($data_rows) {
 
         $total_compte_cb = 0;
         if (isset($caisse_data['cb']) && is_array($caisse_data['cb'])) {
+            // $releves_par_terminal est un tableau groupant les relevés par ID de terminal.
+            // Ex: [ '1' => [releveA, releveB], '2' => [releveC] ]
             foreach ($caisse_data['cb'] as $releves_par_terminal) {
                 if (is_array($releves_par_terminal) && !empty($releves_par_terminal)) {
+                    // Les relevés sont déjà triés par heure grâce à la requête SQL.
+                    // On récupère donc simplement le dernier élément du tableau.
                     $dernier_releve = end($releves_par_terminal);
                     $total_compte_cb += floatval($dernier_releve['montant'] ?? 0);
                 }
@@ -45,6 +49,7 @@ function calculate_results_from_data($data_rows) {
             }
         }
 
+        // NOUVEAU : Calcul du total des retraits
         $total_retraits = 0;
         if (isset($caisse_data['retraits']) && is_array($caisse_data['retraits'])) {
             foreach($caisse_data['retraits'] as $denom => $qty) {
@@ -62,10 +67,11 @@ function calculate_results_from_data($data_rows) {
         $ventes_cheques = floatval($caisse_data['ventes_cheques'] ?? 0);
         $retrocession = floatval($caisse_data['retrocession'] ?? 0);
         $retrocession_cb = floatval($caisse_data['retrocession_cb'] ?? 0);
-        $recette_theorique_totale = $ventes_especes + $ventes_cb + $ventes_cheques + $retrocession - $retrocession_cb;
+        $recette_theorique_totale = $ventes_especes + $ventes_cb + $ventes_cheques + $retrocession + $retrocession_cb;
 
         $ecart = $recette_reelle_totale - $recette_theorique_totale;
         
+        // AMÉLIORATION : On ajoute les totaux détaillés au tableau de résultats
         $results['caisses'][$caisse_id] = [
             'total_compté' => $total_compte_global,
             'fond_de_caisse' => $fond_de_caisse,
@@ -75,10 +81,12 @@ function calculate_results_from_data($data_rows) {
             'recette_theorique' => $recette_theorique_totale,
             'recette_reelle' => $recette_reelle_totale,
             'ecart' => $ecart,
+            // --- AJOUTS ---
             'total_compte_especes' => $total_compte_especes,
             'total_compte_cb' => $total_compte_cb,
             'total_compte_cheques' => $total_compte_cheques,
             'total_retraits' => $total_retraits
+            // --- FIN DES AJOUTS ---
         ];
 
         $results['combines']['total_compté'] += $total_compte_global;

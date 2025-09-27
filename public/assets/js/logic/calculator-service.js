@@ -95,7 +95,6 @@ export function calculateEcartsForCaisse(caisseId, appState) {
         for (const terminalId in tpeState[caisseId]) {
             const releves = tpeState[caisseId][terminalId];
             if (releves && releves.length > 0) {
-                // Tri pour s'assurer que le dernier relevé est bien le plus récent
                 const sortedReleves = [...releves].sort((a, b) => (b.heure || '00:00').localeCompare(a.heure || '00:00'));
                 const dernierReleve = sortedReleves[0];
                 if (dernierReleve) {
@@ -107,7 +106,7 @@ export function calculateEcartsForCaisse(caisseId, appState) {
 
     const ventesCb = parseLocaleFloat(caisseData.ventes_cb);
     const retrocessionCb = parseLocaleFloat(caisseData.retrocession_cb);
-    const ecartCb = totalCompteCb - (ventesCb - retrocessionCb);
+    const ecartCb = totalCompteCb - (ventesCb + retrocessionCb);
     
     const totalCompteCheques = (chequesState[caisseId] || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
     const ventesCheques = parseLocaleFloat(caisseData.ventes_cheques);
