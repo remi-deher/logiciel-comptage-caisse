@@ -481,7 +481,7 @@ export function handleCalculatorClickEvents(e, state) {
         if (amount > 0) {
             if (!state.tpeState[caisseId]) state.tpeState[caisseId] = {};
             if (!state.tpeState[caisseId][terminalId]) state.tpeState[caisseId][terminalId] = [];
-            state.tpeState[caisseId][terminalId].push({ montant: amount, heure: new Date().toTimeString().slice(0, 5) });
+            state.tpeState[caisseId][terminalId].push({ montant: amount, heure: new Date().toTimeString().slice(0, 8) });
             renderTpeList(caisseId, terminalId, state.tpeState[caisseId][terminalId], state.config);
             sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: state.tpeState[caisseId][terminalId] });
             amountInput.value = ''; amountInput.focus();
