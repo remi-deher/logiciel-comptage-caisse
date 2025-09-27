@@ -1,4 +1,4 @@
-/* Fichier : public/assets/css/page-calculateur.css (Complet et Final) */
+/* Fichier : public/assets/css/page-calculateur.css (Corrigé et Final) */
 
 /* --- BANDEAUX DE CLÔTURE --- */
 .cloture-mode-banner, .cloture-final-summary-banner {
@@ -69,18 +69,16 @@
     color: #8a2be2;
 }
 
-/* AMÉLIORATION : Position fixe pour le panneau de clôture */
+/* CORRECTION : On retire la position "sticky" pour que le bloc ne suive pas le défilement */
 #cloture-details-container {
-    position: sticky;
-    top: 90px;
-    z-index: 98;
+    margin-top: -10px;
     margin-bottom: 25px;
     padding: 25px;
     border: 2px solid rgba(138, 43, 226, 0.4);
-    border-radius: 12px;
+    border-top: none;
+    border-radius: 0 0 12px 12px;
     background-color: var(--color-surface);
     animation: fadeIn 0.5s;
-    box-shadow: 0 5px 20px var(--shadow-color);
 }
 
 .cloture-actions {
@@ -142,7 +140,6 @@
 .suggestion-table th { background-color: var(--color-surface-alt); font-weight: 600; color: var(--color-text-secondary); }
 .suggestion-table th:first-child, .suggestion-table td:first-child { text-align: left; }
 
-/* Styles pour les champs de retrait en lecture seule */
 .suggestion-table input[readonly] {
     background-color: transparent;
     border: none;
@@ -154,7 +151,6 @@
     padding: 0;
 }
 
-/* Styles pour les lignes de totaux dans le tableau de retrait */
 .suggestion-table .summary-row td {
     background-color: var(--color-surface-alt);
     font-style: italic;
