@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Complet et Final)
+// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
@@ -23,6 +23,10 @@ async function refreshCalculatorData() {
         const initialData = await service.fetchInitialData();
         state.config = initialData.config;
         state.calculatorData = initialData.calculatorData;
+        
+        // CORRECTION : On définit l'état de clôture immédiatement depuis la réponse HTTP
+        state.lockedCaisses = initialData.clotureState.lockedCaisses;
+        state.closedCaisses = (initialData.clotureState.closedCaisses || []).map(String);
 
         // Le rendu de l'interface est la première étape
         ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.calculatorData);
@@ -36,9 +40,12 @@ async function refreshCalculatorData() {
         // Et on lance le premier calcul
         service.calculateAll(state.config, state);
         
+        // CORRECTION : On applique l'état visuel (verrouillé/fermé) immédiatement
+        ui.updateAllCaisseLocks(state);
+        
         updateClotureButtonState();
 
-        // On demande l'état complet aux autres clients
+        // Le WebSocket prendra ensuite le relais pour les mises à jour en temps réel
         sendWsMessage({ type: 'get_full_state' });
 
     } catch (error) {

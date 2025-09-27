@@ -1,4 +1,4 @@
-/* Fichier : public/assets/css/page-calculateur.css (Complet et Corrigé) */
+/* Fichier : public/assets/css/page-calculateur.css (Modifié) */
 
 /* --- BANDEAUX DE CLÔTURE --- */
 .cloture-mode-banner, .cloture-final-summary-banner {
@@ -17,6 +17,29 @@
 .cloture-final-summary-banner .banner-header p { margin: 0; font-size: 1em; color: var(--color-text-secondary); }
 .cloture-final-summary-banner .banner-actions { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
 .cloture-final-summary-banner .banner-actions .btn { padding: 12px 25px; font-size: 1.1em; font-weight: bold; }
+
+
+/* --- NOUVEAUX STYLES POUR LE RÉCAPITULATIF --- */
+#cloture-recap-container {
+    /* Les propriétés sticky, top et z-index ont été supprimées */
+    margin-bottom: 20px;
+}
+
+.cloture-recap-card {
+    background-color: var(--color-surface);
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid var(--color-success);
+    box-shadow: 0 5px 20px var(--shadow-color);
+    animation: fadeIn 0.5s ease-in-out; /* Animation de fondu */
+}
+
+.cloture-recap-card h4 {
+    border: none;
+    margin-top: 0;
+    color: var(--color-success);
+}
+/* --- FIN DES NOUVEAUX STYLES --- */
 
 
 /* --- ONGLETS DE SÉLECTION DE CAISSE --- */

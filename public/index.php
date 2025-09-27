@@ -79,6 +79,9 @@ require_once ROOT_PATH . '/src/StatistiquesController.php';
 try {
     $pdo = Bdd::getPdo();
 
+    // On instancie le service de gestion de l'état de clôture
+    $clotureStateService = new ClotureStateService($pdo);
+
     $adminController = new AdminController($pdo, $denominations);
     $authController = new AuthController($pdo);
     $statistiquesController = new StatistiquesController($pdo, $noms_caisses, $denominations);
@@ -104,7 +107,7 @@ $request_method = $_SERVER['REQUEST_METHOD'];
 $route_key = "{$request_method}:{$route}";
 
 $routes = [
-    'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $current_currency_code, $current_currency_symbol) {
+    'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $current_currency_code, $current_currency_symbol, $clotureStateService) {
         echo json_encode([
             'success' => true,
             'nomsCaisses' => $noms_caisses,
@@ -113,6 +116,9 @@ $routes = [
             'minToKeep' => $min_to_keep,
             'currencyCode' => $current_currency_code,
             'currencySymbol' => $current_currency_symbol,
+            // CORRECTION : On ajoute l'état actuel des caisses à la réponse de configuration
+            'lockedCaisses' => $clotureStateService->getLockedCaisses(),
+            'closedCaisses' => $clotureStateService->getClosedCaisses(),
         ]);
     },
     'GET:calculateur/get_initial_data' => [$calculateurController, 'getInitialData'],

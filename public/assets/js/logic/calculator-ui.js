@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-ui.js (Complet et Corrigé)
+// Fichier : public/assets/js/logic/calculator-ui.js (Modifié)
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 import * as service from './calculator-service.js';
@@ -38,8 +38,9 @@ export function updateCaisseLockState(caisseId, status, state) {
     const caisseContent = document.getElementById(`caisse${caisseId}`);
     const ecartDisplay = document.getElementById(`ecart-display-caisse${caisseId}`);
     const clotureDetailsContainer = document.getElementById('cloture-details-container');
+    const recapContainer = document.getElementById('cloture-recap-container'); // On récupère le nouveau conteneur
 
-    if (!tabLink || !caisseContent || !ecartDisplay || !clotureDetailsContainer) return;
+    if (!tabLink || !caisseContent || !ecartDisplay || !clotureDetailsContainer || !recapContainer) return;
 
     // 1. Réinitialisation
     const isActive = tabLink.classList.contains('active');
@@ -48,10 +49,11 @@ export function updateCaisseLockState(caisseId, status, state) {
     
     ecartDisplay.classList.remove('cloture-mode', 'cloture-closed');
     
+    // On cache les conteneurs de clôture par défaut
     if (isActive) {
         clotureDetailsContainer.innerHTML = '';
         clotureDetailsContainer.style.display = 'none';
-        clotureDetailsContainer.dataset.caisseId = '';
+        recapContainer.innerHTML = ''; // On vide aussi le récapitulatif
     }
     
     caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = false);
@@ -64,7 +66,6 @@ export function updateCaisseLockState(caisseId, status, state) {
                 ecartDisplay.classList.add('cloture-mode');
                 clotureDetailsContainer.innerHTML = renderClotureSectionForInitiator(caisseId, state);
                 clotureDetailsContainer.style.display = 'block';
-                clotureDetailsContainer.dataset.caisseId = caisseId;
             }
             break;
 
@@ -77,14 +78,15 @@ export function updateCaisseLockState(caisseId, status, state) {
             tabLink.classList.add('status-closed');
             if (isActive) {
                 ecartDisplay.classList.add('cloture-closed');
-                clotureDetailsContainer.innerHTML = renderClotureSectionForClosed(caisseId, state);
-                clotureDetailsContainer.style.display = 'block';
-                clotureDetailsContainer.dataset.caisseId = caisseId;
+                // MODIFICATION : On affiche le récapitulatif dans le nouveau conteneur
+                recapContainer.innerHTML = renderClotureSectionForClosed(caisseId, state);
             }
+            // On désactive les champs mais on ne remplace plus le contenu
             caisseContent.querySelectorAll('input, textarea, button:not(.payment-tab-link)').forEach(el => el.disabled = true);
             break;
     }
 }
+
 
 /**
  * Génère le HTML pour la section de retrait lorsque l'utilisateur a verrouillé la caisse.
@@ -146,6 +148,7 @@ function renderClotureSectionForInitiator(caisseId, state) {
  */
 function renderClotureSectionForClosed(caisseId, state) {
     const suggestions = service.calculateWithdrawalSuggestion(state.calculatorData.caisse[caisseId], state.config);
+    const caisseNom = state.config.nomsCaisses[caisseId];
     
     const rowsHtml = suggestions.suggestions.map(s => `
         <tr>
@@ -155,29 +158,31 @@ function renderClotureSectionForClosed(caisseId, state) {
         </tr>
     `).join('');
 
+    // MODIFICATION : Le HTML est maintenant encapsulé dans un conteneur avec une classe pour le style
     return `
-        <h4><i class="fa-solid fa-check-circle"></i> Caisse Clôturée - Récapitulatif des retraits</h4>
-        <p>Cette caisse a été validée. Voici le résumé des retraits enregistrés.</p>
-        <div class="table-responsive">
-            <table class="suggestion-table">
-                <thead>
-                    <tr>
-                        <th>Dénomination</th>
-                        <th class="text-center">Qté à retirer</th>
-                        <th class="text-right">Valeur</th>
-                    </tr>
-                </thead>
-                <tbody>${rowsHtml.length > 0 ? rowsHtml : `<tr><td colspan="3" class="text-center">Aucun retrait enregistré pour cette clôture.</td></tr>`}</tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="2"><strong>Total des retraits</strong></td>
-                        <td class="text-right"><strong>${formatCurrency(suggestions.totalToWithdraw, state.config)}</strong></td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-        <div class="cloture-actions">
-            <button type="button" class="btn action-btn cloture-reopen-btn" data-caisse-id="${caisseId}"><i class="fa-solid fa-rotate-left"></i> Réouvrir la caisse</button>
+        <div class="cloture-recap-card">
+            <h4><i class="fa-solid fa-check-circle"></i> ${caisseNom} Clôturée - Récapitulatif des retraits</h4>
+            <div class="table-responsive">
+                <table class="suggestion-table">
+                    <thead>
+                        <tr>
+                            <th>Dénomination</th>
+                            <th class="text-center">Qté retirée</th>
+                            <th class="text-right">Valeur</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHtml.length > 0 ? rowsHtml : `<tr><td colspan="3" class="text-center">Aucun retrait enregistré.</td></tr>`}</tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2"><strong>Total des retraits</strong></td>
+                            <td class="text-right"><strong>${formatCurrency(suggestions.totalToWithdraw, state.config)}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="cloture-actions">
+                <button type="button" class="btn action-btn cloture-reopen-btn" data-caisse-id="${caisseId}"><i class="fa-solid fa-rotate-left"></i> Réouvrir la caisse</button>
+            </div>
         </div>
     `;
 }

@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-service.js (Complet et Corrigé)
+// Fichier : public/assets/js/logic/calculator-service.js (Corrigé)
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 
@@ -37,7 +37,18 @@ export async function fetchInitialData() {
         }
     });
 
-    return { config: configResult, calculatorData };
+    // CORRECTION : On extrait l'état de clôture de la réponse de config
+    const clotureState = {
+        lockedCaisses: configResult.lockedCaisses || [],
+        closedCaisses: configResult.closedCaisses || []
+    };
+
+    // On nettoie l'objet config pour ne pas laisser traîner ces données
+    delete configResult.lockedCaisses;
+    delete configResult.closedCaisses;
+
+    // On retourne toutes les données nécessaires à l'initialisation
+    return { config: configResult, calculatorData, clotureState };
 }
 
 /**

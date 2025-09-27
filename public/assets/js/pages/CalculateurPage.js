@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/pages/CalculateurPage.js (Nettoyé)
+// Fichier : public/assets/js/pages/CalculateurPage.js (Modifié)
 
 import { initializeCalculator } from '../logic/calculator-logic.js';
 
@@ -11,6 +11,9 @@ export function renderCalculateurPage(element) {
             <input type="hidden" name="action" value="save">
             <div class="tab-selector"></div>
             <div class="ecart-display-container"></div>
+            
+            <div id="cloture-recap-container"></div>
+
             <div id="caisses-content-container"></div>
             
             <div class="save-section">
