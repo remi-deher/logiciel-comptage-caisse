@@ -45,12 +45,12 @@ export function updateCaisseLockState(caisseId, status, state) {
 
         case 'locked_by_other':
             tabLink.classList.add('status-locked-by-other');
-            caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
+            caisseContent.querySelectorAll('input, textarea, button:not(.payment-tab-link)').forEach(el => el.disabled = true);
             break;
             
         case 'closed':
             tabLink.classList.add('status-closed');
-            caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
+	    caisseContent.querySelectorAll('input, textarea, button:not(.payment-tab-link)').forEach(el => el.disabled = true);
             break;
     }
 }
