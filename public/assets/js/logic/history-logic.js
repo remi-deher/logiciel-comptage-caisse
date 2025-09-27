@@ -178,7 +178,7 @@ async function handleLoadComptage(comptageId, buttonElement) {
             if (!result.success) throw new Error(result.message);
             
             // Notifie les autres clients et navigue vers la page sans recharger
-            sendWsMessage({ type: 'state_changed_refresh_ui' });
+            sendWsMessage({ type: 'force_reload_all' });
             window.location.href = '/calculateur';
 
         } catch (error) {
@@ -189,7 +189,72 @@ async function handleLoadComptage(comptageId, buttonElement) {
     }
 }
 
-// --- Logique du Panneau de Détails (Bottom Sheet) ---
+// --- DÉBUT DE LA CORRECTION : Logique du Panneau de Détails (Bottom Sheet) ---
+
+/**
+ * Crée le contenu HTML détaillé pour le panneau.
+ */
+function renderSheetContent(container, comptageId) {
+    const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
+    if (!comptage) {
+        container.innerHTML = '<p class="error">Données du comptage introuvables.</p>';
+        return;
+    }
+
+    // Mise à jour des en-têtes du panneau
+    document.getElementById('details-sheet-title').textContent = comptage.nom_comptage;
+    document.getElementById('details-sheet-subtitle').textContent = `Comptage du ${formatDateFr(comptage.date_comptage)}`;
+
+    const caissesHtml = Object.entries(comptage.caisses_data).map(([caisse_id, data]) => {
+        const caisseResult = comptage.results.caisses[caisse_id];
+        const nomCaisse = config.nomsCaisses[caisse_id] || `Caisse #${caisse_id}`;
+        
+        const allDenoms = { ...config.denominations.billets, ...config.denominations.pieces };
+        const denomsHtml = Object.entries(allDenoms).sort((a,b) => b[1] - a[1]).map(([key, value]) => {
+            const quantite = data.denominations.find(d => d.denomination_nom === key)?.quantite || 0;
+            if(quantite === 0) return '';
+            const label = value >= 1 ? `${value}€` : `${value * 100}c`;
+            return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
+        }).join('');
+
+        const chequesHtml = (data.cheques || []).map(c => `<tr><td>${c.commentaire || 'N/A'}</td><td class="text-right">${formatEuros(c.montant)}</td></tr>`).join('');
+        
+        const tpeHtml = Object.entries(data.cb || {}).map(([terminalId, releves]) => {
+             const terminalName = config.tpeParCaisse[terminalId]?.nom || `TPE #${terminalId}`;
+             return releves.map(r => `<tr><td>${terminalName} (${r.heure || 'N/A'})</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('');
+        }).join('');
+        
+        return `
+            <div class="card" style="margin-bottom: 20px;">
+                <h3>Détails pour : ${nomCaisse}</h3>
+                <div class="caisse-kpi-grid">
+                    <div class="caisse-kpi-card"><span>Total Compté</span><strong>${formatEuros(caisseResult.total_compté)}</strong></div>
+                    <div class="caisse-kpi-card"><span>Recette Théorique</span><strong>${formatEuros(caisseResult.recette_theorique)}</strong></div>
+                    <div class="caisse-kpi-card ${getEcartClass(caisseResult.ecart)}"><span>Écart</span><strong>${formatEuros(caisseResult.ecart)}</strong></div>
+                </div>
+
+                <div class="modal-details-grid">
+                    <div class="details-card">
+                        <div class="details-card-header"><h5><i class="fa-solid fa-money-bill-wave"></i> Espèces</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_especes)}</span></div>
+                        <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Coupure</th><th class="text-right">Qté</th><th class="text-right">Total</th></tr></thead><tbody>${denomsHtml}</tbody></table></div>
+                    </div>
+                    <div>
+                        <div class="details-card" style="margin-bottom: 15px;">
+                            <div class="details-card-header"><h5><i class="fa-solid fa-credit-card"></i> TPE</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_cb)}</span></div>
+                            <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Terminal</th><th class="text-right">Montant</th></tr></thead><tbody>${tpeHtml || '<tr><td colspan="2">Aucun relevé.</td></tr>'}</tbody></table></div>
+                        </div>
+                        <div class="details-card">
+                            <div class="details-card-header"><h5><i class="fa-solid fa-money-check-dollar"></i> Chèques</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_cheques)}</span></div>
+                            <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Commentaire</th><th class="text-right">Montant</th></tr></thead><tbody>${chequesHtml || '<tr><td colspan="2">Aucun chèque.</td></tr>'}</tbody></table></div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }).join('');
+
+    container.innerHTML = `<div id="printable-content">${caissesHtml}</div>`;
+}
+
 function initializeSheetLogic() {
     const sheet = document.getElementById('details-sheet');
     const overlay = document.getElementById('details-sheet-overlay');
@@ -209,24 +274,12 @@ function openDetailsSheet(comptageId) {
     if (!sheet || !overlay || !content) return;
 
     content.innerHTML = '<p>Chargement des détails...</p>';
-    sheet.style.height = '50vh';
+    sheet.style.height = '60vh'; // Hauteur par défaut
     sheet.classList.add('visible');
     overlay.classList.add('visible');
     
-    // La fonction renderSheetContent doit être définie pour afficher le contenu
-    // renderSheetContent(content, comptageId); 
-
-    requestAnimationFrame(() => {
-        const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
-        if (comptage) {
-            Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
-                if (comptage.results.caisses[caisse_id]) {
-                    // La fonction renderSheetCharts doit aussi être définie
-                    // renderSheetCharts(caisse_id, data, comptage.results.caisses[caisse_id]);
-                }
-            });
-        }
-    });
+    // On appelle la nouvelle fonction pour générer le contenu
+    renderSheetContent(content, comptageId); 
 }
 
 function closeDetailsSheet() {
@@ -273,6 +326,7 @@ function renderWithdrawalDetailsModal(dateKey) {
     modal.querySelector('.modal-close').onclick = () => modal.classList.remove('visible');
     modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
 }
+// --- FIN DE LA CORRECTION ---
     
 /**
  * Point d'entrée pour initialiser la logique de la page d'historique.
@@ -329,7 +383,7 @@ export function initializeHistoryLogic() {
             const sheet = document.getElementById('details-sheet');
             const icon = target.closest('#sheet-fullscreen-btn').querySelector('i');
             if (sheet.style.height === '90vh') {
-                sheet.style.height = '50vh';
+                sheet.style.height = '60vh'; // Rétablit la hauteur par défaut
                 icon.classList.remove('fa-compress');
                 icon.classList.add('fa-expand');
             } else {
@@ -347,6 +401,12 @@ export function initializeHistoryLogic() {
             const loadButton = target.closest('.load-btn');
             const comptageId = loadButton.closest('.history-card').dataset.comptageId;
             handleLoadComptage(comptageId, loadButton);
+        }
+        // Gère le clic sur le bouton "détails" dans la vue des retraits
+        const withdrawalDetailsBtn = target.closest('.day-card .details-btn');
+        if (withdrawalDetailsBtn) {
+            const dateKey = withdrawalDetailsBtn.closest('.day-card').dataset.dateKey;
+            renderWithdrawalDetailsModal(dateKey);
         }
     });
     
