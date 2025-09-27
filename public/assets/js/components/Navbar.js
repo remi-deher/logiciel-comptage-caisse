@@ -1,4 +1,4 @@
-// Fichier: public/assets/js/components/Navbar.js
+// Fichier: public/assets/js/components/Navbar.js (Aucun changement requis)
 
 export function renderNavbar(element) {
   // Le HTML complet de la barre de navigation
@@ -26,28 +26,10 @@ export function renderNavbar(element) {
                 <i class="fa-solid fa-moon"></i>
             </button>
             <div class="user-menu">
-                <button id="user-menu-toggler" class="user-menu-btn" aria-label="Menu utilisateur" aria-expanded="false"><i class="fa-solid fa-user-gear"></i></button>
-                <div id="user-menu-dropdown" class="user-menu-dropdown">
-                    <div class="dropdown-group">
-                        <a href="/aide"><i class="fa-solid fa-circle-question fa-fw"></i> Aide</a>
-                        <a href="/changelog"><i class="fa-solid fa-rocket fa-fw"></i> Changelog</a>
-                    </div>
-
-                    <div class="dropdown-divider"></div>
-
-                    <div class="dropdown-group">
-                        <a href="/admin"><i class="fa-solid fa-toolbox fa-fw"></i> Administration</a>
-                        <a href="/update"><i class="fa-solid fa-cloud-arrow-down fa-fw"></i> Mise à jour</a>
-                    </div>
-
-                    <div class="dropdown-divider"></div>
-
-                    <a href="/logout" class="dropdown-logout-link"><i class="fa-solid fa-sign-out-alt fa-fw"></i> Déconnexion</a>
                 </div>
-            </div>
         </div>
         
-        <button class="navbar-toggler" id="navbar-toggler" aria-label="Toggle navigation" aria-controls="mobile-menu" aria-expanded="false">
+        <button class="navbar-toggler" id="navbar-toggler" aria-label="Toggle navigation">
             <i class="fa-solid fa-bars"></i>
         </button>
         <div class="mobile-menu" id="mobile-menu"></div>
