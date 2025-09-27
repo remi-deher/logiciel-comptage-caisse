@@ -91,17 +91,23 @@ export function calculateEcartsForCaisse(caisseId, appState) {
     const ecartEspeces = (totalCompteEspeces - fondDeCaisse) - (ventesEspeces + retrocession);
 
     let totalCompteCb = 0;
-    if (tpeState[caisseId]) {
+    if (tpeState && tpeState[caisseId]) {
         for (const terminalId in tpeState[caisseId]) {
-            const releves = tpeState[caisseId][terminalId] || [];
-            if (releves.length > 0) {
-                const dernierReleve = releves[releves.length - 1];
-                totalCompteCb += parseLocaleFloat(dernierReleve.montant);
+            const releves = tpeState[caisseId][terminalId];
+            if (releves && releves.length > 0) {
+                // Tri pour s'assurer que le dernier relevé est bien le plus récent
+                const sortedReleves = [...releves].sort((a, b) => (b.heure || '00:00').localeCompare(a.heure || '00:00'));
+                const dernierReleve = sortedReleves[0];
+                if (dernierReleve) {
+                   totalCompteCb += parseLocaleFloat(dernierReleve.montant);
+                }
             }
         }
     }
+
     const ventesCb = parseLocaleFloat(caisseData.ventes_cb);
-    const ecartCb = totalCompteCb - ventesCb;
+    const retrocessionCb = parseLocaleFloat(caisseData.retrocession_cb);
+    const ecartCb = totalCompteCb - (ventesCb - retrocessionCb);
     
     const totalCompteCheques = (chequesState[caisseId] || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
     const ventesCheques = parseLocaleFloat(caisseData.ventes_cheques);
@@ -109,6 +115,7 @@ export function calculateEcartsForCaisse(caisseId, appState) {
 
     return { totalCompteEspeces, ecartEspeces, totalCompteCb, ecartCb, totalCompteCheques, ecartCheques };
 }
+
 
 /**
  * Calcule la suggestion de retrait d'espèces pour une caisse.
@@ -158,6 +165,7 @@ export function calculateAll(config, appState) {
         caisseData.ventes_especes = formElements[`caisse[${id}][ventes_especes]`]?.value;
         caisseData.retrocession = formElements[`caisse[${id}][retrocession]`]?.value;
         caisseData.ventes_cb = formElements[`caisse[${id}][ventes_cb]`]?.value;
+        caisseData.retrocession_cb = formElements[`caisse[${id}][retrocession_cb]`]?.value;
         caisseData.ventes_cheques = formElements[`caisse[${id}][ventes_cheques]`]?.value;
         
         caisseData.denominations = caisseData.denominations || {};

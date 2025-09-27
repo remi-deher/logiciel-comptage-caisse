@@ -310,8 +310,9 @@ export function renderCalculatorUI(pageElement, config, chequesState, tpeState) 
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="tpe-card"><h4>${tpe.nom}</h4><div class="tpe-releves-list" id="tpe-releves-list-${tpeId}-${id}"></div><div class="tpe-releve-form"><input type="text" id="tpe-releve-montant-${tpeId}-${id}" placeholder="Montant du relevé"><button type="button" class="btn new-btn add-tpe-releve-btn" data-caisse-id="${id}" data-terminal-id="${tpeId}"><i class="fa-solid fa-plus"></i> Ajouter</button></div><div id="tpe-hidden-inputs-${tpeId}-${id}"></div></div>`).join('');
         const tpeSectionHtml = tpePourCaisse.length > 0 ? `<div class="tpe-grid">${tpeHtml}</div>` : '<p>Aucun TPE configuré pour cette caisse.</p>';
+        const cbTabContent = `<div class="theoretical-inputs-panel"><div class="compact-input-group"><label>Encaissement CB Théorique</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div><div class="compact-input-group"><label>Rétrocessions en CB</label><input type="text" data-caisse-id="${id}" id="retrocession_cb_${id}" name="caisse[${id}][retrocession_cb]"></div></div>${tpeSectionHtml}`;
 
-        contentHtml += `<div id="caisse${id}" class="caisse-tab-content ${isActive}"><div class="form-group compact-input-group" style="max-width:300px;margin-bottom:25px;"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div><div class="payment-method-tabs"><div class="payment-method-selector"><button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}" data-method-key="especes"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button><button type="button" class="payment-tab-link" data-payment-tab="cb_${id}" data-method-key="cb"><i class="fa-solid fa-credit-card"></i> CB</button><button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}" data-method-key="cheques"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button></div><div id="especes_${id}" class="payment-tab-content active">${especesTabContent}</div><div id="cb_${id}" class="payment-tab-content"><div class="theoretical-inputs-panel"><div class="compact-input-group"><label>Encaissement CB Théorique</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div></div>${tpeSectionHtml}</div><div id="cheques_${id}" class="payment-tab-content"></div></div></div>`;
+        contentHtml += `<div id="caisse${id}" class="caisse-tab-content ${isActive}"><div class="form-group compact-input-group" style="max-width:300px;margin-bottom:25px;"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div><div class="payment-method-tabs"><div class="payment-method-selector"><button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}" data-method-key="especes"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button><button type="button" class="payment-tab-link" data-payment-tab="cb_${id}" data-method-key="cb"><i class="fa-solid fa-credit-card"></i> CB</button><button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}" data-method-key="cheques"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button></div><div id="especes_${id}" class="payment-tab-content active">${especesTabContent}</div><div id="cb_${id}" class="payment-tab-content">${cbTabContent}</div><div id="cheques_${id}" class="payment-tab-content"></div></div></div>`;
     });
     tabSelector.innerHTML = tabsHtml; 
     ecartContainer.innerHTML = ecartsHtml + `<div id="cloture-details-container" style="display:none;"></div>`;
@@ -341,6 +342,7 @@ export function populateInitialData(calculatorData) {
             form.elements[`caisse[${caisseId}][ventes_especes]`].value = caisseData.ventes_especes || '';
             form.elements[`caisse[${caisseId}][retrocession]`].value = caisseData.retrocession || '';
             form.elements[`caisse[${caisseId}][ventes_cb]`].value = caisseData.ventes_cb || '';
+            form.elements[`caisse[${caisseId}][retrocession_cb]`].value = caisseData.retrocession_cb || '';
             form.elements[`caisse[${caisseId}][ventes_cheques]`].value = caisseData.ventes_cheques || '';
 
             if (caisseData.denominations) {
@@ -433,7 +435,7 @@ export function handleCalculatorClickEvents(e, state) {
         tabLink.classList.add('active');
         document.getElementById(tabLink.dataset.tab)?.classList.add('active');
         document.getElementById(`ecart-display-caisse${tabLink.dataset.caisseId}`)?.classList.add('active');
-        updateAllCaisseLocks(state); // Appel corrigé
+        updateAllCaisseLocks(state);
         service.calculateAll(state.config, state);
         return false;
     }
@@ -489,10 +491,13 @@ export function handleCalculatorClickEvents(e, state) {
     const deleteTpeBtn = target.closest('.delete-tpe-releve-btn');
     if (deleteTpeBtn) {
         const { caisseId, terminalId, index } = deleteTpeBtn.dataset;
-        state.tpeState[caisseId][terminalId].splice(index, 1);
-        renderTpeList(caisseId, terminalId, state.tpeState[caisseId][terminalId], state.config);
-        sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: state.tpeState[caisseId][terminalId] });
-        return true;
+        if (state.tpeState && state.tpeState[caisseId] && state.tpeState[caisseId][terminalId]) {
+            state.tpeState[caisseId][terminalId].splice(index, 1);
+            renderTpeList(caisseId, terminalId, state.tpeState[caisseId][terminalId], state.config);
+            sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: state.tpeState[caisseId][terminalId] });
+            return true;
+        }
+        return false;
     }
     return false;
 }
