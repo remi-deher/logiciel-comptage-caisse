@@ -1,11 +1,10 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version avec pagination adaptative et gestion des graphiques vides)
+// Fichier : public/assets/js/logic/history-logic.js (Version finale avec toutes les corrections)
 import { sendWsMessage } from './websocket-service.js';
 
 // --- État et Configuration Globale ---
 let fullHistoryData = [];
 let config = {};
 let withdrawalsByDay = {};
-// On utilise un tableau pour stocker toutes les instances de graphiques
 let sheetCharts = [];
 let currentParams = {};
 
@@ -53,18 +52,15 @@ function renderPagination(container, currentPage, totalPages) {
     }
 
     let html = '<ul class="pagination">';
-    const maxVisiblePages = 7; // Nombre max de boutons de page affichés (ex: 1 ... 4 5 6 ... 10)
+    const maxVisiblePages = 7; 
 
-    // Bouton Précédent
     html += `<li class="${currentPage === 1 ? 'disabled' : ''}"><a href="#" data-page="${currentPage - 1}">&laquo;</a></li>`;
 
     if (totalPages <= maxVisiblePages) {
-        // Affiche toutes les pages si le total est inférieur au max
         for (let i = 1; i <= totalPages; i++) {
             html += `<li class="${i === currentPage ? 'active' : ''}"><a href="#" data-page="${i}">${i}</a></li>`;
         }
     } else {
-        // Logique pour afficher les ellipses (...)
         let startPage = Math.max(2, currentPage - 2);
         let endPage = Math.min(totalPages - 1, currentPage + 2);
 
@@ -78,29 +74,19 @@ function renderPagination(container, currentPage, totalPages) {
             endPage = totalPages - 1;
         }
 
-        // Première page
         html += `<li class="${1 === currentPage ? 'active' : ''}"><a href="#" data-page="1">1</a></li>`;
-
-        // Ellipse de début
         if (startPage > 2) {
             html += `<li><span class="ellipsis">&hellip;</span></li>`;
         }
-
-        // Pages du milieu
         for (let i = startPage; i <= endPage; i++) {
             html += `<li class="${i === currentPage ? 'active' : ''}"><a href="#" data-page="${i}">${i}</a></li>`;
         }
-
-        // Ellipse de fin
         if (endPage < totalPages - 1) {
             html += `<li><span class="ellipsis">&hellip;</span></li>`;
         }
-
-        // Dernière page
         html += `<li class="${totalPages === currentPage ? 'active' : ''}"><a href="#" data-page="${totalPages}">${totalPages}</a></li>`;
     }
 
-    // Bouton Suivant
     html += `<li class="${currentPage === totalPages ? 'disabled' : ''}"><a href="#" data-page="${currentPage + 1}">&raquo;</a></li>`;
     html += '</ul>';
     container.innerHTML = html;
@@ -241,19 +227,11 @@ async function handleLoadComptage(comptageId, buttonElement) {
 
 function renderSheetCharts(caisse_id, data, results) {
     const chartOptions = {
-        chart: {
-            background: 'transparent',
-            toolbar: { show: false }
-        },
-        theme: {
-            mode: document.body.dataset.theme === 'dark' ? 'dark' : 'light'
-        },
-        legend: {
-            position: 'bottom'
-        }
+        chart: { background: 'transparent', toolbar: { show: false } },
+        theme: { mode: document.body.dataset.theme === 'dark' ? 'dark' : 'light' },
+        legend: { position: 'bottom' }
     };
     
-    // Graphique 1 : Répartition
     const repartitionContainer = document.getElementById(`repartition-chart-${caisse_id}`);
     const repartitionData = [results.total_compte_especes, results.total_compte_cb, results.total_compte_cheques];
     if (repartitionContainer && repartitionData.some(v => v > 0)) {
@@ -271,17 +249,11 @@ function renderSheetCharts(caisse_id, data, results) {
         repartitionContainer.innerHTML = '<div class="chart-placeholder">Aucune recette à afficher.</div>';
     }
 
-    // Graphique 2 : Dénominations
     const denominationsContainer = document.getElementById(`denominations-chart-${caisse_id}`);
     const allDenomsMap = { ...config.denominations.billets, ...config.denominations.pieces };
     const denominationsData = (data.denominations || [])
-        .map(d => ({
-            name: d.denomination_nom,
-            value: allDenomsMap[d.denomination_nom],
-            total: d.quantite * allDenomsMap[d.denomination_nom]
-        }))
-        .filter(d => d.total > 0)
-        .sort((a, b) => b.value - a.value);
+        .map(d => ({ name: d.denomination_nom, value: allDenomsMap[d.denomination_nom], total: d.quantite * allDenomsMap[d.denomination_nom] }))
+        .filter(d => d.total > 0).sort((a, b) => b.value - a.value);
 
     if (denominationsContainer && denominationsData.length > 0) {
         const denominationsOptions = {
@@ -295,9 +267,7 @@ function renderSheetCharts(caisse_id, data, results) {
                     const val = parseFloat(d.value);
                     return val >= 1 ? `${val}€` : `${val * 100}c`;
                 }),
-                labels: {
-                    formatter: (value) => formatEuros(value)
-                }
+                labels: { formatter: (value) => formatEuros(value) }
             }
         };
         const chart = new ApexCharts(denominationsContainer, denominationsOptions);
@@ -318,54 +288,92 @@ function renderSheetContent(container, comptageId) {
     document.getElementById('details-sheet-title').textContent = comptage.nom_comptage;
     document.getElementById('details-sheet-subtitle').textContent = `Comptage du ${formatDateFr(comptage.date_comptage)}`;
 
+    const allDenomsMap = { ...config.denominations.billets, ...config.denominations.pieces };
+    let allWithdrawals = {};
+    let grandTotalWithdrawals = 0;
+
+    Object.values(comptage.caisses_data).forEach(caisse => {
+        if (caisse.retraits) {
+            Object.entries(caisse.retraits).forEach(([denom, qty]) => {
+                const quantity = parseInt(qty, 10);
+                allWithdrawals[denom] = (allWithdrawals[denom] || 0) + quantity;
+                grandTotalWithdrawals += quantity * (allDenomsMap[denom] || 0);
+            });
+        }
+    });
+
+    let summaryWithdrawalsHtml = '';
+    if (Object.keys(allWithdrawals).length > 0) {
+        const summaryRows = Object.entries(allDenomsMap)
+            .map(([key, value]) => ({ key, value: parseFloat(value), qty: allWithdrawals[key] || 0 }))
+            .filter(d => d.qty > 0)
+            .sort((a, b) => b.value - a.value)
+            .map(d => `<tr><td>${d.value >= 1 ? `${d.value}€` : `${d.value*100}c`}</td><td class="text-right">${d.qty}</td><td class="text-right">${formatEuros(d.qty * d.value)}</td></tr>`)
+            .join('');
+
+        summaryWithdrawalsHtml = `
+            <div class="card" style="margin-bottom: 20px;">
+                <h3>Récapitulatif Général des Retraits</h3>
+                <div class="details-card">
+                    <div class="details-card-header"><h5><i class="fa-solid fa-arrow-down-from-line"></i> Total Retiré</h5><span class="total-amount">${formatEuros(grandTotalWithdrawals)}</span></div>
+                    <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Coupure</th><th class="text-right">Qté</th><th class="text-right">Total</th></tr></thead><tbody>${summaryRows}</tbody></table></div>
+                </div>
+            </div>`;
+    }
+
     const caissesHtml = Object.entries(comptage.caisses_data).map(([caisse_id, data]) => {
         const caisseResult = comptage.results.caisses[caisse_id];
         const nomCaisse = config.nomsCaisses[caisse_id] || `Caisse #${caisse_id}`;
         
-        const denomsHtml = (data.denominations || [])
-            .map(d => ({ ...d, value: parseFloat(config.denominations.billets[d.denomination_nom] || config.denominations.pieces[d.denomination_nom]) }))
-            .filter(d => d.quantite > 0)
-            .sort((a,b) => b.value - a.value)
-            .map(d => `<tr><td>${d.value >= 1 ? `${d.value}€` : `${d.value*100}c`}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.quantite * d.value)}</td></tr>`)
+        const denomsHtml = (data.denominations || []).map(d => ({ ...d, value: parseFloat(allDenomsMap[d.denomination_nom]) })).filter(d => d.quantite > 0).sort((a,b) => b.value - a.value).map(d => `<tr><td>${d.value >= 1 ? `${d.value}€` : `${d.value*100}c`}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.quantite * d.value)}</td></tr>`).join('');
+        const chequesHtml = (data.cheques || []).map(c => `<tr><td>${c.commentaire || 'N/A'}</td><td class="text-right">${formatEuros(c.montant)}</td></tr>`).join('');
+        const tpeHtml = Object.entries(data.cb || {}).map(([terminalId, releves]) => (releves || []).map(r => `<tr><td>${(config.tpeParCaisse[terminalId] || {}).nom || `TPE #${terminalId}`} (${r.heure || 'N/A'})</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('')).join('');
+        
+        const withdrawalsHtml = (Object.entries(data.retraits || {}) || [])
+            .map(([key, qty]) => ({ key, qty: parseInt(qty, 10), value: parseFloat(allDenomsMap[key]) }))
+            .filter(d => d.qty > 0)
+            .sort((a, b) => b.value - a.value)
+            .map(d => `<tr><td>${d.value >= 1 ? `${d.value}€` : `${d.value*100}c`}</td><td class="text-right">${d.qty}</td><td class="text-right">${formatEuros(d.qty * d.value)}</td></tr>`)
             .join('');
 
-        const chequesHtml = (data.cheques || []).map(c => `<tr><td>${c.commentaire || 'N/A'}</td><td class="text-right">${formatEuros(c.montant)}</td></tr>`).join('');
-        
-        const tpeHtml = Object.entries(data.cb || {}).map(([terminalId, releves]) => {
-             const terminalName = (config.tpeParCaisse[terminalId] || {}).nom || `TPE #${terminalId}`;
-             return (releves || []).map(r => `<tr><td>${terminalName} (${r.heure || 'N/A'})</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('');
-        }).join('');
-        
         return `
             <div class="card" style="margin-bottom: 20px;">
                 <h3>Détails pour : ${nomCaisse}</h3>
                 <div class="modal-details-layout">
                     <div class="modal-charts-container">
-                        <div class="chart-wrapper">
-                            <h5>Répartition de la Recette</h5>
-                            <div id="repartition-chart-${caisse_id}"></div>
-                        </div>
-                        <div class="chart-wrapper">
-                            <h5>Composition des Espèces</h5>
-                            <div id="denominations-chart-${caisse_id}"></div>
-                        </div>
+                        <div class="chart-wrapper"><h5>Répartition de la Recette</h5><div id="repartition-chart-${caisse_id}"></div></div>
+                        <div class="chart-wrapper"><h5>Composition des Espèces</h5><div id="denominations-chart-${caisse_id}"></div></div>
                     </div>
                     <div>
                         <div class="caisse-kpi-grid">
-                            <div class="caisse-kpi-card"><span>Total Compté</span><strong>${formatEuros(caisseResult.total_compté)}</strong></div>
-                            <div class="caisse-kpi-card"><span>Recette Théorique</span><strong>${formatEuros(caisseResult.recette_theorique)}</strong></div>
-                            <div class="caisse-kpi-card ${getEcartClass(caisseResult.ecart)}"><span>Écart</span><strong>${formatEuros(caisseResult.ecart)}</strong></div>
+                           <div class="caisse-kpi-card"><span>Total Compté</span><strong>${formatEuros(caisseResult.total_compté)}</strong></div>
+                           <div class="caisse-kpi-card"><span>Recette Théorique</span><strong>${formatEuros(caisseResult.recette_theorique)}</strong></div>
+                           <div class="caisse-kpi-card ${getEcartClass(caisseResult.ecart)}"><span>Écart</span><strong>${formatEuros(caisseResult.ecart)}</strong></div>
                         </div>
-                        <div class="details-card">
-                            <div class="details-card-header"><h5><i class="fa-solid fa-money-bill-wave"></i> Espèces</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_especes)}</span></div>
-                            <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Coupure</th><th class="text-right">Qté</th><th class="text-right">Total</th></tr></thead><tbody>${denomsHtml || '<tr><td colspan="3">Aucune espèce.</td></tr>'}</tbody></table></div>
+                        <div class="modal-details-grid">
+                            <div class="details-card">
+                                <div class="details-card-header"><h5><i class="fa-solid fa-money-bill-wave"></i> Espèces</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_especes)}</span></div>
+                                <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Coupure</th><th class="text-right">Qté</th><th class="text-right">Total</th></tr></thead><tbody>${denomsHtml || '<tr><td colspan="3">Aucune espèce.</td></tr>'}</tbody></table></div>
+                            </div>
+                            <div class="details-card">
+                                <div class="details-card-header"><h5><i class="fa-solid fa-arrow-down-from-line"></i> Retraits</h5><span class="total-amount">${formatEuros(caisseResult.total_retraits)}</span></div>
+                                <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Coupure</th><th class="text-right">Qté</th><th class="text-right">Total</th></tr></thead><tbody>${withdrawalsHtml || '<tr><td colspan="3">Aucun retrait.</td></tr>'}</tbody></table></div>
+                            </div>
+                            <div class="details-card">
+                                <div class="details-card-header"><h5><i class="fa-solid fa-credit-card"></i> TPE</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_cb)}</span></div>
+                                <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Terminal</th><th class="text-right">Montant</th></tr></thead><tbody>${tpeHtml || '<tr><td colspan="2">Aucun relevé.</td></tr>'}</tbody></table></div>
+                            </div>
+                            <div class="details-card">
+                                <div class="details-card-header"><h5><i class="fa-solid fa-money-check-dollar"></i> Chèques</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_cheques)}</span></div>
+                                <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Commentaire</th><th class="text-right">Montant</th></tr></thead><tbody>${chequesHtml || '<tr><td colspan="2">Aucun chèque.</td></tr>'}</tbody></table></div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>`;
     }).join('');
 
-    container.innerHTML = `<div id="printable-content">${caissesHtml}</div>`;
+    container.innerHTML = `<div id="printable-content">${summaryWithdrawalsHtml}${caissesHtml}</div>`;
 }
 
 function initializeSheetLogic() {
@@ -391,10 +399,8 @@ function openDetailsSheet(comptageId) {
     sheet.classList.add('visible');
     overlay.classList.add('visible');
     
-    // Étape 1 : On injecte le contenu HTML.
     renderSheetContent(content, comptageId); 
     
-    // Étape 2 : Le HTML est maintenant dans le DOM. On peut lancer le rendu des graphiques de manière fiable.
     const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
     if (comptage) {
         Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
@@ -412,9 +418,8 @@ function closeDetailsSheet() {
     sheet.classList.remove('visible');
     overlay.classList.remove('visible');
     
-    // On détruit proprement tous les graphiques stockés
     sheetCharts.forEach(chart => chart.destroy());
-    sheetCharts = []; // On vide le tableau
+    sheetCharts = [];
 }
 
 function renderWithdrawalDetailsModal(dateKey) {
