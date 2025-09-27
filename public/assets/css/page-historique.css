@@ -189,3 +189,26 @@
     background-color: var(--color-danger);
     color: white;
 }
+
+.modal-charts-container .chart-wrapper {
+    background-color: var(--color-surface-alt);
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    min-height: 150px;
+    color: var(--color-text-muted);
+    font-style: italic;
+    text-align: center;
+    border: 2px dashed var(--color-border-light);
+    border-radius: 8px;
+    padding: 20px;
+}
