@@ -26,14 +26,18 @@ export async function fetchInitialData() {
         }
     }
     
-    const chequesState = {};
-    const tpeState = {};
+    // S'assurer que chaque caisse configurée a un objet de données, même vide
     Object.keys(configResult.nomsCaisses).forEach(caisseId => {
-        chequesState[caisseId] = calculatorData.caisse[caisseId]?.cheques || [];
-        tpeState[caisseId] = calculatorData.caisse[caisseId]?.tpe || {};
+        if (!calculatorData.caisse[caisseId]) {
+            calculatorData.caisse[caisseId] = {
+                cheques: [],
+                tpe: {},
+                denominations: {}
+            };
+        }
     });
 
-    return { config: configResult, calculatorData, chequesState, tpeState };
+    return { config: configResult, calculatorData };
 }
 
 /**
@@ -76,9 +80,10 @@ export async function submitClotureGenerale() {
  * Calcule les écarts pour tous les types de paiement d'une caisse donnée.
  */
 export function calculateEcartsForCaisse(caisseId, appState) {
-    const { calculatorData, config, chequesState, tpeState } = appState;
+    const { calculatorData, config } = appState;
     const caisseData = calculatorData.caisse[caisseId] || {};
 
+    // Calcul Espèces
     let totalCompteEspeces = 0;
     const allDenoms = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
     for (const name in allDenoms) {
@@ -90,32 +95,31 @@ export function calculateEcartsForCaisse(caisseId, appState) {
     const retrocession = parseLocaleFloat(caisseData.retrocession);
     const ecartEspeces = (totalCompteEspeces - fondDeCaisse) - (ventesEspeces + retrocession);
 
+    // Calcul CB
     let totalCompteCb = 0;
-    if (tpeState && tpeState[caisseId]) {
-        for (const terminalId in tpeState[caisseId]) {
-            const releves = tpeState[caisseId][terminalId];
-            if (releves && releves.length > 0) {
-                const sortedReleves = [...releves].sort((a, b) => (b.heure || '00:00:00').localeCompare(a.heure || '00:00:00'));
-                const dernierReleve = sortedReleves[0];
-                if (dernierReleve) {
-                   totalCompteCb += parseLocaleFloat(dernierReleve.montant);
-                }
+    const tpeData = caisseData.tpe || {};
+    for (const terminalId in tpeData) {
+        const releves = tpeData[terminalId];
+        if (releves && releves.length > 0) {
+            const sortedReleves = [...releves].sort((a, b) => (b.heure || '00:00:00').localeCompare(a.heure || '00:00:00'));
+            const dernierReleve = sortedReleves[0];
+            if (dernierReleve) {
+               totalCompteCb += parseLocaleFloat(dernierReleve.montant);
             }
         }
     }
-
     const ventesCb = parseLocaleFloat(caisseData.ventes_cb);
     const retrocessionCb = parseLocaleFloat(caisseData.retrocession_cb);
     const ecartCb = totalCompteCb - (ventesCb + retrocessionCb);
     
-    const totalCompteCheques = (chequesState[caisseId] || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
+    // Calcul Chèques
+    const totalCompteCheques = (caisseData.cheques || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
     const ventesCheques = parseLocaleFloat(caisseData.ventes_cheques);
     const retrocessionCheques = parseLocaleFloat(caisseData.retrocession_cheques);
     const ecartCheques = totalCompteCheques - (ventesCheques + retrocessionCheques);
 
     return { totalCompteEspeces, ecartEspeces, totalCompteCb, ecartCb, totalCompteCheques, ecartCheques };
 }
-
 
 /**
  * Calcule la suggestion de retrait d'espèces pour une caisse.
@@ -161,6 +165,7 @@ export function calculateAll(config, appState) {
         const caisseData = appState.calculatorData.caisse[id] || {};
         const formElements = document.getElementById('caisse-form').elements;
 
+        // Met à jour l'objet de données avec les valeurs actuelles du formulaire
         caisseData.fond_de_caisse = formElements[`caisse[${id}][fond_de_caisse]`]?.value;
         caisseData.ventes_especes = formElements[`caisse[${id}][ventes_especes]`]?.value;
         caisseData.retrocession = formElements[`caisse[${id}][retrocession]`]?.value;
@@ -175,8 +180,10 @@ export function calculateAll(config, appState) {
             if (input) caisseData.denominations[name] = input.value;
         });
 
+        // Lance les calculs avec l'état mis à jour
         const results = calculateEcartsForCaisse(id, appState);
         
+        // Met à jour l'affichage des totaux et des écarts
         let totalBillets = 0, totalPieces = 0;
         Object.entries(config.denominations.billets).forEach(([name, value]) => {
             const quantite = parseInt(caisseData.denominations[name], 10) || 0;
