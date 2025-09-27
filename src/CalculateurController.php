@@ -100,7 +100,6 @@ class CalculateurController {
             $this->pdo->beginTransaction();
             $nom_comptage = trim($_POST['nom_comptage'] ?? '');
             if ($is_autosave) {
-                // La ligne supprimant les anciennes sauvegardes a été retirée pour un fonctionnement multi-utilisateurs correct.
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {
                 $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;
@@ -453,6 +452,12 @@ class CalculateurController {
             foreach ($source_data['cheques'] as $cheque) {
                 $stmt = $this->pdo->prepare("INSERT INTO comptage_cheques (comptage_detail_id, montant, commentaire) VALUES (?, ?, ?)");
                 $stmt->execute([$new_detail_id, $cheque['montant'], $cheque['commentaire']]);
+            }
+        }
+        if (!empty($source_data['retraits'])) {
+            foreach ($source_data['retraits'] as $denom_name => $quantity) {
+                 $stmt = $this->pdo->prepare("INSERT INTO comptage_retraits (comptage_detail_id, denomination_nom, quantite_retiree) VALUES (?, ?, ?)");
+                 $stmt->execute([$new_detail_id, $denom_name, $quantity]);
             }
         }
     }

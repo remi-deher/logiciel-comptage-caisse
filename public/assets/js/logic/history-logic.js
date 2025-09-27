@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version finale avec toutes les corrections)
+// Fichier : public/assets/js/logic/history-logic.js (Version avec détails des retraits)
 import { sendWsMessage } from './websocket-service.js';
 
 // --- État et Configuration Globale ---
@@ -335,6 +335,15 @@ function renderSheetContent(container, comptageId) {
             .sort((a, b) => b.value - a.value)
             .map(d => `<tr><td>${d.value >= 1 ? `${d.value}€` : `${d.value*100}c`}</td><td class="text-right">${d.qty}</td><td class="text-right">${formatEuros(d.qty * d.value)}</td></tr>`)
             .join('');
+        
+        let withdrawalsCardHtml = '';
+        if (withdrawalsHtml) {
+             withdrawalsCardHtml = `
+                <div class="details-card">
+                    <div class="details-card-header"><h5><i class="fa-solid fa-arrow-down-from-line"></i> Retraits</h5><span class="total-amount">${formatEuros(caisseResult.total_retraits)}</span></div>
+                    <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Coupure</th><th class="text-right">Qté</th><th class="text-right">Total</th></tr></thead><tbody>${withdrawalsHtml}</tbody></table></div>
+                </div>`;
+        }
 
         return `
             <div class="card" style="margin-bottom: 20px;">
@@ -355,10 +364,7 @@ function renderSheetContent(container, comptageId) {
                                 <div class="details-card-header"><h5><i class="fa-solid fa-money-bill-wave"></i> Espèces</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_especes)}</span></div>
                                 <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Coupure</th><th class="text-right">Qté</th><th class="text-right">Total</th></tr></thead><tbody>${denomsHtml || '<tr><td colspan="3">Aucune espèce.</td></tr>'}</tbody></table></div>
                             </div>
-                            <div class="details-card">
-                                <div class="details-card-header"><h5><i class="fa-solid fa-arrow-down-from-line"></i> Retraits</h5><span class="total-amount">${formatEuros(caisseResult.total_retraits)}</span></div>
-                                <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Coupure</th><th class="text-right">Qté</th><th class="text-right">Total</th></tr></thead><tbody>${withdrawalsHtml || '<tr><td colspan="3">Aucun retrait.</td></tr>'}</tbody></table></div>
-                            </div>
+                            ${withdrawalsCardHtml}
                             <div class="details-card">
                                 <div class="details-card-header"><h5><i class="fa-solid fa-credit-card"></i> TPE</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_cb)}</span></div>
                                 <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Terminal</th><th class="text-right">Montant</th></tr></thead><tbody>${tpeHtml || '<tr><td colspan="2">Aucun relevé.</td></tr>'}</tbody></table></div>
