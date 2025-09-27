@@ -74,12 +74,13 @@ class HistoriqueController {
         $historique = [];
         $placeholders = implode(',', array_fill(0, count($comptage_ids), '?'));
 
+        // On ajoute retrocession_cb et retrocession_cheques à la requête
         $stmt = $this->pdo->prepare("
             SELECT 
                 c.id, c.nom_comptage, c.date_comptage, c.explication,
                 cd.caisse_id, cd.fond_de_caisse, 
                 cd.ventes_especes, cd.ventes_cb, cd.ventes_cheques, 
-                cd.retrocession,
+                cd.retrocession, cd.retrocession_cb, cd.retrocession_cheques,
                 cd.id as comptage_detail_id
             FROM comptages c
             LEFT JOIN comptage_details cd ON c.id = cd.comptage_id
@@ -114,7 +115,6 @@ class HistoriqueController {
             $stmt_cheques->execute([$row['comptage_detail_id']]);
             $cheques_array = $stmt_cheques->fetchAll(PDO::FETCH_ASSOC);
 
-            // CORRECTION : On récupère les relevés TPE et on les groupe manuellement
             $stmt_cb = $this->pdo->prepare("SELECT terminal_id, montant, heure_releve FROM comptage_cb WHERE comptage_detail_id = ? ORDER BY heure_releve ASC");
             $stmt_cb->execute([$row['comptage_detail_id']]);
             $releves_bruts = $stmt_cb->fetchAll(PDO::FETCH_ASSOC);
@@ -126,12 +126,15 @@ class HistoriqueController {
                 ];
             }
 
+            // On ajoute les champs manquants au tableau de données
             $historique[$comptage_id]['caisses_data'][$row['caisse_id']] = [
                 'fond_de_caisse' => $row['fond_de_caisse'],
                 'ventes_especes' => $row['ventes_especes'],
                 'ventes_cb' => $row['ventes_cb'],
                 'ventes_cheques' => $row['ventes_cheques'],
                 'retrocession' => $row['retrocession'],
+                'retrocession_cb' => $row['retrocession_cb'],
+                'retrocession_cheques' => $row['retrocession_cheques'],
                 'denominations' => $denominations_array,
                 'retraits' => $retraits_array,
                 'cb' => $cb_releves_array,
@@ -198,6 +201,8 @@ class HistoriqueController {
             $header[] = "Caisse {$id} - Ventes CB";
             $header[] = "Caisse {$id} - Ventes Chèques";
             $header[] = "Caisse {$id} - Rétrocession";
+            $header[] = "Caisse {$id} - Rétrocession CB";
+            $header[] = "Caisse {$id} - Rétrocession Chèques";
             foreach ($this->denominations as $type => $denoms) {
                 foreach ($denoms as $key => $value) {
                     $label = ($value >= 1) ? "{$value} €" : "{$value} cts";
@@ -218,6 +223,8 @@ class HistoriqueController {
                     $rowData[] = str_replace('.', ',', $caisse_data['ventes_cb'] ?? '0');
                     $rowData[] = str_replace('.', ',', $caisse_data['ventes_cheques'] ?? '0');
                     $rowData[] = str_replace('.', ',', $caisse_data['retrocession']);
+                    $rowData[] = str_replace('.', ',', $caisse_data['retrocession_cb']);
+                    $rowData[] = str_replace('.', ',', $caisse_data['retrocession_cheques']);
                     foreach ($this->denominations as $type => $denoms) {
                         foreach (array_keys($denoms) as $key) {
                              $denom_value = 0;
@@ -231,7 +238,8 @@ class HistoriqueController {
                         }
                     }
                 } else {
-                    $columnCount = 6 + count($this->denominations['billets']) + count($this->denominations['pieces']);
+                    // +2 pour les nouvelles colonnes de rétrocession
+                    $columnCount = 8 + count($this->denominations['billets']) + count($this->denominations['pieces']);
                     for ($i=0; $i < $columnCount; $i++) { 
                         $rowData[] = '';
                     }
