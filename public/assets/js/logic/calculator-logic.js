@@ -11,8 +11,6 @@ let state = {
     config: {},
     wsResourceId: null,
     calculatorData: { caisse: {} },
-    chequesState: {},
-    tpeState: {},
     lockedCaisses: [],
     closedCaisses: [],
     isDirty: false
@@ -25,22 +23,30 @@ async function refreshCalculatorData() {
         const initialData = await service.fetchInitialData();
         state.config = initialData.config;
         state.calculatorData = initialData.calculatorData;
-        state.chequesState = initialData.chequesState;
-        state.tpeState = initialData.tpeState;
 
-        ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.chequesState, state.tpeState);
-        ui.populateInitialData(state.calculatorData);
-        service.calculateAll(state.config, state);
+        // Le rendu de l'interface est la première étape
+        ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.calculatorData);
         
+        // Ensuite, on remplit le formulaire avec les données
+        ui.populateInitialData(state.calculatorData);
+        
+        // C'est seulement maintenant que la page est prête qu'on attache les écouteurs
         attachEventListeners();
+        
+        // Et on lance le premier calcul
+        service.calculateAll(state.config, state);
         
         updateClotureButtonState();
 
+        // On demande l'état complet aux autres clients
         sendWsMessage({ type: 'get_full_state' });
 
     } catch (error) {
         console.error("Erreur critique lors du rafraîchissement:", error);
-        document.getElementById('main-content').innerHTML = `<div class="container error"><p>Impossible de rafraîchir les données : ${error.message}</p></div>`;
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+            mainContent.innerHTML = `<div class="container error"><p>${error.message}</p></div>`;
+        }
     }
 }
 
@@ -54,7 +60,7 @@ async function handleAutosave() {
         const response = await fetch('index.php?route=calculateur/autosave', {
             method: 'POST',
             body: new FormData(form),
-            keepalive: true
+            keepalive: true // Permet à la requête de continuer même si la page se ferme
         });
         const result = await response.json();
         if (!result.success) throw new Error(result.message);
@@ -76,7 +82,9 @@ function attachEventListeners() {
     page.addEventListener('click', handlePageClick);
     
     const form = document.getElementById('caisse-form');
-    form.addEventListener('submit', (e) => { e.preventDefault(); handleAutosave(); });
+    if (form) {
+        form.addEventListener('submit', (e) => { e.preventDefault(); handleAutosave(); });
+    }
 
     const clotureBtn = document.getElementById('cloture-btn');
     if (clotureBtn) {
@@ -104,8 +112,11 @@ function attachEventListeners() {
 function handlePageInput(e) {
     if (e.target.matches('input, textarea')) {
         state.isDirty = true;
-        document.getElementById('autosave-status').textContent = 'Modifications non enregistrées.';
+        const statusEl = document.getElementById('autosave-status');
+        if(statusEl) statusEl.textContent = 'Modifications non enregistrées.';
+        
         service.calculateAll(state.config, state);
+        
         if (e.target.matches('input[type="text"], input[type="number"], textarea')) {
              sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
         }
@@ -150,6 +161,8 @@ function handlePageClick(e) {
 // --- LOGIQUE WEBSOCKET ET MISE À JOUR DE L'UI ---
 
 function handleWebSocketMessage(data) {
+    if (!data || !data.type) return;
+
     switch (data.type) {
         case 'welcome':
             state.wsResourceId = data.resourceId.toString();
@@ -206,6 +219,9 @@ export async function initializeCalculator() {
         await initializeWebSocket(handleWebSocketMessage);
     } catch (error) {
         console.error("Erreur critique d'initialisation:", error.stack);
-        document.getElementById('main-content').innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+            mainContent.innerHTML = `<div class="container error"><p>Impossible de charger le calculateur : ${error.message}</p></div>`;
+        }
     }
 }

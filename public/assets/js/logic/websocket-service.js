@@ -30,7 +30,6 @@ export function initializeWebSocket(onMessageHandler) {
                 statusIndicator.classList.add('connected');
                 statusText.textContent = 'Connecté';
                 console.log('%c[WebSocket] Connexion établie. En attente du message de bienvenue...', 'color: green; font-weight: bold;');
-                // La promesse n'est plus résolue ici. On attend le message 'welcome'.
             };
 
             wsConnection.onerror = (error) => {
@@ -49,17 +48,17 @@ export function initializeWebSocket(onMessageHandler) {
             };
 
             wsConnection.onmessage = (event) => {
+                if (!event.data) return;
                 const parsedData = JSON.parse(event.data);
+                if (!parsedData) return;
+
                 console.log('%c[WebSocket] Message Reçu <<', 'color: blue; font-weight: bold;', parsedData);
 
-                // On traite le message 'welcome' de manière spéciale pour résoudre la promesse
                 if (parsedData.type === 'welcome' && parsedData.resourceId) {
                     console.log('%c[WebSocket] Message de bienvenue reçu. Initialisation terminée.', 'color: green; font-weight: bold;');
-                    // On passe d'abord le message au gestionnaire principal
                     if (typeof onMessageHandler === 'function') {
                         onMessageHandler(parsedData);
                     }
-                    // Ensuite, on résout la promesse pour signaler que tout est prêt.
                     resolve(wsConnection);
                 } else {
                     if (typeof onMessageHandler === 'function') {
