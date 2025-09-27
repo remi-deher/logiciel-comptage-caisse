@@ -1,4 +1,4 @@
-/* Fichier : public/assets/css/page-calculateur.css (Modifié) */
+/* Fichier : public/assets/css/page-calculateur.css (Complet et Final) */
 
 /* --- BANDEAUX DE CLÔTURE --- */
 .cloture-mode-banner, .cloture-final-summary-banner {
@@ -21,7 +21,6 @@
 
 /* --- NOUVEAUX STYLES POUR LE RÉCAPITULATIF --- */
 #cloture-recap-container {
-    /* Les propriétés sticky, top et z-index ont été supprimées */
     margin-bottom: 20px;
 }
 
@@ -31,7 +30,7 @@
     border-radius: 12px;
     border: 2px solid var(--color-success);
     box-shadow: 0 5px 20px var(--shadow-color);
-    animation: fadeIn 0.5s ease-in-out; /* Animation de fondu */
+    animation: fadeIn 0.5s ease-in-out;
 }
 
 .cloture-recap-card h4 {
@@ -39,8 +38,6 @@
     margin-top: 0;
     color: var(--color-success);
 }
-/* --- FIN DES NOUVEAUX STYLES --- */
-
 
 /* --- ONGLETS DE SÉLECTION DE CAISSE --- */
 .tab-selector{border-bottom:2px solid var(--color-border-light);margin-bottom:20px;display:flex;flex-wrap:wrap}
@@ -64,7 +61,6 @@
     color: #8a2be2;
 }
 
-/* NOUVEAU STYLE POUR LA CAISSE CLOTUREE */
 .ecart-display.cloture-closed {
     background-color: rgba(138, 43, 226, 0.1);
     border: 2px solid rgba(138, 43, 226, 0.6);
@@ -73,16 +69,18 @@
     color: #8a2be2;
 }
 
-
+/* AMÉLIORATION : Position fixe pour le panneau de clôture */
 #cloture-details-container {
-    margin-top: -10px;
+    position: sticky;
+    top: 90px;
+    z-index: 98;
     margin-bottom: 25px;
     padding: 25px;
     border: 2px solid rgba(138, 43, 226, 0.4);
-    border-top: none;
-    border-radius: 0 0 12px 12px;
+    border-radius: 12px;
     background-color: var(--color-surface);
     animation: fadeIn 0.5s;
+    box-shadow: 0 5px 20px var(--shadow-color);
 }
 
 .cloture-actions {
@@ -143,3 +141,32 @@
 .suggestion-table th, .suggestion-table td { padding: 12px 15px; border-bottom: 1px solid var(--color-border-light); text-align: right; }
 .suggestion-table th { background-color: var(--color-surface-alt); font-weight: 600; color: var(--color-text-secondary); }
 .suggestion-table th:first-child, .suggestion-table td:first-child { text-align: left; }
+
+/* Styles pour les champs de retrait en lecture seule */
+.suggestion-table input[readonly] {
+    background-color: transparent;
+    border: none;
+    text-align: center;
+    font-weight: bold;
+    color: var(--color-text-primary);
+    cursor: default;
+    box-shadow: none;
+    padding: 0;
+}
+
+/* Styles pour les lignes de totaux dans le tableau de retrait */
+.suggestion-table .summary-row td {
+    background-color: var(--color-surface-alt);
+    font-style: italic;
+    color: var(--color-text-secondary);
+}
+
+.suggestion-table .grand-total-row {
+    font-size: 1.1em;
+    border-top: 2px solid var(--color-primary);
+}
+
+.suggestion-table .grand-total-row td {
+    background-color: var(--color-surface);
+    color: var(--color-primary);
+}

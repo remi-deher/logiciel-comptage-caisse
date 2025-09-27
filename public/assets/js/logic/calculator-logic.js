@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé)
+// Fichier : public/assets/js/logic/calculator-logic.js (Complet et Final)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
@@ -24,28 +24,18 @@ async function refreshCalculatorData() {
         state.config = initialData.config;
         state.calculatorData = initialData.calculatorData;
         
-        // CORRECTION : On définit l'état de clôture immédiatement depuis la réponse HTTP
         state.lockedCaisses = initialData.clotureState.lockedCaisses;
         state.closedCaisses = (initialData.clotureState.closedCaisses || []).map(String);
 
-        // Le rendu de l'interface est la première étape
         ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.calculatorData);
-        
-        // Ensuite, on remplit le formulaire avec les données
         ui.populateInitialData(state.calculatorData);
-        
-        // C'est seulement maintenant que la page est prête qu'on attache les écouteurs
         attachEventListeners();
         
-        // Et on lance le premier calcul
         service.calculateAll(state.config, state);
-        
-        // CORRECTION : On applique l'état visuel (verrouillé/fermé) immédiatement
         ui.updateAllCaisseLocks(state);
         
         updateClotureButtonState();
 
-        // Le WebSocket prendra ensuite le relais pour les mises à jour en temps réel
         sendWsMessage({ type: 'get_full_state' });
 
     } catch (error) {
@@ -67,7 +57,7 @@ async function handleAutosave() {
         const response = await fetch('index.php?route=calculateur/autosave', {
             method: 'POST',
             body: new FormData(form),
-            keepalive: true // Permet à la requête de continuer même si la page se ferme
+            keepalive: true
         });
         const result = await response.json();
         if (!result.success) throw new Error(result.message);
@@ -122,7 +112,12 @@ function handlePageInput(e) {
         const statusEl = document.getElementById('autosave-status');
         if(statusEl) statusEl.textContent = 'Modifications non enregistrées.';
         
+        // On recalcule tout
         service.calculateAll(state.config, state);
+        
+        // AMÉLIORATION : On force la mise à jour du panneau de clôture s'il est visible
+        // pour garantir que les suggestions de retrait sont toujours à jour.
+        ui.updateAllCaisseLocks(state);
         
         if (e.target.matches('input[type="text"], input[type="number"], textarea')) {
              sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });

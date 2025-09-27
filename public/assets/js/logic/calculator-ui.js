@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-ui.js (Modifié)
+// Fichier : public/assets/js/logic/calculator-ui.js (Corrigé et Final)
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 import * as service from './calculator-service.js';
@@ -8,6 +8,7 @@ import { sendWsMessage } from './websocket-service.js';
  * Met à jour l'état visuel de TOUTES les caisses en fonction des données de clôture.
  */
 export function updateAllCaisseLocks(state) {
+    if (!state.config || !state.config.nomsCaisses) return;
     Object.keys(state.config.nomsCaisses).forEach(caisseId => {
         const lockInfo = state.lockedCaisses.find(c => String(c.caisse_id) === String(caisseId));
         const isClosed = state.closedCaisses.includes(String(caisseId));
@@ -38,34 +39,33 @@ export function updateCaisseLockState(caisseId, status, state) {
     const caisseContent = document.getElementById(`caisse${caisseId}`);
     const ecartDisplay = document.getElementById(`ecart-display-caisse${caisseId}`);
     const clotureDetailsContainer = document.getElementById('cloture-details-container');
-    const recapContainer = document.getElementById('cloture-recap-container'); // On récupère le nouveau conteneur
+    const recapContainer = document.getElementById('cloture-recap-container');
 
     if (!tabLink || !caisseContent || !ecartDisplay || !clotureDetailsContainer || !recapContainer) return;
 
-    // 1. Réinitialisation
     const isActive = tabLink.classList.contains('active');
     tabLink.className = 'tab-link';
     if (isActive) tabLink.classList.add('active');
     
     ecartDisplay.classList.remove('cloture-mode', 'cloture-closed');
     
-    // On cache les conteneurs de clôture par défaut
     if (isActive) {
         clotureDetailsContainer.innerHTML = '';
-        clotureDetailsContainer.style.display = 'none';
-        recapContainer.innerHTML = ''; // On vide aussi le récapitulatif
+        // CORRECTION : On cache le conteneur par défaut
+        clotureDetailsContainer.style.display = 'none'; 
+        recapContainer.innerHTML = '';
     }
     
     caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = false);
 
-    // 2. Application du nouveau statut
     switch (status) {
         case 'locked_by_me':
             tabLink.classList.add('status-locked-by-me');
             if (isActive) {
                 ecartDisplay.classList.add('cloture-mode');
                 clotureDetailsContainer.innerHTML = renderClotureSectionForInitiator(caisseId, state);
-                clotureDetailsContainer.style.display = 'block';
+                // CORRECTION : On ré-affiche le conteneur quand il est rempli
+                clotureDetailsContainer.style.display = 'block'; 
             }
             break;
 
@@ -78,44 +78,44 @@ export function updateCaisseLockState(caisseId, status, state) {
             tabLink.classList.add('status-closed');
             if (isActive) {
                 ecartDisplay.classList.add('cloture-closed');
-                // MODIFICATION : On affiche le récapitulatif dans le nouveau conteneur
                 recapContainer.innerHTML = renderClotureSectionForClosed(caisseId, state);
             }
-            // On désactive les champs mais on ne remplace plus le contenu
             caisseContent.querySelectorAll('input, textarea, button:not(.payment-tab-link)').forEach(el => el.disabled = true);
             break;
     }
 }
-
 
 /**
  * Génère le HTML pour la section de retrait lorsque l'utilisateur a verrouillé la caisse.
  */
 function renderClotureSectionForInitiator(caisseId, state) {
     const suggestions = service.calculateWithdrawalSuggestion(state.calculatorData.caisse[caisseId], state.config);
+    const { totalCompteCb, totalCompteCheques } = service.calculateEcartsForCaisse(caisseId, state);
     const minToKeep = state.config.minToKeep || {};
 
     let rowsHtml = suggestions.suggestions.map(s => {
         const currentDenomQty = parseInt(state.calculatorData.caisse[caisseId]?.denominations?.[s.name] || 0);
         const minQtyToKeep = parseInt(minToKeep[s.name] || 0);
-        const maxAllowedToWithdraw = Math.max(0, currentDenomQty - minQtyToKeep);
-
+        
         return `
             <tr>
-                <td>${s.value >= 1 ? `${s.value} ${state.config.currencySymbol}` : `${s.value * 100} cts`}</td>
+                <td><i class="fa-solid fa-money-bill-wave"></i> ${s.value >= 1 ? `${s.value} ${state.config.currencySymbol}` : `${s.value * 100} cts`}</td>
                 <td class="text-center">${currentDenomQty}</td>
                 <td class="text-center">${minQtyToKeep}</td>
                 <td>
-                    <input type="number" class="retrait-input" data-caisse-id="${caisseId}" name="retraits[${caisseId}][${s.name}]" value="${s.qty}" min="0" max="${maxAllowedToWithdraw}">
+                    <input type="number" class="retrait-input" readonly value="${s.qty}">
+                    <input type="hidden" name="retraits[${caisseId}][${s.name}]" value="${s.qty}">
                 </td>
-                <td class="text-right" id="total-retrait-${s.name}-${caisseId}">${formatCurrency(s.total, state.config)}</td>
+                <td class="text-right">${formatCurrency(s.total, state.config)}</td>
             </tr>
         `;
     }).join('');
 
+    const grandTotalInitial = suggestions.totalToWithdraw + totalCompteCb + totalCompteCheques;
+
     return `
         <h4><i class="fa-solid fa-right-from-bracket"></i> Retraits et Finalisation</h4>
-        <p>Ajustez les quantités à retirer pour préparer le fond de caisse de demain.</p>
+        <p>Voici le dépôt suggéré basé sur vos saisies. Validez pour confirmer la clôture.</p>
         <div class="table-responsive">
             <table class="suggestion-table">
                 <thead>
@@ -127,11 +127,21 @@ function renderClotureSectionForInitiator(caisseId, state) {
                         <th class="text-right">Total retiré</th>
                     </tr>
                 </thead>
-                <tbody>${rowsHtml}</tbody>
+                <tbody>
+                    ${rowsHtml}
+                    <tr class="summary-row">
+                        <td colspan="4"><strong><i class="fa-solid fa-credit-card"></i> Total des Cartes Bancaires</strong></td>
+                        <td class="text-right">${formatCurrency(totalCompteCb, state.config)}</td>
+                    </tr>
+                    <tr class="summary-row">
+                        <td colspan="4"><strong><i class="fa-solid fa-money-check-dollar"></i> Total des Chèques</strong></td>
+                        <td class="text-right">${formatCurrency(totalCompteCheques, state.config)}</td>
+                    </tr>
+                </tbody>
                 <tfoot>
-                    <tr>
-                        <td colspan="4"><strong>Total des retraits</strong></td>
-                        <td class="text-right" id="total-global-retrait-${caisseId}"><strong>${formatCurrency(suggestions.totalToWithdraw, state.config)}</strong></td>
+                    <tr class="grand-total-row">
+                        <td colspan="4"><strong>Total Général du dépôt</strong></td>
+                        <td class="text-right"><strong>${formatCurrency(grandTotalInitial, state.config)}</strong></td>
                     </tr>
                 </tfoot>
             </table>
@@ -158,7 +168,6 @@ function renderClotureSectionForClosed(caisseId, state) {
         </tr>
     `).join('');
 
-    // MODIFICATION : Le HTML est maintenant encapsulé dans un conteneur avec une classe pour le style
     return `
         <div class="cloture-recap-card">
             <h4><i class="fa-solid fa-check-circle"></i> ${caisseNom} Clôturée - Récapitulatif des retraits</h4>
@@ -186,7 +195,6 @@ function renderClotureSectionForClosed(caisseId, state) {
         </div>
     `;
 }
-
 
 /**
  * Affiche la nouvelle bannière de finalisation avec le bouton "Voir les suggestions".
@@ -321,14 +329,16 @@ export function renderCalculatorUI(pageElement, config, calculatorData) {
         contentHtml += `<div id="caisse${id}" class="caisse-tab-content ${isActive}"><div class="form-group compact-input-group" style="max-width:300px;margin-bottom:25px;"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div><div class="payment-method-tabs"><div class="payment-method-selector"><button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}" data-method-key="especes"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button><button type="button" class="payment-tab-link" data-payment-tab="cb_${id}" data-method-key="cb"><i class="fa-solid fa-credit-card"></i> CB</button><button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}" data-method-key="cheques"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button></div><div id="especes_${id}" class="payment-tab-content active">${especesTabContent}</div><div id="cb_${id}" class="payment-tab-content">${cbTabContent}</div><div id="cheques_${id}" class="payment-tab-content">${chequesTabContent}</div></div></div>`;
     });
     tabSelector.innerHTML = tabsHtml; 
-    ecartContainer.innerHTML = ecartsHtml + `<div id="cloture-details-container" style="display:none;"></div>`;
+    ecartContainer.innerHTML = ecartsHtml;
+    // On met le conteneur de clôture APRES l'afficheur d'écart pour qu'il puisse être sticky
+    ecartContainer.insertAdjacentHTML('afterend', '<div id="cloture-details-container"></div>');
     caissesContainer.innerHTML = contentHtml;
 
     Object.keys(config.nomsCaisses).forEach(id => {
         const caisseData = calculatorData.caisse[id] || {};
         renderChequeList(id, caisseData.cheques || [], config);
         const tpeData = caisseData.tpe || {};
-        Object.keys(tpeData).forEach(tpeId => renderTpeList(id, tpeId, tpeData[tpeId], config));
+        Object.keys(tpeData).forEach(tpeId => renderTpeList(id, tpeData[tpeId], config));
     });
 }
 
@@ -399,7 +409,6 @@ export function applyFullFormState(data, state) {
             if (field) field.value = data.state[id];
         }
     }
-    // Après avoir mis à jour les champs, on met à jour l'état interne
     if (data.cheques) {
         Object.keys(data.cheques).forEach(caisseId => {
             state.calculatorData.caisse[caisseId].cheques = data.cheques[caisseId];
@@ -436,7 +445,7 @@ export function applyListUpdate(data, state) {
             state.calculatorData.caisse[data.caisseId].tpe = {};
         }
         state.calculatorData.caisse[data.caisseId].tpe[data.terminalId] = data.releves;
-        renderTpeList(data.caisseId, data.terminalId, data.releves, state.config);
+        renderTpeList(caisseId, data.terminalId, data.releves, state.config);
     }
 }
 
