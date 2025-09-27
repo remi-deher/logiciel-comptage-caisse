@@ -13,39 +13,47 @@ import { sendWsMessage } from './websocket-service.js';
 export function updateCaisseLockState(caisseId, status, state) {
     const tabLink = document.querySelector(`.tab-link[data-caisse-id="${caisseId}"]`);
     const caisseContent = document.getElementById(`caisse${caisseId}`);
-    const clotureSection = document.getElementById(`cloture-section-${caisseId}`);
+    const ecartDisplay = document.getElementById(`ecart-display-caisse${caisseId}`);
+    const clotureDetailsContainer = document.getElementById('cloture-details-container');
 
-    if (!tabLink || !caisseContent || !clotureSection) return;
+    if (!tabLink || !caisseContent || !ecartDisplay || !clotureDetailsContainer) return;
 
-    // 1. Réinitialisation des états visuels
+    // 1. Réinitialisation
     const isActive = tabLink.classList.contains('active');
     tabLink.className = 'tab-link'; // Enlève toutes les classes de statut
     if (isActive) tabLink.classList.add('active');
     
-    caisseContent.querySelectorAll('input, textarea, .add-cheque-btn, .add-tpe-releve-btn, .delete-cheque-btn, .delete-tpe-releve-btn').forEach(el => el.disabled = false);
-    clotureSection.innerHTML = `<button type="button" class="btn new-btn cloture-start-btn" data-caisse-id="${caisseId}"><i class="fa-solid fa-lock-open"></i> Démarrer la clôture de cette caisse</button>`;
+    ecartDisplay.classList.remove('cloture-mode');
+    if (clotureDetailsContainer.dataset.caisseId === caisseId) {
+        clotureDetailsContainer.innerHTML = '';
+        clotureDetailsContainer.style.display = 'none';
+    }
     
+    caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = false);
+
     // 2. Application du nouveau statut
     switch (status) {
         case 'locked_by_me':
             tabLink.classList.add('status-locked-by-me');
-            caisseContent.querySelectorAll('input, textarea, .add-cheque-btn, .add-tpe-releve-btn, .delete-cheque-btn, .delete-tpe-releve-btn').forEach(el => el.disabled = true);
-            clotureSection.innerHTML = renderClotureSectionForInitiator(caisseId, state);
-            clotureSection.querySelectorAll('.retrait-input').forEach(el => el.disabled = false); // Réactive seulement les inputs de retrait
+            if(isActive) ecartDisplay.classList.add('cloture-mode');
+            
+            caisseContent.querySelectorAll('input:not(.retrait-input), textarea, .add-cheque-btn, .add-tpe-releve-btn, .delete-cheque-btn, .delete-tpe-releve-btn').forEach(el => el.disabled = true);
+            
+            if(isActive) {
+                clotureDetailsContainer.innerHTML = renderClotureSectionForInitiator(caisseId, state);
+                clotureDetailsContainer.style.display = 'block';
+                clotureDetailsContainer.dataset.caisseId = caisseId;
+            }
             break;
 
         case 'locked_by_other':
             tabLink.classList.add('status-locked-by-other');
             caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
-            const lockInfo = state.lockedCaisses.find(c => String(c.caisse_id) === String(caisseId));
-            const locker = lockInfo ? `par l'utilisateur #${lockInfo.locked_by}` : '';
-            clotureSection.innerHTML = `<div class="cloture-locked-info"><i class="fa-solid fa-lock"></i> Caisse verrouillée ${locker}.</div>`;
             break;
-
+            
         case 'closed':
             tabLink.classList.add('status-closed');
             caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = true);
-            clotureSection.innerHTML = `<div class="cloture-validated-info"><i class="fa-solid fa-check-circle"></i> Caisse clôturée.</div>`;
             break;
     }
 }
@@ -106,21 +114,86 @@ function renderClotureSectionForInitiator(caisseId, state) {
 }
 
 /**
- * Affiche la bannière de résumé final lorsque toutes les caisses sont fermées.
+ * Affiche la nouvelle bannière de finalisation avec le bouton "Voir les suggestions".
  */
-export function showFinalSummaryBanner() {
+export function showFinalSummaryBanner(state) {
     const container = document.getElementById('cloture-final-summary-banner-container');
     if (!container) return;
+
+    let totalRetraits = 0;
+    Object.keys(state.config.nomsCaisses).forEach(caisseId => {
+        const caisseData = state.calculatorData.caisse[caisseId];
+        if(caisseData) {
+            const suggestions = service.calculateWithdrawalSuggestion(caisseData, state.config);
+            totalRetraits += suggestions.totalToWithdraw;
+        }
+    });
+
     container.innerHTML = `
         <div class="cloture-final-summary-banner">
             <div class="banner-header">
                 <h4><i class="fa-solid fa-flag-checkered"></i> Journée Prête pour Finalisation</h4>
-                <p>Toutes les caisses ont été clôturées. Vous pouvez maintenant archiver la journée.</p>
+                <p>Toutes les caisses ont été clôturées. Le retrait total à effectuer est de <strong>${formatCurrency(totalRetraits, state.config)}</strong>.</p>
             </div>
             <div class="banner-actions">
+                <button id="show-suggestions-btn" class="btn action-btn"><i class="fa-solid fa-eye"></i> Voir les suggestions de retrait</button>
                 <button id="finalize-day-btn" class="btn save-btn">Finaliser et Archiver la Journée</button>
             </div>
-        </div>`;
+        </div>
+        
+        <div id="suggestions-modal" class="modal">
+            <div class="modal-content wide">
+                <div class="modal-header">
+                    <h3>Détail des retraits suggérés</h3>
+                    <span class="modal-close">&times;</span>
+                </div>
+                <div class="modal-body" id="suggestions-modal-body"></div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Remplit et affiche la modale des suggestions de retrait.
+ */
+export function renderWithdrawalSummaryModal(state) {
+    const modalBody = document.getElementById('suggestions-modal-body');
+    const modal = document.getElementById('suggestions-modal');
+    if (!modalBody || !modal) return;
+
+    let contentHtml = '';
+    Object.keys(state.config.nomsCaisses).forEach(caisseId => {
+        const caisseData = state.calculatorData.caisse[caisseId];
+        if(!caisseData) return;
+
+        const suggestions = service.calculateWithdrawalSuggestion(caisseData, state.config);
+        const caisseNom = state.config.nomsCaisses[caisseId];
+
+        const rowsHtml = suggestions.suggestions.map(s => `
+            <tr>
+                <td>${s.value >= 1 ? `${s.value} ${state.config.currencySymbol}` : `${s.value * 100} cts`}</td>
+                <td class="text-center">${s.qty}</td>
+                <td class="text-right">${formatCurrency(s.total, state.config)}</td>
+            </tr>
+        `).join('');
+
+        contentHtml += `
+            <div class="card">
+                <h4>${caisseNom} - Total à retirer : ${formatCurrency(suggestions.totalToWithdraw, state.config)}</h4>
+                <div class="table-responsive">
+                    <table class="suggestion-table">
+                        <thead>
+                            <tr><th>Dénomination</th><th class="text-center">Quantité à retirer</th><th class="text-right">Valeur</th></tr>
+                        </thead>
+                        <tbody>${rowsHtml.length > 0 ? rowsHtml : `<tr><td colspan="3" class="text-center">Aucun retrait suggéré pour cette caisse.</td></tr>`}</tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    });
+
+    modalBody.innerHTML = contentHtml;
+    modal.classList.add('visible');
 }
 
 /**
@@ -144,7 +217,7 @@ function createDenominationCard(caisseId, name, value, type, config) {
 }
 
 /**
- * Génère l'interface principale du calculateur (onglets, conteneurs, etc.).
+ * Génère l'interface principale du calculateur.
  */
 export function renderCalculatorUI(pageElement, config, chequesState, tpeState) {
     if (!pageElement) return;
@@ -157,66 +230,27 @@ export function renderCalculatorUI(pageElement, config, chequesState, tpeState) 
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
         
-        ecartsHtml += `
-            <div id="ecart-display-caisse${id}" class="ecart-display ${isActive}">
-                <div id="main-ecart-caisse${id}" class="main-ecart-display">
-                    <span class="ecart-label">Écart Espèces</span>
-                    <span class="ecart-value">0,00 €</span>
-                </div>
-                <div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div>
-            </div>`;
+        ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><div id="main-ecart-caisse${id}" class="main-ecart-display"><span class="ecart-label">Écart Espèces</span><span class="ecart-value">0,00 €</span></div><div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div></div>`;
 
         const billetsHtml = Object.entries(config.denominations.billets).map(([name, v]) => createDenominationCard(id, name, v, 'bill', config)).join('');
-        const piecesLooseHtml = Object.entries(config.denominations.pieces).map(([name, v]) => createDenominationCard(id, name, v, 'piece', config)).join('');
+        const piecesHtml = Object.entries(config.denominations.pieces).map(([name, v]) => createDenominationCard(id, name, v, 'piece', config)).join('');
 
-        const especesTabContent = `
-            <div class="theoretical-inputs-panel">
-                <div class="compact-input-group"><label>Encaissement Espèces Théorique</label><input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]"></div>
-                <div class="compact-input-group"><label>Rétrocessions en Espèces</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div>
-            </div>
-            <div class="cash-drawer-section">
-                <h4><i class="fa-solid fa-money-bill-wave"></i> Billets <span class="section-total" id="total-billets-${id}">0,00 €</span></h4>
-                <div class="denominations-container">${billetsHtml}</div>
-            </div>
-             <div class="cash-drawer-section">
-                <h4><i class="fa-solid fa-coins"></i> Pièces <span class="section-total" id="total-pieces-${id}">0,00 €</span></h4>
-                <div class="denominations-container">${piecesLooseHtml}</div>
-            </div>
-            <div class="cash-drawer-section totals-summary">
-                 <div class="summary-line grand-total"><span>Total Espèces Compté</span><span id="total-especes-${id}">0,00 €</span></div>
-            </div>`;
+        const especesTabContent = `<div class="theoretical-inputs-panel"><div class="compact-input-group"><label>Encaissement Espèces Théorique</label><input type="text" data-caisse-id="${id}" id="ventes_especes_${id}" name="caisse[${id}][ventes_especes]"></div><div class="compact-input-group"><label>Rétrocessions en Espèces</label><input type="text" data-caisse-id="${id}" id="retrocession_${id}" name="caisse[${id}][retrocession]"></div></div><div class="cash-drawer-section"><h4><i class="fa-solid fa-money-bill-wave"></i> Billets <span class="section-total" id="total-billets-${id}">0,00 €</span></h4><div class="denominations-container">${billetsHtml}</div></div><div class="cash-drawer-section"><h4><i class="fa-solid fa-coins"></i> Pièces <span class="section-total" id="total-pieces-${id}">0,00 €</span></h4><div class="denominations-container">${piecesHtml}</div></div><div class="cash-drawer-section totals-summary"><div class="summary-line grand-total"><span>Total Espèces Compté</span><span id="total-especes-${id}">0,00 €</span></div></div>`;
 
         const tpePourCaisse = config.tpeParCaisse ? Object.entries(config.tpeParCaisse).filter(([,tpe]) => tpe.caisse_id.toString() === id) : [];
-        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => {
-            return `<div class="tpe-card"><h4>${tpe.nom}</h4><div class="tpe-releves-list" id="tpe-releves-list-${tpeId}-${id}"></div><div class="tpe-releve-form"><input type="text" id="tpe-releve-montant-${tpeId}-${id}" placeholder="Montant du relevé"><button type="button" class="btn new-btn add-tpe-releve-btn" data-caisse-id="${id}" data-terminal-id="${tpeId}"><i class="fa-solid fa-plus"></i> Ajouter</button></div><div id="tpe-hidden-inputs-${tpeId}-${id}"></div></div>`;
-        }).join('');
+        const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `<div class="tpe-card"><h4>${tpe.nom}</h4><div class="tpe-releves-list" id="tpe-releves-list-${tpeId}-${id}"></div><div class="tpe-releve-form"><input type="text" id="tpe-releve-montant-${tpeId}-${id}" placeholder="Montant du relevé"><button type="button" class="btn new-btn add-tpe-releve-btn" data-caisse-id="${id}" data-terminal-id="${tpeId}"><i class="fa-solid fa-plus"></i> Ajouter</button></div><div id="tpe-hidden-inputs-${tpeId}-${id}"></div></div>`).join('');
         const tpeSectionHtml = tpePourCaisse.length > 0 ? `<div class="tpe-grid">${tpeHtml}</div>` : '<p>Aucun TPE configuré pour cette caisse.</p>';
 
-        contentHtml += `
-            <div id="caisse${id}" class="caisse-tab-content ${isActive}">
-                <div class="form-group compact-input-group" style="max-width:300px;margin-bottom:25px;"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div>
-                <div class="payment-method-tabs">
-                    <div class="payment-method-selector">
-                        <button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}" data-method-key="especes"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button>
-                        <button type="button" class="payment-tab-link" data-payment-tab="cb_${id}" data-method-key="cb"><i class="fa-solid fa-credit-card"></i> CB</button>
-                        <button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}" data-method-key="cheques"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button>
-                    </div>
-                    <div id="especes_${id}" class="payment-tab-content active">${especesTabContent}</div>
-                    <div id="cb_${id}" class="payment-tab-content"><div class="theoretical-inputs-panel"><div class="compact-input-group"><label>Encaissement CB Théorique</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div></div>${tpeSectionHtml}</div>
-                    <div id="cheques_${id}" class="payment-tab-content"></div>
-                </div>
-                <div class="cloture-section-container" id="cloture-section-${id}">
-                    </div>
-            </div>`;
+        contentHtml += `<div id="caisse${id}" class="caisse-tab-content ${isActive}"><div class="form-group compact-input-group" style="max-width:300px;margin-bottom:25px;"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div><div class="payment-method-tabs"><div class="payment-method-selector"><button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}" data-method-key="especes"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button><button type="button" class="payment-tab-link" data-payment-tab="cb_${id}" data-method-key="cb"><i class="fa-solid fa-credit-card"></i> CB</button><button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}" data-method-key="cheques"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button></div><div id="especes_${id}" class="payment-tab-content active">${especesTabContent}</div><div id="cb_${id}" class="payment-tab-content"><div class="theoretical-inputs-panel"><div class="compact-input-group"><label>Encaissement CB Théorique</label><input type="text" data-caisse-id="${id}" id="ventes_cb_${id}" name="caisse[${id}][ventes_cb]"></div></div>${tpeSectionHtml}</div><div id="cheques_${id}" class="payment-tab-content"></div></div></div>`;
     });
     tabSelector.innerHTML = tabsHtml; 
-    ecartContainer.innerHTML = ecartsHtml; 
+    ecartContainer.innerHTML = ecartsHtml + `<div id="cloture-details-container" style="display:none;"></div>`;
     caissesContainer.innerHTML = contentHtml;
 
     Object.keys(config.nomsCaisses).forEach(id => {
-        renderChequeList(id, chequesState, config);
+        renderChequeList(id, chequesState[id], config);
         if (tpeState[id]) {
-            Object.keys(tpeState[id]).forEach(tpeId => renderTpeList(id, tpeId, tpeState, config));
+            Object.keys(tpeState[id]).forEach(tpeId => renderTpeList(id, tpeId, tpeState[id][tpeId], config));
         }
     });
 }
@@ -226,83 +260,68 @@ export function renderCalculatorUI(pageElement, config, chequesState, tpeState) 
  */
 export function populateInitialData(calculatorData) {
     if (!calculatorData) return;
-
-    document.getElementById('nom_comptage').value = calculatorData.nom_comptage || '';
-    document.getElementById('explication').value = calculatorData.explication || '';
+    const form = document.getElementById('caisse-form');
+    form.elements.nom_comptage.value = calculatorData.nom_comptage || '';
+    form.elements.explication.value = calculatorData.explication || '';
 
     for (const caisseId in calculatorData.caisse) {
         const caisseData = calculatorData.caisse[caisseId];
         if (caisseData) {
-            ['fond_de_caisse', 'ventes_especes', 'retrocession', 'ventes_cb', 'ventes_cheques'].forEach(key => {
-                const field = document.getElementById(`${key}_${caisseId}`);
-                if (field && caisseData[key] !== undefined) {
-                    field.value = caisseData[key];
-                }
-            });
+            form.elements[`caisse[${caisseId}][fond_de_caisse]`].value = caisseData.fond_de_caisse || '';
+            form.elements[`caisse[${caisseId}][ventes_especes]`].value = caisseData.ventes_especes || '';
+            form.elements[`caisse[${caisseId}][retrocession]`].value = caisseData.retrocession || '';
+            form.elements[`caisse[${caisseId}][ventes_cb]`].value = caisseData.ventes_cb || '';
+            form.elements[`caisse[${caisseId}][ventes_cheques]`].value = caisseData.ventes_cheques || '';
 
             if (caisseData.denominations) {
                 Object.entries(caisseData.denominations).forEach(([denom, qty]) => {
-                    const denomField = document.getElementById(`${denom}_${caisseId}`);
-                    if (denomField) denomField.value = qty;
+                    const field = form.elements[`caisse[${caisseId}][denominations][${denom}]`];
+                    if (field) field.value = qty;
                 });
             }
         }
     }
 }
 
-function renderChequeList(caisseId, chequesState, config) {
+function renderChequeList(caisseId, cheques = [], config) {
     const container = document.getElementById(`cheques_${caisseId}`);
     if(!container) return;
-    container.innerHTML = `
-        <div class="theoretical-inputs-panel"><div class="compact-input-group"><label>Encaissement Chèques Théorique</label><input type="text" data-caisse-id="${caisseId}" id="ventes_cheques_${caisseId}" name="caisse[${caisseId}][ventes_cheques]"></div></div>
-        <div class="cheque-section"><div class="cheque-grid"><div class="cheque-form-container"><h4><i class="fa-solid fa-plus-circle"></i> Ajouter un chèque</h4><div class="form-group"><label for="cheque-amount-${caisseId}">Montant</label><input type="text" id="cheque-amount-${caisseId}" placeholder="0,00 ${config.currencySymbol}"></div><div class="form-group"><label for="cheque-comment-${caisseId}">Commentaire</label><input type="text" id="cheque-comment-${caisseId}" placeholder="Chèque n°12345"></div><button type="button" class="btn new-btn add-cheque-btn" data-caisse-id="${caisseId}" style="width: 100%;"><i class="fa-solid fa-plus"></i> Ajouter</button></div><div class="cheque-list-container"><div class="cheque-list-header"><h4><i class="fa-solid fa-list-ol"></i> Chèques Encaissés</h4><div class="cheque-total" id="cheque-total-container-${caisseId}"></div></div><div id="cheque-list-${caisseId}" class="cheque-list"></div><div id="cheque-hidden-inputs-${caisseId}"></div></div></div></div>
-    `;
-
+    container.innerHTML = `<div class="theoretical-inputs-panel"><div class="compact-input-group"><label>Encaissement Chèques Théorique</label><input type="text" data-caisse-id="${caisseId}" id="ventes_cheques_${caisseId}" name="caisse[${caisseId}][ventes_cheques]"></div></div><div class="cheque-section"><div class="cheque-grid"><div class="cheque-form-container"><h4><i class="fa-solid fa-plus-circle"></i> Ajouter un chèque</h4><div class="form-group"><label for="cheque-amount-${caisseId}">Montant</label><input type="text" id="cheque-amount-${caisseId}" placeholder="0,00 ${config.currencySymbol}"></div><div class="form-group"><label for="cheque-comment-${caisseId}">Commentaire</label><input type="text" id="cheque-comment-${caisseId}" placeholder="Chèque n°12345"></div><button type="button" class="btn new-btn add-cheque-btn" data-caisse-id="${caisseId}" style="width: 100%;"><i class="fa-solid fa-plus"></i> Ajouter</button></div><div class="cheque-list-container"><div class="cheque-list-header"><h4><i class="fa-solid fa-list-ol"></i> Chèques Encaissés</h4><div class="cheque-total" id="cheque-total-container-${caisseId}"></div></div><div id="cheque-list-${caisseId}" class="cheque-list"></div><div id="cheque-hidden-inputs-${caisseId}"></div></div></div></div>`;
     const listContainer = document.getElementById(`cheque-list-${caisseId}`);
     const totalContainerParent = document.getElementById(`cheque-total-container-${caisseId}`);
     const hiddenInputsContainer = document.getElementById(`cheque-hidden-inputs-${caisseId}`);
-    const cheques = chequesState[caisseId] || [];
     let totalCheques = 0;
-
     if (cheques.length === 0) {
         listContainer.innerHTML = '<p class="empty-list">Aucun chèque ajouté.</p>';
     } else {
         listContainer.innerHTML = `<table class="cheque-table"><thead><tr><th>Montant</th><th>Commentaire</th><th>Actions</th></tr></thead><tbody>${cheques.map((cheque, index) => { totalCheques += parseLocaleFloat(cheque.montant); return `<tr><td>${formatCurrency(parseLocaleFloat(cheque.montant), config)}</td><td>${cheque.commentaire || ''}</td><td class="cheque-actions"><button type="button" class="btn-icon delete-btn delete-cheque-btn" data-caisse-id="${caisseId}" data-index="${index}" title="Supprimer"><i class="fa-solid fa-trash-can"></i></button></td></tr>`;}).join('')}</tbody></table>`;
     }
-    
     totalContainerParent.innerHTML = `Total (${cheques.length} chèque${cheques.length > 1 ? 's' : ''}): <span id="cheque-total-${caisseId}">${formatCurrency(totalCheques, config)}</span>`;
     hiddenInputsContainer.innerHTML = cheques.map((cheque, index) => `<input type="hidden" name="caisse[${caisseId}][cheques][${index}][montant]" value="${cheque.montant}"><input type="hidden" name="caisse[${caisseId}][cheques][${index}][commentaire]" value="${cheque.commentaire}">`).join('');
 }
 
-function renderTpeList(caisseId, terminalId, tpeState, config) {
+function renderTpeList(caisseId, terminalId, releves = [], config) {
     const listContainer = document.getElementById(`tpe-releves-list-${terminalId}-${caisseId}`);
     const hiddenContainer = document.getElementById(`tpe-hidden-inputs-${terminalId}-${caisseId}`);
     if (!listContainer || !hiddenContainer) return;
-
-    const releves = (tpeState[caisseId]?.[terminalId] || []).sort((a, b) => (a.heure || '').localeCompare(b.heure || ''));
-
-    if (releves.length === 0) {
+    const sortedReleves = [...releves].sort((a, b) => (a.heure || '').localeCompare(b.heure || ''));
+    if (sortedReleves.length === 0) {
         listContainer.innerHTML = '<p class="empty-list">Aucun relevé pour ce TPE.</p>';
     } else {
-        listContainer.innerHTML = `<table class="tpe-table"><thead><tr><th>Heure</th><th>Montant</th><th>Action</th></tr></thead><tbody>${releves.map((releve, index) => {
-            const isLast = index === releves.length - 1;
-            const rowClass = isLast ? 'releve-actif' : '';
-            return `<tr class="${rowClass}"><td>${releve.heure || 'N/A'}</td><td>${formatCurrency(parseLocaleFloat(releve.montant), config)}</td><td><button type="button" class="btn-icon delete-btn delete-tpe-releve-btn" data-caisse-id="${caisseId}" data-terminal-id="${terminalId}" data-index="${index}"><i class="fa-solid fa-trash-can"></i></button></td></tr>`;
-        }).join('')}</tbody></table>`;
+        listContainer.innerHTML = `<table class="tpe-table"><thead><tr><th>Heure</th><th>Montant</th><th>Action</th></tr></thead><tbody>${sortedReleves.map((releve, index) => { const isLast = index === sortedReleves.length - 1; const rowClass = isLast ? 'releve-actif' : ''; return `<tr class="${rowClass}"><td>${releve.heure || 'N/A'}</td><td>${formatCurrency(parseLocaleFloat(releve.montant), config)}</td><td><button type="button" class="btn-icon delete-btn delete-tpe-releve-btn" data-caisse-id="${caisseId}" data-terminal-id="${terminalId}" data-index="${index}"><i class="fa-solid fa-trash-can"></i></button></td></tr>`;}).join('')}</tbody></table>`;
     }
-
-    hiddenContainer.innerHTML = releves.map((r, i) => `<input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${i}][montant]" value="${r.montant}"><input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${i}][heure]" value="${r.heure}">`).join('');
+    hiddenContainer.innerHTML = sortedReleves.map((r, i) => `<input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${i}][montant]" value="${r.montant}"><input type="hidden" name="caisse[${caisseId}][tpe][${terminalId}][${i}][heure]" value="${r.heure}">`).join('');
 }
 
 export function applyFullFormState(data, state) {
     if (data.cheques) {
         state.chequesState = data.cheques;
-        Object.keys(state.chequesState).forEach(id => renderChequeList(id, state.chequesState, state.config));
+        Object.keys(state.chequesState).forEach(id => renderChequeList(id, state.chequesState[id], state.config));
     }
     if (data.tpe) {
         state.tpeState = data.tpe;
         Object.keys(state.tpeState).forEach(caisseId => {
-            Object.keys(state.tpeState[caisseId]).forEach(tpeId => renderTpeList(caisseId, tpeId, state.tpeState, state.config));
+            Object.keys(state.tpeState[caisseId]).forEach(tpeId => renderTpeList(caisseId, tpeId, state.tpeState[caisseId][tpeId], state.config));
         });
     }
     if (data.state) {
@@ -326,12 +345,12 @@ export function applyLiveUpdate(data) {
 export function applyListUpdate(data, state) {
     if (data.type === 'cheque_update' && data.caisseId && data.cheques) {
         state.chequesState[data.caisseId] = data.cheques;
-        renderChequeList(data.caisseId, state.chequesState, state.config);
+        renderChequeList(data.caisseId, state.chequesState[data.caisseId], state.config);
     }
     if (data.type === 'tpe_update' && data.caisseId && data.terminalId && data.releves) {
         if (!state.tpeState[data.caisseId]) state.tpeState[data.caisseId] = {};
         state.tpeState[data.caisseId][data.terminalId] = data.releves;
-        renderTpeList(data.caisseId, data.terminalId, state.tpeState, state.config);
+        renderTpeList(data.caisseId, data.terminalId, state.tpeState[data.caisseId][data.terminalId], state.config);
     }
 }
 
@@ -344,8 +363,9 @@ export function handleCalculatorClickEvents(e, state) {
         tabLink.classList.add('active');
         document.getElementById(tabLink.dataset.tab)?.classList.add('active');
         document.getElementById(`ecart-display-${tabLink.dataset.tab}`)?.classList.add('active');
-        service.calculateAll(state.config, state); // Recalculate to update main ecart display
-        return false; // Not a state change, just UI
+        updateAllCaisseLocks(); // Mettre à jour l'affichage de la clôture
+        service.calculateAll(state.config, state);
+        return false;
     }
     const paymentTab = target.closest('.payment-tab-link');
     if(paymentTab) {
@@ -353,8 +373,8 @@ export function handleCalculatorClickEvents(e, state) {
         container.querySelectorAll('.payment-tab-link, .payment-tab-content').forEach(el => el.classList.remove('active'));
         paymentTab.classList.add('active');
         container.querySelector(`#${paymentTab.dataset.paymentTab}`)?.classList.add('active');
-        service.calculateAll(state.config, state); // Recalculate to update main ecart display
-        return false; // Not a state change, just UI
+        service.calculateAll(state.config, state);
+        return false;
     }
     const addChequeBtn = target.closest('.add-cheque-btn');
     if (addChequeBtn) {
@@ -365,7 +385,7 @@ export function handleCalculatorClickEvents(e, state) {
         if (amount > 0) {
             if (!state.chequesState[caisseId]) state.chequesState[caisseId] = [];
             state.chequesState[caisseId].push({ montant: amount, commentaire: commentInput.value });
-            renderChequeList(caisseId, state.chequesState, state.config);
+            renderChequeList(caisseId, state.chequesState[caisseId], state.config);
             sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: state.chequesState[caisseId] });
             amountInput.value = ''; commentInput.value = ''; amountInput.focus();
             return true;
@@ -376,7 +396,7 @@ export function handleCalculatorClickEvents(e, state) {
         const { caisseId, index } = deleteChequeBtn.dataset;
         if (confirm('Voulez-vous vraiment supprimer ce chèque ?')) {
             state.chequesState[caisseId].splice(index, 1);
-            renderChequeList(caisseId, state.chequesState, state.config);
+            renderChequeList(caisseId, state.chequesState[caisseId], state.config);
             sendWsMessage({ type: 'cheque_update', caisseId: caisseId, cheques: state.chequesState[caisseId] });
             return true;
         }
@@ -390,7 +410,7 @@ export function handleCalculatorClickEvents(e, state) {
             if (!state.tpeState[caisseId]) state.tpeState[caisseId] = {};
             if (!state.tpeState[caisseId][terminalId]) state.tpeState[caisseId][terminalId] = [];
             state.tpeState[caisseId][terminalId].push({ montant: amount, heure: new Date().toTimeString().slice(0, 5) });
-            renderTpeList(caisseId, terminalId, state.tpeState, state.config);
+            renderTpeList(caisseId, terminalId, state.tpeState[caisseId][terminalId], state.config);
             sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: state.tpeState[caisseId][terminalId] });
             amountInput.value = ''; amountInput.focus();
             return true;
@@ -400,7 +420,7 @@ export function handleCalculatorClickEvents(e, state) {
     if (deleteTpeBtn) {
         const { caisseId, terminalId, index } = deleteTpeBtn.dataset;
         state.tpeState[caisseId][terminalId].splice(index, 1);
-        renderTpeList(caisseId, terminalId, state.tpeState, state.config);
+        renderTpeList(caisseId, terminalId, state.tpeState[caisseId][terminalId], state.config);
         sendWsMessage({ type: 'tpe_update', caisseId, terminalId, releves: state.tpeState[caisseId][terminalId] });
         return true;
     }

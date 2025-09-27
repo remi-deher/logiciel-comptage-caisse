@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Final et Corrigé)
+// Fichier : public/assets/js/logic/calculator-logic.js (Complet et Final)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
@@ -76,24 +76,23 @@ function attachEventListeners() {
     page.addEventListener('click', handlePageClick);
     
     const form = document.getElementById('caisse-form');
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        handleAutosave(); 
-    });
+    form.addEventListener('submit', (e) => { e.preventDefault(); handleAutosave(); });
 
     const clotureBtn = document.getElementById('cloture-btn');
     if (clotureBtn) {
         clotureBtn.addEventListener('click', () => {
-            // ** DÉBUT DE LA CORRECTION **
-            const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
-            const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(id));
-            
-            if (allClosed) {
-                cloture.finalizeDay();
-            } else {
-                alert("Veuillez d'abord démarrer et valider la clôture pour chaque caisse individuellement avant de pouvoir finaliser la journée.");
+            const activeTab = document.querySelector('.tab-link.active');
+            if (activeTab) {
+                const caisseId = activeTab.dataset.caisseId;
+                const isClosed = state.closedCaisses.includes(caisseId);
+                const isLocked = state.lockedCaisses.some(c => c.caisse_id == caisseId);
+
+                if (!isClosed && !isLocked) {
+                    cloture.startClotureCaisse(caisseId, state);
+                } else {
+                    alert("Cette caisse est déjà en cours de clôture ou a été clôturée. Vous ne pouvez pas redémarrer le processus.");
+                }
             }
-            // ** FIN DE LA CORRECTION **
         });
     }
 
@@ -116,10 +115,6 @@ function handlePageInput(e) {
 function handlePageClick(e) {
     const target = e.target;
     
-    if (target.closest('.cloture-start-btn')) {
-        cloture.startClotureCaisse(target.closest('.cloture-start-btn').dataset.caisseId, state);
-        return;
-    }
     if (target.closest('.cloture-cancel-btn')) {
         cloture.cancelClotureCaisse(target.closest('.cloture-cancel-btn').dataset.caisseId, state);
         return;
@@ -131,6 +126,14 @@ function handlePageClick(e) {
     if (target.closest('#finalize-day-btn')) {
         cloture.finalizeDay();
         return;
+    }
+    if (target.closest('#show-suggestions-btn')) {
+        ui.renderWithdrawalSummaryModal(state);
+        return;
+    }
+    const suggestionsModal = document.getElementById('suggestions-modal');
+    if (suggestionsModal && (target.matches('.modal-close') || e.target === suggestionsModal)) {
+        suggestionsModal.classList.remove('visible');
     }
 
     const handled = ui.handleCalculatorClickEvents(e, state);
@@ -189,7 +192,7 @@ function updateAllCaisseLocks() {
     const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(id));
     
     if (allClosed) {
-        ui.showFinalSummaryBanner();
+        ui.showFinalSummaryBanner(state);
     } else {
         const container = document.getElementById('cloture-final-summary-banner-container');
         if (container) container.innerHTML = '';
@@ -200,17 +203,15 @@ function updateClotureButtonState() {
     const clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn) return;
     
-    clotureBtn.disabled = !state.wsResourceId;
-
     const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
     const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(id));
 
+    clotureBtn.disabled = !state.wsResourceId || allClosed;
+
     if (allClosed) {
-        clotureBtn.classList.add('mode-finalisation');
-        clotureBtn.innerHTML = `<i class="fa-solid fa-flag-checkered"></i> Finaliser`;
+        clotureBtn.innerHTML = `<i class="fa-solid fa-check-circle"></i> Journée Terminée`;
     } else {
-        clotureBtn.classList.remove('mode-finalisation');
-        clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture';
+        clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture Caisse Active';
     }
 }
 

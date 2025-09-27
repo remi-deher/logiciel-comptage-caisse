@@ -155,3 +155,46 @@ body[data-theme="dark"] .tab-link.cloturee {
 .cloture-validation-area .validation-message {
     color: var(--color-success);
 }
+
+.tab-link.status-locked-by-me {
+    color: #8a2be2 !important; /* Violet */
+    font-weight: bold;
+}
+
+/* Style pour l'encart des écarts en mode clôture */
+.ecart-display.cloture-mode {
+    background-color: rgba(138, 43, 226, 0.05); /* Fond violet très clair */
+    border: 2px solid rgba(138, 43, 226, 0.4); /* Bordure violette */
+}
+
+/* Conteneur pour la section des retraits qui apparaît sous les écarts */
+#cloture-details-container {
+    margin-top: -10px; /* Pour se coller joliment sous l'encart des écarts */
+    margin-bottom: 25px;
+    padding: 20px;
+    border: 2px solid rgba(138, 43, 226, 0.4);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    background-color: rgba(138, 43, 226, 0.02);
+    animation: fadeIn 0.5s;
+}
+
+.cloture-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+/* On s'assure que le statut "verrouillé par un autre" est clair sur l'onglet */
+.tab-link.status-locked-by-other {
+    color: #f39c12 !important; /* Orange */
+    cursor: not-allowed;
+}
+
+/* On s'assure que le statut "clôturé" est clair sur l'onglet */
+.tab-link.status-closed {
+    color: #27ae60 !important; /* Vert */
+    background-color: rgba(39, 174, 96, 0.05);
+    cursor: not-allowed;
+}

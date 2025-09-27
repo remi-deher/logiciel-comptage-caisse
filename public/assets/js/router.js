@@ -28,7 +28,6 @@ const routes = {
     '/update': { render: renderUpdatePage, css: 'update.css' },
     '/login': { render: renderLoginPage, css: 'admin.css' },
     '/admin': { render: renderAdminPage, css: 'admin.css' },
-    // La route pour /cloture-wizard a été supprimée
 };
 
 /**
