@@ -31,6 +31,8 @@ class ComptageRepository {
                 'ventes_cb'      => $row['ventes_cb'] ?? '0',
                 'ventes_cheques' => $row['ventes_cheques'] ?? '0',
                 'retrocession'   => $row['retrocession'] ?? '0',
+                'retrocession_cb' => $row['retrocession_cb'] ?? '0',
+                'retrocession_cheques' => $row['retrocession_cheques'] ?? '0',
                 'denominations'  => [],
                 'tpe'            => [],
                 'cheques'        => []
@@ -69,7 +71,7 @@ class ComptageRepository {
                 c.id, c.nom_comptage, c.date_comptage, c.explication,
                 cd.caisse_id, cd.fond_de_caisse, 
                 cd.ventes_especes, cd.ventes_cb, cd.ventes_cheques, 
-                cd.retrocession,
+                cd.retrocession, cd.retrocession_cb, cd.retrocession_cheques,
                 cd.id as comptage_detail_id
             FROM comptages c
             LEFT JOIN comptage_details cd ON c.id = cd.comptage_id
