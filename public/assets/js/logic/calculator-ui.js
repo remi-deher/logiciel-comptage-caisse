@@ -1,8 +1,34 @@
-// Fichier : public/assets/js/logic/calculator-ui.js (Complet et Final)
+// Fichier : public/assets/js/logic/calculator-ui.js (Complet et Corrigé)
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 import * as service from './calculator-service.js';
 import { sendWsMessage } from './websocket-service.js';
+
+/**
+ * Met à jour l'état visuel de TOUTES les caisses en fonction des données de clôture.
+ */
+export function updateAllCaisseLocks(state) {
+    Object.keys(state.config.nomsCaisses).forEach(caisseId => {
+        const lockInfo = state.lockedCaisses.find(c => String(c.caisse_id) === String(caisseId));
+        const isClosed = state.closedCaisses.includes(String(caisseId));
+        
+        let status = 'open';
+        if (isClosed) status = 'closed';
+        else if (lockInfo) status = String(lockInfo.locked_by) === String(state.wsResourceId) ? 'locked_by_me' : 'locked_by_other';
+        
+        updateCaisseLockState(caisseId, status, state);
+    });
+
+    const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
+    const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(id));
+    
+    if (allClosed) {
+        showFinalSummaryBanner(state);
+    } else {
+        const container = document.getElementById('cloture-final-summary-banner-container');
+        if (container) container.innerHTML = '';
+    }
+}
 
 /**
  * Met à jour l'état visuel et interactif d'une caisse (verrouillage, validation).
@@ -22,9 +48,10 @@ export function updateCaisseLockState(caisseId, status, state) {
     
     ecartDisplay.classList.remove('cloture-mode', 'cloture-closed');
     
-    if (clotureDetailsContainer.dataset.caisseId === caisseId) {
+    if (isActive) {
         clotureDetailsContainer.innerHTML = '';
         clotureDetailsContainer.style.display = 'none';
+        clotureDetailsContainer.dataset.caisseId = '';
     }
     
     caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = false);
@@ -49,12 +76,11 @@ export function updateCaisseLockState(caisseId, status, state) {
         case 'closed':
             tabLink.classList.add('status-closed');
             if (isActive) {
-                ecartDisplay.classList.add('cloture-closed'); // Nouvelle classe pour le style violet
+                ecartDisplay.classList.add('cloture-closed');
                 clotureDetailsContainer.innerHTML = renderClotureSectionForClosed(caisseId, state);
                 clotureDetailsContainer.style.display = 'block';
                 clotureDetailsContainer.dataset.caisseId = caisseId;
             }
-            // On désactive tout SAUF les onglets de paiement
             caisseContent.querySelectorAll('input, textarea, button:not(.payment-tab-link)').forEach(el => el.disabled = true);
             break;
     }
@@ -406,8 +432,8 @@ export function handleCalculatorClickEvents(e, state) {
         document.querySelectorAll('.tab-link, .caisse-tab-content, .ecart-display').forEach(el => el.classList.remove('active'));
         tabLink.classList.add('active');
         document.getElementById(tabLink.dataset.tab)?.classList.add('active');
-        document.getElementById(`ecart-display-${tabLink.dataset.tab}`)?.classList.add('active');
-        updateAllCaisseLocks();
+        document.getElementById(`ecart-display-caisse${tabLink.dataset.caisseId}`)?.classList.add('active');
+        updateAllCaisseLocks(state); // Appel corrigé
         service.calculateAll(state.config, state);
         return false;
     }

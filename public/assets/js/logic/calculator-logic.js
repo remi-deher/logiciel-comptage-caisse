@@ -159,13 +159,13 @@ function handleWebSocketMessage(data) {
         case 'cloture_locked_caisses':
             state.lockedCaisses = data.caisses || [];
             state.closedCaisses = (data.closed_caisses || []).map(String);
-            updateAllCaisseLocks();
+            ui.updateAllCaisseLocks(state);
             updateClotureButtonState();
             break;
         case 'full_form_state':
             ui.applyFullFormState(data, state);
             service.calculateAll(state.config, state);
-            updateAllCaisseLocks(); // Mettre à jour l'UI de clôture après chargement de l'état
+            ui.updateAllCaisseLocks(state);
             break;
         case 'update':
             ui.applyLiveUpdate(data);
@@ -178,29 +178,6 @@ function handleWebSocketMessage(data) {
         case 'force_reload_all':
              window.location.reload();
              break;
-    }
-}
-
-function updateAllCaisseLocks() {
-    Object.keys(state.config.nomsCaisses).forEach(caisseId => {
-        const lockInfo = state.lockedCaisses.find(c => String(c.caisse_id) === String(caisseId));
-        const isClosed = state.closedCaisses.includes(String(caisseId));
-        
-        let status = 'open';
-        if (isClosed) status = 'closed';
-        else if (lockInfo) status = String(lockInfo.locked_by) === String(state.wsResourceId) ? 'locked_by_me' : 'locked_by_other';
-        
-        ui.updateCaisseLockState(caisseId, status, state);
-    });
-
-    const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
-    const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(id));
-    
-    if (allClosed) {
-        ui.showFinalSummaryBanner(state);
-    } else {
-        const container = document.getElementById('cloture-final-summary-banner-container');
-        if (container) container.innerHTML = '';
     }
 }
 
