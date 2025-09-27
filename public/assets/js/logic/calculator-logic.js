@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Complet et Final)
+// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé et Final)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
@@ -27,15 +27,24 @@ async function refreshCalculatorData() {
         state.lockedCaisses = initialData.clotureState.lockedCaisses;
         state.closedCaisses = (initialData.clotureState.closedCaisses || []).map(String);
 
-        ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config, state.calculatorData);
-        ui.populateInitialData(state.calculatorData);
+        // 1. On crée la structure HTML de la page
+        ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config);
+        
+        // 2. On remplit cette structure avec toutes les données (champs et listes)
+        ui.populateInitialData(state.calculatorData, state.config);
+
+        // 3. On attache les écouteurs d'événements maintenant que tout est en place
         attachEventListeners();
         
+        // 4. On lance les premiers calculs
         service.calculateAll(state.config, state);
+        
+        // 5. On met à jour l'état visuel des caisses (ouvert/fermé)
         ui.updateAllCaisseLocks(state);
         
         updateClotureButtonState();
 
+        // 6. On se connecte au WebSocket pour les mises à jour en temps réel
         sendWsMessage({ type: 'get_full_state' });
 
     } catch (error) {
@@ -112,12 +121,11 @@ function handlePageInput(e) {
         const statusEl = document.getElementById('autosave-status');
         if(statusEl) statusEl.textContent = 'Modifications non enregistrées.';
         
-        // On recalcule tout
         service.calculateAll(state.config, state);
         
-        // AMÉLIORATION : On force la mise à jour du panneau de clôture s'il est visible
-        // pour garantir que les suggestions de retrait sont toujours à jour.
-        ui.updateAllCaisseLocks(state);
+        if (e.target.closest('#cloture-details-container')) {
+            ui.updateAllCaisseLocks(state);
+        }
         
         if (e.target.matches('input[type="text"], input[type="number"], textarea')) {
              sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });

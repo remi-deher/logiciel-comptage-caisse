@@ -42,9 +42,18 @@ class ComptageRepository {
             $stmt_denoms->execute([$comptage_detail_id]);
             $data[$caisse_id]['denominations'] = $stmt_denoms->fetchAll(PDO::FETCH_KEY_PAIR);
 
+            // CORRECTION : On récupère les relevés TPE et on les groupe manuellement
             $stmt_cb = $this->pdo->prepare("SELECT terminal_id, montant, heure_releve FROM comptage_cb WHERE comptage_detail_id = ? ORDER BY heure_releve ASC");
             $stmt_cb->execute([$comptage_detail_id]);
-            $data[$caisse_id]['tpe'] = $stmt_cb->fetchAll(PDO::FETCH_ASSOC | PDO::FETCH_GROUP) ?: [];
+            $releves_bruts = $stmt_cb->fetchAll(PDO::FETCH_ASSOC);
+            $releves_groupes = [];
+            foreach ($releves_bruts as $releve) {
+                $releves_groupes[$releve['terminal_id']][] = [
+                    'montant' => $releve['montant'],
+                    'heure' => $releve['heure_releve']
+                ];
+            }
+            $data[$caisse_id]['tpe'] = $releves_groupes;
             
             $stmt_cheques = $this->pdo->prepare("SELECT montant, commentaire FROM comptage_cheques WHERE comptage_detail_id = ?");
             $stmt_cheques->execute([$comptage_detail_id]);
@@ -125,9 +134,17 @@ class ComptageRepository {
         $stmt_cheques->execute([$comptage_detail_id]);
         $cheques_array = $stmt_cheques->fetchAll(PDO::FETCH_ASSOC);
 
+        // CORRECTION : On récupère les relevés TPE et on les groupe manuellement
         $stmt_cb = $this->pdo->prepare("SELECT terminal_id, montant, heure_releve FROM comptage_cb WHERE comptage_detail_id = ? ORDER BY heure_releve ASC");
         $stmt_cb->execute([$comptage_detail_id]);
-        $cb_releves_array = $stmt_cb->fetchAll(PDO::FETCH_ASSOC | PDO::FETCH_GROUP);
+        $releves_bruts = $stmt_cb->fetchAll(PDO::FETCH_ASSOC);
+        $cb_releves_array = [];
+        foreach ($releves_bruts as $releve) {
+            $cb_releves_array[$releve['terminal_id']][] = [
+                'montant' => $releve['montant'],
+                'heure' => $releve['heure_releve']
+            ];
+        }
 
         return [
             'denominations' => $denominations_array,

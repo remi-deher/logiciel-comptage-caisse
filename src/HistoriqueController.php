@@ -114,11 +114,17 @@ class HistoriqueController {
             $stmt_cheques->execute([$row['comptage_detail_id']]);
             $cheques_array = $stmt_cheques->fetchAll(PDO::FETCH_ASSOC);
 
-            // --- DEBUT DE L'AJOUT POUR LES TPE ---
+            // CORRECTION : On récupère les relevés TPE et on les groupe manuellement
             $stmt_cb = $this->pdo->prepare("SELECT terminal_id, montant, heure_releve FROM comptage_cb WHERE comptage_detail_id = ? ORDER BY heure_releve ASC");
             $stmt_cb->execute([$row['comptage_detail_id']]);
-            $cb_releves_array = $stmt_cb->fetchAll(PDO::FETCH_ASSOC | PDO::FETCH_GROUP);
-            // --- FIN DE L'AJOUT POUR LES TPE ---
+            $releves_bruts = $stmt_cb->fetchAll(PDO::FETCH_ASSOC);
+            $cb_releves_array = [];
+            foreach ($releves_bruts as $releve) {
+                $cb_releves_array[$releve['terminal_id']][] = [
+                    'montant' => $releve['montant'],
+                    'heure' => $releve['heure_releve']
+                ];
+            }
 
             $historique[$comptage_id]['caisses_data'][$row['caisse_id']] = [
                 'fond_de_caisse' => $row['fond_de_caisse'],
@@ -128,7 +134,7 @@ class HistoriqueController {
                 'retrocession' => $row['retrocession'],
                 'denominations' => $denominations_array,
                 'retraits' => $retraits_array,
-                'cb' => $cb_releves_array, // Ajout des relevés
+                'cb' => $cb_releves_array,
                 'cheques' => $cheques_array
             ];
         }

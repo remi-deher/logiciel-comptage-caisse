@@ -129,6 +129,7 @@ class CalculateurController {
                                 $montant_val = get_numeric_value($releve, 'montant');
                                 if ($montant_val > 0) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
+                                    // CORRECTION : On nettoie la valeur de l'heure avant de l'insérer
                                     $heure_releve_raw = $releve['heure'] ?? null;
                                     $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
                                     $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $heure_releve]);
@@ -197,6 +198,7 @@ class CalculateurController {
                             if (is_array($releves)) {
                                 foreach ($releves as $releve) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
+                                    // CORRECTION : On nettoie également ici pour être cohérent
                                     $heure_releve_raw = $releve['heure'] ?? null;
                                     $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
                                     $stmt_cb->execute([$new_comptage_detail_id, $terminal_id, $releve['montant'], $heure_releve]);

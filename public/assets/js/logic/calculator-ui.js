@@ -51,7 +51,6 @@ export function updateCaisseLockState(caisseId, status, state) {
     
     if (isActive) {
         clotureDetailsContainer.innerHTML = '';
-        // CORRECTION : On cache le conteneur par défaut
         clotureDetailsContainer.style.display = 'none'; 
         recapContainer.innerHTML = '';
     }
@@ -64,7 +63,6 @@ export function updateCaisseLockState(caisseId, status, state) {
             if (isActive) {
                 ecartDisplay.classList.add('cloture-mode');
                 clotureDetailsContainer.innerHTML = renderClotureSectionForInitiator(caisseId, state);
-                // CORRECTION : On ré-affiche le conteneur quand il est rempli
                 clotureDetailsContainer.style.display = 'block'; 
             }
             break;
@@ -302,7 +300,7 @@ function createDenominationCard(caisseId, name, value, type, config) {
 /**
  * Génère l'interface principale du calculateur.
  */
-export function renderCalculatorUI(pageElement, config, calculatorData) {
+export function renderCalculatorUI(pageElement, config) {
     if (!pageElement) return;
     const tabSelector = pageElement.querySelector('.tab-selector');
     const ecartContainer = pageElement.querySelector('.ecart-display-container');
@@ -328,30 +326,24 @@ export function renderCalculatorUI(pageElement, config, calculatorData) {
 
         contentHtml += `<div id="caisse${id}" class="caisse-tab-content ${isActive}"><div class="form-group compact-input-group" style="max-width:300px;margin-bottom:25px;"><label>Fond de Caisse</label><input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]"></div><div class="payment-method-tabs"><div class="payment-method-selector"><button type="button" class="payment-tab-link active" data-payment-tab="especes_${id}" data-method-key="especes"><i class="fa-solid fa-money-bill-wave"></i> Espèces</button><button type="button" class="payment-tab-link" data-payment-tab="cb_${id}" data-method-key="cb"><i class="fa-solid fa-credit-card"></i> CB</button><button type="button" class="payment-tab-link" data-payment-tab="cheques_${id}" data-method-key="cheques"><i class="fa-solid fa-money-check-dollar"></i> Chèques</button></div><div id="especes_${id}" class="payment-tab-content active">${especesTabContent}</div><div id="cb_${id}" class="payment-tab-content">${cbTabContent}</div><div id="cheques_${id}" class="payment-tab-content">${chequesTabContent}</div></div></div>`;
     });
+    
     tabSelector.innerHTML = tabsHtml; 
     ecartContainer.innerHTML = ecartsHtml;
-    // On met le conteneur de clôture APRES l'afficheur d'écart pour qu'il puisse être sticky
-    ecartContainer.insertAdjacentHTML('afterend', '<div id="cloture-details-container"></div>');
     caissesContainer.innerHTML = contentHtml;
-
-    Object.keys(config.nomsCaisses).forEach(id => {
-        const caisseData = calculatorData.caisse[id] || {};
-        renderChequeList(id, caisseData.cheques || [], config);
-        const tpeData = caisseData.tpe || {};
-        Object.keys(tpeData).forEach(tpeId => renderTpeList(id, tpeData[tpeId], config));
-    });
 }
 
 /**
- * Remplit les champs du formulaire avec les données initiales chargées.
+ * Remplit les champs du formulaire et les listes (TPE, chèques) avec les données initiales chargées.
  */
-export function populateInitialData(calculatorData) {
-    if (!calculatorData) return;
+export function populateInitialData(calculatorData, config) {
+    if (!calculatorData || !config) return;
     const form = document.getElementById('caisse-form');
     form.elements.nom_comptage.value = calculatorData.nom_comptage || '';
     form.elements.explication.value = calculatorData.explication || '';
 
     for (const caisseId in calculatorData.caisse) {
+        if (!calculatorData.caisse.hasOwnProperty(caisseId)) continue;
+
         const caisseData = calculatorData.caisse[caisseId];
         if (caisseData) {
             form.elements[`caisse[${caisseId}][fond_de_caisse]`].value = caisseData.fond_de_caisse || '';
@@ -368,6 +360,12 @@ export function populateInitialData(calculatorData) {
                     if (field) field.value = qty;
                 });
             }
+
+            renderChequeList(caisseId, caisseData.cheques || [], config);
+            const tpeData = caisseData.tpe || {};
+            Object.keys(tpeData).forEach(tpeId => {
+                renderTpeList(caisseId, tpeId, tpeData[tpeId], config);
+            });
         }
     }
 }
