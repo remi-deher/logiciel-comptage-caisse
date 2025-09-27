@@ -95,7 +95,7 @@ export function calculateEcartsForCaisse(caisseId, appState) {
         for (const terminalId in tpeState[caisseId]) {
             const releves = tpeState[caisseId][terminalId];
             if (releves && releves.length > 0) {
-                const sortedReleves = [...releves].sort((a, b) => (b.heure || '00:00').localeCompare(a.heure || '00:00'));
+                const sortedReleves = [...releves].sort((a, b) => (b.heure || '00:00:00').localeCompare(a.heure || '00:00:00'));
                 const dernierReleve = sortedReleves[0];
                 if (dernierReleve) {
                    totalCompteCb += parseLocaleFloat(dernierReleve.montant);
