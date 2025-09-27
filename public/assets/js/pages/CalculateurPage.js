@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/pages/CalculateurPage.js (Modifié)
+// Fichier : public/assets/js/pages/CalculateurPage.js (Corrigé)
 
 import { initializeCalculator } from '../logic/calculator-logic.js';
 
@@ -12,6 +12,7 @@ export function renderCalculateurPage(element) {
             <div class="tab-selector"></div>
             <div class="ecart-display-container"></div>
             
+            <div id="cloture-details-container"></div>
             <div id="cloture-recap-container"></div>
 
             <div id="caisses-content-container"></div>
