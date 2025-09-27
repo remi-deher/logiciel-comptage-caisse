@@ -110,7 +110,8 @@ export function calculateEcartsForCaisse(caisseId, appState) {
     
     const totalCompteCheques = (chequesState[caisseId] || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
     const ventesCheques = parseLocaleFloat(caisseData.ventes_cheques);
-    const ecartCheques = totalCompteCheques - ventesCheques;
+    const retrocessionCheques = parseLocaleFloat(caisseData.retrocession_cheques);
+    const ecartCheques = totalCompteCheques - (ventesCheques + retrocessionCheques);
 
     return { totalCompteEspeces, ecartEspeces, totalCompteCb, ecartCb, totalCompteCheques, ecartCheques };
 }
@@ -166,6 +167,7 @@ export function calculateAll(config, appState) {
         caisseData.ventes_cb = formElements[`caisse[${id}][ventes_cb]`]?.value;
         caisseData.retrocession_cb = formElements[`caisse[${id}][retrocession_cb]`]?.value;
         caisseData.ventes_cheques = formElements[`caisse[${id}][ventes_cheques]`]?.value;
+        caisseData.retrocession_cheques = formElements[`caisse[${id}][retrocession_cheques]`]?.value;
         
         caisseData.denominations = caisseData.denominations || {};
         Object.keys({ ...config.denominations.billets, ...config.denominations.pieces }).forEach(name => {

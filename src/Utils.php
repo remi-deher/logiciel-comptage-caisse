@@ -67,7 +67,8 @@ function calculate_results_from_data($data_rows) {
         $ventes_cheques = floatval($caisse_data['ventes_cheques'] ?? 0);
         $retrocession = floatval($caisse_data['retrocession'] ?? 0);
         $retrocession_cb = floatval($caisse_data['retrocession_cb'] ?? 0);
-        $recette_theorique_totale = $ventes_especes + $ventes_cb + $ventes_cheques + $retrocession + $retrocession_cb;
+        $retrocession_cheques = floatval($caisse_data['retrocession_cheques'] ?? 0);
+        $recette_theorique_totale = $ventes_especes + $ventes_cb + $ventes_cheques + $retrocession + $retrocession_cb + $retrocession_cheques;
 
         $ecart = $recette_reelle_totale - $recette_theorique_totale;
         
@@ -78,6 +79,7 @@ function calculate_results_from_data($data_rows) {
             'ventes' => $ventes_especes + $ventes_cb + $ventes_cheques,
             'retrocession' => $retrocession,
             'retrocession_cb' => $retrocession_cb,
+            'retrocession_cheques' => $retrocession_cheques,
             'recette_theorique' => $recette_theorique_totale,
             'recette_reelle' => $recette_reelle_totale,
             'ecart' => $ecart,

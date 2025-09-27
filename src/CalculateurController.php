@@ -111,8 +111,8 @@ class CalculateurController {
             foreach ($this->noms_caisses as $caisse_id => $nom) {
                 $caisse_data = $_POST['caisse'][$caisse_id] ?? [];
                 if (empty($caisse_data)) continue;
-                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession, retrocession_cb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes_especes'), get_numeric_value($caisse_data, 'ventes_cb'), get_numeric_value($caisse_data, 'ventes_cheques'), get_numeric_value($caisse_data, 'retrocession'), get_numeric_value($caisse_data, 'retrocession_cb')]);
+                $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession, retrocession_cb, retrocession_cheques) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt_details->execute([$comptage_id, $caisse_id, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes_especes'), get_numeric_value($caisse_data, 'ventes_cb'), get_numeric_value($caisse_data, 'ventes_cheques'), get_numeric_value($caisse_data, 'retrocession'), get_numeric_value($caisse_data, 'retrocession_cb'), get_numeric_value($caisse_data, 'retrocession_cheques')]);
                 $comptage_detail_id = $this->pdo->lastInsertId();
                 if (isset($caisse_data['denominations']) && is_array($caisse_data['denominations'])) {
                     foreach ($caisse_data['denominations'] as $name => $quantite) {
@@ -183,8 +183,8 @@ class CalculateurController {
             $new_comptage_id = $this->pdo->lastInsertId();
             foreach ($data_to_load as $caisse_id => $caisse_data) {
                 if (isset($this->noms_caisses[$caisse_id])) {
-                    $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession, retrocession_cb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt_details->execute([$new_comptage_id, $caisse_id, $caisse_data['fond_de_caisse'], $caisse_data['ventes_especes'], $caisse_data['ventes_cb'], $caisse_data['ventes_cheques'], $caisse_data['retrocession'], $caisse_data['retrocession_cb']]);
+                    $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession, retrocession_cb, retrocession_cheques) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt_details->execute([$new_comptage_id, $caisse_id, $caisse_data['fond_de_caisse'], $caisse_data['ventes_especes'], $caisse_data['ventes_cb'], $caisse_data['ventes_cheques'], $caisse_data['retrocession'], $caisse_data['retrocession_cb'], $caisse_data['retrocession_cheques']]);
                     $new_comptage_detail_id = $this->pdo->lastInsertId();
                     if (isset($caisse_data['denominations']) && is_array($caisse_data['denominations'])) {
                         foreach ($caisse_data['denominations'] as $denom_name => $quantity) {
@@ -261,8 +261,8 @@ class CalculateurController {
             $caisse_data = $_POST['caisse'][$caisse_id_a_cloturer] ?? [];
             if (empty($caisse_data)) throw new Exception("Données manquantes pour la caisse {$caisse_id_a_cloturer}.");
 
-            $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession, retrocession_cb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt_details->execute([$comptage_id, $caisse_id_a_cloturer, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes_especes'), get_numeric_value($caisse_data, 'ventes_cb'), get_numeric_value($caisse_data, 'ventes_cheques'), get_numeric_value($caisse_data, 'retrocession'), get_numeric_value($caisse_data, 'retrocession_cb')]);
+            $stmt_details = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession, retrocession_cb, retrocession_cheques) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt_details->execute([$comptage_id, $caisse_id_a_cloturer, get_numeric_value($caisse_data, 'fond_de_caisse'), get_numeric_value($caisse_data, 'ventes_especes'), get_numeric_value($caisse_data, 'ventes_cb'), get_numeric_value($caisse_data, 'ventes_cheques'), get_numeric_value($caisse_data, 'retrocession'), get_numeric_value($caisse_data, 'retrocession_cb'), get_numeric_value($caisse_data, 'retrocession_cheques')]);
             $comptage_detail_id = $this->pdo->lastInsertId();
 
             if (isset($caisse_data['denominations'])) {
@@ -341,11 +341,11 @@ class CalculateurController {
                 $latest_detail_id = $stmt_latest_cloture->fetchColumn();
                 if (!$latest_detail_id) continue;
                 $latest_cloture_data = $this->loadComptageDataByDetailId($latest_detail_id);
-                $stmt_details_cg = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession, retrocession_cb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt_details_cg = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession, retrocession_cb, retrocession_cheques) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt_details_cg->execute([
                     $comptage_id_cloture_generale, $caisse_id,
                     $latest_cloture_data['fond_de_caisse'], $latest_cloture_data['ventes_especes'],
-                    $latest_cloture_data['ventes_cb'], $latest_cloture_data['ventes_cheques'], $latest_cloture_data['retrocession'], $latest_cloture_data['retrocession_cb']
+                    $latest_cloture_data['ventes_cb'], $latest_cloture_data['ventes_cheques'], $latest_cloture_data['retrocession'], $latest_cloture_data['retrocession_cb'], $latest_cloture_data['retrocession_cheques']
                 ]);
                 $detail_id_cg = $this->pdo->lastInsertId();
                 $this->copyDetailsToNewRecord($detail_id_cg, $latest_cloture_data);
@@ -361,7 +361,7 @@ class CalculateurController {
                         }
                     }
                 }
-                $stmt_details_j1 = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession, retrocession_cb) VALUES (?, ?, ?, 0, 0, 0, 0, 0)");
+                $stmt_details_j1 = $this->pdo->prepare("INSERT INTO comptage_details (comptage_id, caisse_id, fond_de_caisse, ventes_especes, ventes_cb, ventes_cheques, retrocession, retrocession_cb, retrocession_cheques) VALUES (?, ?, ?, 0, 0, 0, 0, 0, 0)");
                 $stmt_details_j1->execute([$comptage_id_j1, $caisse_id, $nouveau_fond_de_caisse]);
                 $detail_id_j1 = $this->pdo->lastInsertId();
                 foreach ($denominations_j1 as $denom_name => $quantity) {
