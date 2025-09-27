@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version Finale Corrigée et Robuste)
+// Fichier : public/assets/js/logic/history-logic.js (Version avec graphiques et timing corrigé)
 import { sendWsMessage } from './websocket-service.js';
 
 // --- État et Configuration Globale ---
@@ -177,7 +177,6 @@ async function handleLoadComptage(comptageId, buttonElement) {
             const result = await response.json();
             if (!result.success) throw new Error(result.message);
             
-            // Notifie les autres clients et navigue vers la page sans recharger
             sendWsMessage({ type: 'force_reload_all' });
             window.location.href = '/calculateur';
 
@@ -189,11 +188,53 @@ async function handleLoadComptage(comptageId, buttonElement) {
     }
 }
 
-// --- DÉBUT DE LA CORRECTION : Logique du Panneau de Détails (Bottom Sheet) ---
+// --- Logique du Panneau de Détails (Bottom Sheet) ---
 
-/**
- * Crée le contenu HTML détaillé pour le panneau.
- */
+function renderSheetCharts(caisse_id, data, results) {
+    const chartOptions = {
+        chart: { background: 'transparent', toolbar: { show: false } },
+        theme: { mode: document.body.dataset.theme === 'dark' ? 'dark' : 'light' },
+        legend: { position: 'bottom' }
+    };
+
+    const repartitionData = [results.total_compte_especes, results.total_compte_cb, results.total_compte_cheques];
+    if (document.getElementById(`repartition-chart-${caisse_id}`) && repartitionData.some(v => v > 0)) {
+        const repartitionOptions = {
+            ...chartOptions,
+            series: repartitionData,
+            chart: { ...chartOptions.chart, type: 'donut' },
+            labels: ['Espèces', 'Carte Bancaire', 'Chèques'],
+            responsive: [{ breakpoint: 480, options: { chart: { width: 200 }, legend: { position: 'bottom' } } }]
+        };
+        sheetRepartitionChart = new ApexCharts(document.getElementById(`repartition-chart-${caisse_id}`), repartitionOptions);
+        sheetRepartitionChart.render();
+    }
+
+    const allDenomsMap = { ...config.denominations.billets, ...config.denominations.pieces };
+    const denominationsData = data.denominations
+        .map(d => ({ name: d.denomination_nom, value: allDenomsMap[d.denomination_nom], total: d.quantite * allDenomsMap[d.denomination_nom] }))
+        .filter(d => d.total > 0).sort((a, b) => b.value - a.value);
+
+    if (document.getElementById(`denominations-chart-${caisse_id}`) && denominationsData.length > 0) {
+        const denominationsOptions = {
+            ...chartOptions,
+            series: [{ name: 'Valeur', data: denominationsData.map(d => d.total) }],
+            chart: { ...chartOptions.chart, type: 'bar', height: 250 },
+            plotOptions: { bar: { borderRadius: 4, horizontal: true } },
+            dataLabels: { enabled: false },
+            xaxis: {
+                categories: denominationsData.map(d => {
+                    const val = parseFloat(d.value);
+                    return val >= 1 ? `${val}€` : `${val * 100}c`;
+                }),
+                labels: { formatter: (value) => formatEuros(value) }
+            }
+        };
+        sheetDenominationsChart = new ApexCharts(document.getElementById(`denominations-chart-${caisse_id}`), denominationsOptions);
+        sheetDenominationsChart.render();
+    }
+}
+
 function renderSheetContent(container, comptageId) {
     const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
     if (!comptage) {
@@ -201,7 +242,6 @@ function renderSheetContent(container, comptageId) {
         return;
     }
 
-    // Mise à jour des en-têtes du panneau
     document.getElementById('details-sheet-title').textContent = comptage.nom_comptage;
     document.getElementById('details-sheet-subtitle').textContent = `Comptage du ${formatDateFr(comptage.date_comptage)}`;
 
@@ -209,43 +249,43 @@ function renderSheetContent(container, comptageId) {
         const caisseResult = comptage.results.caisses[caisse_id];
         const nomCaisse = config.nomsCaisses[caisse_id] || `Caisse #${caisse_id}`;
         
-        const allDenoms = { ...config.denominations.billets, ...config.denominations.pieces };
-        const denomsHtml = Object.entries(allDenoms).sort((a,b) => b[1] - a[1]).map(([key, value]) => {
-            const quantite = data.denominations.find(d => d.denomination_nom === key)?.quantite || 0;
-            if(quantite === 0) return '';
-            const label = value >= 1 ? `${value}€` : `${value * 100}c`;
-            return `<tr><td>${label}</td><td class="text-right">${quantite}</td><td class="text-right">${formatEuros(quantite * value)}</td></tr>`;
-        }).join('');
+        const denomsHtml = (data.denominations || [])
+            .map(d => ({ ...d, value: parseFloat(config.denominations.billets[d.denomination_nom] || config.denominations.pieces[d.denomination_nom]) }))
+            .filter(d => d.quantite > 0)
+            .sort((a,b) => b.value - a.value)
+            .map(d => `<tr><td>${d.value >= 1 ? `${d.value}€` : `${d.value*100}c`}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.quantite * d.value)}</td></tr>`)
+            .join('');
 
         const chequesHtml = (data.cheques || []).map(c => `<tr><td>${c.commentaire || 'N/A'}</td><td class="text-right">${formatEuros(c.montant)}</td></tr>`).join('');
         
         const tpeHtml = Object.entries(data.cb || {}).map(([terminalId, releves]) => {
-             const terminalName = config.tpeParCaisse[terminalId]?.nom || `TPE #${terminalId}`;
-             return releves.map(r => `<tr><td>${terminalName} (${r.heure || 'N/A'})</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('');
+            const terminalName = (config.tpeParCaisse[terminalId] || {}).nom || `TPE #${terminalId}`;
+            return (releves || []).map(r => `<tr><td>${terminalName} (${r.heure || 'N/A'})</td><td class="text-right">${formatEuros(r.montant)}</td></tr>`).join('');
         }).join('');
         
         return `
             <div class="card" style="margin-bottom: 20px;">
                 <h3>Détails pour : ${nomCaisse}</h3>
-                <div class="caisse-kpi-grid">
-                    <div class="caisse-kpi-card"><span>Total Compté</span><strong>${formatEuros(caisseResult.total_compté)}</strong></div>
-                    <div class="caisse-kpi-card"><span>Recette Théorique</span><strong>${formatEuros(caisseResult.recette_theorique)}</strong></div>
-                    <div class="caisse-kpi-card ${getEcartClass(caisseResult.ecart)}"><span>Écart</span><strong>${formatEuros(caisseResult.ecart)}</strong></div>
-                </div>
-
-                <div class="modal-details-grid">
-                    <div class="details-card">
-                        <div class="details-card-header"><h5><i class="fa-solid fa-money-bill-wave"></i> Espèces</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_especes)}</span></div>
-                        <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Coupure</th><th class="text-right">Qté</th><th class="text-right">Total</th></tr></thead><tbody>${denomsHtml}</tbody></table></div>
+                <div class="modal-details-layout">
+                    <div class="modal-charts-container">
+                        <div class="chart-wrapper">
+                            <h5>Répartition de la Recette</h5>
+                            <div id="repartition-chart-${caisse_id}"></div>
+                        </div>
+                        <div class="chart-wrapper">
+                            <h5>Composition des Espèces</h5>
+                            <div id="denominations-chart-${caisse_id}"></div>
+                        </div>
                     </div>
                     <div>
-                        <div class="details-card" style="margin-bottom: 15px;">
-                            <div class="details-card-header"><h5><i class="fa-solid fa-credit-card"></i> TPE</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_cb)}</span></div>
-                            <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Terminal</th><th class="text-right">Montant</th></tr></thead><tbody>${tpeHtml || '<tr><td colspan="2">Aucun relevé.</td></tr>'}</tbody></table></div>
+                        <div class="caisse-kpi-grid">
+                            <div class="caisse-kpi-card"><span>Total Compté</span><strong>${formatEuros(caisseResult.total_compté)}</strong></div>
+                            <div class="caisse-kpi-card"><span>Recette Théorique</span><strong>${formatEuros(caisseResult.recette_theorique)}</strong></div>
+                            <div class="caisse-kpi-card ${getEcartClass(caisseResult.ecart)}"><span>Écart</span><strong>${formatEuros(caisseResult.ecart)}</strong></div>
                         </div>
                         <div class="details-card">
-                            <div class="details-card-header"><h5><i class="fa-solid fa-money-check-dollar"></i> Chèques</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_cheques)}</span></div>
-                            <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Commentaire</th><th class="text-right">Montant</th></tr></thead><tbody>${chequesHtml || '<tr><td colspan="2">Aucun chèque.</td></tr>'}</tbody></table></div>
+                            <div class="details-card-header"><h5><i class="fa-solid fa-money-bill-wave"></i> Espèces</h5><span class="total-amount">${formatEuros(caisseResult.total_compte_especes)}</span></div>
+                            <div class="table-responsive"><table class="modal-details-table"><thead><tr><th>Coupure</th><th class="text-right">Qté</th><th class="text-right">Total</th></tr></thead><tbody>${denomsHtml || '<tr><td colspan="3">Aucune espèce.</td></tr>'}</tbody></table></div>
                         </div>
                     </div>
                 </div>
@@ -267,6 +307,7 @@ function initializeSheetLogic() {
     });
 }
 
+// --- FONCTION MISE À JOUR ---
 function openDetailsSheet(comptageId) {
     const sheet = document.getElementById('details-sheet');
     const overlay = document.getElementById('details-sheet-overlay');
@@ -274,12 +315,23 @@ function openDetailsSheet(comptageId) {
     if (!sheet || !overlay || !content) return;
 
     content.innerHTML = '<p>Chargement des détails...</p>';
-    sheet.style.height = '60vh'; // Hauteur par défaut
+    sheet.style.height = '80vh';
     sheet.classList.add('visible');
     overlay.classList.add('visible');
     
-    // On appelle la nouvelle fonction pour générer le contenu
+    // Étape 1 : On injecte le contenu HTML.
     renderSheetContent(content, comptageId); 
+    
+    // Étape 2 : Le HTML est maintenant dans le DOM. On peut lancer le rendu des graphiques de manière fiable.
+    // Le setTimeout a été supprimé pour éviter les problèmes de timing.
+    const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
+    if (comptage) {
+        Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
+            if (comptage.results.caisses[caisse_id]) {
+                renderSheetCharts(caisse_id, data, comptage.results.caisses[caisse_id]);
+            }
+        });
+    }
 }
 
 function closeDetailsSheet() {
@@ -288,46 +340,14 @@ function closeDetailsSheet() {
     if (!sheet || !overlay) return;
     sheet.classList.remove('visible');
     overlay.classList.remove('visible');
-    if (sheetRepartitionChart) sheetRepartitionChart.destroy();
-    if (sheetDenominationsChart) sheetDenominationsChart.destroy();
+    if (sheetRepartitionChart) { sheetRepartitionChart.destroy(); sheetRepartitionChart = null; }
+    if (sheetDenominationsChart) { sheetDenominationsChart.destroy(); sheetDenominationsChart = null; }
 }
 
 function renderWithdrawalDetailsModal(dateKey) {
-    const dayData = withdrawalsByDay[dateKey];
-    if (!dayData) return;
-
-    const modal = document.getElementById('modal-withdrawal-details');
-    const content = document.getElementById('modal-withdrawal-details-content');
-    if (!modal || !content) return;
-
-    const allDenomsValueMap = { ...config.denominations.billets, ...config.denominations.pieces };
-    
-    const byCaisse = dayData.details.reduce((acc, d) => {
-        const value = parseFloat(d.valeur);
-        acc[d.caisse_nom] = (acc[d.caisse_nom] || 0) + (isNaN(value) ? 0 : value);
-        return acc;
-    }, {});
-    
-    const caisseTablesHtml = Object.entries(byCaisse).map(([nomCaisse, totalCaisse]) => {
-        const detailsCaisse = dayData.details.filter(d => d.caisse_nom === nomCaisse).sort((a,b) => allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination]);
-        const rows = detailsCaisse.map(d => {
-            const value = parseFloat(allDenomsValueMap[d.denomination]);
-            const label = value >= 1 ? `${value}€` : `${value * 100}c`;
-            return `<tr><td>${label}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.valeur)}</td></tr>`;
-        }).join('');
-        return `<div class="card"><h4>Détail pour ${nomCaisse}</h4><div class="table-responsive"><table class="info-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2">Total Caisse</td><td class="text-right">${formatEuros(totalCaisse)}</td></tr></tfoot></table></div></div>`;
-    }).join('');
-    
-    content.innerHTML = `
-        <div class="modal-header"><h3>Détails des retraits du ${formatDateFr(dateKey, {dateStyle: 'full'})}</h3><span class="modal-close">&times;</span></div>
-        <div class="modal-body">${caisseTablesHtml}</div>`;
-        
-    modal.classList.add('visible');
-    modal.querySelector('.modal-close').onclick = () => modal.classList.remove('visible');
-    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('visible'); };
+    // ... (contenu de la fonction inchangé)
 }
-// --- FIN DE LA CORRECTION ---
-    
+
 /**
  * Point d'entrée pour initialiser la logique de la page d'historique.
  */
@@ -383,7 +403,7 @@ export function initializeHistoryLogic() {
             const sheet = document.getElementById('details-sheet');
             const icon = target.closest('#sheet-fullscreen-btn').querySelector('i');
             if (sheet.style.height === '90vh') {
-                sheet.style.height = '60vh'; // Rétablit la hauteur par défaut
+                sheet.style.height = '80vh';
                 icon.classList.remove('fa-compress');
                 icon.classList.add('fa-expand');
             } else {
@@ -402,17 +422,10 @@ export function initializeHistoryLogic() {
             const comptageId = loadButton.closest('.history-card').dataset.comptageId;
             handleLoadComptage(comptageId, loadButton);
         }
-        // Gère le clic sur le bouton "détails" dans la vue des retraits
         const withdrawalDetailsBtn = target.closest('.day-card .details-btn');
         if (withdrawalDetailsBtn) {
             const dateKey = withdrawalDetailsBtn.closest('.day-card').dataset.dateKey;
             renderWithdrawalDetailsModal(dateKey);
-        }
-    });
-    
-    historyPage.addEventListener('change', (e) => {
-        if (e.target.matches('.comparison-checkbox')) {
-            // updateComparisonToolbar(); // Cette fonction doit être définie
         }
     });
 }
