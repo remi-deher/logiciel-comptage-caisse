@@ -311,7 +311,7 @@ export function renderCalculatorUI(pageElement, config) {
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
         
-        ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><div id="main-ecart-caisse${id}" class="main-ecart-display"><span class="ecart-label">Écart Espèces</span><span class="ecart-value">0,00 €</span><p class="ecart-explanation"></p></div><div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div></div>`;
+        ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><h3 class="caisse-name-display"><i class="fa-solid fa-cash-register"></i> ${nom}</h3><div id="main-ecart-caisse${id}" class="main-ecart-display"><span class="ecart-label">Écart Espèces</span><span class="ecart-value">0,00 €</span><p class="ecart-explanation"></p></div><div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div></div>`;
 
         const billetsHtml = Object.entries(config.denominations.billets).map(([name, v]) => createDenominationCard(id, name, v, 'bill', config)).join('');
         const piecesHtml = Object.entries(config.denominations.pieces).map(([name, v]) => createDenominationCard(id, name, v, 'piece', config)).join('');
