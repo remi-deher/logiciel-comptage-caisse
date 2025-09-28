@@ -1,4 +1,4 @@
-/* Fichier : public/assets/css/page-calculateur.css (Corrigé et Final) */
+/* Fichier : public/assets/css/page-calculateur.css */
 
 /* --- BANDEAUX DE CLÔTURE --- */
 .cloture-mode-banner, .cloture-final-summary-banner {
@@ -69,7 +69,6 @@
     color: #8a2be2;
 }
 
-/* CORRECTION : On retire la position "sticky" pour que le bloc ne suive pas le défilement */
 #cloture-details-container {
     margin-top: -10px;
     margin-bottom: 25px;
@@ -104,7 +103,13 @@
 .ecart-display-container{text-align:center;margin-bottom:20px;transition:all .3s ease;position:sticky;top:80px;z-index:99;background-color:var(--color-surface)}
 .ecart-display{display:none;padding:15px;border:2px solid var(--color-border-light);border-radius:12px;transition:opacity .5s;opacity:0;background-color:var(--color-surface)}
 .ecart-display.active{display:block;opacity:1}
-.main-ecart-display{padding:10px;border-radius:8px;margin-bottom:10px;transition:background-color .3s,border-color .3s}.main-ecart-display .ecart-label{display:block;font-size:1em;font-weight:700;color:var(--color-text-secondary)}.main-ecart-display .ecart-value{display:block;font-size:2.2em;font-weight:700}.main-ecart-display.ecart-ok{background-color:rgba(39,174,96,.1)}.main-ecart-display.ecart-ok .ecart-value{color:var(--color-success)}.main-ecart-display.ecart-positif{background-color:rgba(243,156,18,.1)}.main-ecart-display.ecart-positif .ecart-value{color:var(--color-warning)}.main-ecart-display.ecart-negatif{background-color:rgba(192,57,43,.1)}.main-ecart-display.ecart-negatif .ecart-value{color:var(--color-danger)}
+.main-ecart-display{padding:10px;border-radius:8px;margin-bottom:10px;transition:background-color .3s,border-color .3s}
+.main-ecart-display .ecart-label{display:block;font-size:1em;font-weight:700;color:var(--color-text-secondary)}
+.main-ecart-display .ecart-value{display:block;font-size:2.2em;font-weight:700}
+.main-ecart-display.ecart-ok{background-color:rgba(39,174,96,.1)}.main-ecart-display.ecart-ok .ecart-value{color:var(--color-success)}
+.main-ecart-display.ecart-positif{background-color:rgba(243,156,18,.1)}.main-ecart-display.ecart-positif .ecart-value{color:var(--color-warning)}
+.main-ecart-display.ecart-negatif{background-color:rgba(192,57,43,.1)}.main-ecart-display.ecart-negatif .ecart-value{color:var(--color-danger)}
+.main-ecart-display .ecart-explanation{font-style: italic; margin-top: 5px; color: var(--color-text-secondary);}
 .secondary-ecarts{display:flex;justify-content:center;gap:20px;font-size:.9em}.secondary-ecart-item span{color:var(--color-text-secondary)}.secondary-ecart-item strong{font-weight:700}.secondary-ecart-item.ecart-ok strong{color:var(--color-success)}.secondary-ecart-item.ecart-positif strong{color:var(--color-warning)}.secondary-ecart-item.ecart-negatif strong{color:var(--color-danger)}
 .payment-method-tabs{margin-top:20px;border:1px solid var(--color-border-light);border-radius:12px;overflow:hidden;background-color:var(--color-surface)}.payment-method-selector{display:flex;background-color:var(--color-surface-alt);padding:var(--space-sm);gap:var(--space-sm)}.payment-tab-link{flex:1;padding:12px;background-color:transparent;border:none;border-radius:8px;font-size:1em;font-weight:600;color:var(--color-text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}.payment-tab-link.active{background-color:var(--color-surface);color:var(--color-primary);box-shadow:0 2px 8px rgba(0,0,0,.1)}.payment-tab-content{display:none;padding:25px}.payment-tab-content.active{display:block;animation:fadeIn .5s}@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .theoretical-inputs-panel{display:flex;gap:20px;flex-wrap:wrap;background-color:var(--color-surface-alt);padding:20px;border-radius:8px;margin-bottom:25px}.compact-input-group{flex:1 1 200px;display:flex;flex-direction:column;gap:5px}.compact-input-group label{font-size:.9em;font-weight:700;color:var(--color-text-secondary)}.compact-input-group input{font-size:1.2em;font-weight:700;padding:10px 12px;border:1px solid var(--color-border);border-radius:6px;background-color:var(--color-surface)}

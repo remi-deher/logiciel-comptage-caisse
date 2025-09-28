@@ -1,4 +1,4 @@
-	// Fichier : public/assets/js/logic/calculator-service.js (Corrigé)
+// Fichier : public/assets/js/logic/calculator-service.js
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 
@@ -37,17 +37,14 @@ export async function fetchInitialData() {
         }
     });
 
-    // On extrait l'état de clôture de la réponse de config
     const clotureState = {
         lockedCaisses: configResult.lockedCaisses || [],
         closedCaisses: configResult.closedCaisses || []
     };
 
-    // On nettoie l'objet config pour ne pas laisser traîner ces données
     delete configResult.lockedCaisses;
     delete configResult.closedCaisses;
 
-    // On retourne toutes les données nécessaires à l'initialisation
     return { config: configResult, calculatorData, clotureState };
 }
 
@@ -176,7 +173,6 @@ export function calculateAll(config, appState) {
         const caisseData = appState.calculatorData.caisse[id] || {};
         const formElements = document.getElementById('caisse-form').elements;
 
-        // Met à jour l'objet de données avec les valeurs actuelles du formulaire
         caisseData.fond_de_caisse = formElements[`caisse[${id}][fond_de_caisse]`]?.value;
         caisseData.ventes_especes = formElements[`caisse[${id}][ventes_especes]`]?.value;
         caisseData.retrocession = formElements[`caisse[${id}][retrocession]`]?.value;
@@ -191,10 +187,8 @@ export function calculateAll(config, appState) {
             if (input) caisseData.denominations[name] = input.value;
         });
 
-        // Lance les calculs avec l'état mis à jour
         const results = calculateEcartsForCaisse(id, appState);
         
-        // Met à jour l'affichage des totaux et des écarts
         let totalBillets = 0, totalPieces = 0;
         Object.entries(config.denominations.billets).forEach(([name, value]) => {
             const quantite = parseInt(caisseData.denominations[name], 10) || 0;
@@ -231,6 +225,17 @@ function updateEcartDisplay(id, ecarts, config) {
     if (mainDisplay) {
         mainDisplay.querySelector('.ecart-label').textContent = mainData.label;
         mainDisplay.querySelector('.ecart-value').textContent = formatCurrency(mainData.value, config);
+
+        // Logique pour la phrase explicative
+        const explanationEl = mainDisplay.querySelector('.ecart-explanation');
+        if (Math.abs(mainData.value) < 0.01) {
+            explanationEl.textContent = `Le total des ${activeTabKey} est juste.`;
+        } else if (mainData.value > 0) {
+            explanationEl.textContent = `Il y a un excédent de ${formatCurrency(mainData.value, config)} pour les ${activeTabKey}.`;
+        } else {
+            explanationEl.textContent = `Il manque ${formatCurrency(Math.abs(mainData.value), config)} pour les ${activeTabKey}.`;
+        }
+        
         mainDisplay.className = 'main-ecart-display';
         if (Math.abs(mainData.value) < 0.01) mainDisplay.classList.add('ecart-ok');
         else mainDisplay.classList.add(mainData.value > 0 ? 'ecart-positif' : 'ecart-negatif');
