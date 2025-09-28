@@ -1,4 +1,4 @@
-// Fichier: public/assets/js/components/Navbar.js (Aucun changement requis)
+// Fichier: public/assets/js/components/Navbar.js
 
 export function renderNavbar(element) {
   // Le HTML complet de la barre de navigation
@@ -13,6 +13,7 @@ export function renderNavbar(element) {
             <a href="/historique"><i class="fa-solid fa-history"></i> Historique</a>
             <a href="/statistiques"><i class="fa-solid fa-chart-pie"></i> Statistiques</a>
             <a href="/reserve"><i class="fa-solid fa-vault"></i> Réserve</a>
+            <a href="/aide"><i class="fa-solid fa-circle-question"></i> Aide</a>
         </div>
 
         <div class="navbar-controls">
