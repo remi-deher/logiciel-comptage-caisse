@@ -7,18 +7,13 @@ require_once __DIR__ . '/services/FilterService.php';
 
 class HistoriqueController {
     private $pdo;
-    private $noms_caisses;
-    private $denominations;
-    private $tpe_par_caisse;
-    private $versionService;
+    private $comptageRepository; // Utilise le Repository
     private $filterService;
 
-    public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse) {
+    // Le constructeur est simplifié
+    public function __construct($pdo, $comptageRepository) {
         $this->pdo = $pdo;
-        $this->noms_caisses = $noms_caisses;
-        $this->denominations = $denominations;
-        $this->tpe_par_caisse = $tpe_par_caisse;
-        $this->versionService = new VersionService();
+        $this->comptageRepository = $comptageRepository;
         $this->filterService = new FilterService();
     }
 
@@ -46,16 +41,23 @@ class HistoriqueController {
 
         $sql_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage DESC LIMIT ? OFFSET ?";
         $stmt_ids = $this->pdo->prepare($sql_ids);
-        $stmt_ids->execute(array_merge($bind_values, [$items_par_page, $offset]));
+        // On doit passer les paramètres de la limite et de l'offset en tant qu'entiers
+        $stmt_ids->bindValue(count($bind_values) + 1, $items_par_page, PDO::PARAM_INT);
+        $stmt_ids->bindValue(count($bind_values) + 2, $offset, PDO::PARAM_INT);
+        foreach ($bind_values as $key => $value) {
+            $stmt_ids->bindValue($key + 1, $value);
+        }
+        $stmt_ids->execute();
         $comptage_ids = $stmt_ids->fetchAll(PDO::FETCH_COLUMN);
-
-        $historique_page = $this->fetchComptagesDetails($comptage_ids);
+        
+        // La logique complexe est remplacée par un simple appel au Repository
+        $historique_page = $this->comptageRepository->findMultipleDetailsByIds($comptage_ids);
 
         $sql_all_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage DESC";
         $stmt_all_ids = $this->pdo->prepare($sql_all_ids);
         $stmt_all_ids->execute($bind_values);
         $all_comptage_ids = $stmt_all_ids->fetchAll(PDO::FETCH_COLUMN);
-        $historique_complet = $this->fetchComptagesDetails($all_comptage_ids);
+        $historique_complet = $this->comptageRepository->findMultipleDetailsByIds($all_comptage_ids);
 
         echo json_encode([
             'success' => true,
@@ -68,88 +70,8 @@ class HistoriqueController {
         exit;
     }
 
-    private function fetchComptagesDetails(array $comptage_ids) {
-        if (empty($comptage_ids)) return [];
-
-        $historique = [];
-        $placeholders = implode(',', array_fill(0, count($comptage_ids), '?'));
-
-        // On ajoute retrocession_cb et retrocession_cheques à la requête
-        $stmt = $this->pdo->prepare("
-            SELECT 
-                c.id, c.nom_comptage, c.date_comptage, c.explication,
-                cd.caisse_id, cd.fond_de_caisse, 
-                cd.ventes_especes, cd.ventes_cb, cd.ventes_cheques, 
-                cd.retrocession, cd.retrocession_cb, cd.retrocession_cheques,
-                cd.id as comptage_detail_id
-            FROM comptages c
-            LEFT JOIN comptage_details cd ON c.id = cd.comptage_id
-            WHERE c.id IN ({$placeholders})
-            ORDER BY c.date_comptage DESC, cd.caisse_id ASC
-        ");
-        
-        $stmt->execute($comptage_ids);
-        $raw_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        foreach ($raw_data as $row) {
-            $comptage_id = $row['id'];
-            if (!isset($historique[$comptage_id])) {
-                $historique[$comptage_id] = [
-                    'id' => $comptage_id,
-                    'nom_comptage' => $row['nom_comptage'],
-                    'date_comptage' => $row['date_comptage'],
-                    'explication' => $row['explication'],
-                    'caisses_data' => []
-                ];
-            }
-            
-            $stmt_denoms = $this->pdo->prepare("SELECT denomination_nom, quantite FROM comptage_denominations WHERE comptage_detail_id = ?");
-            $stmt_denoms->execute([$row['comptage_detail_id']]);
-            $denominations_array = $stmt_denoms->fetchAll(PDO::FETCH_ASSOC);
-
-            $stmt_retraits = $this->pdo->prepare("SELECT denomination_nom, quantite_retiree FROM comptage_retraits WHERE comptage_detail_id = ?");
-            $stmt_retraits->execute([$row['comptage_detail_id']]);
-            $retraits_array = $stmt_retraits->fetchAll(PDO::FETCH_KEY_PAIR);
-            
-            $stmt_cheques = $this->pdo->prepare("SELECT montant, commentaire FROM comptage_cheques WHERE comptage_detail_id = ?");
-            $stmt_cheques->execute([$row['comptage_detail_id']]);
-            $cheques_array = $stmt_cheques->fetchAll(PDO::FETCH_ASSOC);
-
-            $stmt_cb = $this->pdo->prepare("SELECT terminal_id, montant, heure_releve FROM comptage_cb WHERE comptage_detail_id = ? ORDER BY heure_releve ASC");
-            $stmt_cb->execute([$row['comptage_detail_id']]);
-            $releves_bruts = $stmt_cb->fetchAll(PDO::FETCH_ASSOC);
-            $cb_releves_array = [];
-            foreach ($releves_bruts as $releve) {
-                $cb_releves_array[$releve['terminal_id']][] = [
-                    'montant' => $releve['montant'],
-                    'heure' => $releve['heure_releve']
-                ];
-            }
-
-            // On ajoute les champs manquants au tableau de données
-            $historique[$comptage_id]['caisses_data'][$row['caisse_id']] = [
-                'fond_de_caisse' => $row['fond_de_caisse'],
-                'ventes_especes' => $row['ventes_especes'],
-                'ventes_cb' => $row['ventes_cb'],
-                'ventes_cheques' => $row['ventes_cheques'],
-                'retrocession' => $row['retrocession'],
-                'retrocession_cb' => $row['retrocession_cb'],
-                'retrocession_cheques' => $row['retrocession_cheques'],
-                'denominations' => $denominations_array,
-                'retraits' => $retraits_array,
-                'cb' => $cb_releves_array,
-                'cheques' => $cheques_array
-            ];
-        }
-
-        foreach ($historique as &$comptage) {
-            $comptage['results'] = calculate_results_from_data($comptage['caisses_data']);
-        }
-
-        return array_values($historique);
-    }
-
     public function delete() {
+        // ... (Cette méthode reste inchangée)
         header('Content-Type: application/json');
         AuthController::checkAuth();
         $id_a_supprimer = intval($_POST['id_a_supprimer'] ?? 0);
@@ -169,9 +91,12 @@ class HistoriqueController {
         }
         exit;
     }
-
+    
     public function exportCsv()
     {
+        // ... (Cette méthode reste inchangée, mais elle bénéficiera de la correction)
+        global $noms_caisses, $denominations;
+        
         $date_debut = $_GET['date_debut'] ?? '';
         $date_fin = $_GET['date_fin'] ?? '';
         $recherche = $_GET['recherche'] ?? '';
@@ -185,7 +110,7 @@ class HistoriqueController {
         $stmt_ids->execute($bind_values);
         $comptage_ids = $stmt_ids->fetchAll(PDO::FETCH_COLUMN);
 
-        $historique = $this->fetchComptagesDetails($comptage_ids);
+        $historique = $this->comptageRepository->findMultipleDetailsByIds($comptage_ids);
 
         $filename = "export-comptages-" . date('Y-m-d') . ".csv";
         header('Content-Type: text/csv');
@@ -194,7 +119,7 @@ class HistoriqueController {
         $output = fopen('php://output', 'w');
         
         $header = ['ID', 'Nom', 'Date', 'Explication'];
-        foreach ($this->noms_caisses as $id => $nom) {
+        foreach ($noms_caisses as $id => $nom) {
             $header[] = "Caisse {$id} - Nom";
             $header[] = "Caisse {$id} - Fond de caisse";
             $header[] = "Caisse {$id} - Ventes Espèces";
@@ -203,7 +128,7 @@ class HistoriqueController {
             $header[] = "Caisse {$id} - Rétrocession";
             $header[] = "Caisse {$id} - Rétrocession CB";
             $header[] = "Caisse {$id} - Rétrocession Chèques";
-            foreach ($this->denominations as $type => $denoms) {
+            foreach ($denominations as $type => $denoms) {
                 foreach ($denoms as $key => $value) {
                     $label = ($value >= 1) ? "{$value} €" : "{$value} cts";
                     $header[] = "Caisse {$id} - {$label}";
@@ -214,7 +139,7 @@ class HistoriqueController {
 
         foreach ($historique as $comptage) {
             $rowData = [$comptage['id'], $comptage['nom_comptage'], $comptage['date_comptage'], $comptage['explication']];
-            foreach ($this->noms_caisses as $caisse_id => $nom_caisse) {
+            foreach ($noms_caisses as $caisse_id => $nom_caisse) {
                 $caisse_data = $comptage['caisses_data'][$caisse_id] ?? null;
                 if ($caisse_data) {
                     $rowData[] = $nom_caisse;
@@ -225,7 +150,7 @@ class HistoriqueController {
                     $rowData[] = str_replace('.', ',', $caisse_data['retrocession']);
                     $rowData[] = str_replace('.', ',', $caisse_data['retrocession_cb']);
                     $rowData[] = str_replace('.', ',', $caisse_data['retrocession_cheques']);
-                    foreach ($this->denominations as $type => $denoms) {
+                    foreach ($denominations as $type => $denoms) {
                         foreach (array_keys($denoms) as $key) {
                              $denom_value = 0;
                             foreach($caisse_data['denominations'] as $d){
@@ -238,8 +163,7 @@ class HistoriqueController {
                         }
                     }
                 } else {
-                    // +2 pour les nouvelles colonnes de rétrocession
-                    $columnCount = 8 + count($this->denominations['billets']) + count($this->denominations['pieces']);
+                    $columnCount = 8 + count($denominations['billets']) + count($denominations['pieces']);
                     for ($i=0; $i < $columnCount; $i++) { 
                         $rowData[] = '';
                     }

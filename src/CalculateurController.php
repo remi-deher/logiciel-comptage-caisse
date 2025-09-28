@@ -16,16 +16,15 @@ class CalculateurController {
     private $backupService;
     private $comptageRepository;
 
-    public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse_obsolete) {
+    public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse_obsolete, $comptageRepository) {
         $this->pdo = $pdo;
         $this->noms_caisses = $noms_caisses;
         $this->denominations = $denominations;
         $this->versionService = new VersionService();
         $this->clotureStateService = new ClotureStateService($pdo);
         $this->backupService = new BackupService();
-        $this->comptageRepository = new ComptageRepository($pdo);
+        $this->comptageRepository = $comptageRepository; // On utilise l'instance fournie
     }
-
     public function getClosedCaisseData() {
         header('Content-Type: application/json');
         $caisse_id = intval($_GET['caisse_id'] ?? 0);
@@ -129,7 +128,7 @@ class CalculateurController {
                                 if ($montant_val > 0) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
                                     $heure_releve_raw = $releve['heure'] ?? null;
-                                    $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
+                                    $heure_releve = (in_array($heure_releve_raw, [null, 'undefined', 'null', ''], true)) ? null : $heure_releve_raw;
                                     $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $heure_releve]);
                                 }
                             }
@@ -197,7 +196,7 @@ class CalculateurController {
                                 foreach ($releves as $releve) {
                                     $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
                                     $heure_releve_raw = $releve['heure'] ?? null;
-                                    $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
+                                    $heure_releve = (in_array($heure_releve_raw, [null, 'undefined', 'null', ''], true)) ? null : $heure_releve_raw;
                                     $stmt_cb->execute([$new_comptage_detail_id, $terminal_id, $releve['montant'], $heure_releve]);
                                 }
                             }
@@ -290,7 +289,7 @@ class CalculateurController {
                             if ($montant_val > 0) {
                                 $stmt_cb = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
                                 $heure_releve_raw = $releve['heure'] ?? null;
-                                $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
+                                $heure_releve = (in_array($heure_releve_raw, [null, 'undefined', 'null', ''], true)) ? null : $heure_releve_raw;
                                 $stmt_cb->execute([$comptage_detail_id, $terminal_id, $montant_val, $heure_releve]);
                             }
                         }
@@ -442,7 +441,7 @@ class CalculateurController {
                     foreach ($releves as $releve) {
                         $stmt = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
                         $heure_releve_raw = $releve['heure'] ?? null;
-                        $heure_releve = ($heure_releve_raw && $heure_releve_raw !== 'undefined' && $heure_releve_raw !== 'null' && $heure_releve_raw !== '') ? $heure_releve_raw : null;
+                        $heure_releve = (in_array($heure_releve_raw, [null, 'undefined', 'null', ''], true)) ? null : $heure_releve_raw;
                         $stmt->execute([$new_detail_id, $terminal_id, $releve['montant'], $heure_releve]);
                     }
                 }

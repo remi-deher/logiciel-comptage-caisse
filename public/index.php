@@ -64,6 +64,9 @@ foreach (glob(ROOT_PATH . '/src/services/*.php') as $service) {
     require_once $service;
 }
 
+// CORRECTION : On inclut le Repository ici
+require_once ROOT_PATH . '/src/Repository/ComptageRepository.php';
+
 require_once ROOT_PATH . '/src/AdminController.php';
 require_once ROOT_PATH . '/src/AideController.php';
 require_once ROOT_PATH . '/src/AuthController.php';
@@ -78,15 +81,17 @@ require_once ROOT_PATH . '/src/StatistiquesController.php';
 
 try {
     $pdo = Bdd::getPdo();
-
-    // On instancie le service de gestion de l'état de clôture
+    
+    // CORRECTION : On instancie le Repository pour le partager
+    $comptageRepository = new ComptageRepository($pdo);
     $clotureStateService = new ClotureStateService($pdo);
 
     $adminController = new AdminController($pdo, $denominations);
     $authController = new AuthController($pdo);
     $statistiquesController = new StatistiquesController($pdo, $noms_caisses, $denominations);
-    $calculateurController = new CalculateurController($pdo, $noms_caisses, $denominations, $tpe_par_caisse);
-    $historiqueController = new HistoriqueController($pdo, $noms_caisses, $denominations, $tpe_par_caisse);
+    // CORRECTION : On injecte le Repository dans les contrôleurs qui en ont besoin
+    $calculateurController = new CalculateurController($pdo, $noms_caisses, $denominations, $tpe_par_caisse, $comptageRepository);
+    $historiqueController = new HistoriqueController($pdo, $comptageRepository);
     $reserveController = new ReserveController($pdo, $noms_caisses, $denominations);
     $changelogController = new ChangelogController();
 
@@ -116,7 +121,6 @@ $routes = [
             'minToKeep' => $min_to_keep,
             'currencyCode' => $current_currency_code,
             'currencySymbol' => $current_currency_symbol,
-            // CORRECTION : On ajoute l'état actuel des caisses à la réponse de configuration
             'lockedCaisses' => $clotureStateService->getLockedCaisses(),
             'closedCaisses' => $clotureStateService->getClosedCaisses(),
         ]);
