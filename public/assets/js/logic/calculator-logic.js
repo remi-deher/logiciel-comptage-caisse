@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé et Final)
+// Fichier : public/assets/js/logic/calculator-logic.js
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
@@ -54,7 +54,7 @@ async function handleAutosave() {
         const response = await fetch('index.php?route=calculateur/autosave', {
             method: 'POST',
             body: new FormData(form),
-            keepalive: true // Important pour les sauvegardes en quittant la page
+            keepalive: true
         });
         const result = await response.json();
         if (!result.success) throw new Error(result.message);
@@ -74,6 +74,9 @@ function attachEventListeners() {
 
     page.addEventListener('input', handlePageInput);
     page.addEventListener('click', handlePageClick);
+    page.addEventListener('keydown', handlePageKeydown);
+    page.addEventListener('focusin', handlePageFocusIn);
+    page.addEventListener('focusout', handlePageFocusOut);
     
     const form = document.getElementById('caisse-form');
     if (form) {
@@ -156,6 +159,37 @@ function handlePageClick(e) {
     }
 }
 
+function handlePageKeydown(e) {
+    if (e.key === 'Enter' && e.target.classList.contains('quantity-input')) {
+        e.preventDefault();
+        const inputs = Array.from(document.querySelectorAll('.caisse-tab-content.active .quantity-input'));
+        const currentIndex = inputs.indexOf(e.target);
+        const nextInput = inputs[currentIndex + 1];
+        if (nextInput) {
+            nextInput.focus();
+            nextInput.select();
+        }
+    }
+}
+
+function handlePageFocusIn(e) {
+    if (e.target.classList.contains('quantity-input')) {
+        const card = e.target.closest('.denom-card');
+        if (card) {
+            card.classList.add('is-focused');
+        }
+    }
+}
+
+function handlePageFocusOut(e) {
+    if (e.target.classList.contains('quantity-input')) {
+        const card = e.target.closest('.denom-card');
+        if (card) {
+            card.classList.remove('is-focused');
+        }
+    }
+}
+
 // --- LOGIQUE WEBSOCKET ET MISE À JOUR DE L'UI ---
 
 function handleWebSocketMessage(data) {
@@ -216,8 +250,6 @@ export async function initializeCalculator() {
         setActiveMessageHandler(handleWebSocketMessage);
         await initializeWebSocket(handleWebSocketMessage);
         
-        // On attache la fonction d'autosave au routeur pour qu'elle soit
-        // exécutée avant chaque changement de page interne à l'application.
         const mainContent = document.getElementById('main-content');
         if (mainContent) {
             mainContent.beforePageChange = handleAutosave;

@@ -117,9 +117,9 @@
 .cash-drawer-section h4{display:flex;align-items:center;gap:10px;margin-top:0;margin-bottom:15px;font-size:1.3em;padding-bottom:10px;border-bottom:2px solid var(--color-border-light);justify-content:space-between;}
 .cash-drawer-section h4 .section-total { background-color: var(--color-surface-alt); padding: 5px 12px; border-radius: 20px; font-size: 0.9em; color: var(--color-primary); border: 1px solid var(--color-border-light); }
 .denominations-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:15px}
-.denom-card{background-color:var(--color-surface);border:1px solid var(--color-border-light);border-radius:8px;box-shadow:0 2px 10px var(--shadow-color);transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column}
+.denom-card{background-color:var(--color-surface);border:1px solid var(--color-border-light);border-radius:8px;box-shadow:0 2px 10px var(--shadow-color);transition:transform .2s,box-shadow .2s, border-color .2s;display:flex;flex-direction:column}
 .denom-card.is-piece{background-color:var(--color-surface-alt)}
-.denom-card-header{padding:10px 15px;text-align:center;font-size:1.2em;font-weight:700;border-bottom:1px solid var(--color-border-light)}
+.denom-card-header{padding:10px 15px;text-align:center;font-size:1.2em;font-weight:700;border-bottom:1px solid var(--color-border-light); transition: background-color .2s, color .2s, border-color .2s;}
 .denom-card-body{padding:15px;display:flex;align-items:center;justify-content:center;gap:10px}
 .denom-card-body .quantity-input{width:60px;font-size:1.5em;text-align:center;font-weight:700;border:none;border-bottom:2px solid var(--color-border);background:0 0;border-radius:0}
 .denom-card-footer{padding:10px 15px;background-color:var(--color-surface-alt);border-top:1px solid var(--color-border-light);text-align:center;font-size:1.1em;font-weight:700;color:var(--color-text-secondary)}
@@ -263,4 +263,17 @@
 
 .cheque-table tbody tr:last-child td {
     border-bottom: none;
+}
+
+/* Styles pour la mise en valeur de la dénomination active */
+.denom-card.is-focused {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px var(--shadow-color);
+    border-color: var(--color-primary);
+}
+
+.denom-card.is-focused .denom-card-header {
+    background-color: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary-dark);
 }
