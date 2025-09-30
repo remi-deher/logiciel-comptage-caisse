@@ -1,5 +1,5 @@
 <?php
-// src/Utils.php - Version améliorée pour des calculs plus détaillés
+// src/Utils.php - Version améliorée pour des calculs plus détaillés et précis
 
 function calculate_results_from_data($data_rows) {
     $results = [
@@ -18,82 +18,82 @@ function calculate_results_from_data($data_rows) {
     $all_denoms_map = ($denominations['billets'] ?? []) + ($denominations['pieces'] ?? []);
 
     foreach ($data_rows as $caisse_id => $caisse_data) {
-        $total_compte_especes = 0;
+        // --- CORRECTION : Passage aux calculs en centimes ---
+        $total_compte_especes_cents = 0;
         if (isset($caisse_data['denominations'])) {
             foreach ($caisse_data['denominations'] as $denom) {
                 $denomination_nom = $denom['denomination_nom'];
-                $quantite = floatval($denom['quantite']);
-                $valeur_unitaire = floatval($all_denoms_map[$denomination_nom] ?? 0);
-                $total_compte_especes += $quantite * $valeur_unitaire;
+                $quantite = intval($denom['quantite']);
+                $valeur_unitaire_euros = floatval($all_denoms_map[$denomination_nom] ?? 0);
+                $total_compte_especes_cents += $quantite * round($valeur_unitaire_euros * 100);
             }
         }
 
-        // --- DÉBUT DE LA CORRECTION ---
-        $total_compte_cb = 0;
+        $total_compte_cb_cents = 0;
         if (isset($caisse_data['cb']) && is_array($caisse_data['cb'])) {
-            // $caisse_data['cb'] est un tableau groupant les relevés par ID de terminal.
-            // Ex: [ '1' => [releveA, releveB], '2' => [releveC] ]
-            // On parcourt chaque terminal.
             foreach ($caisse_data['cb'] as $releves_pour_un_terminal) {
                 if (is_array($releves_pour_un_terminal) && !empty($releves_pour_un_terminal)) {
-                    // Les relevés sont déjà triés par heure (ASC). On prend le dernier.
                     $dernier_releve = end($releves_pour_un_terminal);
-                    // On additionne le montant du dernier relevé de CE terminal au total CB de la caisse.
-                    $total_compte_cb += floatval($dernier_releve['montant'] ?? 0);
+                    $total_compte_cb_cents += round(floatval($dernier_releve['montant'] ?? 0) * 100);
                 }
             }
         }
-        // --- FIN DE LA CORRECTION ---
 
-        $total_compte_cheques = 0;
+        $total_compte_cheques_cents = 0;
         if (isset($caisse_data['cheques']) && is_array($caisse_data['cheques'])) {
             foreach($caisse_data['cheques'] as $cheque) {
-                $total_compte_cheques += floatval($cheque['montant'] ?? 0);
+                $total_compte_cheques_cents += round(floatval($cheque['montant'] ?? 0) * 100);
             }
         }
 
-        $total_retraits = 0;
+        $total_retraits_cents = 0;
         if (isset($caisse_data['retraits']) && is_array($caisse_data['retraits'])) {
             foreach($caisse_data['retraits'] as $denom => $qty) {
-                $valeur_unitaire = floatval($all_denoms_map[$denom] ?? 0);
-                $total_retraits += intval($qty) * $valeur_unitaire;
+                $valeur_unitaire_euros = floatval($all_denoms_map[$denom] ?? 0);
+                $total_retraits_cents += intval($qty) * round($valeur_unitaire_euros * 100);
             }
         }
 
-        $fond_de_caisse = floatval($caisse_data['fond_de_caisse'] ?? 0);
-        $total_compte_global = $total_compte_especes + $total_compte_cb + $total_compte_cheques;
-        $recette_reelle_totale = $total_compte_global - $fond_de_caisse;
+        $fond_de_caisse_cents = round(floatval($caisse_data['fond_de_caisse'] ?? 0) * 100);
+        $total_compte_global_cents = $total_compte_especes_cents + $total_compte_cb_cents + $total_compte_cheques_cents;
+        $recette_reelle_totale_cents = $total_compte_global_cents - $fond_de_caisse_cents;
 
-        $ventes_especes = floatval($caisse_data['ventes_especes'] ?? 0);
-        $ventes_cb = floatval($caisse_data['ventes_cb'] ?? 0);
-        $ventes_cheques = floatval($caisse_data['ventes_cheques'] ?? 0);
-        $retrocession = floatval($caisse_data['retrocession'] ?? 0);
-        $retrocession_cb = floatval($caisse_data['retrocession_cb'] ?? 0);
-        $retrocession_cheques = floatval($caisse_data['retrocession_cheques'] ?? 0);
-        $recette_theorique_totale = $ventes_especes + $ventes_cb + $ventes_cheques + $retrocession + $retrocession_cb + $retrocession_cheques;
+        $ventes_especes_cents = round(floatval($caisse_data['ventes_especes'] ?? 0) * 100);
+        $ventes_cb_cents = round(floatval($caisse_data['ventes_cb'] ?? 0) * 100);
+        $ventes_cheques_cents = round(floatval($caisse_data['ventes_cheques'] ?? 0) * 100);
+        $retrocession_cents = round(floatval($caisse_data['retrocession'] ?? 0) * 100);
+        $retrocession_cb_cents = round(floatval($caisse_data['retrocession_cb'] ?? 0) * 100);
+        $retrocession_cheques_cents = round(floatval($caisse_data['retrocession_cheques'] ?? 0) * 100);
+        $recette_theorique_totale_cents = $ventes_especes_cents + $ventes_cb_cents + $ventes_cheques_cents + $retrocession_cents + $retrocession_cb_cents + $retrocession_cheques_cents;
 
-        $ecart = $recette_reelle_totale - $recette_theorique_totale;
+        $ecart_cents = $recette_reelle_totale_cents - $recette_theorique_totale_cents;
         
+        // Reconversion en euros pour la sortie de la fonction
         $results['caisses'][$caisse_id] = [
-            'total_compté' => $total_compte_global,
-            'fond_de_caisse' => $fond_de_caisse,
-            'ventes' => $ventes_especes + $ventes_cb + $ventes_cheques,
-            'retrocession' => $retrocession,
-            'retrocession_cb' => $retrocession_cb,
-            'retrocession_cheques' => $retrocession_cheques,
-            'recette_theorique' => $recette_theorique_totale,
-            'recette_reelle' => $recette_reelle_totale,
-            'ecart' => $ecart,
-            'total_compte_especes' => $total_compte_especes,
-            'total_compte_cb' => $total_compte_cb,
-            'total_compte_cheques' => $total_compte_cheques,
-            'total_retraits' => $total_retraits
+            'total_compté' => $total_compte_global_cents / 100,
+            'fond_de_caisse' => $fond_de_caisse_cents / 100,
+            'ventes' => ($ventes_especes_cents + $ventes_cb_cents + $ventes_cheques_cents) / 100,
+            'retrocession' => $retrocession_cents / 100,
+            'retrocession_cb' => $retrocession_cb_cents / 100,
+            'retrocession_cheques' => $retrocession_cheques_cents / 100,
+            'recette_theorique' => $recette_theorique_totale_cents / 100,
+            'recette_reelle' => $recette_reelle_totale_cents / 100,
+            'ecart' => $ecart_cents / 100,
+            'total_compte_especes' => $total_compte_especes_cents / 100,
+            'total_compte_cb' => $total_compte_cb_cents / 100,
+            'total_compte_cheques' => $total_compte_cheques_cents / 100,
+            'total_retraits' => $total_retraits_cents / 100
         ];
 
-        $results['combines']['total_compté'] += $total_compte_global;
-        $results['combines']['recette_reelle'] += $recette_reelle_totale;
-        $results['combines']['recette_theorique'] += $recette_theorique_totale;
-        $results['combines']['ecart'] += $ecart;
+        $results['combines']['total_compté'] += $total_compte_global_cents;
+        $results['combines']['recette_reelle'] += $recette_reelle_totale_cents;
+        $results['combines']['recette_theorique'] += $recette_theorique_totale_cents;
+        $results['combines']['ecart'] += $ecart_cents;
+    }
+    
+    // Reconversion finale pour les totaux combinés
+    foreach($results['combines'] as &$value) {
+        $value /= 100;
     }
     
     return $results;
