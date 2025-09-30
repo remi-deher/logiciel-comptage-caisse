@@ -113,6 +113,8 @@ $route_key = "{$request_method}:{$route}";
 
 $routes = [
     'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $current_currency_code, $current_currency_symbol, $clotureStateService) {
+        // CORRECTION : Le service ne fournit plus les caisses verrouillées, seulement les caisses clôturées.
+        // Les informations de verrouillage proviennent désormais exclusivement du WebSocket.
         echo json_encode([
             'success' => true,
             'nomsCaisses' => $noms_caisses,
@@ -121,7 +123,6 @@ $routes = [
             'minToKeep' => $min_to_keep,
             'currencyCode' => $current_currency_code,
             'currencySymbol' => $current_currency_symbol,
-            'lockedCaisses' => $clotureStateService->getLockedCaisses(),
             'closedCaisses' => $clotureStateService->getClosedCaisses(),
         ]);
     },

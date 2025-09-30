@@ -24,8 +24,9 @@ async function refreshCalculatorData() {
         state.config = initialData.config;
         state.calculatorData = initialData.calculatorData;
         
-        state.lockedCaisses = initialData.clotureState.lockedCaisses;
-        state.closedCaisses = (initialData.clotureState.closedCaisses || []).map(String);
+        // La récupération initiale des verrous n'est plus nécessaire ici, le WebSocket s'en chargera.
+        state.lockedCaisses = []; 
+        state.closedCaisses = (initialData.closedCaisses || []).map(String);
 
         ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config);
         ui.populateInitialData(state.calculatorData, state.config);
@@ -201,12 +202,18 @@ function handleWebSocketMessage(data) {
             updateClotureButtonState();
             sendWsMessage({ type: 'get_full_state' });
             break;
-        case 'cloture_locked_caisses':
-            state.lockedCaisses = data.caisses || [];
+        
+        // --- DÉBUT DE LA CORRECTION ---
+        // On écoute le nouveau type de message 'cloture_state'
+        case 'cloture_state':
+            // On met à jour l'état avec les données reçues du serveur
+            state.lockedCaisses = data.locked_caisses || [];
             state.closedCaisses = (data.closed_caisses || []).map(String);
             ui.updateAllCaisseLocks(state);
             updateClotureButtonState();
             break;
+        // --- FIN DE LA CORRECTION ---
+
         case 'full_form_state':
             ui.applyFullFormState(data, state);
             service.calculateAll(state.config, state);

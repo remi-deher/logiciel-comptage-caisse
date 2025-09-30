@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/services/ClotureStateService.php (Version Finale Complète et Corrigée)
+// Fichier : src/services/ClotureStateService.php (Version finale corrigée)
 
 class ClotureStateService {
     private $pdo;
@@ -16,85 +16,59 @@ class ClotureStateService {
         $this->pdo = $pdo;
     }
 
-    public function getCaisseStatus($caisseId) {
-        $stmt = $this->pdo->prepare("SELECT status, locked_by_ws_id FROM cloture_status WHERE caisse_id = ?");
-        $stmt->execute([$caisseId]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: ['status' => 'open', 'locked_by_ws_id' => null];
-    }
-
     /**
-     * Verrouille une caisse en associant l'ID de la connexion WebSocket.
+     * Confirme qu'une caisse est clôturée en insérant/mettant à jour ses données.
+     * @param int $caisseId
+     * @param string $dataJson
+     * @return void
      */
-    public function lockCaisse($caisseId, $lockedBy) {
-        $stmt_update = $this->pdo->prepare(
-            "UPDATE cloture_status SET status='locked', locked_by_ws_id=?
-             WHERE caisse_id = ? AND status = 'open'"
+    public function confirmCaisse($caisseId, $dataJson) {
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO cloture_caisse_data (caisse_id, date_cloture, data_json) 
+             VALUES (?, NOW(), ?)
+             ON DUPLICATE KEY UPDATE date_cloture = NOW(), data_json = ?"
         );
-        $stmt_update->execute([$lockedBy, $caisseId]);
-
-        if ($stmt_update->rowCount() > 0) {
-            return true;
-        }
-
-        try {
-            $stmt_insert = $this->pdo->prepare(
-                "INSERT INTO cloture_status (caisse_id, status, locked_by_ws_id)
-                 VALUES (?, 'locked', ?)"
-            );
-            return $stmt_insert->execute([$caisseId, $lockedBy]);
-        } catch (PDOException $e) {
-            return false;
-        }
-    }
-
-    public function unlockCaisse($caisseId) {
-        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='open', locked_by_ws_id=NULL WHERE caisse_id = ? AND status = 'locked'");
-        $stmt->execute([$caisseId]);
+        $stmt->execute([$caisseId, $dataJson, $dataJson]);
     }
 
     /**
-     * Force le déverrouillage d'une caisse, utilisé par les autres utilisateurs.
+     * Annule la clôture d'une caisse en supprimant son enregistrement.
+     * @param int $caisseId
+     * @return void
      */
-    public function forceUnlockCaisse($caisseId) {
-        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='open', locked_by_ws_id=NULL WHERE caisse_id = ?");
-        $stmt->execute([$caisseId]);
-    }
-
-    public function confirmCaisse($caisseId) {
-        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='closed', locked_by_ws_id=NULL WHERE caisse_id = ?");
-        $stmt->execute([$caisseId]);
-    }
-
     public function reopenCaisse($caisseId) {
-        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='open', locked_by_ws_id=NULL WHERE caisse_id = ? AND status = 'closed'");
+        $stmt = $this->pdo->prepare("DELETE FROM cloture_caisse_data WHERE caisse_id = ?");
         $stmt->execute([$caisseId]);
     }
 
-    public function isCaisseConfirmed($caisseId) {
-        $status = $this->getCaisseStatus($caisseId);
-        return $status['status'] === 'closed';
-    }
-
     /**
-     * Récupère la liste des caisses verrouillées AVEC l'ID de la connexion qui les a verrouillées.
+     * Récupère la liste des ID des caisses qui sont actuellement clôturées.
+     * @return array
      */
-    public function getLockedCaisses() {
-        $stmt = $this->pdo->query("SELECT caisse_id, locked_by_ws_id as locked_by FROM cloture_status WHERE status = 'locked'");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-    
     public function getClosedCaisses() {
-        $stmt = $this->pdo->query("SELECT caisse_id FROM cloture_status WHERE status = 'closed'");
+        $stmt = $this->pdo->query("SELECT caisse_id FROM cloture_caisse_data");
         return $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
     }
     
-    public function resetState() {
-        $this->pdo->exec("DELETE FROM cloture_status");
+    /**
+     * Récupère les données JSON d'une caisse clôturée spécifique.
+     * @param int $caisseId
+     * @return array|null
+     */
+    public function getClosedCaisseData($caisseId) {
+        $stmt = $this->pdo->prepare("SELECT data_json FROM cloture_caisse_data WHERE caisse_id = ?");
+        $stmt->execute([$caisseId]);
+        $json_data = $stmt->fetchColumn();
+        return $json_data ? json_decode($json_data, true) : null;
     }
 
-    public function forceUnlockByConnectionId($connectionId) {
-        $stmt = $this->pdo->prepare("UPDATE cloture_status SET status='open', locked_by_ws_id=NULL WHERE locked_by_ws_id = ? AND status = 'locked'");
-        $stmt->execute([$connectionId]);
+    /**
+     * Vide la table des données de clôture après une clôture générale.
+     * @return void
+     */
+    public function resetState() {
+        // --- CORRECTION ---
+        // On remplace TRUNCATE par DELETE pour rester dans la transaction active.
+        $this->pdo->exec("DELETE FROM cloture_caisse_data");
     }
 }

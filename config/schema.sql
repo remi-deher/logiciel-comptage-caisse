@@ -116,7 +116,17 @@ CREATE TABLE IF NOT EXISTS `reserve_demandes` (
   `statut` ENUM('EN_ATTENTE', 'TRAITEE', 'ANNULEE') NOT NULL DEFAULT 'EN_ATTENTE',
   `notes_demandeur` TEXT DEFAULT NULL,
   `date_traitement` DATETIME NULL,
-  `approbateur_nom` VARCHAR(255) NULL, 
+  `approbateur_nom` VARCHAR(255) NULL,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`caisse_id`) REFERENCES `caisses`(`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- NOUVELLE TABLE POUR LES DONNÉES DE CLÔTURE --
+CREATE TABLE IF NOT EXISTS `cloture_caisse_data` (
+  `id` INT(11) NOT NULL AUTO_INCREMENT,
+  `caisse_id` INT(11) NOT NULL,
+  `date_cloture` DATETIME NOT NULL,
+  `data_json` JSON NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `caisse_id` (`caisse_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
