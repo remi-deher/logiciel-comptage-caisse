@@ -16,6 +16,34 @@ let state = {
     isDirty: false
 };
 
+// --- UTILITIES ---
+const debounce = (func, delay) => {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+    };
+};
+
+const debouncedSendTheoreticals = debounce((target) => {
+    const caisseId = target.dataset.caisseId;
+    if (!caisseId) return;
+
+    const fields = [
+        'ventes_especes', 'retrocession',
+        'ventes_cb', 'retrocession_cb',
+        'ventes_cheques', 'retrocession_cheques',
+        'fond_de_caisse'
+    ];
+    const data = {};
+    fields.forEach(fieldName => {
+        const input = document.getElementById(`${fieldName}_${caisseId}`);
+        if (input) data[fieldName] = input.value;
+    });
+
+    sendWsMessage({ type: 'theoretical_update', caisse_id: caisseId, data: data });
+}, 300); // Envoi groupé après 300ms d'inactivité
+
 // --- FONCTIONS DE GESTION DU CYCLE DE VIE ---
 
 async function refreshCalculatorData() {
@@ -24,8 +52,7 @@ async function refreshCalculatorData() {
         state.config = initialData.config;
         state.calculatorData = initialData.calculatorData;
         
-        // La récupération initiale des verrous n'est plus nécessaire ici, le WebSocket s'en chargera.
-        state.lockedCaisses = []; 
+        state.lockedCaisses = [];
         state.closedCaisses = (initialData.closedCaisses || []).map(String);
 
         ui.renderCalculatorUI(document.getElementById('calculator-page'), state.config);
@@ -108,19 +135,18 @@ function attachEventListeners() {
 }
 
 function handlePageInput(e) {
-    if (e.target.matches('input, textarea')) {
+    const target = e.target;
+    if (target.matches('input, textarea')) {
         state.isDirty = true;
         const statusEl = document.getElementById('autosave-status');
         if(statusEl) statusEl.textContent = 'Modifications non enregistrées.';
         
         service.calculateAll(state.config, state);
         
-        if (e.target.closest('#cloture-details-container')) {
-            ui.updateAllCaisseLocks(state);
-        }
-        
-        if (e.target.matches('input[type="text"], input[type="number"], textarea')) {
-             sendWsMessage({ type: 'update', id: e.target.id, value: e.target.value });
+        if (target.matches('.quantity-input')) {
+             sendWsMessage({ type: 'update', id: target.id, value: target.value });
+        } else if (target.dataset.caisseId) {
+             debouncedSendTheoreticals(target);
         }
     }
 }
@@ -176,18 +202,14 @@ function handlePageKeydown(e) {
 function handlePageFocusIn(e) {
     if (e.target.classList.contains('quantity-input')) {
         const card = e.target.closest('.denom-card');
-        if (card) {
-            card.classList.add('is-focused');
-        }
+        if (card) card.classList.add('is-focused');
     }
 }
 
 function handlePageFocusOut(e) {
     if (e.target.classList.contains('quantity-input')) {
         const card = e.target.closest('.denom-card');
-        if (card) {
-            card.classList.remove('is-focused');
-        }
+        if (card) card.classList.remove('is-focused');
     }
 }
 
@@ -203,30 +225,36 @@ function handleWebSocketMessage(data) {
             sendWsMessage({ type: 'get_full_state' });
             break;
         
-        // --- DÉBUT DE LA CORRECTION ---
-        // On écoute le nouveau type de message 'cloture_state'
         case 'cloture_state':
-            // On met à jour l'état avec les données reçues du serveur
             state.lockedCaisses = data.locked_caisses || [];
             state.closedCaisses = (data.closed_caisses || []).map(String);
             ui.updateAllCaisseLocks(state);
             updateClotureButtonState();
             break;
-        // --- FIN DE LA CORRECTION ---
 
         case 'full_form_state':
             ui.applyFullFormState(data, state);
             service.calculateAll(state.config, state);
             ui.updateAllCaisseLocks(state);
             break;
+
         case 'update':
             ui.applyLiveUpdate(data);
             service.calculateAll(state.config, state);
             break;
+        
+        case 'theoretical_update':
+            if (data.caisse_id && data.data) {
+                ui.applyTheoreticalUpdate(data.caisse_id, data.data);
+                service.calculateAll(state.config, state);
+            }
+            break;
+
         case 'cheque_update': case 'tpe_update':
             ui.applyListUpdate(data, state);
             service.calculateAll(state.config, state);
             break;
+            
         case 'force_reload_all':
              window.location.reload();
              break;

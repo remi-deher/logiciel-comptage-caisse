@@ -101,8 +101,7 @@ function renderClotureSectionForInitiator(caisseId, state) {
                 <td class="text-center">${currentDenomQty}</td>
                 <td class="text-center">${minQtyToKeep}</td>
                 <td>
-                    <input type="number" class="retrait-input" readonly value="${s.qty}">
-                    <input type="hidden" name="retraits[${caisseId}][${s.name}]" value="${s.qty}">
+                    <input type="number" class="retrait-input" readonly value="${s.qty}" data-caisse-id="${caisseId}" name="retraits[${caisseId}][${s.name}]">
                 </td>
                 <td class="text-right">${formatCurrency(s.total, state.config)}</td>
             </tr>
@@ -480,11 +479,31 @@ function renderTpeList(caisseId, terminalId, releves = [], config) {
     `).join('');
 }
 
+export function applyTheoreticalUpdate(caisseId, data) {
+    const activeElement = document.activeElement;
+    
+    for (const fieldName in data) {
+        const inputId = `${fieldName}_${caisseId}`;
+        if (activeElement && activeElement.id === inputId) {
+            continue;
+        }
+        const input = document.getElementById(inputId);
+        if (input) {
+            input.value = data[fieldName];
+        }
+    }
+}
+
 export function applyFullFormState(data, state) {
     if (data.state) {
         for (const id in data.state) {
             const field = document.getElementById(id);
             if (field) field.value = data.state[id];
+        }
+    }
+    if (data.theoreticals) {
+        for (const caisseId in data.theoreticals) {
+            applyTheoreticalUpdate(caisseId, data.theoreticals[caisseId]);
         }
     }
     if (data.cheques) {

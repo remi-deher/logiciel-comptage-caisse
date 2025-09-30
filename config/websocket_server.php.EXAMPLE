@@ -1,8 +1,8 @@
 <?php
-// Fichier : config/websocket_server.php (Corrigé pour la nouvelle structure)
+// Fichier : config/websocket_server.php (Version finale complète et corrigée)
 
 // Port d'écoute du serveur WebSocket
-$port = '8081'; // Assurez-vous que ce port est correct et ouvert sur votre pare-feu
+$port = '8080'; // Assurez-vous que ce port est correct et ouvert sur votre pare-feu
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 require_once __DIR__ . '/../src/services/ClotureStateService.php';
@@ -27,12 +27,12 @@ class CaisseServer implements MessageComponentInterface {
     private $clotureStateService;
     private $dbCredentials;
 
-    // --- NOUVEAU : Gestion des verrous en mémoire ---
+    // --- Gestion des états en mémoire ---
     private $lockedCaisses = []; // Format: ['caisse_id' => 'resource_id']
-
-    private $formState = [];
+    private $formState = []; // Pour les quantités (pièces/billets)
     private $chequesState = []; 
     private $tpeState = [];
+    private $theoreticalsState = []; // Pour les champs théoriques (encaissements, etc.)
 
     public function __construct() {
         $this->clients = new \SplObjectStorage;
@@ -112,7 +112,13 @@ class CaisseServer implements MessageComponentInterface {
             case 'get_full_state':
                 $this->executeDbAction(function() use ($from) {
                     $from->send(json_encode($this->getClotureStatePayload()));
-                    $from->send(json_encode(['type' => 'full_form_state', 'state' => $this->formState, 'cheques' => $this->chequesState, 'tpe' => $this->tpeState]));
+                    $from->send(json_encode([
+                        'type' => 'full_form_state',
+                        'state' => $this->formState,
+                        'cheques' => $this->chequesState,
+                        'tpe' => $this->tpeState,
+                        'theoreticals' => $this->theoreticalsState
+                    ]));
                 });
                 break;
             
@@ -121,6 +127,13 @@ class CaisseServer implements MessageComponentInterface {
                 $this->broadcast($msg, $from);
                 break;
             
+            case 'theoretical_update':
+                if (isset($data['caisse_id']) && isset($data['data'])) {
+                    $this->theoreticalsState[$data['caisse_id']] = $data['data'];
+                    $this->broadcast($msg, $from);
+                }
+                break;
+
             case 'cheque_update':
                 $this->chequesState[$data['caisseId']] = $data['cheques'];
                 $this->broadcast($msg, $from);
@@ -132,16 +145,13 @@ class CaisseServer implements MessageComponentInterface {
                 $this->broadcast($msg, $from);
                 break;
 
-            // --- NOUVELLE GESTION DES VERROUS ---
             case 'cloture_lock':
-                // On ne verrouille que si la caisse n'est pas déjà verrouillée par quelqu'un d'autre
                 if (!isset($this->lockedCaisses[$data['caisse_id']])) {
                     $this->lockedCaisses[$data['caisse_id']] = (string)$from->resourceId;
                     $broadcastClotureState = true;
                 }
                 break;
             case 'cloture_unlock':
-                // On ne déverrouille que si c'est le bon utilisateur qui le demande
                 if (isset($this->lockedCaisses[$data['caisse_id']]) && $this->lockedCaisses[$data['caisse_id']] === (string)$from->resourceId) {
                     unset($this->lockedCaisses[$data['caisse_id']]);
                     $broadcastClotureState = true;
@@ -155,13 +165,13 @@ class CaisseServer implements MessageComponentInterface {
                 $broadcastClotureState = true;
                 break;
 
-            case 'cloture_state_changed': // Reçu après une validation de clôture réussie
-                unset($this->lockedCaisses[$data['caisse_id'] ?? null]); // On libère le verrou
+            case 'cloture_state_changed':
+                unset($this->lockedCaisses[$data['caisse_id'] ?? null]);
                 $broadcastClotureState = true;
                 break;
 
             case 'force_reload_all':
-                $this->formState = []; $this->chequesState = []; $this->tpeState = []; $this->lockedCaisses = [];
+                $this->formState = []; $this->chequesState = []; $this->tpeState = []; $this->theoreticalsState = []; $this->lockedCaisses = [];
                 $this->broadcast(json_encode(['type' => 'force_reload_all']), null);
                 break;
         }
@@ -175,7 +185,6 @@ class CaisseServer implements MessageComponentInterface {
         $this->clients->detach($conn);
         $resourceId = (string)$conn->resourceId;
         
-        // On libère les verrous détenus par la connexion qui s'est fermée
         foreach ($this->lockedCaisses as $caisseId => $lockOwnerId) {
             if ($lockOwnerId === $resourceId) {
                 unset($this->lockedCaisses[$caisseId]);
@@ -184,9 +193,9 @@ class CaisseServer implements MessageComponentInterface {
         
         if (count($this->clients) === 0) {
              echo "Dernier client déconnecté. Réinitialisation de l'état en mémoire.\n";
-             $this->formState = []; $this->chequesState = []; $this->tpeState = []; $this->lockedCaisses = [];
+             $this->formState = []; $this->chequesState = []; $this->tpeState = []; $this->theoreticalsState = []; $this->lockedCaisses = [];
          } else {
-             $this->broadcastClotureStateToAll(); // Notifier les autres du changement de verrou
+             $this->broadcastClotureStateToAll();
          }
         echo "CONNEXION FERMEE pour CLIENT-{$conn->resourceId}.\n";
     }
@@ -196,7 +205,6 @@ class CaisseServer implements MessageComponentInterface {
         $conn->close();
     }
     
-    // --- NOUVELLE MÉTHODE POUR CONSTRUIRE L'ÉTAT ACTUEL ---
     private function getClotureStatePayload() {
         $caisses = [];
         foreach ($this->lockedCaisses as $caisseId => $resourceId) {
