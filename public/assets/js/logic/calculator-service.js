@@ -38,7 +38,7 @@ export async function fetchInitialData() {
     });
 
     const clotureState = {
-        lockedCaisses: configResult.lockedCaisses || [],
+        lockedCaisses: [], // N'est plus fourni par cette route
         closedCaisses: configResult.closedCaisses || []
     };
 
@@ -47,6 +47,7 @@ export async function fetchInitialData() {
 
     return { config: configResult, calculatorData, clotureState };
 }
+
 
 /**
  * Prépare le FormData pour la clôture d'une seule caisse.
@@ -86,25 +87,27 @@ export async function submitClotureGenerale() {
 
 /**
  * Calcule les écarts pour tous les types de paiement d'une caisse donnée.
+ * --- CORRECTION : Tous les calculs sont faits en centimes pour éviter les erreurs de virgule flottante ---
  */
 export function calculateEcartsForCaisse(caisseId, appState) {
     const { calculatorData, config } = appState;
     const caisseData = calculatorData.caisse[caisseId] || {};
 
-    // Calcul Espèces
-    let totalCompteEspeces = 0;
+    // --- Calcul Espèces en centimes ---
+    let totalCompteEspecesCents = 0;
     const allDenoms = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
     for (const name in allDenoms) {
         const quantite = parseInt(caisseData.denominations?.[name], 10) || 0;
-        totalCompteEspeces += quantite * parseFloat(allDenoms[name]);
+        // On convertit la valeur de la dénomination en centimes pour le calcul
+        totalCompteEspecesCents += quantite * Math.round(parseFloat(allDenoms[name]) * 100);
     }
-    const fondDeCaisse = parseLocaleFloat(caisseData.fond_de_caisse);
-    const ventesEspeces = parseLocaleFloat(caisseData.ventes_especes);
-    const retrocession = parseLocaleFloat(caisseData.retrocession);
-    const ecartEspeces = (totalCompteEspeces - fondDeCaisse) - (ventesEspeces + retrocession);
+    const fondDeCaisseCents = Math.round(parseLocaleFloat(caisseData.fond_de_caisse) * 100);
+    const ventesEspecesCents = Math.round(parseLocaleFloat(caisseData.ventes_especes) * 100);
+    const retrocessionCents = Math.round(parseLocaleFloat(caisseData.retrocession) * 100);
+    const ecartEspecesCents = (totalCompteEspecesCents - fondDeCaisseCents) - (ventesEspecesCents + retrocessionCents);
 
-    // Calcul CB
-    let totalCompteCb = 0;
+    // --- Calcul CB en centimes ---
+    let totalCompteCbCents = 0;
     const tpeData = caisseData.tpe || {};
     for (const terminalId in tpeData) {
         const releves = tpeData[terminalId];
@@ -112,22 +115,31 @@ export function calculateEcartsForCaisse(caisseId, appState) {
             const sortedReleves = [...releves].sort((a, b) => (b.heure || '00:00:00').localeCompare(a.heure || '00:00:00'));
             const dernierReleve = sortedReleves[0];
             if (dernierReleve) {
-               totalCompteCb += parseLocaleFloat(dernierReleve.montant);
+               totalCompteCbCents += Math.round(parseLocaleFloat(dernierReleve.montant) * 100);
             }
         }
     }
-    const ventesCb = parseLocaleFloat(caisseData.ventes_cb);
-    const retrocessionCb = parseLocaleFloat(caisseData.retrocession_cb);
-    const ecartCb = totalCompteCb - (ventesCb + retrocessionCb);
+    const ventesCbCents = Math.round(parseLocaleFloat(caisseData.ventes_cb) * 100);
+    const retrocessionCbCents = Math.round(parseLocaleFloat(caisseData.retrocession_cb) * 100);
+    const ecartCbCents = totalCompteCbCents - (ventesCbCents + retrocessionCbCents);
     
-    // Calcul Chèques
-    const totalCompteCheques = (caisseData.cheques || []).reduce((sum, cheque) => sum + parseLocaleFloat(cheque.montant), 0);
-    const ventesCheques = parseLocaleFloat(caisseData.ventes_cheques);
-    const retrocessionCheques = parseLocaleFloat(caisseData.retrocession_cheques);
-    const ecartCheques = totalCompteCheques - (ventesCheques + retrocessionCheques);
+    // --- Calcul Chèques en centimes ---
+    const totalCompteChequesCents = (caisseData.cheques || []).reduce((sum, cheque) => sum + Math.round(parseLocaleFloat(cheque.montant) * 100), 0);
+    const ventesChequesCents = Math.round(parseLocaleFloat(caisseData.ventes_cheques) * 100);
+    const retrocessionChequesCents = Math.round(parseLocaleFloat(caisseData.retrocession_cheques) * 100);
+    const ecartChequesCents = totalCompteChequesCents - (ventesChequesCents + retrocessionChequesCents);
 
-    return { totalCompteEspeces, ecartEspeces, totalCompteCb, ecartCb, totalCompteCheques, ecartCheques };
+    // On reconvertit en euros UNIQUEMENT pour l'affichage final
+    return { 
+        totalCompteEspeces: totalCompteEspecesCents / 100, 
+        ecartEspeces: ecartEspecesCents / 100, 
+        totalCompteCb: totalCompteCbCents / 100, 
+        ecartCb: ecartCbCents / 100, 
+        totalCompteCheques: totalCompteChequesCents / 100, 
+        ecartCheques: ecartChequesCents / 100 
+    };
 }
+
 
 /**
  * Calcule la suggestion de retrait d'espèces pour une caisse.
