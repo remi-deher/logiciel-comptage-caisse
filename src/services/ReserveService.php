@@ -27,13 +27,12 @@ class ReserveService {
         }
     }
     
-    // NOUVELLE MÉTHODE : Pour mettre à jour le stock de la réserve depuis l'admin
     public function updateQuantities(array $quantities) {
         $this->pdo->beginTransaction();
         try {
             foreach ($quantities as $denomination_nom => $quantite) {
                 if (!isset($this->all_denominations[$denomination_nom])) {
-                    continue; // Ignore les dénominations inconnues pour la sécurité
+                    continue;
                 }
                 $stmt = $this->pdo->prepare(
                     "UPDATE reserve_denominations SET quantite = ? WHERE denomination_nom = ?"
@@ -44,7 +43,6 @@ class ReserveService {
             return true;
         } catch (Exception $e) {
             $this->pdo->rollBack();
-            // Log l'erreur ou la propage pour un traitement ultérieur
             error_log("Erreur lors de la mise à jour de la réserve : " . $e->getMessage());
             return false;
         }
@@ -85,10 +83,15 @@ class ReserveService {
     public function createDemande($data) {
         $valeur = ($this->all_denominations[$data['denomination_demandee']] ?? 0) * intval($data['quantite_demandee']);
         
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO reserve_demandes (date_demande, caisse_id, demandeur_nom, denomination_demandee, quantite_demandee, valeur_demandee, notes_demandeur) 
-            VALUES (NOW(), ?, ?, ?, ?, ?, ?)"
-        );
+        // --- CORRECTION : Compatibilité SQLite/MySQL et ajout du statut ---
+        $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $now_function = ($driver === 'sqlite') ? "datetime('now')" : "NOW()";
+
+        // On ajoute explicitement le statut pour plus de robustesse.
+        $sql = "INSERT INTO reserve_demandes (date_demande, caisse_id, demandeur_nom, denomination_demandee, quantite_demandee, valeur_demandee, notes_demandeur, statut) 
+                VALUES ({$now_function}, ?, ?, ?, ?, ?, ?, 'EN_ATTENTE')";
+        
+        $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             $data['caisse_id'],
             $_SESSION['admin_username'] ?? 'Operateur',
@@ -121,15 +124,19 @@ class ReserveService {
             $stmt = $this->pdo->prepare("UPDATE reserve_denominations SET quantite = quantite + ? WHERE denomination_nom = ?");
             $stmt->execute([$data['quantite_depuis_caisse'], $data['denomination_depuis_caisse']]);
             
+            // --- CORRECTION : Compatibilité SQLite/MySQL ---
+            $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            $now_function = ($driver === 'sqlite') ? "datetime('now')" : "NOW()";
+            
             // Mettre à jour la demande
-            $stmt = $this->pdo->prepare("UPDATE reserve_demandes SET statut = 'TRAITEE', date_traitement = NOW(), approbateur_nom = ? WHERE id = ?");
+            $stmt = $this->pdo->prepare("UPDATE reserve_demandes SET statut = 'TRAITEE', date_traitement = {$now_function}, approbateur_nom = ? WHERE id = ?");
             $stmt->execute([$_SESSION['admin_username'] ?? 'Admin', $data['demande_id']]);
 
             // Ajouter au journal des opérations
-            $stmt_log = $this->pdo->prepare(
-                "INSERT INTO reserve_operations_log (demande_id, date_operation, caisse_id, denomination_vers_caisse, quantite_vers_caisse, denomination_depuis_caisse, quantite_depuis_caisse, valeur_echange, notes, approbateur_nom)
-                VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?)"
-            );
+            $sql_log = "INSERT INTO reserve_operations_log (demande_id, date_operation, caisse_id, denomination_vers_caisse, quantite_vers_caisse, denomination_depuis_caisse, quantite_depuis_caisse, valeur_echange, notes, approbateur_nom)
+                        VALUES (?, {$now_function}, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $stmt_log = $this->pdo->prepare($sql_log);
+
             $stmt_log->execute([
                 $data['demande_id'], $data['caisse_id'],
                 $data['denomination_vers_caisse'], $data['quantite_vers_caisse'],

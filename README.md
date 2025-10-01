@@ -35,3 +35,10 @@ Une base de donnée MysQL et un serveur Web sont les seuls prérequis avec compo
 - Importer le fichier schema.sql pour créer les tables
 - Faites les modifications necessaire dans votre serveur web (il dois pointer sur le dossier public du projet)
 - Un script install.sh se trouve à la racine du projet, celui ci n'a pas été testé pour le moment et nécessitera quelques ajustement
+
+
+## Activation des Hooks Git
+
+Pour garantir la qualité du code, ce projet utilise un hook pre-commit qui lance les tests unitaires avant chaque commit. Pour l'activer sur votre copie locale, lancez la commande suivante à la racine du projet :
+
+ln -s ../../scripts/pre-commit.sh .git/hooks/pre-commit

@@ -1,60 +1,49 @@
 <?php
-// Fichier : src/services/ClotureStateService.php (Version finale corrigée)
+// Fichier : src/services/ClotureStateService.php (Corrigé pour la compatibilité des tests)
 
 class ClotureStateService {
     private $pdo;
-
-    /**
-     * Permet de remplacer l'objet PDO interne après une reconnexion.
-     * @param PDO $pdo Le nouvel objet PDO.
-     */
-    public function setPDO(PDO $pdo) {
-        $this->pdo = $pdo;
-    }
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
     }
 
-    /**
-     * Confirme qu'une caisse est clôturée en insérant/mettant à jour ses données.
-     * @param int $caisseId
-     * @param string $dataJson
-     * @return void
-     */
-    public function confirmCaisse($caisseId, $dataJson) {
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO cloture_caisse_data (caisse_id, date_cloture, data_json) 
-             VALUES (?, NOW(), ?)
-             ON DUPLICATE KEY UPDATE date_cloture = NOW(), data_json = ?"
-        );
-        $stmt->execute([$caisseId, $dataJson, $dataJson]);
+    public function setPDO(PDO $pdo) {
+        $this->pdo = $pdo;
     }
 
-    /**
-     * Annule la clôture d'une caisse en supprimant son enregistrement.
-     * @param int $caisseId
-     * @return void
-     */
+    public function confirmCaisse($caisseId, $dataJson) {
+        // --- DÉBUT DE LA CORRECTION ---
+        // On détecte le type de base de données utilisé (mysql en production, sqlite pour les tests)
+        $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'sqlite') {
+            // Syntaxe pour SQLite : Remplacer la ligne existante si la caisse_id est déjà présente.
+            $sql = "INSERT OR REPLACE INTO cloture_caisse_data (caisse_id, date_cloture, data_json) 
+                    VALUES (?, datetime('now'), ?)";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$caisseId, $dataJson]);
+        } else {
+            // Syntaxe pour MySQL (celle que nous avions déjà)
+            $sql = "INSERT INTO cloture_caisse_data (caisse_id, date_cloture, data_json) 
+                    VALUES (?, NOW(), ?)
+                    ON DUPLICATE KEY UPDATE date_cloture = NOW(), data_json = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$caisseId, $dataJson, $dataJson]);
+        }
+        // --- FIN DE LA CORRECTION ---
+    }
+
     public function reopenCaisse($caisseId) {
         $stmt = $this->pdo->prepare("DELETE FROM cloture_caisse_data WHERE caisse_id = ?");
         $stmt->execute([$caisseId]);
     }
 
-    /**
-     * Récupère la liste des ID des caisses qui sont actuellement clôturées.
-     * @return array
-     */
     public function getClosedCaisses() {
         $stmt = $this->pdo->query("SELECT caisse_id FROM cloture_caisse_data");
         return $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
     }
     
-    /**
-     * Récupère les données JSON d'une caisse clôturée spécifique.
-     * @param int $caisseId
-     * @return array|null
-     */
     public function getClosedCaisseData($caisseId) {
         $stmt = $this->pdo->prepare("SELECT data_json FROM cloture_caisse_data WHERE caisse_id = ?");
         $stmt->execute([$caisseId]);
@@ -62,13 +51,8 @@ class ClotureStateService {
         return $json_data ? json_decode($json_data, true) : null;
     }
 
-    /**
-     * Vide la table des données de clôture après une clôture générale.
-     * @return void
-     */
     public function resetState() {
-        // --- CORRECTION ---
-        // On remplace TRUNCATE par DELETE pour rester dans la transaction active.
+        // La commande DELETE est compatible avec MySQL et SQLite.
         $this->pdo->exec("DELETE FROM cloture_caisse_data");
     }
 }
