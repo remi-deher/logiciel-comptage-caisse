@@ -3,13 +3,15 @@
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 
 /**
- * Récupère les données initiales (configuration et dernière sauvegarde).
+ * Récupère les données initiales (configuration, dernière sauvegarde et état de la réserve).
  */
 export async function fetchInitialData() {
     const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
     const dataPromise = fetch('index.php?route=calculateur/get_initial_data').then(res => res.json());
+    // On ajoute l'appel pour les données de la réserve
+    const reservePromise = fetch('index.php?route=reserve/get_data').then(res => res.json());
 
-    const [configResult, dataResult] = await Promise.all([configPromise, dataPromise]);
+    const [configResult, dataResult, reserveResult] = await Promise.all([configPromise, dataPromise, reservePromise]);
     
     let calculatorData = { caisse: {} };
     if (dataResult.success && dataResult.data) {
@@ -38,14 +40,20 @@ export async function fetchInitialData() {
     });
 
     const clotureState = {
-        lockedCaisses: [], // N'est plus fourni par cette route
+        lockedCaisses: [],
         closedCaisses: configResult.closedCaisses || []
     };
 
     delete configResult.lockedCaisses;
     delete configResult.closedCaisses;
 
-    return { config: configResult, calculatorData, clotureState };
+    // On ajoute le statut de la réserve aux données retournées
+    return { 
+        config: configResult, 
+        calculatorData, 
+        clotureState, 
+        reserveStatus: reserveResult.success ? reserveResult.reserve_status : { denominations: {}, total: 0 } 
+    };
 }
 
 

@@ -5,6 +5,9 @@ import * as ui from './calculator-ui.js';
 import { setActiveMessageHandler } from '../main.js';
 import { initializeWebSocket, sendWsMessage } from './websocket-service.js';
 import * as cloture from './cloture-logic.js';
+// On importe le service de la réserve
+import * as reserveService from './reserve-service.js';
+import { formatCurrency } from '../utils/formatters.js';
 
 // État global de la page du calculateur
 let state = {
@@ -13,7 +16,8 @@ let state = {
     calculatorData: { caisse: {} },
     lockedCaisses: [],
     closedCaisses: [],
-    isDirty: false
+    isDirty: false,
+    reserveStatus: { denominations: {}, total: 0 } // Nouvel état pour le stock de la réserve
 };
 
 // --- UTILITIES ---
@@ -51,6 +55,7 @@ async function refreshCalculatorData() {
         const initialData = await service.fetchInitialData();
         state.config = initialData.config;
         state.calculatorData = initialData.calculatorData;
+        state.reserveStatus = initialData.reserveStatus; // On stocke l'état de la réserve
         
         state.lockedCaisses = [];
         state.closedCaisses = (initialData.closedCaisses || []).map(String);
@@ -96,6 +101,29 @@ async function handleAutosave() {
 
 // --- GESTION DES ÉVÉNEMENTS ---
 
+async function handleReserveRequestSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Envoi...';
+
+    try {
+        const result = await reserveService.submitDemande(new FormData(form));
+        if (!result.success) throw new Error(result.message);
+        
+        alert('Demande envoyée avec succès !');
+        sendWsMessage({ type: 'nouvelle_demande_reserve' }); // Notifie les autres clients
+        document.getElementById('reserve-request-modal').classList.remove('visible');
+
+    } catch (error) {
+        alert(`Erreur: ${error.message}`);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Envoyer la demande';
+    }
+}
+
 function attachEventListeners() {
     const page = document.getElementById('calculator-page');
     if (page._eventListenersAttached) return;
@@ -108,8 +136,32 @@ function attachEventListeners() {
     
     const form = document.getElementById('caisse-form');
     if (form) {
-        form.addEventListener('submit', (e) => { e.preventDefault(); handleAutosave(); });
+        form.addEventListener('submit', (e) => { 
+            if (e.target.matches('#caisse-form')) {
+                e.preventDefault(); 
+                handleAutosave();
+            }
+        });
     }
+
+    // On ajoute l'écouteur pour le formulaire de la modale
+    page.addEventListener('submit', (e) => {
+        if (e.target.matches('#calculator-reserve-request-form')) {
+            handleReserveRequestSubmit(e);
+        }
+    });
+
+    // On ajoute un écouteur pour le calcul du total dans la modale
+    page.addEventListener('input', (e) => {
+        if (e.target.closest('#calculator-reserve-request-form')) {
+            const form = e.target.closest('form');
+            const quantite = parseInt(form.elements.quantite_demandee.value) || 0;
+            const denomName = form.elements.denomination_demandee.value;
+            const allDenominations = { ...state.config.denominations.billets, ...state.config.denominations.pieces };
+            const denomValue = allDenominations[denomName] || 0;
+            document.getElementById('reserve-demande-valeur').textContent = formatCurrency(quantite * denomValue, state.config);
+        }
+    });
 
     const clotureBtn = document.getElementById('cloture-btn');
     if (clotureBtn) {
@@ -136,7 +188,7 @@ function attachEventListeners() {
 
 function handlePageInput(e) {
     const target = e.target;
-    if (target.matches('input, textarea')) {
+    if (target.matches('input, textarea') && !target.closest('#calculator-reserve-request-form')) {
         state.isDirty = true;
         const statusEl = document.getElementById('autosave-status');
         if(statusEl) statusEl.textContent = 'Modifications non enregistrées.';
@@ -154,6 +206,22 @@ function handlePageInput(e) {
 function handlePageClick(e) {
     const target = e.target;
     
+    // NOUVELLE LOGIQUE pour ouvrir la modale
+    if (target.closest('.open-reserve-modal-btn')) {
+        const caisseId = target.closest('.open-reserve-modal-btn').dataset.caisseId;
+        // On appelle la fonction de rendu avec les données de la réserve stockées dans notre état
+        ui.renderReserveModal(caisseId, state.reserveStatus, state.config);
+        document.getElementById('reserve-request-modal').classList.add('visible');
+        return;
+    }
+
+    // NOUVELLE LOGIQUE pour fermer la modale
+    const reserveModal = document.getElementById('reserve-request-modal');
+    if (reserveModal && (target.matches('#cancel-reserve-request-btn') || target.matches('.modal-close') || e.target === reserveModal)) {
+        reserveModal.classList.remove('visible');
+        return;
+    }
+
     if (target.closest('.cloture-cancel-btn')) {
         cloture.cancelClotureCaisse(target.closest('.cloture-cancel-btn').dataset.caisseId, state);
         return;
@@ -217,6 +285,18 @@ function handlePageFocusOut(e) {
 
 function handleWebSocketMessage(data) {
     if (!data || !data.type) return;
+
+    // NOUVEAU : Gérer la mise à jour de la réserve
+    if (data.type === 'nouvelle_demande_reserve') {
+        // On rafraîchit simplement les données de la réserve en arrière-plan
+        fetch('index.php?route=reserve/get_data').then(res => res.json()).then(result => {
+            if (result.success) {
+                state.reserveStatus = result.reserve_status;
+                console.log("État de la réserve mis à jour via WebSocket.");
+            }
+        });
+        return; // Pas besoin de faire autre chose
+    }
 
     switch (data.type) {
         case 'welcome':

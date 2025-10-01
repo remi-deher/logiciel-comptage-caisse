@@ -296,6 +296,7 @@ function createDenominationCard(caisseId, name, value, type, config) {
         </div>`;
 }
 
+
 /**
  * Génère l'interface principale du calculateur.
  */
@@ -310,7 +311,17 @@ export function renderCalculatorUI(pageElement, config) {
         const isActive = index === 0 ? 'active' : '';
         tabsHtml += `<button type="button" class="tab-link ${isActive}" data-tab="caisse${id}" data-caisse-id="${id}">${nom}</button>`;
         
-        ecartsHtml += `<div id="ecart-display-caisse${id}" class="ecart-display ${isActive}"><h3 class="caisse-name-display"><i class="fa-solid fa-cash-register"></i> ${nom}</h3><div id="main-ecart-caisse${id}" class="main-ecart-display"><span class="ecart-label">Écart Espèces</span><span class="ecart-value">0,00 €</span><p class="ecart-explanation"></p></div><div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div></div>`;
+        ecartsHtml += `
+            <div id="ecart-display-caisse${id}" class="ecart-display ${isActive}">
+                <div class="caisse-header">
+                     <h3 class="caisse-name-display"><i class="fa-solid fa-cash-register"></i> ${nom}</h3>
+                     <button type="button" class="btn action-btn open-reserve-modal-btn" data-caisse-id="${id}">
+                         <i class="fa-solid fa-vault"></i> Demander à la Réserve
+                     </button>
+                </div>
+                <div id="main-ecart-caisse${id}" class="main-ecart-display"><span class="ecart-label">Écart Espèces</span><span class="ecart-value">0,00 €</span><p class="ecart-explanation"></p></div>
+                <div id="secondary-ecarts-caisse${id}" class="secondary-ecarts"></div>
+            </div>`;
 
         const billetsHtml = Object.entries(config.denominations.billets).map(([name, v]) => createDenominationCard(id, name, v, 'bill', config)).join('');
         const piecesHtml = Object.entries(config.denominations.pieces).map(([name, v]) => createDenominationCard(id, name, v, 'piece', config)).join('');
@@ -620,4 +631,65 @@ export function handleCalculatorClickEvents(e, state) {
         return false;
     }
     return false;
+}
+
+// NOUVELLE FONCTION pour générer le contenu de la modale de demande à la réserve
+export function renderReserveModal(caisseId, reserveStatus, config) {
+    const modalBody = document.getElementById('reserve-request-modal-body');
+    if (!modalBody) return;
+
+    const allDenominations = { ...config.denominations.billets, ...config.denominations.pieces };
+    const sortedDenoms = Object.entries(allDenominations).sort((a, b) => b[1] - a[1]);
+    
+    const denomOptions = sortedDenoms.map(([name, value]) => {
+        const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+        return `<option value="${name}">${label}</option>`;
+    }).join('');
+
+    const stockHtml = sortedDenoms.map(([name, value]) => {
+        const quantite = reserveStatus.denominations[name] || 0;
+        const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
+        return `
+            <div class="denom-card ${quantite > 0 ? '' : 'disabled'}">
+                <h4>${label}</h4>
+                <div class="quantite">${quantite}</div>
+            </div>`;
+    }).join('');
+
+    modalBody.innerHTML = `
+        <div class="reserve-request-layout">
+            <div class="reserve-stock-preview">
+                <h4><i class="fa-solid fa-boxes-stacked"></i> Stock actuel de la Réserve</h4>
+                <div class="total-value-display">Valeur totale : ${formatCurrency(reserveStatus.total, config)}</div>
+                <div class="denominations-grid">${stockHtml}</div>
+            </div>
+            <div class="reserve-request-form">
+                <h4><i class="fa-solid fa-file-invoice-dollar"></i> Nouvelle Demande</h4>
+                <form id="calculator-reserve-request-form">
+                    <input type="hidden" name="caisse_id" value="${caisseId}">
+                    <div class="form-group">
+                        <label for="reserve-demande-caisse">Pour la caisse</label>
+                        <input type="text" id="reserve-demande-caisse" value="${config.nomsCaisses[caisseId]}" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="reserve-demande-denomination">J'ai besoin de</label>
+                        <select id="reserve-demande-denomination" name="denomination_demandee" required>${denomOptions}</select>
+                    </div>
+                    <div class="form-group">
+                        <label for="reserve-demande-quantite">Quantité</label>
+                        <input type="number" id="reserve-demande-quantite" name="quantite_demandee" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reserve-notes-demandeur">Notes (optionnel)</label>
+                        <textarea id="reserve-notes-demandeur" name="notes_demandeur" rows="2" placeholder="Ex: Pour fond de caisse..."></textarea>
+                    </div>
+                    <div class="value-display">Total demandé: <span id="reserve-demande-valeur">0,00 ${config.currencySymbol}</span></div>
+                    <div class="form-actions">
+                        <button type="button" class="btn delete-btn" id="cancel-reserve-request-btn">Annuler</button>
+                        <button type="submit" class="btn save-btn">Envoyer la demande</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
 }

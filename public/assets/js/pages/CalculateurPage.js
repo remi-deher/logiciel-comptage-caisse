@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/pages/CalculateurPage.js (Corrigé)
+// Fichier : public/assets/js/pages/CalculateurPage.js
 
 import { initializeCalculator } from '../logic/calculator-logic.js';
 
@@ -33,6 +33,17 @@ export function renderCalculateurPage(element) {
                 </div>
             </div>
         </form>
+
+        <div id="reserve-request-modal" class="modal">
+            <div class="modal-content wide">
+                <div class="modal-header">
+                    <h3>Effectuer une demande à la Réserve</h3>
+                    <span class="modal-close">&times;</span>
+                </div>
+                <div class="modal-body" id="reserve-request-modal-body">
+                    </div>
+            </div>
+        </div>
     </div>
   `;
 
