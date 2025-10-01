@@ -124,6 +124,47 @@ async function handleReserveRequestSubmit(e) {
     }
 }
 
+// NOUVELLE FONCTION pour calculer la balance de la modale
+function updateReserveModalBalance() {
+    const form = document.getElementById('calculator-reserve-request-form');
+    if (!form) return;
+
+    const allDenominations = { ...state.config.denominations.billets, ...state.config.denominations.pieces };
+    let totalVers = 0;
+    let totalDepuis = 0;
+
+    form.querySelectorAll('#demande-rows-container .exchange-row').forEach(row => {
+        const denom = row.querySelector('select').value;
+        const qty = parseInt(row.querySelector('input').value) || 0;
+        totalVers += qty * (parseFloat(allDenominations[denom]) || 0);
+    });
+
+    form.querySelectorAll('#donne-rows-container .exchange-row').forEach(row => {
+        const denom = row.querySelector('select').value;
+        const qty = parseInt(row.querySelector('input').value) || 0;
+        totalDepuis += qty * (parseFloat(allDenominations[denom]) || 0);
+    });
+
+    document.getElementById('total-vers-caisse').textContent = formatCurrency(totalVers, state.config);
+    document.getElementById('total-depuis-caisse').textContent = formatCurrency(totalDepuis, state.config);
+
+    const balance = totalVers - totalDepuis;
+    const balanceIndicator = document.getElementById('reserve-balance-indicator');
+    const submitBtn = document.getElementById('submit-reserve-request-btn');
+
+    balanceIndicator.querySelector('span').textContent = `Balance : ${formatCurrency(balance, state.config)}`;
+    // Le bouton est actif si la balance est nulle ET qu'au moins un montant a été saisi
+    if (Math.abs(balance) < 0.01 && (totalVers > 0 || totalDepuis > 0)) {
+        balanceIndicator.className = 'balance-indicator balance-ok';
+        balanceIndicator.querySelector('i').className = 'fa-solid fa-scale-balanced';
+        submitBtn.disabled = false;
+    } else {
+        balanceIndicator.className = 'balance-indicator balance-nok';
+        balanceIndicator.querySelector('i').className = 'fa-solid fa-scale-unbalanced';
+        submitBtn.disabled = true;
+    }
+}
+
 function attachEventListeners() {
     const page = document.getElementById('calculator-page');
     if (page._eventListenersAttached) return;
@@ -144,44 +185,17 @@ function attachEventListeners() {
         });
     }
 
-    // On ajoute l'écouteur pour le formulaire de la modale
+    // Gestion de la soumission du formulaire de la modale
     page.addEventListener('submit', (e) => {
         if (e.target.matches('#calculator-reserve-request-form')) {
             handleReserveRequestSubmit(e);
         }
     });
 
-    // On ajoute un écouteur pour le calcul du total dans la modale
+    // Gestion de la mise à jour de la balance dans la modale
     page.addEventListener('input', (e) => {
         if (e.target.closest('#calculator-reserve-request-form')) {
-            const form = e.target.closest('form');
-            const allDenominations = { ...state.config.denominations.billets, ...state.config.denominations.pieces };
-            
-            const qteVers = parseInt(form.elements.quantite_vers_caisse.value) || 0;
-            const denomVers = form.elements.denomination_vers_caisse.value;
-            const totalVers = qteVers * parseFloat(allDenominations[denomVers] || 0);
-
-            const qteDepuis = parseInt(form.elements.quantite_depuis_caisse.value) || 0;
-            const denomDepuis = form.elements.denomination_depuis_caisse.value;
-            const totalDepuis = qteDepuis * parseFloat(allDenominations[denomDepuis] || 0);
-
-            document.getElementById('total-vers-caisse').textContent = formatCurrency(totalVers, state.config);
-            document.getElementById('total-depuis-caisse').textContent = formatCurrency(totalDepuis, state.config);
-            
-            const balance = totalVers - totalDepuis;
-            const balanceIndicator = document.getElementById('reserve-balance-indicator');
-            const submitBtn = document.getElementById('submit-reserve-request-btn');
-
-            balanceIndicator.querySelector('span').textContent = `Balance : ${formatCurrency(balance, state.config)}`;
-            if (Math.abs(balance) < 0.01) {
-                balanceIndicator.className = 'balance-indicator balance-ok';
-                balanceIndicator.querySelector('i').className = 'fa-solid fa-scale-balanced';
-                submitBtn.disabled = false;
-            } else {
-                balanceIndicator.className = 'balance-indicator balance-nok';
-                balanceIndicator.querySelector('i').className = 'fa-solid fa-scale-unbalanced';
-                submitBtn.disabled = true;
-            }
+            updateReserveModalBalance();
         }
     });
 
@@ -210,6 +224,7 @@ function attachEventListeners() {
 
 function handlePageInput(e) {
     const target = e.target;
+    // On s'assure que l'input n'est pas dans la modale de réserve
     if (target.matches('input, textarea') && !target.closest('#calculator-reserve-request-form')) {
         state.isDirty = true;
         const statusEl = document.getElementById('autosave-status');
@@ -228,22 +243,41 @@ function handlePageInput(e) {
 function handlePageClick(e) {
     const target = e.target;
     
-    // NOUVELLE LOGIQUE pour ouvrir la modale
+    // Ouvre la modale
     if (target.closest('.open-reserve-modal-btn')) {
         const caisseId = target.closest('.open-reserve-modal-btn').dataset.caisseId;
-        // On appelle la fonction de rendu avec les données de la réserve stockées dans notre état
         ui.renderReserveModal(caisseId, state.reserveStatus, state.config);
         document.getElementById('reserve-request-modal').classList.add('visible');
         return;
     }
 
-    // NOUVELLE LOGIQUE pour fermer la modale
+    // Ferme la modale
     const reserveModal = document.getElementById('reserve-request-modal');
     if (reserveModal && (target.matches('#cancel-reserve-request-btn') || target.matches('.modal-close') || e.target === reserveModal)) {
         reserveModal.classList.remove('visible');
         return;
     }
 
+    // Gère l'ajout d'une ligne dans la modale
+    if (target.closest('.add-exchange-row-btn')) {
+        const type = target.closest('.add-exchange-row-btn').dataset.type;
+        const allDenominations = { ...state.config.denominations.billets, ...state.config.denominations.pieces };
+        const sortedDenoms = Object.entries(allDenominations).sort((a, b) => b[1] - a[1]);
+        const denomOptions = sortedDenoms.map(([name, value]) => {
+            const label = value >= 1 ? `${value} ${state.config.currencySymbol}` : `${value * 100} cts`;
+            return `<option value="${name}">${label}</option>`;
+        }).join('');
+        ui.addExchangeRow(type, denomOptions);
+        return;
+    }
+    
+    // Gère la suppression d'une ligne dans la modale
+    if (target.closest('.remove-exchange-row-btn')) {
+        target.closest('.exchange-row').remove();
+        updateReserveModalBalance();
+        return;
+    }
+    
     if (target.closest('.cloture-cancel-btn')) {
         cloture.cancelClotureCaisse(target.closest('.cloture-cancel-btn').dataset.caisseId, state);
         return;

@@ -293,6 +293,7 @@
     border-color: var(--color-primary-dark);
 }
 
+/* STYLES POUR L'INTEGRATION DE LA RESERVE DANS LA MODALE */
 .caisse-header {
     display: flex;
     justify-content: space-between;
@@ -318,6 +319,13 @@
     .reserve-request-layout {
         grid-template-columns: 1fr;
     }
+}
+
+.reserve-stock-preview h4, .reserve-request-form h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--color-border-light);
+    padding-bottom: 10px;
 }
 
 .reserve-stock-preview .total-value-display {
@@ -355,6 +363,8 @@
 .reserve-stock-preview .denom-card h4 {
     margin: 0 0 5px 0;
     font-size: 1em;
+    border: none;
+    padding: 0;
 }
 
 .reserve-stock-preview .denom-card .quantite {
@@ -362,9 +372,67 @@
     font-weight: bold;
 }
 
+.reserve-request-form .exchange-panel {
+    background-color: var(--color-surface-alt);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.reserve-request-form .exchange-panel h5 {
+    margin: 0 0 10px 0;
+}
+
+.exchange-rows-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.exchange-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.exchange-row select {
+    flex: 2;
+}
+.exchange-row input.quantity {
+    flex: 1;
+}
+
+.add-exchange-row-btn {
+    font-size: 0.9em !important;
+    padding: 5px 10px !important;
+}
+
+.reserve-request-form .balance-indicator {
+    padding: 10px;
+    text-align: center;
+    font-weight: bold;
+    border-radius: 8px;
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.reserve-request-form .balance-indicator.balance-nok {
+    background-color: rgba(192, 57, 43, 0.1);
+    color: var(--color-danger);
+}
+
+.reserve-request-form .balance-indicator.balance-ok {
+    background-color: rgba(39, 174, 96, 0.1);
+    color: var(--color-success);
+}
+
 .reserve-request-form .value-display {
     font-weight: bold;
-    margin-top: 15px;
+    margin-top: 10px;
+    text-align: right;
 }
 
 .reserve-request-form .form-actions {
@@ -374,4 +442,9 @@
     margin-top: 20px;
     border-top: 1px solid var(--color-border-light);
     padding-top: 20px;
+}
+
+.action-btn-small {
+    padding: 5px 10px;
+    font-size: 0.8em;
 }

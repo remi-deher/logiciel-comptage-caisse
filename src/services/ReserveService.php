@@ -26,7 +26,7 @@ class ReserveService {
             $this->pdo->exec($sql);
         }
     }
-    
+
     public function updateQuantities(array $quantities) {
         $this->pdo->beginTransaction();
         try {
@@ -81,13 +81,71 @@ class ReserveService {
     }
 
     public function createDemande($data) {
-        $valeur = ($this->all_denominations[$data['denomination_demandee']] ?? 0) * intval($data['quantite_demandee']);
+        $valeur_demandee = 0;
+        $demande_items = [];
+        $valeur_proposee = 0;
+        $donne_items = [];
+
+        // --- DÉBUT DE LA CORRECTION : GESTION DES DEUX FORMATS DE DONNÉES ---
         
-        // --- CORRECTION : Compatibilité SQLite/MySQL et ajout du statut ---
+        // Cas 1 : Nouveau format (multi-dénominations via le calculateur)
+        if (isset($data['demande_denoms']) || isset($data['donne_denoms'])) {
+            if (isset($data['demande_denoms']) && is_array($data['demande_denoms'])) {
+                foreach ($data['demande_denoms'] as $index => $denom) {
+                    $qty = intval($data['demande_qtys'][$index] ?? 0);
+                    if ($qty > 0) {
+                        $valeur_demandee += ($this->all_denominations[$denom] ?? 0) * $qty;
+                        $demande_items[] = ['denom' => $denom, 'qty' => $qty];
+                    }
+                }
+            }
+
+            if (isset($data['donne_denoms']) && is_array($data['donne_denoms'])) {
+                foreach ($data['donne_denoms'] as $index => $denom) {
+                    $qty = intval($data['donne_qtys'][$index] ?? 0);
+                    if ($qty > 0) {
+                        $valeur_proposee += ($this->all_denominations[$denom] ?? 0) * $qty;
+                        $donne_items[] = ['denom' => $denom, 'qty' => $qty];
+                    }
+                }
+            }
+
+            if (abs($valeur_demandee - $valeur_proposee) > 0.01) {
+                throw new Exception("La balance de l'échange proposé n'est pas équilibrée.");
+            }
+
+        } else {
+            // Cas 2 : Ancien format (simple demande, pour la rétrocompatibilité des tests)
+            $denom_demandee = $data['denomination_demandee'] ?? $data['denomination_vers_caisse'] ?? null;
+            $qty_demandee = intval($data['quantite_demandee'] ?? $data['quantite_vers_caisse'] ?? 0);
+
+            if ($denom_demandee && $qty_demandee > 0) {
+                $valeur_demandee = ($this->all_denominations[$denom_demandee] ?? 0) * $qty_demandee;
+                $demande_items[] = ['denom' => $denom_demandee, 'qty' => $qty_demandee];
+            }
+        }
+        // --- FIN DE LA CORRECTION ---
+        
+        if (empty($demande_items) && empty($donne_items)) {
+             throw new Exception("La proposition d'échange est vide.");
+        }
+
+        $notes_demandeur = trim($data['notes_demandeur'] ?? '');
+        $exchange_proposal = [
+            'vers_caisse' => $demande_items,
+            'depuis_caisse' => $donne_items
+        ];
+        $notes_finales = json_encode($exchange_proposal);
+        if (!empty($notes_demandeur)) {
+            $notes_finales .= "\n\n--- Notes ---\n" . $notes_demandeur;
+        }
+
         $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
         $now_function = ($driver === 'sqlite') ? "datetime('now')" : "NOW()";
 
-        // On ajoute explicitement le statut pour plus de robustesse.
+        $premiere_denom_demandee = !empty($demande_items) ? $demande_items[0]['denom'] : 'multiple';
+        $premiere_qty_demandee = !empty($demande_items) ? $demande_items[0]['qty'] : 0;
+
         $sql = "INSERT INTO reserve_demandes (date_demande, caisse_id, demandeur_nom, denomination_demandee, quantite_demandee, valeur_demandee, notes_demandeur, statut) 
                 VALUES ({$now_function}, ?, ?, ?, ?, ?, ?, 'EN_ATTENTE')";
         
@@ -95,10 +153,10 @@ class ReserveService {
         $stmt->execute([
             $data['caisse_id'],
             $_SESSION['admin_username'] ?? 'Operateur',
-            $data['denomination_demandee'],
-            $data['quantite_demandee'],
-            $valeur,
-            $data['notes_demandeur']
+            $premiere_denom_demandee,
+            $premiere_qty_demandee,
+            $valeur_demandee,
+            $notes_finales
         ]);
         return $this->pdo->lastInsertId();
     }
@@ -124,7 +182,6 @@ class ReserveService {
             $stmt = $this->pdo->prepare("UPDATE reserve_denominations SET quantite = quantite + ? WHERE denomination_nom = ?");
             $stmt->execute([$data['quantite_depuis_caisse'], $data['denomination_depuis_caisse']]);
             
-            // --- CORRECTION : Compatibilité SQLite/MySQL ---
             $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
             $now_function = ($driver === 'sqlite') ? "datetime('now')" : "NOW()";
             

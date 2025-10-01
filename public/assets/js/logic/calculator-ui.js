@@ -297,7 +297,7 @@ function createDenominationCard(caisseId, name, value, type, config) {
 }
 
 /**
- * NOUVELLE VERSION : Génère la modale de proposition d'échange.
+ * NOUVELLE VERSION : Génère la modale de proposition d'échange multi-dénominations.
  */
 export function renderReserveModal(caisseId, reserveStatus, config) {
     const modalBody = document.getElementById('reserve-request-modal-body');
@@ -335,15 +335,17 @@ export function renderReserveModal(caisseId, reserveStatus, config) {
                     
                     <div class="exchange-panel">
                         <h5><i class="fa-solid fa-arrow-down-to-bracket"></i> Je demande (à la Réserve)</h5>
-                        <div class="form-group"><label>Dénomination</label><select name="denomination_vers_caisse" required>${denomOptions}</select></div>
-                        <div class="form-group"><label>Quantité</label><input type="number" name="quantite_vers_caisse" min="0" required value="0"></div>
+                        <div class="exchange-rows-container" id="demande-rows-container">
+                            </div>
+                        <button type="button" class="btn action-btn-small add-exchange-row-btn" data-type="demande"><i class="fa-solid fa-plus"></i> Ajouter une ligne</button>
                         <div class="value-display">Total demandé : <span id="total-vers-caisse">0,00 ${config.currencySymbol}</span></div>
                     </div>
 
                     <div class="exchange-panel">
                         <h5><i class="fa-solid fa-arrow-up-from-bracket"></i> Je donne (de ma Caisse)</h5>
-                        <div class="form-group"><label>Dénomination</label><select name="denomination_depuis_caisse" required>${denomOptions}</select></div>
-                        <div class="form-group"><label>Quantité</label><input type="number" name="quantite_depuis_caisse" min="0" required value="0"></div>
+                        <div class="exchange-rows-container" id="donne-rows-container">
+                            </div>
+                        <button type="button" class="btn action-btn-small add-exchange-row-btn" data-type="donne"><i class="fa-solid fa-plus"></i> Ajouter une ligne</button>
                         <div class="value-display">Total donné : <span id="total-depuis-caisse">0,00 ${config.currencySymbol}</span></div>
                     </div>
                     
@@ -365,6 +367,28 @@ export function renderReserveModal(caisseId, reserveStatus, config) {
             </div>
         </div>
     `;
+    
+    // Ajoute une première ligne vide dans chaque section
+    addExchangeRow('demande', denomOptions);
+    addExchangeRow('donne', denomOptions);
+}
+
+// NOUVELLE FONCTION pour créer une ligne de dénomination
+export function addExchangeRow(type, denomOptions) {
+    const container = document.getElementById(`${type}-rows-container`);
+    if (!container) return;
+
+    const row = document.createElement('div');
+    row.className = 'exchange-row';
+    
+    const namePrefix = type === 'demande' ? 'demande' : 'donne';
+
+    row.innerHTML = `
+        <select name="${namePrefix}_denoms[]" class="inline-input">${denomOptions}</select>
+        <input type="number" name="${namePrefix}_qtys[]" class="inline-input quantity" min="0" placeholder="Qté">
+        <button type="button" class="btn-icon delete-btn remove-exchange-row-btn"><i class="fa-solid fa-trash-can"></i></button>
+    `;
+    container.appendChild(row);
 }
 
 /**
