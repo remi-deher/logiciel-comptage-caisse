@@ -84,22 +84,18 @@ export function updateCaisseLockState(caisseId, status, state) {
 }
 
 /**
- * Génère le HTML pour la section de retrait lorsque l'utilisateur a verrouillé la caisse.
+ * --- MODIFICATION 1 ---
+ * Génère le HTML pour la section de retrait simplifiée.
  */
 function renderClotureSectionForInitiator(caisseId, state) {
     const suggestions = service.calculateWithdrawalSuggestion(state.calculatorData.caisse[caisseId], state.config);
     const { totalCompteCb, totalCompteCheques } = service.calculateEcartsForCaisse(caisseId, state);
-    const minToKeep = state.config.minToKeep || {};
 
-    let rowsHtml = suggestions.suggestions.map(s => {
-        const currentDenomQty = parseInt(state.calculatorData.caisse[caisseId]?.denominations?.[s.name] || 0);
-        const minQtyToKeep = parseInt(minToKeep[s.name] || 0);
-        
+    // Filtrer pour n'afficher que les dénominations avec une quantité à retirer > 0
+    let rowsHtml = suggestions.suggestions.filter(s => s.qty > 0).map(s => {
         return `
             <tr>
                 <td><i class="fa-solid fa-money-bill-wave"></i> ${s.value >= 1 ? `${s.value} ${state.config.currencySymbol}` : `${s.value * 100} cts`}</td>
-                <td class="text-center">${currentDenomQty}</td>
-                <td class="text-center">${minQtyToKeep}</td>
                 <td>
                     <input type="number" class="retrait-input" readonly value="${s.qty}" data-caisse-id="${caisseId}" name="retraits[${caisseId}][${s.name}]">
                 </td>
@@ -111,33 +107,35 @@ function renderClotureSectionForInitiator(caisseId, state) {
     const grandTotalInitial = suggestions.totalToWithdraw + totalCompteCb + totalCompteCheques;
 
     return `
-        <h4><i class="fa-solid fa-right-from-bracket"></i> Retraits et Finalisation</h4>
-        <p>Voici le dépôt suggéré basé sur vos saisies. Validez pour confirmer la clôture.</p>
+        <h4><i class="fa-solid fa-right-from-bracket"></i> Récapitulatif du Dépôt pour cette Caisse</h4>
+        <p>Voici le détail du dépôt à effectuer basé sur vos saisies. Validez pour confirmer la clôture de cette caisse.</p>
         <div class="table-responsive">
             <table class="suggestion-table">
                 <thead>
                     <tr>
                         <th>Dénomination</th>
-                        <th class="text-center">Qté en caisse</th>
-                        <th class="text-center">Qté min. à garder</th>
-                        <th>Qté à retirer</th>
+                        <th>Quantité à retirer</th>
                         <th class="text-right">Total retiré</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${rowsHtml}
+                    ${rowsHtml.length > 0 ? rowsHtml : `<tr><td colspan="3" class="text-center">Aucun retrait d'espèces suggéré.</td></tr>`}
                     <tr class="summary-row">
-                        <td colspan="4"><strong><i class="fa-solid fa-credit-card"></i> Total des Cartes Bancaires</strong></td>
+                        <td colspan="2"><strong><i class="fa-solid fa-money-bill-wave"></i> Total Espèces retirées</strong></td>
+                        <td class="text-right"><strong>${formatCurrency(suggestions.totalToWithdraw, state.config)}</strong></td>
+                    </tr>
+                    <tr class="summary-row">
+                        <td colspan="2"><strong><i class="fa-solid fa-credit-card"></i> Total des Cartes Bancaires</strong></td>
                         <td class="text-right">${formatCurrency(totalCompteCb, state.config)}</td>
                     </tr>
                     <tr class="summary-row">
-                        <td colspan="4"><strong><i class="fa-solid fa-money-check-dollar"></i> Total des Chèques</strong></td>
+                        <td colspan="2"><strong><i class="fa-solid fa-money-check-dollar"></i> Total des Chèques</strong></td>
                         <td class="text-right">${formatCurrency(totalCompteCheques, state.config)}</td>
                     </tr>
                 </tbody>
                 <tfoot>
                     <tr class="grand-total-row">
-                        <td colspan="4"><strong>Total Général du dépôt</strong></td>
+                        <td colspan="2"><strong>Total Général du dépôt pour cette caisse</strong></td>
                         <td class="text-right"><strong>${formatCurrency(grandTotalInitial, state.config)}</strong></td>
                     </tr>
                 </tfoot>
@@ -149,6 +147,8 @@ function renderClotureSectionForInitiator(caisseId, state) {
         </div>
     `;
 }
+// --- FIN MODIFICATION 1 ---
+
 
 /**
  * Génère le HTML pour la section d'une caisse déjà clôturée.
@@ -157,7 +157,7 @@ function renderClotureSectionForClosed(caisseId, state) {
     const suggestions = service.calculateWithdrawalSuggestion(state.calculatorData.caisse[caisseId], state.config);
     const caisseNom = state.config.nomsCaisses[caisseId];
     
-    const rowsHtml = suggestions.suggestions.map(s => `
+    const rowsHtml = suggestions.suggestions.filter(s => s.qty > 0).map(s => `
         <tr>
             <td>${s.value >= 1 ? `${s.value} ${state.config.currencySymbol}` : `${s.value * 100} cts`}</td>
             <td class="text-center">${s.qty}</td>
@@ -194,29 +194,45 @@ function renderClotureSectionForClosed(caisseId, state) {
 }
 
 /**
- * Affiche la nouvelle bannière de finalisation avec le bouton "Voir les suggestions".
+ * --- MODIFICATION 2 ---
+ * Affiche la bannière de finalisation avec le récapitulatif global.
  */
 export function showFinalSummaryBanner(state) {
     const container = document.getElementById('cloture-final-summary-banner-container');
     if (!container) return;
 
-    let totalRetraits = 0;
+    let totalEspeces = 0;
+    let totalCb = 0;
+    let totalCheques = 0;
+
     Object.keys(state.config.nomsCaisses).forEach(caisseId => {
         const caisseData = state.calculatorData.caisse[caisseId];
         if(caisseData) {
             const suggestions = service.calculateWithdrawalSuggestion(caisseData, state.config);
-            totalRetraits += suggestions.totalToWithdraw;
+            const ecarts = service.calculateEcartsForCaisse(caisseId, state);
+            totalEspeces += suggestions.totalToWithdraw;
+            totalCb += ecarts.totalCompteCb;
+            totalCheques += ecarts.totalCompteCheques;
         }
     });
+    
+    const grandTotal = totalEspeces + totalCb + totalCheques;
 
     container.innerHTML = `
         <div class="cloture-final-summary-banner">
             <div class="banner-header">
                 <h4><i class="fa-solid fa-flag-checkered"></i> Journée Prête pour Finalisation</h4>
-                <p>Toutes les caisses ont été clôturées. Le retrait total à effectuer est de <strong>${formatCurrency(totalRetraits, state.config)}</strong>.</p>
+                <p>Toutes les caisses sont clôturées. Voici le récapitulatif de votre remise en banque :</p>
+                <div class="final-summary-details">
+                    <p><i class="fa-solid fa-money-bill-wave"></i> Total Espèces : <strong>${formatCurrency(totalEspeces, state.config)}</strong></p>
+                    <p><i class="fa-solid fa-credit-card"></i> Total CB : <strong>${formatCurrency(totalCb, state.config)}</strong></p>
+                    <p><i class="fa-solid fa-money-check-dollar"></i> Total Chèques : <strong>${formatCurrency(totalCheques, state.config)}</strong></p>
+                    <hr>
+                    <p class="grand-total">Montant total du dépôt : <strong>${formatCurrency(grandTotal, state.config)}</strong></p>
+                </div>
             </div>
             <div class="banner-actions">
-                <button id="show-suggestions-btn" class="btn action-btn"><i class="fa-solid fa-eye"></i> Voir les suggestions de retrait</button>
+                <button id="show-suggestions-btn" class="btn action-btn"><i class="fa-solid fa-eye"></i> Voir le détail par caisse</button>
                 <button id="finalize-day-btn" class="btn save-btn">Finaliser et Archiver la Journée</button>
             </div>
         </div>
@@ -224,7 +240,7 @@ export function showFinalSummaryBanner(state) {
         <div id="suggestions-modal" class="modal">
             <div class="modal-content wide">
                 <div class="modal-header">
-                    <h3>Détail des retraits suggérés</h3>
+                    <h3>Détail des retraits suggérés par caisse</h3>
                     <span class="modal-close">&times;</span>
                 </div>
                 <div class="modal-body" id="suggestions-modal-body"></div>
@@ -232,6 +248,8 @@ export function showFinalSummaryBanner(state) {
         </div>
     `;
 }
+// --- FIN MODIFICATION 2 ---
+
 
 /**
  * Remplit et affiche la modale des suggestions de retrait.
@@ -249,7 +267,7 @@ export function renderWithdrawalSummaryModal(state) {
         const suggestions = service.calculateWithdrawalSuggestion(caisseData, state.config);
         const caisseNom = state.config.nomsCaisses[caisseId];
 
-        const rowsHtml = suggestions.suggestions.map(s => `
+        const rowsHtml = suggestions.suggestions.filter(s => s.qty > 0).map(s => `
             <tr>
                 <td>${s.value >= 1 ? `${s.value} ${state.config.currencySymbol}` : `${s.value * 100} cts`}</td>
                 <td class="text-center">${s.qty}</td>
