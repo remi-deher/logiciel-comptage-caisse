@@ -1,4 +1,4 @@
-import { formatCurrency, parseLocaleFloat, formatDateFr, getEcartClass } from '../utils/formatters.js';
+import { formatCurrency, parseLocaleFloat, formatDateFr, getEcartClass } from '../../public/assets/js/utils/formatters.js';
 
 describe('formatters', () => {
   describe('formatCurrency', () => {
