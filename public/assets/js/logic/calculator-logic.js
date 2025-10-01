@@ -112,7 +112,7 @@ async function handleReserveRequestSubmit(e) {
         const result = await reserveService.submitDemande(new FormData(form));
         if (!result.success) throw new Error(result.message);
         
-        alert('Demande envoyée avec succès !');
+        alert('Proposition d\'échange envoyée avec succès !');
         sendWsMessage({ type: 'nouvelle_demande_reserve' }); // Notifie les autres clients
         document.getElementById('reserve-request-modal').classList.remove('visible');
 
@@ -120,7 +120,7 @@ async function handleReserveRequestSubmit(e) {
         alert(`Erreur: ${error.message}`);
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Envoyer la demande';
+        submitBtn.textContent = 'Proposer l\'échange';
     }
 }
 
@@ -155,11 +155,33 @@ function attachEventListeners() {
     page.addEventListener('input', (e) => {
         if (e.target.closest('#calculator-reserve-request-form')) {
             const form = e.target.closest('form');
-            const quantite = parseInt(form.elements.quantite_demandee.value) || 0;
-            const denomName = form.elements.denomination_demandee.value;
             const allDenominations = { ...state.config.denominations.billets, ...state.config.denominations.pieces };
-            const denomValue = allDenominations[denomName] || 0;
-            document.getElementById('reserve-demande-valeur').textContent = formatCurrency(quantite * denomValue, state.config);
+            
+            const qteVers = parseInt(form.elements.quantite_vers_caisse.value) || 0;
+            const denomVers = form.elements.denomination_vers_caisse.value;
+            const totalVers = qteVers * parseFloat(allDenominations[denomVers] || 0);
+
+            const qteDepuis = parseInt(form.elements.quantite_depuis_caisse.value) || 0;
+            const denomDepuis = form.elements.denomination_depuis_caisse.value;
+            const totalDepuis = qteDepuis * parseFloat(allDenominations[denomDepuis] || 0);
+
+            document.getElementById('total-vers-caisse').textContent = formatCurrency(totalVers, state.config);
+            document.getElementById('total-depuis-caisse').textContent = formatCurrency(totalDepuis, state.config);
+            
+            const balance = totalVers - totalDepuis;
+            const balanceIndicator = document.getElementById('reserve-balance-indicator');
+            const submitBtn = document.getElementById('submit-reserve-request-btn');
+
+            balanceIndicator.querySelector('span').textContent = `Balance : ${formatCurrency(balance, state.config)}`;
+            if (Math.abs(balance) < 0.01) {
+                balanceIndicator.className = 'balance-indicator balance-ok';
+                balanceIndicator.querySelector('i').className = 'fa-solid fa-scale-balanced';
+                submitBtn.disabled = false;
+            } else {
+                balanceIndicator.className = 'balance-indicator balance-nok';
+                balanceIndicator.querySelector('i').className = 'fa-solid fa-scale-unbalanced';
+                submitBtn.disabled = true;
+            }
         }
     });
 

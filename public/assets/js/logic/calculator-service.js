@@ -95,7 +95,6 @@ export async function submitClotureGenerale() {
 
 /**
  * Calcule les écarts pour tous les types de paiement d'une caisse donnée.
- * --- CORRECTION : Tous les calculs sont faits en centimes pour éviter les erreurs de virgule flottante ---
  */
 export function calculateEcartsForCaisse(caisseId, appState) {
     const { calculatorData, config } = appState;
@@ -106,7 +105,6 @@ export function calculateEcartsForCaisse(caisseId, appState) {
     const allDenoms = { ...(config.denominations.billets || {}), ...(config.denominations.pieces || {}) };
     for (const name in allDenoms) {
         const quantite = parseInt(caisseData.denominations?.[name], 10) || 0;
-        // On convertit la valeur de la dénomination en centimes pour le calcul
         totalCompteEspecesCents += quantite * Math.round(parseFloat(allDenoms[name]) * 100);
     }
     const fondDeCaisseCents = Math.round(parseLocaleFloat(caisseData.fond_de_caisse) * 100);
@@ -137,7 +135,6 @@ export function calculateEcartsForCaisse(caisseId, appState) {
     const retrocessionChequesCents = Math.round(parseLocaleFloat(caisseData.retrocession_cheques) * 100);
     const ecartChequesCents = totalCompteChequesCents - (ventesChequesCents + retrocessionChequesCents);
 
-    // On reconvertit en euros UNIQUEMENT pour l'affichage final
     return { 
         totalCompteEspeces: totalCompteEspecesCents / 100, 
         ecartEspeces: ecartEspecesCents / 100, 
