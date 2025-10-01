@@ -297,7 +297,7 @@ function createDenominationCard(caisseId, name, value, type, config) {
 }
 
 /**
- * NOUVELLE VERSION : Génère la modale de proposition d'échange multi-dénominations.
+ * Génère la modale de proposition d'échange multi-dénominations.
  */
 export function renderReserveModal(caisseId, reserveStatus, config) {
     const modalBody = document.getElementById('reserve-request-modal-body');
@@ -324,29 +324,32 @@ export function renderReserveModal(caisseId, reserveStatus, config) {
     modalBody.innerHTML = `
         <div class="reserve-request-layout">
             <div class="reserve-stock-preview">
-                <h4><i class="fa-solid fa-boxes-stacked"></i> Stock de la Réserve</h4>
-                <div class="total-value-display">Total : ${formatCurrency(reserveStatus.total, config)}</div>
+                <h4><i class="fa-solid fa-boxes-stacked"></i> Stock actuel de la Réserve</h4>
+                <div class="total-value-display">Valeur totale : ${formatCurrency(reserveStatus.total, config)}</div>
                 <div class="denominations-grid">${stockHtml}</div>
             </div>
+
             <div class="reserve-request-form">
                 <h4><i class="fa-solid fa-right-left"></i> Proposition d'Échange</h4>
                 <form id="calculator-reserve-request-form">
                     <input type="hidden" name="caisse_id" value="${caisseId}">
                     
-                    <div class="exchange-panel">
-                        <h5><i class="fa-solid fa-arrow-down-to-bracket"></i> Je demande (à la Réserve)</h5>
-                        <div class="exchange-rows-container" id="demande-rows-container">
-                            </div>
-                        <button type="button" class="btn action-btn-small add-exchange-row-btn" data-type="demande"><i class="fa-solid fa-plus"></i> Ajouter une ligne</button>
-                        <div class="value-display">Total demandé : <span id="total-vers-caisse">0,00 ${config.currencySymbol}</span></div>
-                    </div>
+                    <div class="exchange-panels-container">
+                        <div class="exchange-panel">
+                            <h5><i class="fa-solid fa-arrow-down-to-bracket"></i> Je demande (à la Réserve)</h5>
+                            <div class="exchange-rows-container" id="demande-rows-container">
+                                </div>
+                            <button type="button" class="btn action-btn-small add-exchange-row-btn" data-type="demande"><i class="fa-solid fa-plus"></i> Ajouter une ligne</button>
+                            <div class="value-display">Total demandé : <span id="total-vers-caisse">0,00 ${config.currencySymbol}</span></div>
+                        </div>
 
-                    <div class="exchange-panel">
-                        <h5><i class="fa-solid fa-arrow-up-from-bracket"></i> Je donne (de ma Caisse)</h5>
-                        <div class="exchange-rows-container" id="donne-rows-container">
-                            </div>
-                        <button type="button" class="btn action-btn-small add-exchange-row-btn" data-type="donne"><i class="fa-solid fa-plus"></i> Ajouter une ligne</button>
-                        <div class="value-display">Total donné : <span id="total-depuis-caisse">0,00 ${config.currencySymbol}</span></div>
+                        <div class="exchange-panel">
+                            <h5><i class="fa-solid fa-arrow-up-from-bracket"></i> Je donne (de ma Caisse)</h5>
+                            <div class="exchange-rows-container" id="donne-rows-container">
+                                </div>
+                            <button type="button" class="btn action-btn-small add-exchange-row-btn" data-type="donne"><i class="fa-solid fa-plus"></i> Ajouter une ligne</button>
+                            <div class="value-display">Total donné : <span id="total-depuis-caisse">0,00 ${config.currencySymbol}</span></div>
+                        </div>
                     </div>
                     
                     <div class="balance-indicator" id="reserve-balance-indicator">
@@ -368,12 +371,13 @@ export function renderReserveModal(caisseId, reserveStatus, config) {
         </div>
     `;
     
-    // Ajoute une première ligne vide dans chaque section
     addExchangeRow('demande', denomOptions);
     addExchangeRow('donne', denomOptions);
 }
 
-// NOUVELLE FONCTION pour créer une ligne de dénomination
+/**
+ * Crée une nouvelle ligne de dénomination dans la modale d'échange.
+ */
 export function addExchangeRow(type, denomOptions) {
     const container = document.getElementById(`${type}-rows-container`);
     if (!container) return;
