@@ -82,6 +82,22 @@ class AuthController {
     }
 
     /**
+     * Renvoie le statut d'authentification actuel de l'utilisateur.
+     */
+    public function status() {
+        header('Content-Type: application/json');
+        if (!empty($_SESSION['is_admin'])) {
+            echo json_encode([
+                'isLoggedIn' => true,
+                'username' => $_SESSION['admin_username'] ?? 'Admin'
+            ]);
+        } else {
+            echo json_encode(['isLoggedIn' => false]);
+        }
+        exit;
+    }
+
+    /**
      * Gère la déconnexion.
      */
     public function logout() {

@@ -38,6 +38,7 @@ $noms_caisses = $noms_caisses ?? [];
 $denominations = $denominations ?? ['billets' => [], 'pieces' => []];
 $tpe_par_caisse = $tpe_par_caisse ?? [];
 $min_to_keep = $min_to_keep ?? [];
+$rouleaux_pieces = $rouleaux_pieces ?? []; // Ajout pour la nouvelle fonctionnalité
 
 date_default_timezone_set(defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Europe/Paris');
 
@@ -64,7 +65,6 @@ foreach (glob(ROOT_PATH . '/src/services/*.php') as $service) {
     require_once $service;
 }
 
-// CORRECTION : On inclut le Repository ici
 require_once ROOT_PATH . '/src/Repository/ComptageRepository.php';
 
 require_once ROOT_PATH . '/src/AdminController.php';
@@ -82,14 +82,12 @@ require_once ROOT_PATH . '/src/StatistiquesController.php';
 try {
     $pdo = Bdd::getPdo();
     
-    // CORRECTION : On instancie le Repository pour le partager
     $comptageRepository = new ComptageRepository($pdo);
     $clotureStateService = new ClotureStateService($pdo);
 
     $adminController = new AdminController($pdo, $denominations);
     $authController = new AuthController($pdo);
     $statistiquesController = new StatistiquesController($pdo, $noms_caisses, $denominations);
-    // CORRECTION : On injecte le Repository dans les contrôleurs qui en ont besoin
     $calculateurController = new CalculateurController($pdo, $noms_caisses, $denominations, $tpe_par_caisse, $comptageRepository);
     $historiqueController = new HistoriqueController($pdo, $comptageRepository);
     $reserveController = new ReserveController($pdo, $noms_caisses, $denominations);
@@ -112,15 +110,14 @@ $request_method = $_SERVER['REQUEST_METHOD'];
 $route_key = "{$request_method}:{$route}";
 
 $routes = [
-    'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $current_currency_code, $current_currency_symbol, $clotureStateService) {
-        // CORRECTION : Le service ne fournit plus les caisses verrouillées, seulement les caisses clôturées.
-        // Les informations de verrouillage proviennent désormais exclusivement du WebSocket.
+    'GET:calculateur/config' => function() use ($noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $rouleaux_pieces, $current_currency_code, $current_currency_symbol, $clotureStateService) {
         echo json_encode([
             'success' => true,
             'nomsCaisses' => $noms_caisses,
             'denominations' => $denominations,
             'tpeParCaisse' => $tpe_par_caisse,
             'minToKeep' => $min_to_keep,
+            'rouleaux_pieces' => $rouleaux_pieces, // On ajoute la config des rouleaux
             'currencyCode' => $current_currency_code,
             'currencySymbol' => $current_currency_symbol,
             'closedCaisses' => $clotureStateService->getClosedCaisses(),
@@ -135,7 +132,6 @@ $routes = [
     'POST:historique/delete' => [$historiqueController, 'delete'],
     'GET:historique/export_csv' => [$historiqueController, 'exportCsv'],
     'GET:stats/get_data' => [$statistiquesController, 'getStatsData'],
-    'GET:cloture/get_state' => [$calculateurController, 'getClotureState'],
     'POST:cloture/confirm_caisse' => [$calculateurController, 'cloture'],
     'POST:cloture/confirm_generale' => [$calculateurController, 'cloture_generale'],
     'GET:reserve/get_data' => [$reserveController, 'getReserveDataJson'],
@@ -143,6 +139,7 @@ $routes = [
     'POST:reserve/process_demande' => [$reserveController, 'processDemande'],
     'POST:auth/login' => [$authController, 'login'],
     'GET:auth/logout' => [$authController, 'logout'],
+    'GET:auth/status' => [$authController, 'status'],
     'POST:admin/action' => [$adminController, 'index'],
     'GET:admin/dashboard_data' => [$adminController, 'getDashboardData'],
     'GET:version/check' => [$adminController, 'gitReleaseCheck'],

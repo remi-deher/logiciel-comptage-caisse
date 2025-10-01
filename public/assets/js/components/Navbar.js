@@ -26,7 +26,7 @@ export function renderNavbar(element) {
                 <i class="fa-solid fa-sun"></i>
                 <i class="fa-solid fa-moon"></i>
             </button>
-            <div class="user-menu">
+            <div class="user-menu" id="user-menu">
                 </div>
         </div>
         
