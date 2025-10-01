@@ -1,0 +1,79 @@
+<?php
+
+// Paramètres de connexion à la base de données
+define('DB_HOST', 'DB_IP_OR_FQDN');
+define('DB_NAME', 'DB_NAME');
+define('DB_USER', 'DB_USER');
+define('DB_PASS', 'DB_PASS');
+
+// URL du dépôt Git pour le pied de page
+define('GIT_REPO_URL', 'https://github.com/remi-deher/logiciel-comptage-caisse');
+
+// Fuseau horaire de l'application
+define('APP_TIMEZONE', 'Europe/Paris');
+
+// Devise de l'application
+define('APP_CURRENCY', 'EUR');
+
+// Configuration de l'application
+$noms_caisses = array (
+  1 => 'Caisse 1',
+  2 => 'Caisse 2',
+);
+$tpe_par_caisse = array (
+  1 => 
+  array (
+    'nom' => 'pc droite',
+    'caisse_id' => 1,
+  ),
+  2 => 
+  array (
+    'nom' => 'pc gauche',
+    'caisse_id' => 1,
+  ),
+  3 => 
+  array (
+    'nom' => 'officine',
+    'caisse_id' => 2,
+  ),
+);
+$denominations = array (
+  'billets' => 
+  array (
+    'b500' => '500',
+    'b200' => '200',
+    'b100' => '100',
+    'b50' => '50',
+    'b20' => '20',
+    'b10' => '10',
+    'b5' => '5',
+  ),
+  'pieces' => 
+  array (
+    'p200' => '2',
+    'p100' => '1',
+    'p050' => '0.5',
+    'p020' => '0.2',
+    'p010' => '0.1',
+    'p005' => '0.05',
+    'p002' => '0.02',
+    'p001' => '0.01',
+  ),
+);
+
+$rouleaux_pieces = [
+    'p200' => 25, // 2€ => 25 pièces/rouleau (50€)
+    'p100' => 25, // 1€ => 25 pièces/rouleau (25€)
+    'p050' => 40, // 50c => 40 pièces/rouleau (20€)
+    'p020' => 40, // 20c => 40 pièces/rouleau (8€)
+    'p010' => 40, // 10c => 40 pièces/rouleau (4€)
+    'p005' => 50, // 5c => 50 pièces/rouleau (2.5€)
+    'p002' => 50, // 2c => 50 pièces/rouleau (1€)
+    'p001' => 50, // 1c => 50 pièces/rouleau (0.5€)
+];
+
+$min_to_keep = array (
+  'b5' => 1,
+  'p200' => 2,
+  'p100' => 1,
+);
