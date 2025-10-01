@@ -31,12 +31,31 @@ export function attachEventListeners(pageElement, state, loadAndRender) {
     });
 
     demandeForm.addEventListener('input', () => {
-        const quantite = parseInt(document.getElementById('demande-quantite').value) || 0;
-        const denomName = document.getElementById('demande-denomination').value;
+        let totalValue = 0;
         const allDenominations = { ...state.config.denominations.billets, ...state.config.denominations.pieces };
-        const denomValue = allDenominations[denomName] || 0;
-        document.getElementById('demande-valeur').textContent = formatCurrency(quantite * denomValue, state.config);
+        const rouleauxConfig = state.config.rouleaux_pieces || {};
+
+        // Calcul pour les billets
+        demandeForm.querySelectorAll('input[name="demande_billets_qtys[]"]').forEach((input, index) => {
+            const denom = demandeForm.querySelectorAll('input[name="demande_billets_denoms[]"]')[index].value;
+            const qty = parseInt(input.value) || 0;
+            totalValue += qty * (parseFloat(allDenominations[denom]) || 0);
+        });
+
+        // Calcul pour les pièces et rouleaux
+        demandeForm.querySelectorAll('input[name="demande_pieces_qtys[]"]').forEach((input, index) => {
+            const denom = demandeForm.querySelectorAll('input[name="demande_pieces_denoms[]"]')[index].value;
+            const qtyPieces = parseInt(input.value) || 0;
+            const qtyRouleaux = parseInt(demandeForm.querySelectorAll('input[name="demande_rouleaux_qtys[]"]')[index].value) || 0;
+            const piecesParRouleau = parseInt(rouleauxConfig[denom]) || 0;
+
+            totalValue += qtyPieces * (parseFloat(allDenominations[denom]) || 0);
+            totalValue += qtyRouleaux * piecesParRouleau * (parseFloat(allDenominations[denom]) || 0);
+        });
+
+        document.getElementById('demande-valeur').textContent = formatCurrency(totalValue, state.config);
     });
+
 
     demandeForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -52,7 +71,7 @@ export function attachEventListeners(pageElement, state, loadAndRender) {
         } catch (error) {
             alert(`Erreur: ${error.message}`);
         } finally {
-            submitBtn.disabled = false; submitBtn.textContent = 'Envoyer';
+            submitBtn.disabled = false; submitBtn.textContent = 'Envoyer la Demande';
         }
     });
 
@@ -96,7 +115,7 @@ export function attachEventListeners(pageElement, state, loadAndRender) {
             const balanceIndicator = document.getElementById('balance-indicator');
             const confirmBtn = document.getElementById('confirm-exchange-btn');
             balanceIndicator.querySelector('span').textContent = `Balance : ${formatCurrency(balance, state.config)}`;
-            if (Math.abs(balance) < 0.01) {
+            if (Math.abs(balance) < 0.01 && (totalVers > 0 || totalDepuis > 0)) { // Balance doit être nulle ET un montant saisi
                 balanceIndicator.className = 'balance-indicator balance-ok';
                 balanceIndicator.querySelector('i').className = 'fa-solid fa-scale-balanced';
                 confirmBtn.disabled = false;

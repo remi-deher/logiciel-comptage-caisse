@@ -15,7 +15,6 @@ export function renderReserveStatus(container, status, config) {
     container.innerHTML = sortedDenoms.map(([name, value]) => {
         const quantite = status.denominations[name] || 0;
         const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-        // Utilisation de l'accent grave (backtick) ` pour le template literal
         return `
             <div class="denom-card">
                 <h4>${label}</h4>
@@ -36,9 +35,14 @@ export function renderDemandes(container, demandes, config) {
     }
 
     container.innerHTML = demandes.map(demande => {
-         const denomValue = (config.denominations.billets[demande.denomination_demandee] || config.denominations.pieces[demande.denomination_demandee]);
-         const label = denomValue >= 1 ? `${denomValue} ${config.currencySymbol}` : `${denomValue * 100} cts`;
-         // Utilisation de l'accent grave (backtick) ` pour le template literal
+         // Nouvelle logique pour afficher les détails depuis le JSON
+        const detailsHtml = (demande.details || []).map(item => {
+            const denomValue = (config.denominations.billets[item.denomination] || config.denominations.pieces[item.denomination]);
+            const label = denomValue >= 1 ? `${denomValue} ${config.currencySymbol}` : `${denomValue * 100} cts`;
+            const unit = item.type === 'rouleau' ? (item.quantite > 1 ? 'Rouleaux' : 'Rouleau') : (item.type === 'billet' ? 'x' : 'pièces');
+            return `<strong>${item.quantite}</strong> ${unit} de ${label}`;
+        }).join('<br>');
+
          return `
             <div class="card demande-card" data-demande-id="${demande.id}" data-caisse-id="${demande.caisse_id}" data-caisse-nom="${demande.caisse_nom}" data-valeur-demandee="${demande.valeur_demandee}">
                 <div class="demande-header">
@@ -47,7 +51,7 @@ export function renderDemandes(container, demandes, config) {
                 </div>
                 <div class="demande-body">
                     <div>
-                        <strong>Besoin de :</strong> ${demande.quantite_demandee} x ${label}
+                        <strong>Besoin de :</strong><br> ${detailsHtml}
                         <div class="valeur-display">${formatCurrency(demande.valeur_demandee, config)}</div>
                     </div>
                     <button class="btn save-btn process-demande-btn">Traiter</button>
@@ -56,6 +60,7 @@ export function renderDemandes(container, demandes, config) {
             </div>`;
     }).join('');
 }
+
 
 /**
  * Affiche l'historique des dernières opérations.
@@ -79,32 +84,68 @@ export function renderHistorique(container, historique, config) {
     `).join('');
 }
 
+
 /**
- * Affiche le formulaire de nouvelle demande.
+ * Affiche le formulaire de nouvelle demande avec la distinction pièces/rouleaux.
  */
 export function renderDemandeForm(container, config) {
     if (!container) return;
     
     const caisseOptions = Object.entries(config.nomsCaisses).map(([id, nom]) => `<option value="${id}">${nom}</option>`).join('');
-    const allDenominations = { ...config.denominations.billets, ...config.denominations.pieces };
-    const sortedDenoms = Object.entries(allDenominations).sort((a, b) => b[1] - a[1]);
-    const denomOptions = sortedDenoms.map(([name, value]) => {
-        const label = value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`;
-        return `<option value="${name}">${label}</option>`;
-    }).join('');
+    
+    // Trier les billets et les pièces
+    const sortedBillets = Object.entries(config.denominations.billets).sort((a, b) => b[1] - a[1]);
+    const sortedPieces = Object.entries(config.denominations.pieces).sort((a, b) => b[1] - a[1]);
+
+    const billetsHtml = sortedBillets.map(([name, value]) => `
+        <div class="demande-form-row">
+            <label>${value} ${config.currencySymbol}</label>
+            <input type="hidden" name="demande_billets_denoms[]" value="${name}">
+            <input type="number" name="demande_billets_qtys[]" min="0" placeholder="Qté" class="inline-input">
+        </div>
+    `).join('');
+
+    const piecesHtml = sortedPieces.map(([name, value]) => `
+        <div class="demande-form-row">
+            <label>${value >= 1 ? `${value} ${config.currencySymbol}` : `${value * 100} cts`}</label>
+            <input type="hidden" name="demande_pieces_denoms[]" value="${name}">
+            <input type="number" name="demande_pieces_qtys[]" min="0" placeholder="Pièces" class="inline-input">
+            <input type="number" name="demande_rouleaux_qtys[]" min="0" placeholder="Rouleaux" class="inline-input">
+        </div>
+    `).join('');
 
     container.innerHTML = `
         <form id="new-demande-form" class="card hidden">
             <h4>Faire une nouvelle demande</h4>
-            <div class="form-group"><label for="demande-caisse-id">Pour la caisse</label><select id="demande-caisse-id" name="caisse_id" required>${caisseOptions}</select></div>
-            <div class="form-group"><label for="demande-denomination">J'ai besoin de</label><select id="demande-denomination" name="denomination_demandee" required>${denomOptions}</select></div>
-            <div class="form-group"><label for="demande-quantite">Quantité</label><input type="number" id="demande-quantite" name="quantite_demandee" min="1" required></div>
-            <div class="form-group"><label for="notes_demandeur">Notes (optionnel)</label><textarea id="notes_demandeur" name="notes_demandeur" rows="2" placeholder="Ex: Pour fond de caisse..."></textarea></div>
+            <div class="form-group">
+                <label for="demande-caisse-id">Pour la caisse</label>
+                <select id="demande-caisse-id" name="caisse_id" required>${caisseOptions}</select>
+            </div>
+            
+            <div class="demande-grid">
+                <div class="demande-column">
+                    <h5>Billets</h5>
+                    ${billetsHtml}
+                </div>
+                <div class="demande-column">
+                    <h5>Pièces</h5>
+                    ${piecesHtml}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="notes_demandeur">Notes (optionnel)</label>
+                <textarea id="notes_demandeur" name="notes_demandeur" rows="2" placeholder="Ex: Pour fond de caisse..."></textarea>
+            </div>
             <div class="value-display">Total demandé: <span id="demande-valeur">0,00 ${config.currencySymbol}</span></div>
-            <div class="form-actions"><button type="button" id="cancel-demande-btn" class="btn delete-btn">Annuler</button><button type="submit" class="btn save-btn">Envoyer</button></div>
+            <div class="form-actions">
+                <button type="button" id="cancel-demande-btn" class="btn delete-btn">Annuler</button>
+                <button type="submit" class="btn save-btn">Envoyer la Demande</button>
+            </div>
         </form>
     `;
 }
+
 
 /**
  * Affiche le contenu de la modale de traitement de demande.

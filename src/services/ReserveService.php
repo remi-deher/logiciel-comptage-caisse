@@ -4,14 +4,17 @@
 class ReserveService {
     private $pdo;
     private $all_denominations = [];
+    private $rouleaux_pieces = []; 
 
     public function __construct(PDO $pdo, $denominations) {
+        global $rouleaux_pieces; 
         $this->pdo = $pdo;
         foreach ($denominations as $type) {
             foreach ($type as $key => $value) {
-                $this->all_denominations[$key] = $value;
+                $this->all_denominations[$key] = floatval($value);
             }
         }
+        $this->rouleaux_pieces = $rouleaux_pieces ?? [];
     }
 
     public function initDenominations() {
@@ -48,7 +51,6 @@ class ReserveService {
         }
     }
 
-
     public function getReserveStatus() {
         $stmt = $this->pdo->query("SELECT * FROM reserve_denominations");
         $denominations = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -62,9 +64,10 @@ class ReserveService {
     public function getDemandesEnAttente() {
         global $noms_caisses;
         $stmt = $this->pdo->query("SELECT * FROM reserve_demandes WHERE statut = 'EN_ATTENTE' ORDER BY date_demande ASC");
-        $demandes = $stmt->fetchAll();
+        $demandes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach($demandes as &$demande) {
             $demande['caisse_nom'] = $noms_caisses[$demande['caisse_id']] ?? 'Inconnue';
+            $demande['details'] = json_decode($demande['details_json'], true);
         }
         return $demandes;
     }
@@ -81,86 +84,78 @@ class ReserveService {
     }
 
     public function createDemande($data) {
-        $valeur_demandee = 0;
-        $demande_items = [];
-        $valeur_proposee = 0;
-        $donne_items = [];
+        $details_demande = [];
+        $valeur_totale = 0;
 
-        // --- DÉBUT DE LA CORRECTION : GESTION DES DEUX FORMATS DE DONNÉES ---
-        
-        // Cas 1 : Nouveau format (multi-dénominations via le calculateur)
-        if (isset($data['demande_denoms']) || isset($data['donne_denoms'])) {
-            if (isset($data['demande_denoms']) && is_array($data['demande_denoms'])) {
-                foreach ($data['demande_denoms'] as $index => $denom) {
-                    $qty = intval($data['demande_qtys'][$index] ?? 0);
-                    if ($qty > 0) {
-                        $valeur_demandee += ($this->all_denominations[$denom] ?? 0) * $qty;
-                        $demande_items[] = ['denom' => $denom, 'qty' => $qty];
-                    }
-                }
+        // --- DÉBUT DE LA CORRECTION : GESTION DE LA RÉTROCOMPATIBILITÉ ---
+        // Si les nouvelles clés (pièces/billets) n'existent pas, on traite l'ancien format des tests.
+        if (!isset($data['demande_pieces_denoms']) && !isset($data['demande_billets_denoms'])) {
+            $denom = $data['denomination_demandee'] ?? null;
+            $qty = intval($data['quantite_demandee'] ?? 0);
+
+            if ($denom && $qty > 0) {
+                // On détermine si c'est un billet ou une pièce pour le type
+                $type = isset($this->all_denominations[$denom]) && strpos($denom, 'b') === 0 ? 'billet' : 'piece';
+                $details_demande[] = ['type' => $type, 'denomination' => $denom, 'quantite' => $qty];
+                $valeur_totale += $qty * ($this->all_denominations[$denom] ?? 0);
             }
-
-            if (isset($data['donne_denoms']) && is_array($data['donne_denoms'])) {
-                foreach ($data['donne_denoms'] as $index => $denom) {
-                    $qty = intval($data['donne_qtys'][$index] ?? 0);
-                    if ($qty > 0) {
-                        $valeur_proposee += ($this->all_denominations[$denom] ?? 0) * $qty;
-                        $donne_items[] = ['denom' => $denom, 'qty' => $qty];
-                    }
-                }
-            }
-
-            if (abs($valeur_demandee - $valeur_proposee) > 0.01) {
-                throw new Exception("La balance de l'échange proposé n'est pas équilibrée.");
-            }
-
         } else {
-            // Cas 2 : Ancien format (simple demande, pour la rétrocompatibilité des tests)
-            $denom_demandee = $data['denomination_demandee'] ?? $data['denomination_vers_caisse'] ?? null;
-            $qty_demandee = intval($data['quantite_demandee'] ?? $data['quantite_vers_caisse'] ?? 0);
+            // --- FIN DE LA CORRECTION ---
 
-            if ($denom_demandee && $qty_demandee > 0) {
-                $valeur_demandee = ($this->all_denominations[$denom_demandee] ?? 0) * $qty_demandee;
-                $demande_items[] = ['denom' => $denom_demandee, 'qty' => $qty_demandee];
+            // Traitement des pièces et des rouleaux (nouveau format)
+            if (isset($data['demande_pieces_denoms']) && is_array($data['demande_pieces_denoms'])) {
+                foreach ($data['demande_pieces_denoms'] as $index => $denom) {
+                    $qty_pieces = intval($data['demande_pieces_qtys'][$index] ?? 0);
+                    $qty_rouleaux = intval($data['demande_rouleaux_qtys'][$index] ?? 0);
+
+                    if ($qty_pieces > 0) {
+                        $details_demande[] = ['type' => 'piece', 'denomination' => $denom, 'quantite' => $qty_pieces];
+                        $valeur_totale += $qty_pieces * ($this->all_denominations[$denom] ?? 0);
+                    }
+                    if ($qty_rouleaux > 0) {
+                        $details_demande[] = ['type' => 'rouleau', 'denomination' => $denom, 'quantite' => $qty_rouleaux];
+                        $pieces_par_rouleau = $this->rouleaux_pieces[$denom] ?? 0;
+                        $valeur_totale += $qty_rouleaux * $pieces_par_rouleau * ($this->all_denominations[$denom] ?? 0);
+                    }
+                }
+            }
+
+            // Traitement des billets (nouveau format)
+            if (isset($data['demande_billets_denoms']) && is_array($data['demande_billets_denoms'])) {
+                foreach ($data['demande_billets_denoms'] as $index => $denom) {
+                    $qty = intval($data['demande_billets_qtys'][$index] ?? 0);
+                    if ($qty > 0) {
+                        $details_demande[] = ['type' => 'billet', 'denomination' => $denom, 'quantite' => $qty];
+                        $valeur_totale += $qty * ($this->all_denominations[$denom] ?? 0);
+                    }
+                }
             }
         }
-        // --- FIN DE LA CORRECTION ---
-        
-        if (empty($demande_items) && empty($donne_items)) {
-             throw new Exception("La proposition d'échange est vide.");
-        }
 
-        $notes_demandeur = trim($data['notes_demandeur'] ?? '');
-        $exchange_proposal = [
-            'vers_caisse' => $demande_items,
-            'depuis_caisse' => $donne_items
-        ];
-        $notes_finales = json_encode($exchange_proposal);
-        if (!empty($notes_demandeur)) {
-            $notes_finales .= "\n\n--- Notes ---\n" . $notes_demandeur;
+        if (empty($details_demande)) {
+             throw new Exception("La demande est vide.");
         }
+        
+        $notes_demandeur = trim($data['notes_demandeur'] ?? '');
+        $details_json = json_encode($details_demande);
 
         $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
         $now_function = ($driver === 'sqlite') ? "datetime('now')" : "NOW()";
 
-        $premiere_denom_demandee = !empty($demande_items) ? $demande_items[0]['denom'] : 'multiple';
-        $premiere_qty_demandee = !empty($demande_items) ? $demande_items[0]['qty'] : 0;
-
-        $sql = "INSERT INTO reserve_demandes (date_demande, caisse_id, demandeur_nom, denomination_demandee, quantite_demandee, valeur_demandee, notes_demandeur, statut) 
-                VALUES ({$now_function}, ?, ?, ?, ?, ?, ?, 'EN_ATTENTE')";
+        $sql = "INSERT INTO reserve_demandes (date_demande, caisse_id, demandeur_nom, valeur_demandee, details_json, notes_demandeur, statut) 
+                VALUES ({$now_function}, ?, ?, ?, ?, ?, 'EN_ATTENTE')";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             $data['caisse_id'],
             $_SESSION['admin_username'] ?? 'Operateur',
-            $premiere_denom_demandee,
-            $premiere_qty_demandee,
-            $valeur_demandee,
-            $notes_finales
+            round($valeur_totale, 2),
+            $details_json,
+            $notes_demandeur
         ]);
         return $this->pdo->lastInsertId();
     }
-
+    
     public function processDemande($data) {
         $valeur_vers_caisse = ($this->all_denominations[$data['denomination_vers_caisse']] ?? 0) * intval($data['quantite_vers_caisse']);
         $valeur_depuis_caisse = ($this->all_denominations[$data['denomination_depuis_caisse']] ?? 0) * intval($data['quantite_depuis_caisse']);
@@ -171,25 +166,21 @@ class ReserveService {
 
         $this->pdo->beginTransaction();
         try {
-            // Décrémenter la réserve
             $stmt = $this->pdo->prepare("UPDATE reserve_denominations SET quantite = quantite - ? WHERE denomination_nom = ? AND quantite >= ?");
             $stmt->execute([$data['quantite_vers_caisse'], $data['denomination_vers_caisse'], $data['quantite_vers_caisse']]);
             if ($stmt->rowCount() == 0) {
-                throw new Exception("Quantité insuffisante dans la réserve pour la dénomination demandée.");
+                throw new Exception("Quantité insuffisante dans la réserve pour la dénomination '" . $data['denomination_vers_caisse'] . "'.");
             }
 
-            // Incrémenter la réserve
             $stmt = $this->pdo->prepare("UPDATE reserve_denominations SET quantite = quantite + ? WHERE denomination_nom = ?");
             $stmt->execute([$data['quantite_depuis_caisse'], $data['denomination_depuis_caisse']]);
             
             $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
             $now_function = ($driver === 'sqlite') ? "datetime('now')" : "NOW()";
             
-            // Mettre à jour la demande
             $stmt = $this->pdo->prepare("UPDATE reserve_demandes SET statut = 'TRAITEE', date_traitement = {$now_function}, approbateur_nom = ? WHERE id = ?");
             $stmt->execute([$_SESSION['admin_username'] ?? 'Admin', $data['demande_id']]);
 
-            // Ajouter au journal des opérations
             $sql_log = "INSERT INTO reserve_operations_log (demande_id, date_operation, caisse_id, denomination_vers_caisse, quantite_vers_caisse, denomination_depuis_caisse, quantite_depuis_caisse, valeur_echange, notes, approbateur_nom)
                         VALUES (?, {$now_function}, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt_log = $this->pdo->prepare($sql_log);
