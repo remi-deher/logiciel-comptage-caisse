@@ -28,20 +28,17 @@ class CalculateurController {
 
     public function getInitialData() {
         header('Content-Type: application/json');
-        // Logique pour trouver la dernière sauvegarde pertinente (auto ou J+1)
-        $stmt_auto = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
-        $autosave = $stmt_auto->fetch();
-        $stmt_j1 = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Fond de caisse J+1%' ORDER BY id DESC LIMIT 1");
-        $fond_j1 = $stmt_j1->fetch();
 
-        $last_comptage = null;
-        if ($autosave && $fond_j1) {
-            $last_comptage = ($autosave['id'] > $fond_j1['id']) ? $autosave : $fond_j1;
-        } elseif ($autosave) {
-            $last_comptage = $autosave;
-        } elseif ($fond_j1) {
-            $last_comptage = $fond_j1;
-        } else {
+        // Logique simplifiée pour trouver la dernière sauvegarde pertinente (auto ou J+1)
+        $stmt = $this->pdo->query(
+            "SELECT id, nom_comptage, explication FROM comptages
+             WHERE nom_comptage LIKE 'Sauvegarde auto%' OR nom_comptage LIKE 'Fond de caisse J+1%'
+             ORDER BY id DESC LIMIT 1"
+        );
+        $last_comptage = $stmt->fetch();
+
+        // Si on ne trouve ni l'un ni l'autre, on charge le tout dernier comptage existant
+        if (!$last_comptage) {
             $stmt_last = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages ORDER BY id DESC LIMIT 1");
             $last_comptage = $stmt_last->fetch();
         }
