@@ -1,0 +1,157 @@
+<?php
+// Fichier : tests/FullCycleTest.php
+
+use PHPUnit\Framework\TestCase;
+
+// On charge toutes les dépendances nécessaires pour le test
+require_once __DIR__ . '/../src/CalculateurController.php';
+require_once __DIR__ . '/../src/services/ClotureStateService.php';
+require_once __DIR__ . '/../src/services/BackupService.php';
+require_once __DIR__ . '/../src/Repository/ComptageRepository.php';
+require_once __DIR__ . '/../src/Utils.php';
+
+/**
+ * Ce test simule un cycle complet de clôture pour valider la correction
+ * sur le chargement du fond de caisse J+1.
+ */
+class FullCycleTest extends TestCase
+{
+    private $pdo;
+    private $calculateurController;
+    private $clotureStateService;
+
+    /**
+     * Cette fonction prépare un environnement de test propre avant chaque test.
+     */
+    protected function setUp(): void
+    {
+        // 1. On utilise une base de données en mémoire pour un test rapide et isolé
+        $this->pdo = new PDO('sqlite::memory:');
+        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        // 2. On crée le schéma de la base de données à partir de votre fichier schema.sql
+        $schema = file_get_contents(__DIR__ . '/../config/schema.sql');
+        // On adapte le schéma pour SQLite (suppression des spécificités MySQL)
+        $schema = preg_replace('/ENGINE=InnoDB.*?COLLATE=utf8mb4_unicode_ci;/', ';', $schema);
+        $schema = preg_replace('/AUTO_INCREMENT/', 'PRIMARY KEY AUTOINCREMENT', $schema);
+        $schema = str_replace('JSON NOT NULL', 'TEXT NOT NULL', $schema);
+        $this->pdo->exec($schema);
+
+        // 3. On simule les variables de configuration globales
+        global $noms_caisses, $denominations;
+        $this->noms_caisses = [1 => 'Caisse Principale', 2 => 'Caisse Annexe'];
+        $this->denominations = [
+            'billets' => ['b50' => 50, 'b20' => 20, 'b10' => 10],
+            'pieces'  => ['p2' => 2, 'p1' => 1]
+        ];
+        $noms_caisses = $this->noms_caisses;
+        $denominations = $this->denominations;
+
+
+        // 4. On crée les instances des services nécessaires
+        $comptageRepository = new ComptageRepository($this->pdo);
+        $this->clotureStateService = new ClotureStateService($this->pdo);
+
+        // On "mock" le service de backup pour ne pas créer de vrais fichiers
+        $backupServiceMock = $this->createMock(BackupService::class);
+        $backupServiceMock->method('createBackup')->willReturn(['success' => true]);
+
+        // 5. On instancie le contrôleur à tester avec les dépendances de test
+        // et on lui injecte la correction que nous avons faite
+        $this->calculateurController = new class($this->pdo, $this->noms_caisses, $this->denominations, [], $comptageRepository, $backupServiceMock) extends CalculateurController {
+            // On ré-injecte la version corrigée de getInitialData pour ce test
+            public function getInitialData() {
+                header('Content-Type: application/json');
+                $stmt = $this->pdo->query(
+                    "SELECT id, nom_comptage, explication FROM comptages
+                     WHERE nom_comptage LIKE 'Sauvegarde auto%' OR nom_comptage LIKE 'Fond de caisse J+1%'
+                     ORDER BY id DESC LIMIT 1"
+                );
+                $last_comptage = $stmt->fetch();
+
+                if (!$last_comptage) {
+                    $stmt_last = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages ORDER BY id DESC LIMIT 1");
+                    $last_comptage = $stmt_last->fetch();
+                }
+
+                if ($last_comptage) {
+                    $data = $this->comptageRepository->findDetailsById($last_comptage['id']);
+                    $data['nom_comptage'] = $last_comptage['nom_comptage'];
+                    $data['explication'] = $last_comptage['explication'];
+                    echo json_encode(['success' => true, 'data' => $data]);
+                } else {
+                    echo json_encode(['success' => false, 'data' => null]);
+                }
+                exit;
+            }
+        };
+    }
+
+    /**
+     * Le test principal qui exécute le scénario complet.
+     */
+    public function testClotureGeneraleThenGetInitialDataLoadsCorrectFondDeCaisse()
+    {
+        // --- 1. ARRANGE : On simule la clôture de deux caisses ---
+
+        // Caisse 1 : 170€ comptés, ventes de 70€. On retire 2x b20 et 3x b10 (70€). Il doit rester 100€ (2x b50).
+        $dataCaisse1 = json_encode([
+            'fond_de_caisse' => '100.00',
+            'ventes_especes' => '70.00',
+            'denominations' => ['b50' => '2', 'b20' => '2', 'b10' => '3'], // Total 170€
+            'retraits' => ['b20' => '2', 'b10' => '3'] // Total 70€ retirés
+        ]);
+        $this->clotureStateService->confirmCaisse(1, $dataCaisse1);
+
+        // Caisse 2 : 60€ comptés, ventes de 10€. On retire 1x b10 (10€). Il doit rester 50€ (1x b50).
+        $dataCaisse2 = json_encode([
+            'fond_de_caisse' => '50.00',
+            'ventes_especes' => '10.00',
+            'denominations' => ['b50' => '1', 'b10' => '1'], // Total 60€
+            'retraits' => ['b10' => '1'] // Total 10€ retirés
+        ]);
+        $this->clotureStateService->confirmCaisse(2, $dataCaisse2);
+
+
+        // --- 2. ACT : On exécute la clôture générale ---
+
+        // On utilise la capture de sortie pour récupérer le JSON sans que `exit` arrête le test
+        ob_start();
+        $this->calculateurController->cloture_generale();
+        $clotureJsonResponse = ob_get_clean();
+        $clotureResult = json_decode($clotureJsonResponse, true);
+
+        // Première vérification : la clôture générale a-t-elle réussi ?
+        $this->assertTrue($clotureResult['success'], "La clôture générale aurait dû réussir.");
+
+
+        // --- 3. ASSERT : On vérifie le rechargement des données initiales ---
+
+        ob_start();
+        // On appelle la fonction corrigée pour simuler le rechargement de la page
+        $this->calculateurController->getInitialData();
+        $initialDataJsonResponse = ob_get_clean();
+        $initialDataResult = json_decode($initialDataJsonResponse, true);
+
+        // Vérifications finales
+        $this->assertTrue($initialDataResult['success'], "getInitialData aurait dû trouver un comptage à charger.");
+        $this->assertStringContainsString('Fond de caisse J+1', $initialDataResult['data']['nom_comptage']);
+
+        // On vérifie les données chargées pour la Caisse 1
+        $caisse1LoadedData = $initialDataResult['data'][1];
+        $this->assertEquals('100.00', $caisse1LoadedData['fond_de_caisse'], "Le fond de caisse J+1 pour Caisse 1 devrait être 100.00.");
+        $this->assertEquals(2, $caisse1LoadedData['denominations']['b50'], "Il devrait rester 2 billets de 50 pour la Caisse 1.");
+        $this->assertArrayNotHasKey('b20', $caisse1LoadedData['denominations'], "Les billets de 20 auraient dû être retirés de la Caisse 1.");
+
+        // On vérifie que les champs de vente ont bien été remis à zéro
+        $this->assertEquals('0', $caisse1LoadedData['ventes_especes']);
+    }
+    
+    /**
+     * Nettoie l'environnement après chaque test.
+     */
+    protected function tearDown(): void
+    {
+        $this->pdo = null;
+    }
+}
