@@ -1,8 +1,6 @@
 <?php
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/../src/services/FilterService.php';
-
 /**
  * Cette classe teste la logique de construction des requêtes SQL pour les filtres.
  */

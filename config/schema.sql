@@ -110,13 +110,14 @@ CREATE TABLE IF NOT EXISTS `reserve_demandes` (
   `date_demande` DATETIME NOT NULL,
   `caisse_id` INT(11) NOT NULL,
   `demandeur_nom` VARCHAR(255) NULL,
-  `denomination_demandee` VARCHAR(255) NOT NULL,
-  `quantite_demandee` INT(11) NOT NULL,
   `valeur_demandee` DECIMAL(10,2) NOT NULL,
+  `details_json` TEXT NULL DEFAULT NULL,
   `statut` ENUM('EN_ATTENTE', 'TRAITEE', 'ANNULEE') NOT NULL DEFAULT 'EN_ATTENTE',
   `notes_demandeur` TEXT DEFAULT NULL,
   `date_traitement` DATETIME NULL,
   `approbateur_nom` VARCHAR(255) NULL,
+  `denomination_demandee_old` VARCHAR(255) NULL,
+  `quantite_demandee_old` INT(11) NULL,
   PRIMARY KEY (`id`),
   FOREIGN KEY (`caisse_id`) REFERENCES `caisses`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
