@@ -152,7 +152,9 @@ $routes = [
     'GET:version/changelog' => [$changelogController, 'index'],
     'GET:version/get_local' => [$adminController, 'getLocalVersion'],
     'GET:update/status' => [$adminController, 'getUpdateStatus'],
-    'POST:update/perform_migration' => [$adminController, 'performMigration'],
+    'POST:update/perform_full_update' => [$adminController, 'performFullUpdate'], // NOUVELLE ROUTE PRINCIPALE
+    'POST:update/perform_migration' => [$adminController, 'performMigration'], // Gardée pour compatibilité ou usage futur
+
 ];
 
 if (array_key_exists($route_key, $routes)) {

@@ -30,7 +30,7 @@ class VersionService {
             $remote_version = $cachedData['remote_version'] ?? $local_version;
             return array_merge($cachedData, [
                 'local_version' => $local_version,
-                'update_available' => version_compare($local_version, $remote_version, '<')
+                'update_available' => version_compare(ltrim($local_version, 'v'), ltrim($remote_version, 'v'), '<')
             ]);
         }
 
@@ -49,7 +49,7 @@ class VersionService {
                 file_put_contents($cacheFile, json_encode($responseData), LOCK_EX);
                 return array_merge($responseData, [
                     'local_version' => $local_version,
-                    'update_available' => version_compare($local_version, $remote_version, '<')
+                    'update_available' => version_compare(ltrim($local_version, 'v'), ltrim($remote_version, 'v'), '<')
                 ]);
             }
         }
@@ -86,7 +86,11 @@ class VersionService {
         return $fallback;
     }
     
-    private function fetchFromApi($endpoint, $headers = []) {
+    /**
+     * CORRECTION : La méthode est maintenant 'protected' au lieu de 'private'
+     * pour permettre aux tests de la surcharger (mocking).
+     */
+    protected function fetchFromApi($endpoint, $headers = []) {
         if (!function_exists('curl_init')) return ['success' => false];
         
         $ch = curl_init();
@@ -109,10 +113,6 @@ class VersionService {
         ];
     }
 
-    //
-    // --- CORRECTION CI-DESSOUS ---
-    // La fonction est maintenant 'public' au lieu de 'private'
-    //
     public function getLocalVersion() {
         $version_file = dirname(__DIR__, 2) . '/VERSION';
         return file_exists($version_file) ? trim(file_get_contents($version_file)) : '0.0.0';
