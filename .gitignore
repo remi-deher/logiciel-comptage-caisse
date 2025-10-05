@@ -1,3 +1,4 @@
+.phpunit.result.cache
 config/admins.php
 config/config.php
 composer.phar
@@ -15,3 +16,4 @@ build
 npm-debug.log
 .env
 .DS_Store
+phpunit.xml
