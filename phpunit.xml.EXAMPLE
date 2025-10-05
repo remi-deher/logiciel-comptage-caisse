@@ -10,6 +10,7 @@
     </testsuites>
 
     <php>
+	<const name="PHPUNIT_RUNNING" value="true"/>
         <env name="DB_TYPE" value="mysql" /> <env name="DB_HOST" value="127.0.0.1" />
         <env name="DB_PORT" value="3306" />
         <env name="DB_NAME_TEST" value="votre_bdd_de_test" />

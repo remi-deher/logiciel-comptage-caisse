@@ -1,5 +1,5 @@
 <?php
-// Fichier : src/CalculateurController.php (Version finale et corrigée)
+// Fichier : src/CalculateurController.php
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';
@@ -16,29 +16,33 @@ class CalculateurController {
     private $backupService;
     private $comptageRepository;
 
-    public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse_obsolete, $comptageRepository) {
+    public function __construct($pdo, $noms_caisses, $denominations, $tpe_par_caisse_obsolete, $comptageRepository, BackupService $backupService = null) {
         $this->pdo = $pdo;
         $this->noms_caisses = $noms_caisses;
         $this->denominations = $denominations;
         $this->versionService = new VersionService();
         $this->clotureStateService = new ClotureStateService($pdo);
-        $this->backupService = new BackupService();
         $this->comptageRepository = $comptageRepository;
+        // Si aucun service n'est fourni lors de l'instanciation, on en crée un par défaut.
+        $this->backupService = $backupService ?? new BackupService();
     }
 
     public function getInitialData() {
-        header('Content-Type: application/json');
+        if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
+        
+        $stmt_auto = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
+        $autosave = $stmt_auto->fetch();
+        $stmt_j1 = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Fond de caisse J+1%' ORDER BY id DESC LIMIT 1");
+        $fond_j1 = $stmt_j1->fetch();
 
-        // Logique simplifiée pour trouver la dernière sauvegarde pertinente (auto ou J+1)
-        $stmt = $this->pdo->query(
-            "SELECT id, nom_comptage, explication FROM comptages
-             WHERE nom_comptage LIKE 'Sauvegarde auto%' OR nom_comptage LIKE 'Fond de caisse J+1%'
-             ORDER BY id DESC LIMIT 1"
-        );
-        $last_comptage = $stmt->fetch();
-
-        // Si on ne trouve ni l'un ni l'autre, on charge le tout dernier comptage existant
-        if (!$last_comptage) {
+        $last_comptage = null;
+        if ($autosave && $fond_j1) {
+            $last_comptage = ($autosave['id'] > $fond_j1['id']) ? $autosave : $fond_j1;
+        } elseif ($autosave) {
+            $last_comptage = $autosave;
+        } elseif ($fond_j1) {
+            $last_comptage = $fond_j1;
+        } else {
             $stmt_last = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages ORDER BY id DESC LIMIT 1");
             $last_comptage = $stmt_last->fetch();
         }
@@ -49,72 +53,60 @@ class CalculateurController {
             $data['explication'] = $last_comptage['explication'];
             echo json_encode(['success' => true, 'data' => $data]);
         } else {
-            // S'il n'y a aucun comptage, on renvoie une structure de données vide
             echo json_encode(['success' => false, 'data' => null]);
         }
-        exit;
     }
 
     public function cloture() {
-        header('Content-Type: application/json');
+        if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
         try {
             $caisse_id_a_cloturer = intval($_POST['caisse_id_a_cloturer'] ?? 0);
             if ($caisse_id_a_cloturer <= 0) {
                 throw new Exception("ID de caisse à clôturer invalide.");
             }
     
-            // Rassembler toutes les données de la caisse depuis $_POST
             $caisse_data = $_POST['caisse'][$caisse_id_a_cloturer] ?? [];
             if (empty($caisse_data)) {
                 throw new Exception("Données manquantes pour la caisse {$caisse_id_a_cloturer}.");
             }
             
-            // Ajouter les retraits au tableau de données
             $caisse_data['retraits'] = $_POST['retraits'][$caisse_id_a_cloturer] ?? [];
-    
-            // Convertir le tableau de données en JSON pour le stockage
             $data_json = json_encode($caisse_data);
     
-            // Utiliser le service pour enregistrer les données de manière atomique
             $this->clotureStateService->confirmCaisse($caisse_id_a_cloturer, $data_json);
     
             echo json_encode(['success' => true, 'message' => 'La caisse a été clôturée avec succès.']);
     
         } catch (Exception $e) {
-            http_response_code(500);
-            error_log("Erreur de clôture: " . $e->getMessage()); // Pour le débogage serveur
+            if (!defined('PHPUNIT_RUNNING')) { http_response_code(500); }
+            error_log("Erreur de clôture: " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => 'Erreur lors de la clôture : ' . $e->getMessage()]);
         }
-        exit;
     }
     
     public function cloture_generale() {
-        header('Content-Type: application/json');
+        if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
 
         $allCaisseIds = array_keys($this->noms_caisses);
         $closedCaissesIds = $this->clotureStateService->getClosedCaisses();
 
         if (count($allCaisseIds) !== count($closedCaissesIds)) {
-            http_response_code(400);
+            if (!defined('PHPUNIT_RUNNING')) { http_response_code(400); }
             echo json_encode(['success' => false, 'message' => "Action impossible : Toutes les caisses ne sont pas encore clôturées."]);
-            exit;
+            return;
         }
 
-        // 1. Sauvegarde de la base de données
         $backupResult = $this->backupService->createBackup();
         if (!$backupResult['success']) {
-            http_response_code(500);
+            if (!defined('PHPUNIT_RUNNING')) { http_response_code(500); }
             echo json_encode(['success' => false, 'message' => $backupResult['message']]);
-            exit;
+            return;
         }
         
         try {
             $this->pdo->beginTransaction();
-
-            // 2. Nettoyage des sauvegardes auto
             $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
             
-            // 3. Création des entrées "Clôture Générale" et "Fond de caisse J+1"
             $now = date('Y-m-d H:i:s');
             $date_for_name = date('d/m/Y H:i');
             
@@ -126,16 +118,13 @@ class CalculateurController {
             $stmt_j1->execute(["Fond de caisse J+1 du " . $date_for_name, "Préparation pour la journée suivante.", $now]);
             $comptage_id_j1 = $this->pdo->lastInsertId();
 
-            // 4. Traitement de chaque caisse clôturée
             foreach ($allCaisseIds as $caisse_id) {
                 $cloture_data = $this->clotureStateService->getClosedCaisseData($caisse_id);
                 if (!$cloture_data) continue;
 
-                // 4a. Insérer les détails dans le comptage "Clôture Générale"
                 $detail_id_cg = $this->insertComptageDetail($comptage_id_cg, $caisse_id, $cloture_data);
                 $this->copyDetailsToNewRecord($detail_id_cg, $cloture_data);
 
-                // 4b. Calculer et insérer le "Fond de caisse J+1"
                 $all_denoms_map = array_merge($this->denominations['billets'] ?? [], $this->denominations['pieces'] ?? []);
                 $nouveau_fond_de_caisse = 0;
                 $denominations_j1 = [];
@@ -157,7 +146,6 @@ class CalculateurController {
                 $this->copyDetailsToNewRecord($detail_id_j1, $data_j1);
             }
 
-            // 5. Réinitialiser l'état des clôtures
             $this->clotureStateService->resetState();
             
             $this->pdo->commit();
@@ -165,11 +153,10 @@ class CalculateurController {
 
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
-            http_response_code(500);
+            if (!defined('PHPUNIT_RUNNING')) { http_response_code(500); }
             error_log("Erreur de clôture générale: " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => 'Erreur lors de la clôture générale : ' . $e->getMessage()]);
         }
-        exit;
     }
 
     private function insertComptageDetail($comptage_id, $caisse_id, $data) {
@@ -191,7 +178,6 @@ class CalculateurController {
     }
 
     private function copyDetailsToNewRecord($new_detail_id, $source_data) {
-        // Copie des dénominations
         if (!empty($source_data['denominations'])) {
             foreach ($source_data['denominations'] as $denom_name => $quantity) {
                 if (intval($quantity) > 0) {
@@ -200,30 +186,24 @@ class CalculateurController {
                 }
             }
         }
-        // Copie des relevés TPE
         if (!empty($source_data['tpe'])) {
             foreach ($source_data['tpe'] as $terminal_id => $releves) {
                 if(is_array($releves)) {
                     foreach ($releves as $releve) {
                         $stmt = $this->pdo->prepare("INSERT INTO comptage_cb (comptage_detail_id, terminal_id, montant, heure_releve) VALUES (?, ?, ?, ?)");
-                        // --- DÉBUT DE LA CORRECTION ---
                         $heure_releve_raw = $releve['heure'] ?? null;
-                        // On vérifie que la valeur n'est pas une chaîne vide ou 'null' avant de l'insérer
                         $heure_releve = (in_array($heure_releve_raw, [null, 'undefined', 'null', ''], true)) ? null : $heure_releve_raw;
                         $stmt->execute([$new_detail_id, $terminal_id, get_numeric_value($releve, 'montant'), $heure_releve]);
-                        // --- FIN DE LA CORRECTION ---
                     }
                 }
             }
         }
-        // Copie des chèques
         if (!empty($source_data['cheques'])) {
             foreach ($source_data['cheques'] as $cheque) {
                 $stmt = $this->pdo->prepare("INSERT INTO comptage_cheques (comptage_detail_id, montant, commentaire) VALUES (?, ?, ?)");
                 $stmt->execute([$new_detail_id, get_numeric_value($cheque, 'montant'), $cheque['commentaire'] ?? '']);
             }
         }
-        // Copie des retraits
         if (!empty($source_data['retraits'])) {
             foreach ($source_data['retraits'] as $denom_name => $quantity) {
                  if (intval($quantity) > 0) {
@@ -238,12 +218,11 @@ class CalculateurController {
     public function autosave() { $this->handleSave(true); }
 
     private function handleSave($is_autosave) {
-        header('Content-Type: application/json');
+        if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
         try {
             $this->pdo->beginTransaction();
             $nom_comptage = trim($_POST['nom_comptage'] ?? '');
             if ($is_autosave) {
-                // Supprimer les anciennes sauvegardes auto pour ne pas polluer
                 $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {
@@ -266,20 +245,19 @@ class CalculateurController {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            http_response_code(500);
+            if (!defined('PHPUNIT_RUNNING')) { http_response_code(500); }
             error_log("Erreur de sauvegarde: " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => 'Erreur côté serveur lors de la sauvegarde : ' . $e->getMessage()]);
         }
-        exit;
     }
 
     public function loadFromHistory() {
-        header('Content-Type: application/json');
+        if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
         $comptage_id_to_load = intval($_POST['comptage_id'] ?? 0);
         if ($comptage_id_to_load <= 0) {
-            http_response_code(400);
+            if (!defined('PHPUNIT_RUNNING')) { http_response_code(400); }
             echo json_encode(['success' => false, 'message' => 'ID de comptage invalide.']);
-            exit;
+            return;
         }
         try {
             $stmt_name = $this->pdo->prepare("SELECT nom_comptage, explication FROM comptages WHERE id = ?");
@@ -310,20 +288,19 @@ class CalculateurController {
             echo json_encode(['success' => true, 'message' => 'Sauvegarde automatique créée depuis l\'historique.']);
         } catch (Exception $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
-            http_response_code(500);
+            if (!defined('PHPUNIT_RUNNING')) { http_response_code(500); }
             error_log("Erreur loadFromHistory: " . $e->getMessage());
             echo json_encode(['success' => false, 'message' => 'Erreur serveur: ' . $e->getMessage()]);
         }
-        exit;
     }
 
     public function getClosedCaisseData() {
-        header('Content-Type: application/json');
+        if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
         $caisse_id = intval($_GET['caisse_id'] ?? 0);
         if ($caisse_id <= 0) {
-            http_response_code(400);
+            if (!defined('PHPUNIT_RUNNING')) { http_response_code(400); }
             echo json_encode(['success' => false, 'message' => 'ID de caisse invalide.']);
-            exit;
+            return;
         }
 
         try {
@@ -333,9 +310,8 @@ class CalculateurController {
             }
             echo json_encode(['success' => true, 'data' => $data]);
         } catch (Exception $e) {
-            http_response_code(404);
+            if (!defined('PHPUNIT_RUNNING')) { http_response_code(404); }
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
-        exit;
     }
 }
