@@ -201,38 +201,75 @@ export function showFinalSummaryBanner(state) {
     const container = document.getElementById('cloture-final-summary-banner-container');
     if (!container) return;
 
-    let totalEspeces = 0;
-    let totalCb = 0;
-    let totalCheques = 0;
+    const caisseTotals = [];
+    let grandTotalEspeces = 0;
+    let grandTotalCb = 0;
+    let grandTotalCheques = 0;
 
     Object.keys(state.config.nomsCaisses).forEach(caisseId => {
         const caisseData = state.calculatorData.caisse[caisseId];
-        if(caisseData) {
+        if (caisseData) {
             const suggestions = service.calculateWithdrawalSuggestion(caisseData, state.config);
             const ecarts = service.calculateEcartsForCaisse(caisseId, state);
-            totalEspeces += suggestions.totalToWithdraw;
-            totalCb += ecarts.totalCompteCb;
-            totalCheques += ecarts.totalCompteCheques;
+            const totalEspeces = suggestions.totalToWithdraw;
+            const totalCb = ecarts.totalCompteCb;
+            const totalCheques = ecarts.totalCompteCheques;
+
+            caisseTotals.push({
+                nom: state.config.nomsCaisses[caisseId],
+                totalEspeces,
+                totalCb,
+                totalCheques
+            });
+
+            grandTotalEspeces += totalEspeces;
+            grandTotalCb += totalCb;
+            grandTotalCheques += totalCheques;
         }
     });
-    
-    const grandTotal = totalEspeces + totalCb + totalCheques;
+
+    const grandTotal = grandTotalEspeces + grandTotalCb + grandTotalCheques;
+
+    const tableRows = caisseTotals.map(caisse => `
+        <tr>
+            <td>${caisse.nom}</td>
+            <td class="text-right">${formatCurrency(caisse.totalEspeces, state.config)}</td>
+            <td class="text-right">${formatCurrency(caisse.totalCb, state.config)}</td>
+            <td class="text-right">${formatCurrency(caisse.totalCheques, state.config)}</td>
+        </tr>
+    `).join('');
 
     container.innerHTML = `
         <div class="cloture-final-summary-banner">
             <div class="banner-header">
                 <h4><i class="fa-solid fa-flag-checkered"></i> Journée Prête pour Finalisation</h4>
                 <p>Toutes les caisses sont clôturées. Voici le récapitulatif de votre remise en banque :</p>
-                <div class="final-summary-details">
-                    <p><i class="fa-solid fa-money-bill-wave"></i> Total Espèces : <strong>${formatCurrency(totalEspeces, state.config)}</strong></p>
-                    <p><i class="fa-solid fa-credit-card"></i> Total CB : <strong>${formatCurrency(totalCb, state.config)}</strong></p>
-                    <p><i class="fa-solid fa-money-check-dollar"></i> Total Chèques : <strong>${formatCurrency(totalCheques, state.config)}</strong></p>
-                    <hr>
-                    <p class="grand-total">Montant total du dépôt : <strong>${formatCurrency(grandTotal, state.config)}</strong></p>
-                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="suggestion-table">
+                    <thead>
+                        <tr>
+                            <th>Caisse</th>
+                            <th class="text-right">Espèces</th>
+                            <th class="text-right">CB</th>
+                            <th class="text-right">Chèques</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                    <tfoot>
+                        <tr class="grand-total-row">
+                            <td><strong>Total Général</strong></td>
+                            <td class="text-right"><strong>${formatCurrency(grandTotalEspeces, state.config)}</strong></td>
+                            <td class="text-right"><strong>${formatCurrency(grandTotalCb, state.config)}</strong></td>
+                            <td class="text-right"><strong>${formatCurrency(grandTotalCheques, state.config)}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
             <div class="banner-actions">
-                <button id="show-suggestions-btn" class="btn action-btn"><i class="fa-solid fa-eye"></i> Voir le détail par caisse</button>
+                <button id="show-suggestions-btn" class="btn action-btn"><i class="fa-solid fa-eye"></i> Voir le détail des retraits</button>
                 <button id="finalize-day-btn" class="btn save-btn">Finaliser et Archiver la Journée</button>
             </div>
         </div>
