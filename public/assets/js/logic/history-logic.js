@@ -1,5 +1,7 @@
 // Fichier : public/assets/js/logic/history-logic.js (Version avec détails des retraits)
 import { sendWsMessage } from './websocket-service.js';
+import { showConfirmationModal } from '../utils/ui.js'; // Importation de la modale
+import { showToast } from '../utils/toast.js'; // Importation du toast
 
 // --- État et Configuration Globale ---
 let fullHistoryData = [];
@@ -184,44 +186,64 @@ function processWithdrawalData(comptages, denominations) {
 }
 
 async function handleDeleteComptage(comptageId, cardElement) {
-    if (confirm("Êtes-vous sûr de vouloir supprimer définitivement ce comptage ?")) {
-        const formData = new FormData();
-        formData.append('id_a_supprimer', comptageId);
-        try {
-            const response = await fetch('index.php?route=historique/delete', { method: 'POST', body: formData });
-            const result = await response.json();
-            if(!result.success) throw new Error(result.message);
-            cardElement.style.transition = 'opacity 0.3s';
-            cardElement.style.opacity = '0';
-            setTimeout(() => cardElement.remove(), 300);
-        } catch(err) {
-            alert(`Erreur: ${err.message}`);
+    showConfirmationModal({
+        title: 'Supprimer le comptage',
+        message: 'Êtes-vous sûr de vouloir supprimer définitivement ce comptage ?',
+        confirmButtonClass: 'delete-btn',
+        confirmButtonText: 'Supprimer',
+        onConfirm: async () => {
+            const formData = new FormData();
+            formData.append('id_a_supprimer', comptageId);
+            try {
+                const response = await fetch('index.php?route=historique/delete', { method: 'POST', body: formData });
+                const result = await response.json();
+                if(!result.success) throw new Error(result.message);
+                cardElement.style.transition = 'opacity 0.3s';
+                cardElement.style.opacity = '0';
+                setTimeout(() => cardElement.remove(), 300);
+                showToast('Comptage supprimé avec succès.', 'success');
+            } catch(err) {
+                showToast(`Erreur: ${err.message}`, 'error');
+            }
         }
-    }
+    });
 }
 
 async function handleLoadComptage(comptageId, buttonElement) {
     const comptageData = fullHistoryData.find(c => c.id.toString() === comptageId);
-    if(comptageData && confirm(`Voulez-vous charger le comptage "${comptageData.nom_comptage}" ?\n\nAttention : Votre travail non sauvegardé dans le calculateur sera écrasé.`)) {
-        buttonElement.disabled = true;
-        buttonElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        try {
-            const formData = new FormData();
-            formData.append('comptage_id', comptageId);
-            const response = await fetch('index.php?route=calculateur/load_from_history', { method: 'POST', body: formData });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message);
-            
-            sendWsMessage({ type: 'force_reload_all' });
-            window.location.href = '/calculateur';
+    if (!comptageData) return;
 
-        } catch (error) {
-            alert(`Erreur lors du chargement : ${error.message}`);
-            buttonElement.disabled = false;
-            buttonElement.innerHTML = '<i class="fa-solid fa-download"></i> Charger';
+    showConfirmationModal({
+        title: 'Charger un comptage',
+        message: `Voulez-vous charger le comptage "${comptageData.nom_comptage}" ?\n\nAttention : Votre travail non sauvegardé dans le calculateur sera écrasé.`,
+        confirmButtonClass: 'save-btn',
+        confirmButtonText: 'Charger',
+        onConfirm: async () => {
+            buttonElement.disabled = true;
+            buttonElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            
+            showToast('Chargement du comptage en cours...', 'info');
+
+            try {
+                const formData = new FormData();
+                formData.append('comptage_id', comptageId);
+                const response = await fetch('index.php?route=calculateur/load_from_history', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (!result.success) throw new Error(result.message);
+                
+                sendWsMessage({ type: 'force_reload_all' });
+                
+                window.location.href = '/calculateur';
+
+            } catch (error) {
+                showToast(`Erreur lors du chargement : ${error.message}`, 'error');
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = '<i class="fa-solid fa-download"></i> Charger';
+            }
         }
-    }
+    });
 }
+
 
 // --- Logique du Panneau de Détails (Bottom Sheet) ---
 

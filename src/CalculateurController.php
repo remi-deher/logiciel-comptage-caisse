@@ -223,7 +223,6 @@ class CalculateurController {
             $this->pdo->beginTransaction();
             $nom_comptage = trim($_POST['nom_comptage'] ?? '');
             if ($is_autosave) {
-                $this->pdo->exec("DELETE FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%'");
                 $nom_comptage = "Sauvegarde auto du " . date('Y-m-d H:i:s');
             } else {
                 $nom_comptage = empty($nom_comptage) ? "Comptage du " . date('Y-m-d H:i:s') : $nom_comptage;

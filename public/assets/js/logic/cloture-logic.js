@@ -2,62 +2,23 @@
 
 import { sendWsMessage } from './websocket-service.js';
 import * as service from './calculator-service.js';
-import { showToast } from '../utils/toast.js'; // Importation du service de toast
+import { showToast } from '../utils/toast.js';
+import { showConfirmationModal } from '../utils/ui.js'; // Mise à jour de l'import
 
-/**
- * Affiche une modale de confirmation personnalisée.
- * @param {string} title - Le titre de la modale.
- * @param {string} message - Le message à afficher dans la modale.
- * @param {function} onConfirm - La fonction à exécuter si l'utilisateur confirme.
- * @param {string} confirmButtonClass - La classe CSS pour le bouton de confirmation (ex: 'save-btn', 'delete-btn').
- */
-function showConfirmationModal(title, message, onConfirm, confirmButtonClass = 'save-btn') {
-    const modal = document.getElementById('confirmation-modal');
-    const titleEl = document.getElementById('confirmation-modal-title');
-    const messageEl = document.getElementById('confirmation-modal-message');
-    const confirmBtn = document.getElementById('confirmation-modal-confirm-btn');
-    const cancelBtn = document.getElementById('confirmation-modal-cancel-btn');
-    const closeModalBtns = modal.querySelectorAll('.modal-close');
-
-    titleEl.textContent = title;
-    messageEl.textContent = message;
-
-    // Appliquer le style de couleur au bouton de confirmation
-    confirmBtn.className = `btn ${confirmButtonClass}`;
-
-    modal.classList.add('visible');
-
-    // On utilise .cloneNode(true) pour supprimer les anciens écouteurs d'événements
-    const newConfirmBtn = confirmBtn.cloneNode(true);
-    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-
-    const closeModal = () => modal.classList.remove('visible');
-
-    newConfirmBtn.addEventListener('click', () => {
-        closeModal();
-        onConfirm(); // Exécute l'action de confirmation
-    });
-
-    cancelBtn.addEventListener('click', closeModal);
-    closeModalBtns.forEach(btn => btn.addEventListener('click', closeModal));
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-    });
-}
-
+// La fonction showConfirmationModal locale a été supprimée et est maintenant importée.
 
 /**
  * Démarre le processus de clôture pour une seule caisse.
  */
 export function startClotureCaisse(caisseId, state) {
     const caisseNom = state.config.nomsCaisses[caisseId];
-    showConfirmationModal(
-        'Démarrer la Clôture',
-        `Voulez-vous démarrer la clôture de la caisse "${caisseNom}" ? Cette action la verrouillera pour les autres utilisateurs.`,
-        () => {
+    showConfirmationModal({
+        title: 'Démarrer la Clôture',
+        message: `Voulez-vous démarrer la clôture pour la caisse "${caisseNom}" ? Cette action la verrouillera pour les autres utilisateurs.`,
+        onConfirm: () => {
             sendWsMessage({ type: 'cloture_lock', caisse_id: caisseId });
         }
-    );
+    });
 }
 
 /**
@@ -65,14 +26,15 @@ export function startClotureCaisse(caisseId, state) {
  */
 export function cancelClotureCaisse(caisseId, state) {
     const caisseNom = state.config.nomsCaisses[caisseId];
-    showConfirmationModal(
-        'Annuler la Clôture',
-        `Voulez-vous annuler la clôture de la caisse "${caisseNom}" et la déverrouiller ?`,
-        () => {
+    showConfirmationModal({
+        title: 'Annuler la Clôture',
+        message: `Voulez-vous annuler la clôture pour la caisse "${caisseNom}" et la déverrouiller ?`,
+        confirmButtonClass: 'delete-btn',
+        confirmButtonText: 'Annuler la clôture',
+        onConfirm: () => {
             sendWsMessage({ type: 'cloture_unlock', caisse_id: caisseId });
-        },
-        'delete-btn' // Bouton rouge pour une action d'annulation
-    );
+        }
+    });
 }
 
 /**
@@ -80,14 +42,15 @@ export function cancelClotureCaisse(caisseId, state) {
  */
 export function reopenCaisse(caisseId, state) {
     const caisseNom = state.config.nomsCaisses[caisseId];
-    showConfirmationModal(
-        'Réouvrir la Caisse',
-        `Voulez-vous réouvrir la caisse "${caisseNom}" ?\n\nCela la rendra de nouveau modifiable.`,
-        () => {
+    showConfirmationModal({
+        title: 'Réouvrir la Caisse',
+        message: `Voulez-vous réouvrir la caisse "${caisseNom}" ?\n\nCela la rendra de nouveau modifiable.`,
+        confirmButtonClass: 'action-btn',
+        confirmButtonText: 'Réouvrir',
+        onConfirm: () => {
             sendWsMessage({ type: 'cloture_reopen', caisse_id: caisseId });
-        },
-        'action-btn' // Bouton neutre
-    );
+        }
+    });
 }
 
 /**
@@ -95,10 +58,10 @@ export function reopenCaisse(caisseId, state) {
  */
 export async function validateClotureCaisse(caisseId, state) {
     const caisseNom = state.config.nomsCaisses[caisseId];
-    showConfirmationModal(
-        'Confirmer la Clôture',
-        `Confirmez-vous la clôture définitive de la caisse "${caisseNom}" ?`,
-        async () => {
+    showConfirmationModal({
+        title: 'Confirmer la Clôture',
+        message: `Confirmez-vous la clôture définitive de la caisse "${caisseNom}" ?`,
+        onConfirm: async () => {
             const validateButton = document.querySelector(`.cloture-validate-btn[data-caisse-id="${caisseId}"]`);
             if(validateButton) {
                 validateButton.disabled = true;
@@ -122,17 +85,17 @@ export async function validateClotureCaisse(caisseId, state) {
                 }
             }
         }
-    );
+    });
 }
 
 /**
  * Déclenche la finalisation de la journée.
  */
 export async function finalizeDay() {
-     showConfirmationModal(
-        'Finaliser la Journée',
-        "Toutes les caisses sont clôturées. Voulez-vous finaliser et archiver la journée ? Cette action est irréversible.",
-        async () => {
+     showConfirmationModal({
+        title: 'Finaliser la Journée',
+        message: "Toutes les caisses sont clôturées. Voulez-vous finaliser et archiver la journée ? Cette action est irréversible.",
+        onConfirm: async () => {
             const finalizeButton = document.getElementById('finalize-day-btn');
             if(finalizeButton) {
                 finalizeButton.disabled = true;
@@ -142,7 +105,7 @@ export async function finalizeDay() {
                 const result = await service.submitClotureGenerale();
                 if (!result.success) throw new Error(result.message);
 
-                showToast(result.message, 'success', 5000); // Durée plus longue pour ce message important
+                showToast(result.message, 'success', 5000);
                 sendWsMessage({ type: 'force_reload_all' });
 
             } catch (error) {
@@ -153,5 +116,5 @@ export async function finalizeDay() {
                  }
             }
         }
-    );
+    });
 }

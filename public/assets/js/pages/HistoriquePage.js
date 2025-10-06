@@ -66,7 +66,23 @@ export function renderHistoriquePage(element) {
             <div id="details-sheet-content" class="details-sheet-content">
                 </div>
         </div>
+        
+        <div id="confirmation-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="confirmation-modal-title">Confirmation requise</h3>
+                    <span class="modal-close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmation-modal-message"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn action-btn" id="confirmation-modal-cancel-btn">Annuler</button>
+                    <button type="button" class="btn" id="confirmation-modal-confirm-btn">Confirmer</button>
+                </div>
+            </div>
         </div>
+    </div>
   `;
 
   // Une fois le HTML en place, on lance la logique JavaScript associée
