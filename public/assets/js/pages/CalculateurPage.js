@@ -45,7 +45,6 @@ export function renderCalculateurPage(element) {
             </div>
         </div>
 
-        {/* --- AJOUT DE LA NOUVELLE MODALE DE CONFIRMATION --- */}
         <div id="confirmation-modal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">

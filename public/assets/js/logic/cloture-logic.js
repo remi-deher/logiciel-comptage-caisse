@@ -1,7 +1,8 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Final et Corrigé)
+// Fichier : public/assets/js/logic/cloture-logic.js (Final et Corrigé avec Toasts)
 
 import { sendWsMessage } from './websocket-service.js';
 import * as service from './calculator-service.js';
+import { showToast } from '../utils/toast.js'; // Importation du service de toast
 
 /**
  * Affiche une modale de confirmation personnalisée.
@@ -52,7 +53,7 @@ export function startClotureCaisse(caisseId, state) {
     const caisseNom = state.config.nomsCaisses[caisseId];
     showConfirmationModal(
         'Démarrer la Clôture',
-        `Voulez-vous démarrer la clôture pour la caisse "${caisseNom}" ? Cette action la verrouillera pour les autres utilisateurs.`,
+        `Voulez-vous démarrer la clôture de la caisse "${caisseNom}" ? Cette action la verrouillera pour les autres utilisateurs.`,
         () => {
             sendWsMessage({ type: 'cloture_lock', caisse_id: caisseId });
         }
@@ -66,7 +67,7 @@ export function cancelClotureCaisse(caisseId, state) {
     const caisseNom = state.config.nomsCaisses[caisseId];
     showConfirmationModal(
         'Annuler la Clôture',
-        `Voulez-vous annuler la clôture pour la caisse "${caisseNom}" et la déverrouiller ?`,
+        `Voulez-vous annuler la clôture de la caisse "${caisseNom}" et la déverrouiller ?`,
         () => {
             sendWsMessage({ type: 'cloture_unlock', caisse_id: caisseId });
         },
@@ -109,12 +110,12 @@ export async function validateClotureCaisse(caisseId, state) {
                 const result = await service.submitSingleCaisseCloture(formData);
                 if (!result.success) throw new Error(result.message);
 
-                alert(`La caisse "${caisseNom}" a été clôturée avec succès.`);
+                showToast(`La caisse "${caisseNom}" a été clôturée avec succès.`, 'success');
                 
                 sendWsMessage({ type: 'cloture_state_changed' });
 
             } catch (error) {
-                alert(`Erreur lors de la validation : ${error.message}`);
+                showToast(`Erreur lors de la validation : ${error.message}`, 'error');
                 if(validateButton) {
                     validateButton.disabled = false;
                     validateButton.innerHTML = `<i class="fa-solid fa-check"></i> Valider la clôture`;
@@ -141,11 +142,11 @@ export async function finalizeDay() {
                 const result = await service.submitClotureGenerale();
                 if (!result.success) throw new Error(result.message);
 
-                alert(result.message);
+                showToast(result.message, 'success', 5000); // Durée plus longue pour ce message important
                 sendWsMessage({ type: 'force_reload_all' });
 
             } catch (error) {
-                 alert(`Erreur lors de la finalisation : ${error.message}`);
+                 showToast(`Erreur lors de la finalisation : ${error.message}`, 'error');
                  if(finalizeButton) {
                     finalizeButton.disabled = false;
                     finalizeButton.innerHTML = `Finaliser et Archiver la Journée`;
