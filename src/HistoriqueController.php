@@ -21,80 +21,97 @@ class HistoriqueController {
     {
         header('Content-Type: application/json');
 
-        $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
-        $items_par_page = 10;
-        $offset = ($page - 1) * $items_par_page;
+        try {
+            $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
+            $items_par_page = 10;
+            $offset = ($page - 1) * $items_par_page;
 
-        $date_debut = $_GET['date_debut'] ?? '';
-        $date_fin = $_GET['date_fin'] ?? '';
-        $recherche = $_GET['recherche'] ?? '';
+            $date_debut = $_GET['date_debut'] ?? '';
+            $date_fin = $_GET['date_fin'] ?? '';
+            $recherche = $_GET['recherche'] ?? '';
 
-        $filter_params = $this->filterService->getWhereClauseAndBindings($date_debut, $date_fin, $recherche);
-        $sql_where = $filter_params['sql_where'];
-        $bind_values = $filter_params['bind_values'];
+            $filter_params = $this->filterService->getWhereClauseAndBindings($date_debut, $date_fin, $recherche);
+            $sql_where = $filter_params['sql_where'];
+            $bind_values = $filter_params['bind_values'];
 
-        $sql_total = "SELECT COUNT(id) FROM comptages" . $sql_where;
-        $stmt_total = $this->pdo->prepare($sql_total);
-        $stmt_total->execute($bind_values);
-        $total_items = $stmt_total->fetchColumn();
-        $pages_totales = ceil($total_items / $items_par_page);
+            $sql_total = "SELECT COUNT(id) FROM comptages" . $sql_where;
+            $stmt_total = $this->pdo->prepare($sql_total);
+            $stmt_total->execute($bind_values);
+            $total_items = $stmt_total->fetchColumn();
+            $pages_totales = ceil($total_items / $items_par_page);
 
-        $sql_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage DESC LIMIT ? OFFSET ?";
-        $stmt_ids = $this->pdo->prepare($sql_ids);
-        // On doit passer les paramètres de la limite et de l'offset en tant qu'entiers
-        $stmt_ids->bindValue(count($bind_values) + 1, $items_par_page, PDO::PARAM_INT);
-        $stmt_ids->bindValue(count($bind_values) + 2, $offset, PDO::PARAM_INT);
-        foreach ($bind_values as $key => $value) {
-            $stmt_ids->bindValue($key + 1, $value);
+            $sql_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage DESC LIMIT ? OFFSET ?";
+            $stmt_ids = $this->pdo->prepare($sql_ids);
+            
+            $stmt_ids->bindValue(count($bind_values) + 1, $items_par_page, PDO::PARAM_INT);
+            $stmt_ids->bindValue(count($bind_values) + 2, $offset, PDO::PARAM_INT);
+            foreach ($bind_values as $key => $value) {
+                $stmt_ids->bindValue($key + 1, $value);
+            }
+            $stmt_ids->execute();
+            $comptage_ids = $stmt_ids->fetchAll(PDO::FETCH_COLUMN);
+            
+            $historique_page = $this->comptageRepository->findMultipleDetailsByIds($comptage_ids);
+
+            $sql_all_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage DESC";
+            $stmt_all_ids = $this->pdo->prepare($sql_all_ids);
+            $stmt_all_ids->execute($bind_values);
+            $all_comptage_ids = $stmt_all_ids->fetchAll(PDO::FETCH_COLUMN);
+            $historique_complet = $this->comptageRepository->findMultipleDetailsByIds($all_comptage_ids);
+
+            echo json_encode([
+                'success' => true,
+                'historique' => $historique_page,
+                'historique_complet' => $historique_complet,
+                'page_courante' => $page,
+                'pages_totales' => $pages_totales,
+                'total_items' => $total_items
+            ]);
+
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => "Erreur serveur lors de la récupération de l'historique : " . $e->getMessage()]);
         }
-        $stmt_ids->execute();
-        $comptage_ids = $stmt_ids->fetchAll(PDO::FETCH_COLUMN);
-        
-        // La logique complexe est remplacée par un simple appel au Repository
-        $historique_page = $this->comptageRepository->findMultipleDetailsByIds($comptage_ids);
-
-        $sql_all_ids = "SELECT id FROM comptages" . $sql_where . " ORDER BY date_comptage DESC";
-        $stmt_all_ids = $this->pdo->prepare($sql_all_ids);
-        $stmt_all_ids->execute($bind_values);
-        $all_comptage_ids = $stmt_all_ids->fetchAll(PDO::FETCH_COLUMN);
-        $historique_complet = $this->comptageRepository->findMultipleDetailsByIds($all_comptage_ids);
-
-        echo json_encode([
-            'success' => true,
-            'historique' => $historique_page,
-            'historique_complet' => $historique_complet,
-            'page_courante' => $page,
-            'pages_totales' => $pages_totales,
-            'total_items' => $total_items
-        ]);
         exit;
     }
 
     public function delete() {
-        // ... (Cette méthode reste inchangée)
         header('Content-Type: application/json');
+        
+        // On vérifie l'authentification en premier
+        // Si l'utilisateur n'est pas connecté, le script s'arrête ici avec une erreur 401
         AuthController::checkAuth();
+        
         $id_a_supprimer = intval($_POST['id_a_supprimer'] ?? 0);
 
         if ($id_a_supprimer > 0) {
             try {
+                // On s'assure que la suppression a bien eu lieu en vérifiant le nombre de lignes affectées
                 $stmt = $this->pdo->prepare("DELETE FROM comptages WHERE id = ?");
                 $stmt->execute([$id_a_supprimer]);
-                echo json_encode(['success' => true, 'message' => "Le comptage a bien été supprimé."]);
+
+                if ($stmt->rowCount() > 0) {
+                    echo json_encode(['success' => true, 'message' => "Le comptage a bien été supprimé."]);
+                } else {
+                    http_response_code(404); // Not Found
+                    echo json_encode(['success' => false, 'message' => "Le comptage avec l'ID {$id_a_supprimer} n'a pas été trouvé."]);
+                }
             } catch (Exception $e) {
                 http_response_code(500);
-                echo json_encode(['success' => false, 'message' => "Erreur de base de données : " . $e->getMessage()]);
+                // On logue l'erreur pour le débogage côté serveur
+                error_log("Erreur de suppression du comptage : " . $e->getMessage());
+                echo json_encode(['success' => false, 'message' => "Erreur de base de données lors de la suppression."]);
             }
         } else {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => "ID de comptage invalide."]);
+            http_response_code(400); // Bad Request
+            echo json_encode(['success' => false, 'message' => "ID de comptage invalide ou manquant."]);
         }
         exit;
     }
     
     public function exportCsv()
     {
-        // ... (Cette méthode reste inchangée, mais elle bénéficiera de la correction)
+        // ... (Cette méthode reste inchangée)
         global $noms_caisses, $denominations;
         
         $date_debut = $_GET['date_debut'] ?? '';

@@ -3,7 +3,7 @@
 /**
  * Récupère les données de configuration et l'historique des comptages depuis l'API.
  */
-export async function fetchHistoriqueData(params) {
+async function fetchHistoriqueData(params) {
     const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
     const historyPromise = fetch(`index.php?route=historique/get_data&${new URLSearchParams(params)}`).then(res => res.json());
 
@@ -12,51 +12,70 @@ export async function fetchHistoriqueData(params) {
     if (!history.success || !history.historique) {
         throw new Error(history.message || "La réponse de l'API pour l'historique est invalide.");
     }
-
-    // On stocke la config dans une variable globale accessible par les autres fonctions du service
-    // C'est un petit raccourci pour éviter de passer la config à chaque fonction
-    service.config = config;
-
+    
+    // On retourne la config en plus de l'historique
     return { config, history };
 }
 
 /**
- * Traite les données de retraits pour les agréger par jour.
+ * Traite les données de retraits pour les agréger par comptage de clôture.
  */
-export function processWithdrawalData(comptages, denominations, nomsCaisses) {
-    const withdrawalsByDay = {};
+function processClotureWithdrawalData(comptages, denominations, nomsCaisses) {
+    if (!comptages) return [];
+
     const allDenomsValueMap = { ...(denominations.billets || {}), ...(denominations.pieces || {}) };
 
-    if (!comptages) return {};
+    // 1. On filtre pour ne garder que les clôtures générales
+    const clotures = comptages.filter(c => c.nom_comptage && c.nom_comptage.toLowerCase().startsWith('clôture générale'));
+    
+    // 2. On traite chaque clôture individuellement
+    return clotures.map(comptage => {
+        const clotureData = {
+            id: comptage.id,
+            nom_comptage: comptage.nom_comptage,
+            date_comptage: comptage.date_comptage,
+            totalValue: 0,
+            totalItems: 0,
+            totalBillets: 0,
+            totalPieces: 0,
+            details: []
+        };
 
-    for (const comptage of comptages) {
-        const dateKey = new Date(comptage.date_comptage).toISOString().split('T')[0];
-        if (!withdrawalsByDay[dateKey]) {
-            withdrawalsByDay[dateKey] = { totalValue: 0, totalItems: 0, details: [] };
-        }
-        if (!comptage.caisses_data) continue;
+        if (!comptage.caisses_data) return clotureData;
+
         for (const [caisse_id, caisse] of Object.entries(comptage.caisses_data)) {
             if (!caisse.retraits || Object.keys(caisse.retraits).length === 0) continue;
+            
             for (const [denom, qtyStr] of Object.entries(caisse.retraits)) {
                 const qty = parseInt(qtyStr, 10);
                 const value = parseFloat(allDenomsValueMap[denom]);
+
                 if (!isNaN(qty) && !isNaN(value) && qty > 0) {
                     const amount = qty * value;
-                    if (!isNaN(amount)) {
-                        withdrawalsByDay[dateKey].totalValue += amount;
-                        withdrawalsByDay[dateKey].totalItems += qty;
-                        withdrawalsByDay[dateKey].details.push({ caisse_id, caisse_nom: nomsCaisses[caisse_id] || `Caisse ${caisse_id}`, denomination: denom, quantite: qty, valeur: amount });
+                    clotureData.totalValue += amount;
+                    clotureData.totalItems += qty;
+                    if (denom.startsWith('b')) {
+                        clotureData.totalBillets += amount;
+                    } else {
+                        clotureData.totalPieces += amount;
                     }
+                    clotureData.details.push({
+                        caisse_id,
+                        caisse_nom: nomsCaisses[caisse_id] || `Caisse ${caisse_id}`,
+                        denomination: denom,
+                        quantite: qty,
+                        valeur: amount
+                    });
                 }
             }
         }
-    }
-    return withdrawalsByDay;
+        return clotureData;
+    }).sort((a, b) => new Date(b.date_comptage) - new Date(a.date_comptage));
 }
 
-// On exporte un objet `service` pour pouvoir y attacher la config
+
+// On exporte un objet `service`
 export const service = {
     fetchHistoriqueData,
-    processWithdrawalData,
-    config: {}
+    processClotureWithdrawalData
 };

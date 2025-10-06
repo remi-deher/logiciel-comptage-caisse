@@ -1,12 +1,12 @@
-// Fichier : public/assets/js/logic/history-logic.js (Version avec détails des retraits)
+// Fichier : public/assets/js/logic/history-logic.js (Version corrigée et finale)
 import { sendWsMessage } from './websocket-service.js';
-import { showConfirmationModal } from '../utils/ui.js'; // Importation de la modale
-import { showToast } from '../utils/toast.js'; // Importation du toast
+// Correction de l'import : on importe l'objet 'service' qui contient les fonctions.
+import { service as historyService } from './history-service.js';
 
 // --- État et Configuration Globale ---
 let fullHistoryData = [];
 let config = {};
-let withdrawalsByDay = {};
+let clotureWithdrawals = [];
 let sheetCharts = [];
 let currentParams = {};
 
@@ -54,7 +54,7 @@ function renderPagination(container, currentPage, totalPages) {
     }
 
     let html = '<ul class="pagination">';
-    const maxVisiblePages = 7; 
+    const maxVisiblePages = 7;
 
     html += `<li class="${currentPage === 1 ? 'disabled' : ''}"><a href="#" data-page="${currentPage - 1}">&laquo;</a></li>`;
 
@@ -96,33 +96,52 @@ function renderPagination(container, currentPage, totalPages) {
 
 function renderRetraitsView(container) {
    if (!container) return;
-   const sortedDays = Object.keys(withdrawalsByDay).sort((a, b) => new Date(b) - new Date(a));
-
-    if (sortedDays.length === 0) {
-        container.innerHTML = `<div class="withdrawals-header"><h3>Journal des Retraits</h3></div><p>Aucun retrait trouvé pour la période sélectionnée.</p>`;
+   
+    if (clotureWithdrawals.length === 0) {
+        container.innerHTML = `<div class="withdrawals-header"><h3>Journal des Retraits de Clôture</h3></div><p>Aucun retrait de clôture trouvé pour la période sélectionnée.</p>`;
         return;
     }
 
-    const dayCardsHtml = sortedDays.map(dateKey => {
-        const dayData = withdrawalsByDay[dateKey];
-        if (dayData.totalValue === 0) return '';
+    const dayCardsHtml = clotureWithdrawals.map(cloture => {
         return `
-            <div class="day-card" data-date-key="${dateKey}">
-                <div class="day-card-header"><i class="fa-solid fa-calendar-day"></i>${formatDateFr(dateKey, { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-                <div class="day-card-body">
-                    <div class="day-kpi"><span>Montant Retiré</span><strong>${formatEuros(dayData.totalValue)}</strong></div>
-                    <div class="day-kpi"><span>Articles</span><strong>${dayData.totalItems}</strong></div>
+            <div class="withdrawal-card" data-comptage-id="${cloture.id}">
+                <div class="withdrawal-card-header">
+                    <h4>${cloture.nom_comptage}</h4>
+                    <small>${formatDateFr(cloture.date_comptage, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</small>
                 </div>
-                <div class="day-card-footer"><button class="action-btn-small details-btn"><i class="fa-solid fa-eye"></i> Voir détails</button></div>
+                <div class="withdrawal-card-body">
+                    <div class="total-section">
+                        <span>Total Retiré</span>
+                        <strong>${formatEuros(cloture.totalValue)}</strong>
+                    </div>
+                    <div class="details-section">
+                        <div class="detail-item">
+                            <span><i class="fa-solid fa-money-bill-wave"></i> Billets</span>
+                            <strong>${formatEuros(cloture.totalBillets)}</strong>
+                        </div>
+                        <div class="detail-item">
+                            <span><i class="fa-solid fa-coins"></i> Pièces</span>
+                            <strong>${formatEuros(cloture.totalPieces)}</strong>
+                        </div>
+                        <div class="detail-item">
+                            <span><i class="fa-solid fa-hashtag"></i> Coupures</span>
+                            <strong>${cloture.totalItems}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="withdrawal-card-footer">
+                    <button class="action-btn-small details-btn"><i class="fa-solid fa-eye"></i> Voir les détails</button>
+                </div>
             </div>`;
     }).join('');
 
     container.innerHTML = `
-        <div class="withdrawals-header"><h3>Journal des Retraits</h3></div>
-        <div class="withdrawals-log-wrapper"><div id="withdrawals-log-container">${dayCardsHtml}</div></div>
+        <div class="withdrawals-header"><h3>Journal des Retraits de Clôture</h3></div>
+        <div id="withdrawals-log-container">${dayCardsHtml}</div>
         <div id="modal-withdrawal-details" class="modal"><div class="modal-content wide" id="modal-withdrawal-details-content"></div></div>
     `;
 }
+
 
 // --- Logique Principale ---
 
@@ -135,10 +154,15 @@ async function loadAndRender(historyPage, params = {}) {
         historyGridContainer.innerHTML = '<p>Chargement...</p>';
         retraitsContentContainer.innerHTML = '<p>Chargement...</p>';
         
-        const data = await fetchHistoriqueData(params);
-        renderCards(historyGridContainer, data.historique);
-        renderPagination(paginationNav, data.page_courante, data.pages_totales);
-        processWithdrawalData(data.historique_complet, config.denominations);
+        const {config: fetchedConfig, history} = await historyService.fetchHistoriqueData(params);
+        config = fetchedConfig; // Met à jour la configuration globale
+        fullHistoryData = history.historique_complet || [];
+        
+        renderCards(historyGridContainer, history.historique);
+        renderPagination(paginationNav, history.page_courante, history.pages_totales);
+        
+        clotureWithdrawals = historyService.processClotureWithdrawalData(history.historique_complet, config.denominations, config.nomsCaisses);
+        
         renderRetraitsView(retraitsContentContainer);
     } catch (error) {
         console.error("Erreur de chargement:", error);
@@ -148,102 +172,46 @@ async function loadAndRender(historyPage, params = {}) {
     }
 }
 
-async function fetchHistoriqueData(params) {
-    const configPromise = fetch('index.php?route=calculateur/config').then(res => res.json());
-    const historyPromise = fetch(`index.php?route=historique/get_data&${new URLSearchParams(params)}`).then(res => res.json());
-    const [conf, history] = await Promise.all([configPromise, historyPromise]);
-    config = conf;
-    if (!history.success || !history.historique) {
-        throw new Error(history.message || "La réponse de l'API pour l'historique est invalide.");
-    }
-    fullHistoryData = history.historique_complet || [];
-    return history;
-}
-
-function processWithdrawalData(comptages, denominations) {
-    withdrawalsByDay = {};
-    const allDenomsValueMap = { ...(denominations.billets || {}), ...(denominations.pieces || {}) };
-    for (const comptage of comptages) {
-        const dateKey = new Date(comptage.date_comptage).toISOString().split('T')[0];
-        if (!withdrawalsByDay[dateKey]) {
-            withdrawalsByDay[dateKey] = { totalValue: 0, totalItems: 0, details: [] };
-        }
-        if (!comptage.caisses_data) continue;
-        for (const [caisse_id, caisse] of Object.entries(comptage.caisses_data)) {
-            if (!caisse.retraits || Object.keys(caisse.retraits).length === 0) continue;
-            for (const [denom, qtyStr] of Object.entries(caisse.retraits)) {
-                const qty = parseInt(qtyStr, 10);
-                if (qty > 0) {
-                    const value = parseFloat(allDenomsValueMap[denom] || 0);
-                    const amount = qty * value;
-                    withdrawalsByDay[dateKey].totalValue += amount;
-                    withdrawalsByDay[dateKey].totalItems += qty;
-                    withdrawalsByDay[dateKey].details.push({ caisse_nom: config.nomsCaisses[caisse_id], denomination: denom, quantite: qty, valeur: amount });
-                }
-            }
-        }
-    }
-}
 
 async function handleDeleteComptage(comptageId, cardElement) {
-    showConfirmationModal({
-        title: 'Supprimer le comptage',
-        message: 'Êtes-vous sûr de vouloir supprimer définitivement ce comptage ?',
-        confirmButtonClass: 'delete-btn',
-        confirmButtonText: 'Supprimer',
-        onConfirm: async () => {
-            const formData = new FormData();
-            formData.append('id_a_supprimer', comptageId);
-            try {
-                const response = await fetch('index.php?route=historique/delete', { method: 'POST', body: formData });
-                const result = await response.json();
-                if(!result.success) throw new Error(result.message);
-                cardElement.style.transition = 'opacity 0.3s';
-                cardElement.style.opacity = '0';
-                setTimeout(() => cardElement.remove(), 300);
-                showToast('Comptage supprimé avec succès.', 'success');
-            } catch(err) {
-                showToast(`Erreur: ${err.message}`, 'error');
-            }
+    if (confirm("Êtes-vous sûr de vouloir supprimer définitivement ce comptage ?")) {
+        const formData = new FormData();
+        formData.append('id_a_supprimer', comptageId);
+        try {
+            const response = await fetch('index.php?route=historique/delete', { method: 'POST', body: formData });
+            const result = await response.json();
+            if(!result.success) throw new Error(result.message);
+            cardElement.style.transition = 'opacity 0.3s';
+            cardElement.style.opacity = '0';
+            setTimeout(() => cardElement.remove(), 300);
+        } catch(err) {
+            alert(`Erreur: ${err.message}`);
         }
-    });
+    }
 }
 
 async function handleLoadComptage(comptageId, buttonElement) {
     const comptageData = fullHistoryData.find(c => c.id.toString() === comptageId);
-    if (!comptageData) return;
-
-    showConfirmationModal({
-        title: 'Charger un comptage',
-        message: `Voulez-vous charger le comptage "${comptageData.nom_comptage}" ?\n\nAttention : Votre travail non sauvegardé dans le calculateur sera écrasé.`,
-        confirmButtonClass: 'save-btn',
-        confirmButtonText: 'Charger',
-        onConfirm: async () => {
-            buttonElement.disabled = true;
-            buttonElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    if(comptageData && confirm(`Voulez-vous charger le comptage "${comptageData.nom_comptage}" ?\n\nAttention : Votre travail non sauvegardé dans le calculateur sera écrasé.`)) {
+        buttonElement.disabled = true;
+        buttonElement.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        try {
+            const formData = new FormData();
+            formData.append('comptage_id', comptageId);
+            const response = await fetch('index.php?route=calculateur/load_from_history', { method: 'POST', body: formData });
+            const result = await response.json();
+            if (!result.success) throw new Error(result.message);
             
-            showToast('Chargement du comptage en cours...', 'info');
+            sendWsMessage({ type: 'force_reload_all' });
+            window.location.href = '/calculateur';
 
-            try {
-                const formData = new FormData();
-                formData.append('comptage_id', comptageId);
-                const response = await fetch('index.php?route=calculateur/load_from_history', { method: 'POST', body: formData });
-                const result = await response.json();
-                if (!result.success) throw new Error(result.message);
-                
-                sendWsMessage({ type: 'force_reload_all' });
-                
-                window.location.href = '/calculateur';
-
-            } catch (error) {
-                showToast(`Erreur lors du chargement : ${error.message}`, 'error');
-                buttonElement.disabled = false;
-                buttonElement.innerHTML = '<i class="fa-solid fa-download"></i> Charger';
-            }
+        } catch (error) {
+            alert(`Erreur lors du chargement : ${error.message}`);
+            buttonElement.disabled = false;
+            buttonElement.innerHTML = '<i class="fa-solid fa-download"></i> Charger';
         }
-    });
+    }
 }
-
 
 // --- Logique du Panneau de Détails (Bottom Sheet) ---
 
@@ -427,15 +395,20 @@ function openDetailsSheet(comptageId) {
     sheet.classList.add('visible');
     overlay.classList.add('visible');
     
-    renderSheetContent(content, comptageId); 
-    
-    const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
-    if (comptage) {
-        Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
-            if (comptage.results.caisses[caisse_id]) {
-                renderSheetCharts(caisse_id, data, comptage.results.caisses[caisse_id]);
-            }
-        });
+    // On s'assure que fullHistoryData est bien disponible avant de chercher dedans
+    if (fullHistoryData && fullHistoryData.length > 0) {
+        renderSheetContent(content, comptageId); 
+        
+        const comptage = fullHistoryData.find(c => c.id.toString() === comptageId);
+        if (comptage) {
+            Object.entries(comptage.caisses_data).forEach(([caisse_id, data]) => {
+                if (comptage.results.caisses[caisse_id]) {
+                    renderSheetCharts(caisse_id, data, comptage.results.caisses[caisse_id]);
+                }
+            });
+        }
+    } else {
+        content.innerHTML = '<p class="error">Les données complètes de l\'historique ne sont pas chargées. Impossible d\'afficher les détails.</p>';
     }
 }
 
@@ -450,9 +423,9 @@ function closeDetailsSheet() {
     sheetCharts = [];
 }
 
-function renderWithdrawalDetailsModal(dateKey) {
-    const dayData = withdrawalsByDay[dateKey];
-    if (!dayData) return;
+function renderWithdrawalDetailsModal(comptageId) {
+    const clotureData = clotureWithdrawals.find(c => c.id.toString() === comptageId);
+    if (!clotureData) return;
 
     const modal = document.getElementById('modal-withdrawal-details');
     const content = document.getElementById('modal-withdrawal-details-content');
@@ -460,25 +433,54 @@ function renderWithdrawalDetailsModal(dateKey) {
 
     const allDenomsValueMap = { ...config.denominations.billets, ...config.denominations.pieces };
     
-    const byCaisse = dayData.details.reduce((acc, d) => {
-        const value = parseFloat(d.valeur);
-        acc[d.caisse_nom] = (acc[d.caisse_nom] || 0) + (isNaN(value) ? 0 : value);
+    const byCaisse = clotureData.details.reduce((acc, d) => {
+        const caisseName = d.caisse_nom || 'Caisse Inconnue';
+        if (!acc[caisseName]) {
+            acc[caisseName] = { total: 0, details: [] };
+        }
+        acc[caisseName].total += d.valeur;
+        acc[caisseName].details.push(d);
         return acc;
     }, {});
     
-    const caisseTablesHtml = Object.entries(byCaisse).map(([nomCaisse, totalCaisse]) => {
-        const detailsCaisse = dayData.details.filter(d => d.caisse_nom === nomCaisse).sort((a,b) => allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination]);
+    const caisseTablesHtml = Object.entries(byCaisse).map(([nomCaisse, caisseData]) => {
+        const detailsCaisse = caisseData.details.sort((a,b) => allDenomsValueMap[b.denomination] - allDenomsValueMap[a.denomination]);
         const rows = detailsCaisse.map(d => {
             const value = parseFloat(allDenomsValueMap[d.denomination]);
             const label = value >= 1 ? `${value}€` : `${value * 100}c`;
             return `<tr><td>${label}</td><td class="text-right">${d.quantite}</td><td class="text-right">${formatEuros(d.valeur)}</td></tr>`;
         }).join('');
-        return `<div class="card"><h4>Détail pour ${nomCaisse}</h4><div class="table-responsive"><table class="info-table"><thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="2">Total Caisse</td><td class="text-right">${formatEuros(totalCaisse)}</td></tr></tfoot></table></div></div>`;
+        return `<div class="details-card">
+                    <div class="details-card-header">
+                        <h5>${nomCaisse}</h5>
+                        <span class="total-amount">${formatEuros(caisseData.total)}</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="modal-details-table">
+                            <thead><tr><th>Dénomination</th><th class="text-right">Quantité</th><th class="text-right">Valeur</th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
     }).join('');
     
+    const summaryHtml = `
+        <div class="caisse-kpi-grid">
+            <div class="caisse-kpi-card"><span>Total Retiré</span><strong>${formatEuros(clotureData.totalValue)}</strong></div>
+            <div class="caisse-kpi-card"><span>Total Billets</span><strong>${formatEuros(clotureData.totalBillets)}</strong></div>
+            <div class="caisse-kpi-card"><span>Total Pièces</span><strong>${formatEuros(clotureData.totalPieces)}</strong></div>
+        </div>
+    `;
+
     content.innerHTML = `
-        <div class="modal-header"><h3>Détails des retraits du ${formatDateFr(dateKey, {dateStyle: 'full'})}</h3><span class="modal-close">&times;</span></div>
-        <div class="modal-body">${caisseTablesHtml}</div>`;
+        <div class="modal-header">
+            <h3>Détails des retraits pour "${clotureData.nom_comptage}"</h3>
+            <span class="modal-close">&times;</span>
+        </div>
+        <div class="modal-body">
+            ${summaryHtml}
+            <div class="modal-details-grid">${caisseTablesHtml}</div>
+        </div>`;
         
     modal.classList.add('visible');
     modal.querySelector('.modal-close').onclick = () => modal.classList.remove('visible');
@@ -556,10 +558,10 @@ export function initializeHistoryLogic() {
             const comptageId = loadButton.closest('.history-card').dataset.comptageId;
             handleLoadComptage(comptageId, loadButton);
         }
-        const withdrawalDetailsBtn = target.closest('.day-card .details-btn');
+        const withdrawalDetailsBtn = target.closest('.withdrawal-card .details-btn');
         if (withdrawalDetailsBtn) {
-            const dateKey = withdrawalDetailsBtn.closest('.day-card').dataset.dateKey;
-            renderWithdrawalDetailsModal(dateKey);
+            const comptageId = withdrawalDetailsBtn.closest('.withdrawal-card').dataset.comptageId;
+            renderWithdrawalDetailsModal(comptageId);
         }
     });
 }
