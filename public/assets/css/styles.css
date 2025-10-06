@@ -156,6 +156,24 @@ body[data-theme="dark"] .main-footer {
 .modal-header { margin-bottom: 20px; }
 .modal-footer { margin-top: 30px; display: flex; justify-content: flex-end; gap: 10px; }
 
+/* --- STYLES POUR LA MODALE DE CONFIRMATION --- */
+#confirmation-modal .modal-content {
+    max-width: 500px; /* Plus petite que les autres modales */
+}
+
+#confirmation-modal .modal-body p {
+    font-size: 1.1em;
+    line-height: 1.6;
+    margin: 0;
+}
+
+#confirmation-modal-confirm-btn.save-btn {
+    background-color: var(--color-success);
+}
+
+#confirmation-modal-confirm-btn.delete-btn {
+    background-color: var(--color-danger);
+}
 /* ==========================================================================
    Système d'aide par infobulles (Tooltips)
    ========================================================================== */
