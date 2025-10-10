@@ -511,6 +511,8 @@ export function initializeHistoryLogic() {
         const paginationLink = target.closest('.pagination-nav a');
         if (paginationLink && !paginationLink.parentElement.classList.contains('disabled')) {
             e.preventDefault();
+            // === LA CORRECTION EST ICI ===
+            e.stopPropagation(); // Empêche l'événement de "remonter" au routeur de main.js
             loadAndRender(historyPage, { ...currentParams, p: parseInt(paginationLink.dataset.page) });
         }
         const tabLink = target.closest('.view-tabs .tab-link');
