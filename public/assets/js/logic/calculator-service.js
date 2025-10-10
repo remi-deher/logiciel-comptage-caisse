@@ -148,36 +148,56 @@ export function calculateEcartsForCaisse(caisseId, appState) {
 
 /**
  * Calcule la suggestion de retrait d'espèces pour une caisse.
+ * === VERSION CORRIGÉE AVEC CALCUL EN CENTIMES ===
  */
 export function calculateWithdrawalSuggestion(caisseData, config) {
     if (!caisseData) return { suggestions: [], totalToWithdraw: 0 };
-    const targetWithdrawalAmount = parseLocaleFloat(caisseData.ventes_especes) + parseLocaleFloat(caisseData.retrocession);
-    if (targetWithdrawalAmount <= 0) return { suggestions: [], totalToWithdraw: 0 };
+
+    // 1. On convertit tout en centimes dès le début
+    const targetWithdrawalAmountCents = Math.round(
+        (parseLocaleFloat(caisseData.ventes_especes) + parseLocaleFloat(caisseData.retrocession)) * 100
+    );
+
+    if (targetWithdrawalAmountCents <= 0) return { suggestions: [], totalToWithdraw: 0 };
 
     const denominationsData = caisseData.denominations || {};
     const allDenoms = { ...(config.denominations?.billets || {}), ...(config.denominations?.pieces || {}) };
+
+    // 2. On trie les dénominations de la plus grande à la plus petite
     const sortedDenoms = Object.keys(allDenoms).sort((a, b) => parseFloat(allDenoms[b]) - parseFloat(allDenoms[a]));
     
     let suggestions = [];
-    let totalWithdrawn = 0;
+    let totalWithdrawnCents = 0;
 
+    // 3. On parcourt les dénominations pour construire la suggestion
     for (const name of sortedDenoms) {
-        const value = parseFloat(allDenoms[name]);
+        const valueInCents = Math.round(parseFloat(allDenoms[name]) * 100);
         let qtyAvailable = parseInt(denominationsData[name], 10) || 0;
         
-        if (qtyAvailable > 0 && totalWithdrawn < targetWithdrawalAmount) {
-            const remainingToWithdraw = targetWithdrawalAmount - totalWithdrawn;
-            const howManyCanFit = Math.floor(remainingToWithdraw / value);
+        if (qtyAvailable > 0 && totalWithdrawnCents < targetWithdrawalAmountCents) {
+            const remainingToWithdrawCents = targetWithdrawalAmountCents - totalWithdrawnCents;
+            
+            // On calcule combien de coupures de cette valeur on peut utiliser
+            const howManyCanFit = Math.floor(remainingToWithdrawCents / valueInCents);
+            
+            // On prend le minimum entre ce dont on a besoin et ce qui est disponible
             const qtyToWithdraw = Math.min(qtyAvailable, howManyCanFit);
 
             if (qtyToWithdraw > 0) {
-                suggestions.push({ name, value, qty: qtyToWithdraw, total: qtyToWithdraw * value });
-                totalWithdrawn += qtyToWithdraw * value;
+                const totalValueCents = qtyToWithdraw * valueInCents;
+                suggestions.push({ 
+                    name, 
+                    value: valueInCents / 100, // On stocke la valeur unitaire en euros pour l'affichage
+                    qty: qtyToWithdraw, 
+                    total: totalValueCents / 100 // On stocke le total de la ligne en euros
+                });
+                totalWithdrawnCents += totalValueCents;
             }
         }
     }
     
-    return { suggestions, totalToWithdraw: totalWithdrawn };
+    // 4. On reconvertit le total final en euros seulement au moment de le retourner
+    return { suggestions, totalToWithdraw: totalWithdrawnCents / 100 };
 }
 
 /**
