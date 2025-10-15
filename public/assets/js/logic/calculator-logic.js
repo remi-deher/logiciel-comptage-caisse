@@ -342,7 +342,7 @@ function handlePageFocusOut(e) {
 function handleWebSocketMessage(data) {
     if (!data || !data.type) return;
 
-    // NOUVEAU : Gérer la mise à jour de la réserve
+    // Gérer la mise à jour de la réserve
     if (data.type === 'nouvelle_demande_reserve') {
         // On rafraîchit simplement les données de la réserve en arrière-plan
         fetch('index.php?route=reserve/get_data').then(res => res.json()).then(result => {
@@ -351,7 +351,7 @@ function handleWebSocketMessage(data) {
                 console.log("État de la réserve mis à jour via WebSocket.");
             }
         });
-        return; // Pas besoin de faire autre chose
+        return;
     }
 
     switch (data.type) {

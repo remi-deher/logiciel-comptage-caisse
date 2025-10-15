@@ -1,5 +1,4 @@
 <?php
-// Fichier : src/CalculateurController.php
 
 require_once __DIR__ . '/services/VersionService.php';
 require_once __DIR__ . '/Utils.php';

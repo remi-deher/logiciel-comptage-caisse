@@ -5,7 +5,6 @@ import * as service from './calculator-service.js';
 import { showToast } from '../utils/toast.js';
 import { showConfirmationModal } from '../utils/ui.js'; // Mise à jour de l'import
 
-// La fonction showConfirmationModal locale a été supprimée et est maintenant importée.
 
 /**
  * Démarre le processus de clôture pour une seule caisse.
