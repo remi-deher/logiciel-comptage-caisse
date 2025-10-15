@@ -84,7 +84,6 @@ export function updateCaisseLockState(caisseId, status, state) {
 }
 
 /**
- * --- MODIFICATION 1 ---
  * Génère le HTML pour la section de retrait simplifiée.
  */
 function renderClotureSectionForInitiator(caisseId, state) {
@@ -147,7 +146,6 @@ function renderClotureSectionForInitiator(caisseId, state) {
         </div>
     `;
 }
-// --- FIN MODIFICATION 1 ---
 
 
 /**
@@ -194,19 +192,21 @@ function renderClotureSectionForClosed(caisseId, state) {
 }
 
 /**
- * --- MODIFICATION 2 ---
  * Affiche la bannière de finalisation avec le récapitulatif global.
  */
 export function showFinalSummaryBanner(state) {
     const container = document.getElementById('cloture-final-summary-banner-container');
     if (!container) return;
 
-    const caisseTotals = [];
+    const caisseDataMap = new Map();
     let grandTotalEspeces = 0;
     let grandTotalCb = 0;
     let grandTotalCheques = 0;
+    let grandTotalGeneral = 0;
 
-    Object.keys(state.config.nomsCaisses).forEach(caisseId => {
+    const caisseIds = Object.keys(state.config.nomsCaisses);
+
+    caisseIds.forEach(caisseId => {
         const caisseData = state.calculatorData.caisse[caisseId];
         if (caisseData) {
             const suggestions = service.calculateWithdrawalSuggestion(caisseData, state.config);
@@ -215,29 +215,71 @@ export function showFinalSummaryBanner(state) {
             const totalCb = ecarts.totalCompteCb;
             const totalCheques = ecarts.totalCompteCheques;
 
-            caisseTotals.push({
+            caisseDataMap.set(caisseId, {
                 nom: state.config.nomsCaisses[caisseId],
                 totalEspeces,
                 totalCb,
-                totalCheques
+                totalCheques,
+                totalCaisse: totalEspeces + totalCb + totalCheques
             });
 
             grandTotalEspeces += totalEspeces;
             grandTotalCb += totalCb;
             grandTotalCheques += totalCheques;
+        } else {
+             caisseDataMap.set(caisseId, {
+                nom: state.config.nomsCaisses[caisseId],
+                totalEspeces: 0,
+                totalCb: 0,
+                totalCheques: 0,
+                totalCaisse: 0
+            });
         }
     });
+    
+    grandTotalGeneral = grandTotalEspeces + grandTotalCb + grandTotalCheques;
 
-    const grandTotal = grandTotalEspeces + grandTotalCb + grandTotalCheques;
-
-    const tableRows = caisseTotals.map(caisse => `
+    // --- NOUVELLE STRUCTURE DU TABLEAU ---
+    const headerHtml = `
         <tr>
-            <td>${caisse.nom}</td>
-            <td class="text-right">${formatCurrency(caisse.totalEspeces, state.config)}</td>
-            <td class="text-right">${formatCurrency(caisse.totalCb, state.config)}</td>
-            <td class="text-right">${formatCurrency(caisse.totalCheques, state.config)}</td>
+            <th>Moyen de Paiement</th>
+            ${caisseIds.map(id => `<th class="text-right">${state.config.nomsCaisses[id]}</th>`).join('')}
+            <th class="text-right">Total</th>
         </tr>
-    `).join('');
+    `;
+
+    const especesRow = `
+        <tr>
+            <td><i class="fa-solid fa-money-bill-wave"></i> Espèces</td>
+            ${caisseIds.map(id => `<td class="text-right">${formatCurrency(caisseDataMap.get(id).totalEspeces, state.config)}</td>`).join('')}
+            <td class="text-right"><strong>${formatCurrency(grandTotalEspeces, state.config)}</strong></td>
+        </tr>
+    `;
+
+    const cbRow = `
+        <tr>
+            <td><i class="fa-solid fa-credit-card"></i> Cartes Bancaires</td>
+            ${caisseIds.map(id => `<td class="text-right">${formatCurrency(caisseDataMap.get(id).totalCb, state.config)}</td>`).join('')}
+            <td class="text-right"><strong>${formatCurrency(grandTotalCb, state.config)}</strong></td>
+        </tr>
+    `;
+
+    const chequesRow = `
+        <tr>
+            <td><i class="fa-solid fa-money-check-dollar"></i> Chèques</td>
+            ${caisseIds.map(id => `<td class="text-right">${formatCurrency(caisseDataMap.get(id).totalCheques, state.config)}</td>`).join('')}
+            <td class="text-right"><strong>${formatCurrency(grandTotalCheques, state.config)}</strong></td>
+        </tr>
+    `;
+
+    const footerHtml = `
+        <tr class="grand-total-row">
+            <td><strong>Total Caisse</strong></td>
+             ${caisseIds.map(id => `<td class="text-right"><strong>${formatCurrency(caisseDataMap.get(id).totalCaisse, state.config)}</strong></td>`).join('')}
+            <td class="text-right"><strong>${formatCurrency(grandTotalGeneral, state.config)}</strong></td>
+        </tr>
+    `;
+    // --- FIN DE LA NOUVELLE STRUCTURE ---
 
     container.innerHTML = `
         <div class="cloture-final-summary-banner">
@@ -248,23 +290,15 @@ export function showFinalSummaryBanner(state) {
             <div class="table-responsive">
                 <table class="suggestion-table">
                     <thead>
-                        <tr>
-                            <th>Caisse</th>
-                            <th class="text-right">Espèces</th>
-                            <th class="text-right">CB</th>
-                            <th class="text-right">Chèques</th>
-                        </tr>
+                        ${headerHtml}
                     </thead>
                     <tbody>
-                        ${tableRows}
+                        ${especesRow}
+                        ${cbRow}
+                        ${chequesRow}
                     </tbody>
                     <tfoot>
-                        <tr class="grand-total-row">
-                            <td><strong>Total Général</strong></td>
-                            <td class="text-right"><strong>${formatCurrency(grandTotalEspeces, state.config)}</strong></td>
-                            <td class="text-right"><strong>${formatCurrency(grandTotalCb, state.config)}</strong></td>
-                            <td class="text-right"><strong>${formatCurrency(grandTotalCheques, state.config)}</strong></td>
-                        </tr>
+                        ${footerHtml}
                     </tfoot>
                 </table>
             </div>
@@ -285,7 +319,6 @@ export function showFinalSummaryBanner(state) {
         </div>
     `;
 }
-// --- FIN MODIFICATION 2 ---
 
 
 /**
