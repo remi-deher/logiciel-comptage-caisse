@@ -70,16 +70,16 @@ function showClotureSummaryModal(caisseId, state) {
 /**
  * Démarre le processus de clôture immédiate pour une seule caisse.
  */
-export function startClotureCaisse(caisseId, state) {
+export async function startClotureCaisse(caisseId, state) {
     const caisseNom = state.config.nomsCaisses[caisseId];
-    console.log(`[startClotureCaisse] Démarrage pour caisse ${caisseId}`); // DEBUG A
+    console.log(`[startClotureCaisse] Démarrage IMMÉDIAT pour caisse ${caisseId}`); // DEBUG A
 
     const isClosed = state.closedCaisses.includes(String(caisseId));
     const isLockedByOther = state.lockedCaisses.some(c => String(c.caisse_id) === String(caisseId) && String(c.locked_by) !== String(state.wsResourceId));
 
     if (isClosed) {
         console.log(`[startClotureCaisse] Caisse ${caisseId} déjà clôturée. Affichage récap.`); // DEBUG B
-        showClotureSummaryModal(caisseId, state);
+        showClotureSummaryModal(caisseId, state); // Affiche directement le récap
         return;
     }
     if (isLockedByOther) {
@@ -88,7 +88,7 @@ export function startClotureCaisse(caisseId, state) {
         return;
     }
 
-    let suggestions; // Déclarer suggestions ici pour qu'elle soit accessible dans onConfirm
+    let suggestions;
     try {
         console.log(`[startClotureCaisse] Calcul suggestions pour caisse ${caisseId}`); // DEBUG D
         suggestions = service.calculateWithdrawalSuggestion(state.calculatorData.caisse[caisseId], state.config);
@@ -96,80 +96,63 @@ export function startClotureCaisse(caisseId, state) {
     } catch (e) {
         console.error(`[startClotureCaisse] ERREUR lors du calcul des suggestions pour caisse ${caisseId}:`, e);
         showToast("Erreur interne lors du calcul des retraits.", "error");
-        return; // Arrêter si le calcul échoue
+        return;
     }
 
+    // *** DEBUT DU BLOC DE LOGIQUE (anciennement dans onConfirm) ***
+    console.log(`[startClotureCaisse] Exécution directe de la clôture pour ${caisseId}.`); // DEBUG E (modifié)
+    const clotureButton = document.getElementById('cloture-btn');
+    if (clotureButton) {
+        clotureButton.disabled = true;
+        clotureButton.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Clôture...`;
+    }
 
-    showConfirmationModal({
-        title: 'Clôturer la Caisse',
-        message: `Voulez-vous clôturer immédiatement la caisse "${caisseNom}" ?`,
-        confirmButtonClass: 'save-btn',
-        confirmButtonText: 'Clôturer Maintenant',
-        onConfirm: async () => {
-            console.log(`[startClotureCaisse] Confirmation reçue pour ${caisseId}.`); // DEBUG E
-            const clotureButton = document.getElementById('cloture-btn');
-            if (clotureButton) {
-                clotureButton.disabled = true;
-                clotureButton.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Clôture...`;
-            }
-
-            try {
-                // Vérifier si suggestions est défini (il devrait l'être si on arrive ici)
-                if (!suggestions) {
-                     throw new Error("Erreur interne: suggestions non calculées.");
-                }
-
-                console.log(`[startClotureCaisse] Préparation FormData pour ${caisseId}...`); // DEBUG F
-                const formData = service.prepareSingleCaisseClotureData(caisseId, state, suggestions.suggestions); // Passer suggestions.suggestions
-
-                 // DEBUG FormData: Afficher les clés/valeurs juste avant l'envoi
-                 console.log("[startClotureCaisse] Contenu FormData avant envoi:");
-                 for (let [key, value] of formData.entries()) {
-                     console.log(`  ${key}: ${value}`);
-                 }
-
-
-                console.log(`[startClotureCaisse] >>> APPEL API submitSingleCaisseCloture pour ${caisseId}...`); // DEBUG G
-                const result = await service.submitSingleCaisseCloture(formData);
-                console.log(`[startClotureCaisse] <<< Résultat API pour ${caisseId}:`, result); // DEBUG H
-
-                showToast(`Caisse "${caisseNom}" clôturée.`, 'success');
-
-                // MàJ état local
-                if (!state.closedCaisses.includes(String(caisseId))) {
-                    state.closedCaisses.push(String(caisseId));
-                }
-                state.lockedCaisses = state.lockedCaisses.filter(c => String(c.caisse_id) !== String(caisseId));
-                console.log(`[startClotureCaisse] État local MàJ: closed=${state.closedCaisses.join(',')}`); // DEBUG I
-
-                // MàJ UI
-                ui.updateAllCaisseLocks(state);
-                updateClotureButtonState(state);
-
-                console.log(`[startClotureCaisse] >>> APPEL showClotureSummaryModal pour ${caisseId}...`); // DEBUG J
-                showClotureSummaryModal(caisseId, state);
-                console.log(`[startClotureCaisse] <<< RETOUR de showClotureSummaryModal.`); // DEBUG K
-
-                // Informer les autres
-                console.log(`[startClotureCaisse] Envoi WS 'cloture_state_changed' pour ${caisseId}`); // DEBUG L
-                sendWsMessage({ type: 'cloture_state_changed', caisse_id: caisseId });
-
-            } catch (error) {
-                console.error(`[startClotureCaisse] ERREUR Clôture ${caisseId}:`, error); // DEBUG M
-                showToast(`Erreur clôture : ${error.message || 'Erreur inconnue'}`, 'error');
-                // Réactiver le bouton principal en cas d'erreur
-                 if (clotureButton) {
-                     updateClotureButtonState(state); // Remet le bouton dans l'état correct
-                 }
-            }
-            // Finally n'est plus nécessaire ici car updateClotureButtonState est appelé dans try et catch
+    try {
+        if (!suggestions) {
+             throw new Error("Erreur interne: suggestions non calculées.");
         }
-    });
-}
 
+        console.log(`[startClotureCaisse] Préparation FormData pour ${caisseId}...`); // DEBUG F
+        const formData = service.prepareSingleCaisseClotureData(caisseId, state, suggestions.suggestions);
 
-export function cancelClotureCaisse(caisseId, state) {
-    console.warn("cancelClotureCaisse appelée, vérifier utilité.");
+        console.log("[startClotureCaisse] Contenu FormData avant envoi:");
+         for (let [key, value] of formData.entries()) {
+             console.log(`  ${key}: ${value}`);
+         }
+
+        console.log(`[startClotureCaisse] >>> APPEL API submitSingleCaisseCloture pour ${caisseId}...`); // DEBUG G
+        const result = await service.submitSingleCaisseCloture(formData);
+        console.log(`[startClotureCaisse] <<< Résultat API pour ${caisseId}:`, result); // DEBUG H
+
+        showToast(`Caisse "${caisseNom}" clôturée.`, 'success');
+
+        // MàJ état local
+        if (!state.closedCaisses.includes(String(caisseId))) {
+            state.closedCaisses.push(String(caisseId));
+        }
+        state.lockedCaisses = state.lockedCaisses.filter(c => String(c.caisse_id) !== String(caisseId));
+        console.log(`[startClotureCaisse] État local MàJ: closed=${state.closedCaisses.join(',')}`); // DEBUG I
+
+        // MàJ UI
+        ui.updateAllCaisseLocks(state);
+        updateClotureButtonState(state);
+
+        console.log(`[startClotureCaisse] >>> APPEL showClotureSummaryModal pour ${caisseId}...`); // DEBUG J
+        showClotureSummaryModal(caisseId, state);
+        console.log(`[startClotureCaisse] <<< RETOUR de showClotureSummaryModal.`); // DEBUG K
+
+        // Informer les autres
+        console.log(`[startClotureCaisse] Envoi WS 'cloture_state_changed' pour ${caisseId}`); // DEBUG L
+        sendWsMessage({ type: 'cloture_state_changed', caisse_id: caisseId });
+
+    } catch (error) {
+        console.error(`[startClotureCaisse] ERREUR Clôture ${caisseId}:`, error); // DEBUG M
+        showToast(`Erreur clôture : ${error.message || 'Erreur inconnue'}`, 'error');
+         if (clotureButton) {
+             updateClotureButtonState(state);
+         }
+    }
+    // *** FIN DU BLOC DE LOGIQUE ***
 }
 
 export function reopenCaisse(caisseId, state) {
