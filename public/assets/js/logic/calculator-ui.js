@@ -158,7 +158,6 @@ function renderClotureSectionForClosed(caisseId, state) {
         <div class="cloture-recap-card">
             <h4><i class="fa-solid fa-check-circle"></i> ${caisseNom} Clôturée - Récapitulatif du Dépôt</h4>
             ${recapContentHtml}
-            {/* Le bouton Réouvrir est retiré d'ici */}
         </div>
     `;
 }
@@ -259,8 +258,6 @@ export function showFinalSummaryBanner(state) {
             </div>
             ${summaryHtml}
             <div class="banner-actions">
-                {/* Bouton Voir Détails retiré car redondant avec la modale finale */}
-                {/* <button id="show-suggestions-btn" class="btn action-btn"><i class="fa-solid fa-eye"></i> Voir détail retraits par caisse</button> */}
                 <button id="finalize-day-btn" class="btn save-btn">Finaliser et Archiver la Journée</button>
             </div>
         </div>
