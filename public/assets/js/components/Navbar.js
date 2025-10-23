@@ -5,7 +5,6 @@ export function renderNavbar(element) {
   element.innerHTML = `
     <nav class="navbar">
         <a href="/" class="navbar-brand">
-            <i class="fa-solid fa-cash-register"></i> Comptage Caisse
         </a>
 
         <div class="navbar-links">
