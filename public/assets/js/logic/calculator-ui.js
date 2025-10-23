@@ -1,13 +1,8 @@
-// Fichier : public/assets/js/logic/calculator-ui.js (Corrigé - Added Export for populateInitialData)
+// Fichier : public/assets/js/logic/calculator-ui.js (Version Finale Complète)
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 import * as service from './calculator-service.js';
 import { sendWsMessage } from './websocket-service.js';
-
-// Référence à la fonction qui met à jour le bouton principal (sera définie dans calculator-logic.js)
-// On la retire car l'affectation directe ne fonctionne pas avec les modules ES6
-// export let updateClotureButtonState = (state) => {};
-
 
 /**
  * Met à jour l'état visuel de TOUTES les caisses en fonction des données de clôture.
@@ -29,11 +24,12 @@ export function updateAllCaisseLocks(state) {
     const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
     const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(String(id)));
 
+    // Affiche la bannière verte uniquement si toutes les caisses sont fermées
     if (allClosed) {
         showFinalSummaryBanner(state);
     } else {
         const container = document.getElementById('cloture-final-summary-banner-container');
-        if (container) container.innerHTML = '';
+        if (container) container.innerHTML = ''; // Cache la bannière sinon
     }
 }
 
@@ -47,22 +43,21 @@ export function updateCaisseLockState(caisseId, status, state) {
     const recapContainer = document.getElementById('cloture-recap-container');
 
     if (!tabLink || !caisseContent || !recapContainer) {
-        // console.warn(`Éléments manquants pour la caisse ${caisseId}, impossible de mettre à jour l'état.`);
         return;
     }
     if (ecartDisplay) {
          ecartDisplay.classList.remove('cloture-mode', 'cloture-closed');
     }
 
-
     const isActive = tabLink.classList.contains('active');
     tabLink.className = 'tab-link';
     if (isActive) tabLink.classList.add('active');
 
     if (isActive) {
-        recapContainer.innerHTML = '';
+        recapContainer.innerHTML = ''; // Vider le récap avant de potentiellement le remplir
     }
 
+    // Réactiver par défaut, sera désactivé si besoin
     caisseContent.querySelectorAll('input, textarea, button').forEach(el => el.disabled = false);
 
     switch (status) {
@@ -75,18 +70,21 @@ export function updateCaisseLockState(caisseId, status, state) {
             tabLink.classList.add('status-closed');
              if (ecartDisplay) ecartDisplay.classList.add('cloture-closed');
             if (isActive) {
+                // Afficher le récapitulatif simple (sans bouton réouvrir)
                 recapContainer.innerHTML = renderClotureSectionForClosed(caisseId, state);
             }
-            caisseContent.querySelectorAll('input, textarea, button:not(.payment-tab-link):not(.cloture-reopen-btn)').forEach(el => el.disabled = true);
+            // Griser tous les champs SAUF les onglets de paiement
+            caisseContent.querySelectorAll('input, textarea, button:not(.payment-tab-link)').forEach(el => el.disabled = true);
             break;
 
         case 'open':
+             // Rien de spécial à faire, déjà réactivé par défaut
              break;
     }
 }
 
 /**
- * Génère le HTML pour le contenu du récapitulatif de dépôt/retrait.
+ * Génère le HTML pour le contenu du récapitulatif de dépôt/retrait (pour une seule caisse).
  */
 export function renderClotureSectionContent(caisseId, state) {
     const caisseData = state.calculatorData.caisse[caisseId];
@@ -149,34 +147,31 @@ export function renderClotureSectionContent(caisseId, state) {
 
 
 /**
- * Génère le HTML pour la section d'une caisse déjà clôturée.
+ * Génère le HTML pour la section d'une caisse déjà clôturée (AFFICHÉE SOUS LE BANDEAU D'ÉCART).
+ * *** MODIFIÉ: Retire le bouton Réouvrir ***
  */
 function renderClotureSectionForClosed(caisseId, state) {
     const caisseNom = state.config.nomsCaisses[caisseId];
-    const recapContentHtml = renderClotureSectionContent(caisseId, state);
+    const recapContentHtml = renderClotureSectionContent(caisseId, state); // Réutilise la fonction commune
 
     return `
         <div class="cloture-recap-card">
             <h4><i class="fa-solid fa-check-circle"></i> ${caisseNom} Clôturée - Récapitulatif du Dépôt</h4>
             ${recapContentHtml}
+            {/* Le bouton Réouvrir est retiré d'ici */}
         </div>
     `;
 }
 
-
 /**
- * Affiche la bannière de finalisation avec le récapitulatif global.
+ * Génère le HTML du contenu du tableau récapitulatif final pour toutes les caisses.
  */
-export function showFinalSummaryBanner(state) {
-    const container = document.getElementById('cloture-final-summary-banner-container');
-    if (!container) return;
-
+export function generateFinalSummaryContentHtml(state) {
     const caisseDataMap = new Map();
     let grandTotalEspeces = 0;
     let grandTotalCb = 0;
     let grandTotalCheques = 0;
     let grandTotalGeneral = 0;
-
     const caisseIds = Object.keys(state.config.nomsCaisses);
 
     caisseIds.forEach(caisseId => {
@@ -206,7 +201,6 @@ export function showFinalSummaryBanner(state) {
             <th class="text-right">Total Général</th>
         </tr>
     `;
-
     const especesRow = `
         <tr>
             <td><i class="fa-solid fa-money-bill-wave"></i> Espèces</td>
@@ -214,7 +208,6 @@ export function showFinalSummaryBanner(state) {
             <td class="text-right"><strong>${formatCurrency(grandTotalEspeces, state.config)}</strong></td>
         </tr>
     `;
-
     const cbRow = `
         <tr>
             <td><i class="fa-solid fa-credit-card"></i> Cartes Bancaires</td>
@@ -222,7 +215,6 @@ export function showFinalSummaryBanner(state) {
             <td class="text-right"><strong>${formatCurrency(grandTotalCb, state.config)}</strong></td>
         </tr>
     `;
-
     const chequesRow = `
         <tr>
             <td><i class="fa-solid fa-money-check-dollar"></i> Chèques</td>
@@ -230,7 +222,6 @@ export function showFinalSummaryBanner(state) {
             <td class="text-right"><strong>${formatCurrency(grandTotalCheques, state.config)}</strong></td>
         </tr>
     `;
-
     const footerHtml = `
         <tr class="grand-total-row">
             <td><strong>Total Caisse</strong></td>
@@ -239,43 +230,38 @@ export function showFinalSummaryBanner(state) {
         </tr>
     `;
 
+    return `
+        <div class="table-responsive">
+            <table class="suggestion-table">
+                <thead>${headerHtml}</thead>
+                <tbody>${especesRow}${cbRow}${chequesRow}</tbody>
+                <tfoot>${footerHtml}</tfoot>
+            </table>
+        </div>
+    `;
+}
+
+
+/**
+ * Affiche la bannière de finalisation avec le récapitulatif global.
+ */
+export function showFinalSummaryBanner(state) {
+    const container = document.getElementById('cloture-final-summary-banner-container');
+    if (!container) return;
+
+    const summaryHtml = generateFinalSummaryContentHtml(state); // Utilise la fonction réutilisable
+
     container.innerHTML = `
         <div class="cloture-final-summary-banner">
             <div class="banner-header">
                 <h4><i class="fa-solid fa-flag-checkered"></i> Journée Prête pour Finalisation</h4>
-                <p>Toutes les caisses sont clôturées. Voici le récapitulatif consolidé de votre remise en banque :</p>
+                <p>Toutes les caisses sont clôturées. Voici le récapitulatif consolidé :</p>
             </div>
-            <div class="table-responsive">
-                <table class="suggestion-table">
-                    <thead>
-                        ${headerHtml}
-                    </thead>
-                    <tbody>
-                        ${especesRow}
-                        ${cbRow}
-                        ${chequesRow}
-                    </tbody>
-                    <tfoot>
-                        ${footerHtml}
-                    </tfoot>
-                </table>
-            </div>
+            ${summaryHtml}
             <div class="banner-actions">
-                <button id="show-suggestions-btn" class="btn action-btn"><i class="fa-solid fa-eye"></i> Voir détail retraits par caisse</button>
+                {/* Bouton Voir Détails retiré car redondant avec la modale finale */}
+                {/* <button id="show-suggestions-btn" class="btn action-btn"><i class="fa-solid fa-eye"></i> Voir détail retraits par caisse</button> */}
                 <button id="finalize-day-btn" class="btn save-btn">Finaliser et Archiver la Journée</button>
-            </div>
-        </div>
-
-        <div id="suggestions-modal" class="modal">
-            <div class="modal-content wide">
-                <div class="modal-header">
-                    <h3>Détail des retraits d'espèces par caisse</h3>
-                    <span class="modal-close">&times;</span>
-                </div>
-                <div class="modal-body" id="suggestions-modal-body"></div>
-                 <div class="modal-footer">
-                    <button type="button" class="btn action-btn modal-close">Fermer</button>
-                </div>
             </div>
         </div>
     `;
@@ -283,7 +269,7 @@ export function showFinalSummaryBanner(state) {
 
 
 /**
- * Remplit et affiche la modale des suggestions de retrait.
+ * Remplit et affiche la modale des suggestions de retrait (détail espèces par caisse).
  */
 export function renderWithdrawalSummaryModal(state) {
     const modalBody = document.getElementById('suggestions-modal-body');
@@ -458,12 +444,10 @@ export function renderCalculatorUI(pageElement, config) {
     const tabSelector = pageElement.querySelector('.tab-selector');
     const ecartContainer = pageElement.querySelector('.ecart-display-container');
     const caissesContainer = pageElement.querySelector('#caisses-content-container');
-    // Vérifier que les conteneurs existent
     if (!tabSelector || !ecartContainer || !caissesContainer) {
         console.error("Éléments conteneurs manquants pour renderCalculatorUI.");
         return;
     }
-
 
     let tabsHtml = '', contentHtml = '', ecartsHtml = '';
 
@@ -525,11 +509,9 @@ export function renderCalculatorUI(pageElement, config) {
         const tpeHtml = tpePourCaisse.map(([tpeId, tpe]) => `
             <div class="tpe-card">
                 <h4>${tpe.nom || `TPE #${tpeId}`}</h4>
-                <div class="tpe-releves-list" id="tpe-releves-list-${tpeId}-${id}">
-                    <p class="empty-list">Aucun relevé pour ce TPE.</p>
-                </div>
+                <div class="tpe-releves-list" id="tpe-releves-list-${tpeId}-${id}"><p class="empty-list">Aucun relevé.</p></div>
                 <div class="tpe-releve-form">
-                    <input type="text" id="tpe-releve-montant-${tpeId}-${id}" placeholder="Montant du relevé" inputmode="decimal">
+                     <input type="text" id="tpe-releve-montant-${tpeId}-${id}" placeholder="Montant du relevé" inputmode="decimal">
                      <input type="time" id="tpe-releve-heure-${tpeId}-${id}" title="Heure du relevé (optionnel)">
                     <button type="button" class="btn new-btn add-tpe-releve-btn" data-caisse-id="${id}" data-terminal-id="${tpeId}">
                         <i class="fa-solid fa-plus"></i> Ajouter
@@ -600,7 +582,7 @@ export function renderCalculatorUI(pageElement, config) {
 
      if (config.nomsCaisses) {
         Object.keys(config.nomsCaisses).forEach(id => {
-            renderChequeList(id, [], config);
+            renderChequeList(id, [], config); // Initialise la section chèques vide
         });
     }
 }
@@ -608,7 +590,6 @@ export function renderCalculatorUI(pageElement, config) {
 
 /**
  * Remplit les champs du formulaire et les listes (TPE, chèques) avec les données initiales chargées.
- * *** DOIT ÊTRE EXPORTÉE ***
  */
 export function populateInitialData(calculatorData, config) {
     if (!calculatorData || !config) return;
@@ -647,10 +628,11 @@ export function populateInitialData(calculatorData, config) {
                 });
             }
 
-            // Appeler les fonctions de rendu de listes (qui sont dans ce fichier maintenant)
+            // Appeler les fonctions de rendu de listes
             renderChequeList(caisseId, caisseData.cheques || [], config);
             const tpeData = caisseData.tpe || {};
             Object.keys(tpeData).forEach(tpeId => {
+                // S'assurer que le terminal existe toujours dans la config
                 if(config.tpeParCaisse && config.tpeParCaisse[tpeId]) {
                     renderTpeList(caisseId, tpeId, tpeData[tpeId] || [], config);
                 }
@@ -709,13 +691,7 @@ export function renderChequeList(caisseId, cheques = [], config) {
                 <div class="cheque-list" id="cheque-list-${caisseId}">
                     ${cheques.length === 0 ? '<p class="empty-list">Aucun chèque ajouté pour cette caisse.</p>' : `
                         <table class="cheque-table">
-                            <thead>
-                                <tr>
-                                    <th>Montant</th>
-                                    <th>Commentaire</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>Montant</th><th>Commentaire</th><th>Actions</th></tr></thead>
                             <tbody>${chequesHtml}</tbody>
                         </table>
                     `}
@@ -839,8 +815,8 @@ export function handleCalculatorClickEvents(e, state) {
         const ecartDisplay = document.getElementById(`ecart-display-caisse${tabLink.dataset.caisseId}`);
         if (ecartDisplay) ecartDisplay.classList.add('active');
 
-        updateAllCaisseLocks(state);
-        service.calculateAll(config, state);
+        updateAllCaisseLocks(state); // Met à jour l'UI après changement d'onglet
+        service.calculateAll(config, state); // Recalcule
         return false;
     }
 
