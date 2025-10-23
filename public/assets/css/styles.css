@@ -300,3 +300,11 @@ body[data-theme="dark"] .main-footer {
 .toast-info i {
     color: var(--color-primary);
 }
+
+.cloture-btn.mode-reopen {
+    background-color: var(--color-warning);
+}
+
+.cloture-btn.mode-reopen:hover {
+     filter: brightness(110%);
+}

@@ -475,24 +475,46 @@ function updateClotureButtonState(state) {
     const clotureBtn = document.getElementById('cloture-btn');
     if (!clotureBtn || !state.config || !state.config.nomsCaisses) return;
 
+    const activeTab = document.querySelector('.tab-link.active');
+    const activeCaisseId = activeTab ? activeTab.dataset.caisseId : null;
+
+    // Désactiver si pas de connexion WS ou pas de caisse active
+    clotureBtn.disabled = !state.wsResourceId || !activeCaisseId;
+    clotureBtn.classList.remove('mode-reopen', 'action-btn'); // Retirer classes spécifiques
+    clotureBtn.style.backgroundColor = ''; // Revenir au style par défaut
+
+    if (activeCaisseId) {
+        const isActiveCaisseClosed = state.closedCaisses.includes(String(activeCaisseId));
+        const isLockedByOther = state.lockedCaisses.some(c => String(c.caisse_id) === String(activeCaisseId) && String(c.locked_by) !== String(state.wsResourceId));
+
+        if (isLockedByOther) {
+            clotureBtn.disabled = true; // Désactiver si verrouillé par un autre
+            clotureBtn.innerHTML = `<i class="fa-solid fa-user-lock"></i> Verrouillée`;
+        } else if (isActiveCaisseClosed) {
+            clotureBtn.innerHTML = `<i class="fa-solid fa-rotate-left"></i> Réouvrir Caisse Active`;
+            clotureBtn.classList.add('mode-reopen', 'action-btn'); // Ajoute la classe pour le style gris
+            clotureBtn.disabled = false; // Le bouton Réouvrir doit être actif
+        } else {
+            // Cas où la caisse est ouverte (ou verrouillée par soi-même, ce qui n'arrive plus)
+            clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture Caisse Active';
+            clotureBtn.disabled = !state.wsResourceId; // Actif si WS connecté
+        }
+
+    } else {
+        // Pas d'onglet actif (ne devrait pas arriver normalement)
+        clotureBtn.innerHTML = '<i class="fa-solid fa-ban"></i> Sélectionner Caisse';
+    }
+
+    // Gérer le cas où toutes les caisses sont fermées (prioritaire)
     const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
     const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(String(id)));
-
-    clotureBtn.disabled = !state.wsResourceId || allClosed;
-
     if (allClosed) {
+        clotureBtn.disabled = true;
         clotureBtn.innerHTML = `<i class="fa-solid fa-check-circle"></i> Journée Terminée`;
-        clotureBtn.classList.remove('mode-validation', 'mode-finalisation');
-        clotureBtn.style.backgroundColor = '';
-    } else {
-        clotureBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Clôture Caisse Active';
-         if (!clotureBtn.disabled) {
-             clotureBtn.classList.remove('mode-validation', 'mode-finalisation');
-             clotureBtn.style.backgroundColor = '';
-         }
+        clotureBtn.classList.remove('mode-reopen', 'action-btn');
+        clotureBtn.style.backgroundColor = ''; // Ou style spécifique "terminé"
     }
 }
-
 
 // --- POINT D'ENTRÉE ---
 
