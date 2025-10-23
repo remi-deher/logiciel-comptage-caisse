@@ -308,3 +308,40 @@ body[data-theme="dark"] .main-footer {
 .cloture-btn.mode-reopen:hover {
      filter: brightness(110%);
 }
+
+/* Style pour le bouton 'Annuler' ou 'Fermer' dans les modales */
+.btn.action-btn.modal-close-button,
+#confirmation-modal-cancel-btn { /* Cible spécifiquement le bouton Annuler de la modale de confirmation */
+    background-color: var(--color-danger); /* Utilise la variable CSS pour la couleur danger */
+    color: white; /* Assure que le texte reste lisible */
+}
+
+/* Optionnel : Style au survol pour le bouton rouge */
+.btn.action-btn.modal-close-button:hover,
+#confirmation-modal-cancel-btn:hover {
+    background-color: #a53026; /* Une teinte de rouge un peu plus foncée au survol */
+    filter: brightness(110%); /* Ou utiliser filter pour éclaircir/assombrir */
+}
+
+/* Style spécifique pour le bouton Confirmer quand il sert à Réouvrir */
+#confirmation-modal-confirm-btn.mode-reopen {
+    background-color: #8a2be2; /* Violet comme le bouton cloture */
+    color: white;
+}
+
+/* Optionnel: Style au survol pour le bouton violet */
+#confirmation-modal-confirm-btn.mode-reopen:hover {
+    background-color: #7a25c9; /* Violet un peu plus foncé */
+    filter: brightness(110%);
+}
+
+/* Ajustement de la classe existante pour le bouton Annuler/Fermer rouge */
+.btn.action-btn.modal-close-button,
+#confirmation-modal-cancel-btn {
+    background-color: var(--color-danger); /* Rouge */
+    color: white;
+}
+.btn.action-btn.modal-close-button:hover,
+#confirmation-modal-cancel-btn:hover {
+    background-color: #a53026; /* Rouge plus foncé */
+}

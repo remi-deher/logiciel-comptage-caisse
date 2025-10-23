@@ -207,7 +207,7 @@ export function reopenCaisse(caisseId, state) {
     showConfirmationModal({
         title: 'Réouvrir la Caisse',
         message: `Voulez-vous réouvrir la caisse "${caisseNom}" ?`,
-        confirmButtonClass: 'action-btn',
+        confirmButtonClass: 'mode-reopen',
         confirmButtonText: 'Réouvrir',
         onConfirm: () => {
             console.log(`[reopenCaisse] Envoi WS 'cloture_reopen' pour ${caisseId}`);
