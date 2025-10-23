@@ -459,3 +459,51 @@
     padding: 5px 10px;
     font-size: 0.8em;
 }
+
+/* Styles pour le champ Fond de Caisse verrouillable */
+.fond-de-caisse-group .input-with-lock {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Espace entre l'input et le bouton */
+}
+
+.fond-de-caisse-group .input-with-lock input {
+    flex-grow: 1; /* L'input prend l'espace restant */
+    transition: background-color 0.2s, border-color 0.2s; /* Effet de transition */
+}
+
+/* Style de l'input quand il est verrouillé (readonly) */
+.fond-de-caisse-group .input-with-lock input[readonly] {
+    background-color: var(--color-surface-alt); /* Fond légèrement grisé */
+    cursor: not-allowed; /* Curseur 'interdit' */
+    border-color: var(--color-border-light);
+}
+
+.lock-toggle-btn {
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    width: 38px; /* Ajustez la taille si nécessaire */
+    height: 38px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0; /* Pas de padding interne pour centrer l'icône */
+    flex-shrink: 0; /* Empêche le bouton de rétrécir */
+}
+
+.lock-toggle-btn:hover {
+    background-color: var(--color-surface-alt-hover);
+}
+
+.lock-toggle-btn i {
+    font-size: 1em; /* Taille de l'icône */
+}
+
+/* Optionnel: Style quand l'input est déverrouillé (pour mieux le voir) */
+.fond-de-caisse-group .input-with-lock input:not([readonly]) {
+     border-color: var(--color-primary); /* Bordure bleue pour indiquer qu'il est éditable */
+     background-color: var(--color-surface); /* Fond blanc normal */
+}

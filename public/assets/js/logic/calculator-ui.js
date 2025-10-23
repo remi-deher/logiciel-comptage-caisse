@@ -566,9 +566,14 @@ export function renderCalculatorUI(pageElement, config) {
                     <div id="cb_${id}" class="payment-tab-content">${cbTabContent}</div>
                     <div id="cheques_${id}" class="payment-tab-content">${chequesTabContent}</div>
                 </div>
-                <div class="form-group compact-input-group" style="max-width:300px; margin-top:25px;">
+			<div class="form-group compact-input-group fond-de-caisse-group" style="max-width:300px; margin-top:25px;">
                     <label for="fond_de_caisse_${id}">Fond de Caisse Initial</label>
-                    <input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]" inputmode="decimal">
+                    <div class="input-with-lock">
+                        <input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]" inputmode="decimal" readonly>
+                        <button type="button" class="lock-toggle-btn" data-target-input="fond_de_caisse_${id}" title="Déverrouiller/Verrouiller">
+                            <i class="fa-solid fa-lock"></i>
+                        </button>
+                    </div>
                 </div>
             </div>`;
     });

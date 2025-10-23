@@ -309,6 +309,38 @@ function handlePageInput(e) {
 function handlePageClick(e) {
     const target = e.target;
 
+// --- Gestion du bouton de verrouillage du Fond de Caisse ---
+    const lockBtn = target.closest('.lock-toggle-btn');
+    if (lockBtn) {
+        const targetInputId = lockBtn.dataset.targetInput;
+        const inputField = document.getElementById(targetInputId);
+        const icon = lockBtn.querySelector('i');
+
+        if (inputField && icon) {
+            const isReadOnly = inputField.hasAttribute('readonly');
+            if (isReadOnly) {
+                inputField.removeAttribute('readonly');
+                icon.classList.remove('fa-lock');
+                icon.classList.add('fa-lock-open');
+                inputField.focus(); // Met le focus sur le champ pour l'édition
+                inputField.select(); // Sélectionne le contenu
+            } else {
+                inputField.setAttribute('readonly', '');
+                icon.classList.remove('fa-lock-open');
+                icon.classList.add('fa-lock');
+                // Optionnel: Envoyer la mise à jour via WebSocket dès le verrouillage
+                debouncedSendTheoreticals(inputField); // Force l'envoi si la valeur a changé
+            }
+            // Marquez l'état comme modifié pour déclencher l'autosave/save
+            state.isDirty = true;
+            const statusEl = document.getElementById('autosave-status');
+            if(statusEl) statusEl.textContent = 'Modifications non enregistrées.';
+            // Recalculer au cas où la valeur ait changé
+            service.calculateAll(state.config, state);
+        }
+        return; // Important: Arrêter le traitement ici
+    }
+
     // --- Clics pour la modale Réserve ---
     if (target.closest('.open-reserve-modal-btn')) {
         const caisseId = target.closest('.open-reserve-modal-btn').dataset.caisseId;
