@@ -1,4 +1,4 @@
-/* Fichier : public/assets/css/styles.css (Version Complète) */
+/* Fichier : public/assets/css/styles.css (Version Complète et Corrigée) */
 :root {
     --color-bg: #f4f7f9;
     --color-surface: #ffffff;
@@ -64,11 +64,19 @@ h2, h3 {
 .save-btn, .new-btn, .delete-btn, .action-btn {
     color: white; padding: 10px 20px; border: none;
     cursor: pointer; border-radius: 6px;
+    font-weight: bold; /* Correspond aux autres boutons */
+    font-size: 1em; /* Ajustez si nécessaire */
+    transition: background-color 0.2s, filter 0.2s; /* Pour les effets de survol */
 }
 .save-btn { background-color: var(--color-success); }
+.save-btn:hover { filter: brightness(110%); }
 .new-btn { background-color: var(--color-primary); }
+.new-btn:hover { filter: brightness(110%); }
 .delete-btn { background-color: var(--color-danger); }
-.action-btn { background-color: #7f8c8d; }
+.delete-btn:hover { background-color: #a53026; } /* Rouge plus foncé */
+.action-btn { background-color: #7f8c8d; } /* Gris par défaut */
+.action-btn:hover { filter: brightness(110%); }
+
 .error { color: #721c24; background-color: #f8d7da; padding: 15px; border-radius: 5px; }
 .main-footer {
     max-width: 1400px;
@@ -167,13 +175,55 @@ body[data-theme="dark"] .main-footer {
     margin: 0;
 }
 
-#confirmation-modal-confirm-btn.save-btn {
-    background-color: var(--color-success);
+/* Styles de BASE pour TOUS les boutons dans le pied de la modale de confirmation */
+#confirmation-modal .modal-footer .btn {
+    color: white;
+    padding: 10px 20px; /* Assure le padding correct */
+    border: none;
+    cursor: pointer;
+    border-radius: 6px; /* Assure les coins arrondis */
+    font-weight: bold; /* Correspond aux autres boutons */
+    font-size: 1em; /* Ajustez si nécessaire */
+    transition: background-color 0.2s, filter 0.2s; /* Pour les effets de survol */
 }
 
-#confirmation-modal-confirm-btn.delete-btn {
-    background-color: var(--color-danger);
+/* Couleurs spécifiques pour le bouton Confirmer */
+#confirmation-modal-confirm-btn.save-btn {
+    background-color: var(--color-success); /* Vert par défaut */
 }
+#confirmation-modal-confirm-btn.delete-btn {
+    background-color: var(--color-danger); /* Rouge si classe delete-btn */
+}
+#confirmation-modal-confirm-btn.mode-reopen {
+    background-color: #8a2be2; /* Violet si classe mode-reopen */
+}
+
+/* Couleur spécifique pour le bouton Annuler */
+#confirmation-modal-cancel-btn {
+     background-color: var(--color-danger); /* Rouge */
+ }
+
+
+/* Effets de survol */
+#confirmation-modal-confirm-btn.save-btn:hover {
+    filter: brightness(110%);
+}
+#confirmation-modal-confirm-btn.delete-btn:hover,
+#confirmation-modal-cancel-btn:hover {
+    background-color: #a53026; /* Rouge plus foncé */
+}
+#confirmation-modal-confirm-btn.mode-reopen:hover {
+    background-color: #7a25c9; /* Violet un peu plus foncé */
+}
+
+/* État désactivé (au cas où) */
+#confirmation-modal .modal-footer .btn:disabled {
+    background-color: #7f8c8d;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+
 /* ==========================================================================
    Système d'aide par infobulles (Tooltips)
    ========================================================================== */
@@ -301,47 +351,11 @@ body[data-theme="dark"] .main-footer {
     color: var(--color-primary);
 }
 
+/* Style pour le bouton Réouvrir dans la navbar */
 .cloture-btn.mode-reopen {
-    background-color: var(--color-warning);
+    background-color: var(--color-warning); /* Utilise la couleur warning (orange) */
 }
 
 .cloture-btn.mode-reopen:hover {
      filter: brightness(110%);
-}
-
-/* Style pour le bouton 'Annuler' ou 'Fermer' dans les modales */
-.btn.action-btn.modal-close-button,
-#confirmation-modal-cancel-btn { /* Cible spécifiquement le bouton Annuler de la modale de confirmation */
-    background-color: var(--color-danger); /* Utilise la variable CSS pour la couleur danger */
-    color: white; /* Assure que le texte reste lisible */
-}
-
-/* Optionnel : Style au survol pour le bouton rouge */
-.btn.action-btn.modal-close-button:hover,
-#confirmation-modal-cancel-btn:hover {
-    background-color: #a53026; /* Une teinte de rouge un peu plus foncée au survol */
-    filter: brightness(110%); /* Ou utiliser filter pour éclaircir/assombrir */
-}
-
-/* Style spécifique pour le bouton Confirmer quand il sert à Réouvrir */
-#confirmation-modal-confirm-btn.mode-reopen {
-    background-color: #8a2be2; /* Violet comme le bouton cloture */
-    color: white;
-}
-
-/* Optionnel: Style au survol pour le bouton violet */
-#confirmation-modal-confirm-btn.mode-reopen:hover {
-    background-color: #7a25c9; /* Violet un peu plus foncé */
-    filter: brightness(110%);
-}
-
-/* Ajustement de la classe existante pour le bouton Annuler/Fermer rouge */
-.btn.action-btn.modal-close-button,
-#confirmation-modal-cancel-btn {
-    background-color: var(--color-danger); /* Rouge */
-    color: white;
-}
-.btn.action-btn.modal-close-button:hover,
-#confirmation-modal-cancel-btn:hover {
-    background-color: #a53026; /* Rouge plus foncé */
 }
