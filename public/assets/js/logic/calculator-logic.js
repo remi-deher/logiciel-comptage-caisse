@@ -349,7 +349,7 @@ function handlePageClick(e) {
         cloture.finalizeDay(state);
         return;
     }
-     if (target.closest('#show-suggestions-btn')) {
+    if (target.closest('#show-suggestions-btn')) {
         ui.renderWithdrawalSummaryModal(state);
         return;
     }
@@ -358,7 +358,7 @@ function handlePageClick(e) {
         suggestionsModal.classList.remove('visible');
         return;
     }
-     const summaryModal = document.getElementById('cloture-summary-modal');
+    const summaryModal = document.getElementById('cloture-summary-modal');
     if (summaryModal && (target.matches('.modal-close') || target === summaryModal)) {
         summaryModal.classList.remove('visible');
         return;
@@ -366,12 +366,16 @@ function handlePageClick(e) {
 
     // --- Clics gérés par calculator-ui ---
     const handledByUI = ui.handleCalculatorClickEvents(e, state);
-    if(handledByUI) {
+    if (handledByUI) {
         state.isDirty = true;
         service.calculateAll(state.config, state);
     }
-}
 
+    const mainTabClicked = target.closest('.tab-link') && target.closest('.tab-selector');
+    if (mainTabClicked) {
+        updateClotureButtonState(state);
+    }
+}
 
 function handlePageKeydown(e) {
     if (e.key === 'Enter' && e.target.classList.contains('quantity-input')) {
