@@ -241,15 +241,29 @@ function attachEventListeners() {
         }
     });
 
-    const clotureBtn = document.getElementById('cloture-btn');
+const clotureBtn = document.getElementById('cloture-btn');
     if (clotureBtn) {
         clotureBtn.addEventListener('click', () => {
+            console.log("Clic sur #cloture-btn détecté."); // DEBUG
             const activeTab = document.querySelector('.tab-link.active');
             if (activeTab) {
                 const caisseId = activeTab.dataset.caisseId;
-                cloture.startClotureCaisse(caisseId, state);
+                // Vérifier l'état *actuel* de la caisse sélectionnée
+                const isClosed = state.closedCaisses.includes(String(caisseId));
+                console.log(`Caisse active ID: ${caisseId}, est fermée: ${isClosed}`); // DEBUG
+
+                if (isClosed) {
+                    // Si la caisse active est fermée, on appelle la réouverture
+                    console.log("Action: Appel de reopenCaisse"); // DEBUG
+                    cloture.reopenCaisse(caisseId, state);
+                } else {
+                    // Sinon (elle est ouverte), on appelle la clôture
+                    console.log("Action: Appel de startClotureCaisse"); // DEBUG
+                    cloture.startClotureCaisse(caisseId, state);
+                }
             } else {
-                 showToast("Veuillez sélectionner une caisse pour la clôturer.", "info");
+                 console.log("Aucune caisse active sélectionnée."); // DEBUG
+                 showToast("Veuillez sélectionner une caisse.", "info");
             }
         });
     }
@@ -504,21 +518,10 @@ function updateClotureButtonState(state) {
         // Pas d'onglet actif (ne devrait pas arriver normalement)
         clotureBtn.innerHTML = '<i class="fa-solid fa-ban"></i> Sélectionner Caisse';
     }
-
-    // Gérer le cas où toutes les caisses sont fermées (prioritaire)
-    const allCaisseIds = Object.keys(state.config.nomsCaisses || {});
-    const allClosed = allCaisseIds.length > 0 && allCaisseIds.every(id => state.closedCaisses.includes(String(id)));
-    if (allClosed) {
-        clotureBtn.disabled = true;
-        clotureBtn.innerHTML = `<i class="fa-solid fa-check-circle"></i> Journée Terminée`;
-        clotureBtn.classList.remove('mode-reopen', 'action-btn');
-        clotureBtn.style.backgroundColor = ''; // Ou style spécifique "terminé"
-    }
 }
 
 // --- POINT D'ENTRÉE ---
 
-// *** CORRECTION ICI: Ajout du mot-clé 'export' ***
 export async function initializeCalculator() {
     try {
         await refreshCalculatorData();

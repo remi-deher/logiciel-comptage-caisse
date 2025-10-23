@@ -159,9 +159,6 @@ function renderClotureSectionForClosed(caisseId, state) {
         <div class="cloture-recap-card">
             <h4><i class="fa-solid fa-check-circle"></i> ${caisseNom} Clôturée - Récapitulatif du Dépôt</h4>
             ${recapContentHtml}
-            <div class="cloture-actions">
-                <button type="button" class="btn action-btn cloture-reopen-btn" data-caisse-id="${caisseId}"><i class="fa-solid fa-rotate-left"></i> Réouvrir la caisse</button>
-            </div>
         </div>
     `;
 }
