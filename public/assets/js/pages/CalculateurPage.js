@@ -57,17 +57,17 @@ export function renderCalculateurPage(element) {
             </div>
         </div>
 
-        <div id="cloture-summary-modal" class="modal">
+	<div id="cloture-summary-modal" class="modal">
             <div class="modal-content wide">
                 <div class="modal-header">
                     <h3 id="cloture-summary-modal-title">Récapitulatif du Dépôt</h3>
                     <span class="modal-close">&times;</span>
                 </div>
                 <div class="modal-body" id="cloture-summary-modal-body">
-                    </div>
-                 <div class="modal-footer">
-                    <button type="button" class="btn action-btn modal-close">Fermer</button>
                 </div>
+                 <div class="modal-footer">
+                    <button type="button" class="btn action-btn" id="cloture-summary-modal-close-btn">Fermer</button>
+		</div>
             </div>
         </div>
 
