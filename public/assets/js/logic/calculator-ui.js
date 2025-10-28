@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-ui.js (Version Finale Complète)
+// Fichier : public/assets/js/logic/calculator-ui.js (Version Finale Complète - Modifiée)
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 import * as service from './calculator-service.js';
@@ -566,15 +566,7 @@ export function renderCalculatorUI(pageElement, config) {
                     <div id="cb_${id}" class="payment-tab-content">${cbTabContent}</div>
                     <div id="cheques_${id}" class="payment-tab-content">${chequesTabContent}</div>
                 </div>
-			<div class="form-group compact-input-group fond-de-caisse-group" style="max-width:300px; margin-top:25px;">
-                    <label for="fond_de_caisse_${id}">Fond de Caisse Initial</label>
-                    <div class="input-with-lock">
-                        <input type="text" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]" inputmode="decimal" readonly>
-                        <button type="button" class="lock-toggle-btn" data-target-input="fond_de_caisse_${id}" title="Déverrouiller/Verrouiller">
-                            <i class="fa-solid fa-lock"></i>
-                        </button>
-                    </div>
-                </div>
+            <input type="hidden" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]">
             </div>`;
     });
 
@@ -582,7 +574,8 @@ export function renderCalculatorUI(pageElement, config) {
     ecartContainer.innerHTML = ecartsHtml;
     caissesContainer.innerHTML = contentHtml;
 
-     if (config.nomsCaisses) {
+   // On ajoute une vérification pour s'assurer que nomsCaisses existe avant d'itérer
+    if (config.nomsCaisses) {
         Object.keys(config.nomsCaisses).forEach(id => {
             renderChequeList(id, [], config); // Initialise la section chèques vide
         });
@@ -616,6 +609,7 @@ export function populateInitialData(calculatorData, config) {
 
         const caisseData = calculatorData.caisse[caisseId];
         if (caisseData) {
+            // L'input fond de caisse est maintenant caché, mais on le remplit quand même
             setFieldValue(`caisse[${caisseId}][fond_de_caisse]`, caisseData.fond_de_caisse);
             setFieldValue(`caisse[${caisseId}][ventes_especes]`, caisseData.ventes_especes);
             setFieldValue(`caisse[${caisseId}][retrocession]`, caisseData.retrocession);
@@ -751,6 +745,9 @@ export function applyTheoreticalUpdate(caisseId, data) {
     const activeElement = document.activeElement;
 
     for (const fieldName in data) {
+        // Ignorer le champ fond de caisse s'il est maintenant caché
+        if (fieldName === 'fond_de_caisse') continue;
+
         const inputId = `${fieldName}_${caisseId}`;
         if (activeElement && activeElement.id === inputId) {
             continue;
@@ -938,6 +935,8 @@ export function applyFullFormState(data, state) {
     // Appliquer les quantités de dénominations
     if (data.state) {
         for (const id in data.state) {
+            // Ignorer le champ fond de caisse s'il est caché
+            if (id.startsWith('fond_de_caisse_')) continue;
             const field = document.getElementById(id);
             if (field && document.activeElement !== field) field.value = data.state[id];
         }
