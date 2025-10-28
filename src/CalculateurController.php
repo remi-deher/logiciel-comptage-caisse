@@ -26,24 +26,37 @@ class CalculateurController {
         $this->backupService = $backupService ?? new BackupService();
     }
 
-    public function getInitialData() {
+public function getInitialData() {
         if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
-        
-        $stmt_auto = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
-        $autosave = $stmt_auto->fetch();
+
+        // 1. Chercher la DERNIÈRE sauvegarde "Fond de caisse J+1"
         $stmt_j1 = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Fond de caisse J+1%' ORDER BY id DESC LIMIT 1");
         $fond_j1 = $stmt_j1->fetch();
 
+        // 2. Chercher la DERNIÈRE sauvegarde "Sauvegarde auto"
+        $stmt_auto = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages WHERE nom_comptage LIKE 'Sauvegarde auto%' ORDER BY id DESC LIMIT 1");
+        $autosave = $stmt_auto->fetch();
+
         $last_comptage = null;
-        if ($autosave && $fond_j1) {
-            $last_comptage = ($autosave['id'] > $fond_j1['id']) ? $autosave : $fond_j1;
+
+        // 3. Logique de priorité :
+        //    - Si J+1 existe et est plus récent OU SI auto n'existe pas, prendre J+1
+        //    - Sinon (si Auto existe et est plus récent que J+1), prendre Auto
+        if ($fond_j1 && (!$autosave || $fond_j1['id'] >= $autosave['id'])) {
+            $last_comptage = $fond_j1;
+            error_log("Chargement initial: Priorité 'Fond de caisse J+1' (ID: {$fond_j1['id']})"); // Log pour débogage
         } elseif ($autosave) {
             $last_comptage = $autosave;
-        } elseif ($fond_j1) {
-            $last_comptage = $fond_j1;
+            error_log("Chargement initial: Priorité 'Sauvegarde auto' (ID: {$autosave['id']})"); // Log pour débogage
         } else {
+            // 4. Si ni J+1 ni Auto n'existent, prendre le tout dernier comptage (fallback)
             $stmt_last = $this->pdo->query("SELECT id, nom_comptage, explication FROM comptages ORDER BY id DESC LIMIT 1");
             $last_comptage = $stmt_last->fetch();
+            if ($last_comptage) {
+                error_log("Chargement initial: Fallback dernier comptage (ID: {$last_comptage['id']})"); // Log pour débogage
+            } else {
+                 error_log("Chargement initial: Aucun comptage trouvé."); // Log pour débogage
+            }
         }
 
         if ($last_comptage) {
