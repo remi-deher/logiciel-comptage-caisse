@@ -33,8 +33,28 @@ function showClotureSummaryModal(caisseId, state) {
         // --- Affichage Final ---
         console.log("[showClotureSummaryModal] Affichage du récapitulatif FINAL.");
         modalTitle.textContent = "Récapitulatif Final de la Journée";
-        modalBody.innerHTML = `<p>Toutes les caisses sont clôturées. Voici le récapitulatif consolidé :</p>`
-                              + ui.generateFinalSummaryContentHtml(state); // Utilise la fonction UI
+
+        // *** NOUVELLE PARTIE : Ajout du récapitulatif de la dernière caisse clôturée ***
+        let lastCaisseRecapHtml = '';
+        const caisseNom = state.config.nomsCaisses[caisseId];
+        try {
+            lastCaisseRecapHtml = `
+                <div class="cloture-recap-card" style="border-color: var(--color-primary); margin-bottom: 20px;">
+                   <h4>Récapitulatif - ${caisseNom} (Dernière clôturée)</h4>
+                   ${ui.renderClotureSectionContent(caisseId, state)}
+                </div>
+                <hr style="margin: 20px 0; border-top: 1px solid var(--color-border-light);">
+            `;
+            console.log(`[showClotureSummaryModal] Récapitulatif individuel pour caisse ${caisseId} généré.`);
+        } catch (renderError) {
+             console.error(`[showClotureSummaryModal] ERREUR lors du rendu du contenu individuel pour caisse ${caisseId}:`, renderError);
+             lastCaisseRecapHtml = `<p class="error">Impossible de générer le récapitulatif pour la dernière caisse.</p>`;
+        }
+        // *** FIN DE LA NOUVELLE PARTIE ***
+
+        modalBody.innerHTML = lastCaisseRecapHtml // Ajout du récap individuel ici
+                              + `<p>Toutes les caisses sont clôturées. Voici le récapitulatif consolidé :</p>`
+                              + ui.generateFinalSummaryContentHtml(state); // Récap global après
 
         footerHtml = `
             <button type="button" class="btn action-btn modal-close-button">Fermer</button>
@@ -112,7 +132,6 @@ function showClotureSummaryModal(caisseId, state) {
     console.log("[showClotureSummaryModal] Ajout de la classe 'visible'.");
     modal.classList.add('visible');
 }
-
 
 /**
  * Démarre le processus de clôture immédiate pour une seule caisse, SANS confirmation.
