@@ -17,7 +17,8 @@ class ConfigService {
      * @return array ['success' => bool, 'message' => string|null]
      */
     public function updateConfigFile($updates) {
-        global $noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep;
+        // SUPPRIMER $target_fonds_de_caisse de la ligne global
+        global $noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $rouleaux_pieces;
 
         // On charge les valeurs actuelles pour ne pas les écraser
         $current_defines = [
@@ -40,15 +41,22 @@ class ConfigService {
         if (isset($updates['tpe_par_caisse'])) {
             $tpe_par_caisse = $updates['tpe_par_caisse'];
         }
-        // MODIFICATION CI-DESSOUS : On ajoute la gestion de min_to_keep
         if (isset($updates['min_to_keep'])) {
-            // On s'assure de ne garder que les entrées avec une valeur numérique > 0
             $min_to_keep = array_filter($updates['min_to_keep'], function($value) {
                 return is_numeric($value) && $value > 0;
             });
         }
         if (isset($updates['denominations'])) {
             $denominations = $updates['denominations'];
+        }
+        // SUPPRIMER CE BLOC
+        /*
+        if (isset($updates['target_fonds_de_caisse'])) {
+            // ...
+        }
+        */
+        if (isset($updates['rouleaux_pieces'])) {
+             $rouleaux_pieces = $updates['rouleaux_pieces'];
         }
 
         // On construit le nouveau contenu du fichier de configuration
@@ -67,7 +75,11 @@ class ConfigService {
         $new_content .= '$noms_caisses = ' . var_export($noms_caisses, true) . ";\n";
         $new_content .= '$tpe_par_caisse = ' . var_export($tpe_par_caisse, true) . ";\n";
         $new_content .= '$denominations = ' . var_export($denominations, true) . ";\n";
+        $new_content .= '$rouleaux_pieces = ' . var_export($rouleaux_pieces, true) . ";\n";
         $new_content .= '$min_to_keep = ' . var_export($min_to_keep, true) . ";\n";
+        // SUPPRIMER LA LIGNE SUIVANTE
+        // $new_content .= '$target_fonds_de_caisse = ' . var_export($target_fonds_de_caisse, true) . ";\n";
+
 
         if (is_writable($this->configPath)) {
             file_put_contents($this->configPath, $new_content, LOCK_EX);
