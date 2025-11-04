@@ -13,6 +13,8 @@ export function renderNavbar(element) {
             <a href="/statistiques"><i class="fa-solid fa-chart-pie"></i> Statistiques</a>
             <a href="/reserve"><i class="fa-solid fa-vault"></i> Réserve</a>
             <a href="/aide"><i class="fa-solid fa-circle-question"></i> Aide</a>
+            
+            <a href="/update"><i class="fa-solid fa-cloud-arrow-down"></i> Mise à jour</a>
         </div>
 
         <div class="navbar-controls">
