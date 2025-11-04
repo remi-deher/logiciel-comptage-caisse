@@ -8,10 +8,10 @@ require_once __DIR__ . '/services/ReserveService.php';
 require_once __DIR__ . '/services/DatabaseMigrationService.php';
 require_once __DIR__ . '/services/UserService.php';
 require_once __DIR__ . '/services/CaisseManagementService.php';
-require_once __DIR__ . '/services/VersionService.php'; // Ajouté si manquant
-require_once __DIR__ . '/services/ConfigService.php'; // Ajouté si manquant
-require_once __DIR__ . '/services/BackupService.php'; // Ajouté si manquant
-require_once __DIR__ . '/AuthController.php'; // Ajouté si manquant
+require_once __DIR__ . '/services/VersionService.php'; 
+require_once __DIR__ . '/services/ConfigService.php'; 
+require_once __DIR__ . '/services/BackupService.php'; 
+require_once __DIR__ . '/AuthController.php'; 
 
 
 class AdminController {
@@ -51,13 +51,9 @@ class AdminController {
         AuthController::checkAuth();
         if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
 
-        // --- MODIFIÉ ---
-        // Récupérer les caisses AVEC leur fond de caisse de référence (anciennement fond_cible)
         $stmt_caisses = $this->pdo->query("SELECT id, nom_caisse, fond_de_caisse FROM caisses ORDER BY id ASC");
-        // --- FIN MODIFICATION ---
         $caisses_db = $stmt_caisses->fetchAll(PDO::FETCH_ASSOC);
 
-        // Transformer pour correspondre à l'ancien format attendu par le JS (si nécessaire)
         $noms_caisses_output = [];
         foreach ($caisses_db as $caisse) {
             $noms_caisses_output[$caisse['id']] = $caisse['nom_caisse'];
@@ -68,8 +64,8 @@ class AdminController {
 
         echo json_encode([
             'success' => true,
-            'caisses' => $noms_caisses_output, // Garder pour compatibilité éventuelle
-            'caisses_details' => $caisses_db, // NOUVEAU : Envoyer les détails complets
+            'caisses' => $noms_caisses_output,
+            'caisses_details' => $caisses_db,
             'admins' => $this->userService->getAdminsList(),
             'terminaux' => $terminaux,
             'backups' => $this->backupService->getBackups(),
@@ -83,29 +79,38 @@ class AdminController {
 
     public function index() {
         AuthController::checkAuth();
+        // --- MODIFIÉ : S'assurer que la sortie est JSON ---
+        if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
+
         $action = $_REQUEST['action'] ?? null;
+        $response = ['success' => false, 'message' => 'Action non reconnue.']; // Réponse par défaut
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action) {
+            // Vider les anciens messages de session (au cas où)
+            $_SESSION['admin_error'] = null;
+            $_SESSION['admin_message'] = null;
+
             switch ($action) {
                 case 'add_caisse':
                     $this->caisseManagementService->addCaisse($_POST['caisse_name'] ?? '');
+                    $response = isset($_SESSION['admin_error']) 
+                        ? ['success' => false, 'message' => $_SESSION['admin_error']] 
+                        : ['success' => true, 'message' => $_SESSION['admin_message'] ?? 'Caisse ajoutée.'];
                     break;
-                // --- MODIFIER CETTE ACTION ---
-                case 'rename_caisse': // Cette action met à jour le nom ET le fond de caisse
+                
+                case 'rename_caisse':
                     $caisse_id = intval($_POST['caisse_id'] ?? 0);
                     $new_name = $_POST['caisse_name'] ?? '';
-                    // Récupérer la valeur du fond de caisse (anciennement fond_cible)
                     $fond_de_caisse_value = $_POST['fond_de_caisse'] ?? null;
-
-                    // Valider et formater le fond de caisse
                     $fond_de_caisse_to_update = null;
+
                     if ($fond_de_caisse_value !== null) {
                         $floatVal = floatval(str_replace(',', '.', $fond_de_caisse_value));
                         if (is_numeric($floatVal) && $floatVal >= 0) {
                             $fond_de_caisse_to_update = number_format($floatVal, 2, '.', '');
                         } else {
-                             $_SESSION['admin_error'] = "Le montant du fond de caisse pour la caisse ID {$caisse_id} est invalide.";
-                             // On ne bloque pas forcément le renommage pour une erreur de fond
+                            $response = ['success' => false, 'message' => "Le montant du fond de caisse pour la caisse ID {$caisse_id} est invalide."];
+                            break; // Sortir du switch
                         }
                     }
 
@@ -114,7 +119,7 @@ class AdminController {
                             $sql = "UPDATE caisses SET nom_caisse = ?";
                             $params = [$new_name];
                             if ($fond_de_caisse_to_update !== null) {
-                                $sql .= ", fond_de_caisse = ?"; // Modification de la colonne
+                                $sql .= ", fond_de_caisse = ?";
                                 $params[] = $fond_de_caisse_to_update;
                             }
                             $sql .= " WHERE id = ?";
@@ -123,49 +128,69 @@ class AdminController {
                             $stmt = $this->pdo->prepare($sql);
                             $stmt->execute($params);
 
-                            // Mettre à jour la variable globale $noms_caisses pour le fichier config
                             global $noms_caisses;
                             $noms_caisses[$caisse_id] = $new_name;
                             $this->configService->updateConfigFile(['noms_caisses' => $noms_caisses]);
 
-                            $_SESSION['admin_message'] = "Caisse '{$new_name}' mise à jour.";
+                            $response = ['success' => true, 'message' => "Caisse '{$new_name}' mise à jour."];
 
                         } catch (\Exception $e) {
-                             $_SESSION['admin_error'] = "Erreur BDD lors de la mise à jour de la caisse : " . $e->getMessage();
+                             $response = ['success' => false, 'message' => "Erreur BDD : " . $e->getMessage()];
                         }
                     } else {
-                         $_SESSION['admin_error'] = "Données invalides pour la mise à jour de la caisse.";
+                         $response = ['success' => false, 'message' => "Données invalides pour la mise à jour."];
                     }
                     break;
-                // --- FIN MODIFICATION ---
+                
                 case 'delete_caisse':
                      $this->caisseManagementService->deleteCaisse(intval($_POST['caisse_id'] ?? 0));
+                     $response = isset($_SESSION['admin_error']) 
+                        ? ['success' => false, 'message' => $_SESSION['admin_error']] 
+                        : ['success' => true, 'message' => $_SESSION['admin_message'] ?? 'Caisse supprimée.'];
                      break;
-		        case 'update_reserve':
+		        
+                case 'update_reserve':
                     if (isset($_POST['quantities']) && is_array($_POST['quantities'])) {
                         $this->reserveService->updateQuantities($_POST['quantities']);
-                        $_SESSION['admin_message'] = "Stock de la réserve mis à jour.";
+                        $response = ['success' => true, 'message' => 'Stock de la réserve mis à jour.'];
+                    } else {
+                        $response = ['success' => false, 'message' => 'Données de réserve manquantes.'];
                     }
                     break;
+                
                 case 'update_min_to_keep':
                     if (isset($_POST['min_to_keep']) && is_array($_POST['min_to_keep'])) {
                         $this->configService->updateConfigFile(['min_to_keep' => $_POST['min_to_keep']]);
-                        $_SESSION['admin_message'] = "Configuration du fond de caisse minimal enregistrée.";
+                        $response = ['success' => true, 'message' => 'Fond de caisse minimal enregistré.'];
+                    } else {
+                         $response = ['success' => false, 'message' => 'Données de fond minimal manquantes.'];
                     }
                     break;
-                // Le case 'update_target_fonds' a été supprimé (logique maintenant dans 'rename_caisse')
+                
                 case 'add_terminal':
                     $this->terminalManagementService->addTerminal($_POST['terminal_name'] ?? '', intval($_POST['caisse_id'] ?? 0));
+                    $response = isset($_SESSION['admin_error']) 
+                        ? ['success' => false, 'message' => $_SESSION['admin_error']] 
+                        : ['success' => true, 'message' => $_SESSION['admin_message'] ?? 'Terminal ajouté.'];
                     break;
+                
                 case 'rename_terminal':
                     $this->terminalManagementService->renameTerminal(intval($_POST['terminal_id'] ?? 0), $_POST['terminal_name'] ?? '', intval($_POST['caisse_id'] ?? 0));
+                    $response = isset($_SESSION['admin_error']) 
+                        ? ['success' => false, 'message' => $_SESSION['admin_error']] 
+                        : ['success' => true, 'message' => $_SESSION['admin_message'] ?? 'Terminal mis à jour.'];
                     break;
+                
                 case 'delete_terminal':
                     $this->terminalManagementService->deleteTerminal(intval($_POST['terminal_id'] ?? 0));
+                    $response = isset($_SESSION['admin_error']) 
+                        ? ['success' => false, 'message' => $_SESSION['admin_error']] 
+                        : ['success' => true, 'message' => $_SESSION['admin_message'] ?? 'Terminal supprimé.'];
                     break;
-                // Ajoutez d'autres actions ici si nécessaire
             }
-            if (!defined('PHPUNIT_RUNNING')) { header('Location: /admin'); } // Redirection après action POST
+            
+            // --- MODIFIÉ : On affiche la réponse JSON et on arrête le script ---
+            echo json_encode($response);
             exit;
         }
 

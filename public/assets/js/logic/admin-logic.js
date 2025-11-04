@@ -1,7 +1,11 @@
 // public/assets/js/logic/admin-logic.js
 
-// --- IMPORT AJOUTÉ ---
+// --- IMPORTS MODIFIÉS ---
 import { sendWsMessage } from './websocket-service.js';
+import { showToast } from '../utils/toast.js'; // Ajouté pour les notifications
+// AJOUTÉ : Imports pour initialiser le WebSocket
+import { initializeWebSocket } from './websocket-service.js';
+import { setActiveMessageHandler } from '../main.js';
 
 // --- API ---
 async function fetchAdminData() {
@@ -15,7 +19,9 @@ async function fetchAdminData() {
     }
     const data = await response.json();
     if (!data.success) {
+        // --- CORRECTION DE LA SYNTAXE (Apostrophe échappée) ---
         throw new Error(data.message || 'Impossible de charger les données de l\'administration.');
+        // --- FIN CORRECTION ---
     }
     return data;
 }
@@ -25,11 +31,9 @@ function renderAdminDashboard(container, data) {
     const caisseOptionsHtml = Object.entries(data.caisses).map(([id, nom]) => `<option value="${id}">${nom}</option>`).join('');
     const currencySymbol = data.currencySymbol || '€';
 
-    // --- MODIFIER CETTE PARTIE ---
     const caissesHtml = data.caisses_details.map(caisse => {
         const id = caisse.id;
         const nom = caisse.nom_caisse;
-        // Utilise fond_de_caisse (au lieu de fond_cible)
         const fondDeCaisse = parseFloat(caisse.fond_de_caisse || 0).toFixed(2); 
 
         return `
@@ -55,10 +59,7 @@ function renderAdminDashboard(container, data) {
             </td>
         </tr>
     `;}).join('');
-    // --- FIN MODIFICATION ---
 
-
-    // ... adminsHtml, terminauxHtml, minToKeepHtml (inchangés) ...
     const adminsHtml = Object.entries(data.admins).map(([username, details]) => `
         <tr>
             <td data-label="Utilisateur">${username}</td>
@@ -174,75 +175,107 @@ function renderAdminDashboard(container, data) {
     `;
 }
 
+// --- AJOUTÉ : Gestionnaire de messages simple pour la page admin ---
+function handleAdminSocketMessage(data) {
+    if (!data || !data.type) return;
+    
+    switch (data.type) {
+        case 'welcome':
+            console.log(`[WebSocket Admin] Connecté avec l'ID: ${data.resourceId}`);
+            // La page admin n'a pas besoin de 'get_full_state'
+            break;
+        case 'force_reload_all':
+             showToast("L'application va se recharger (action serveur)...", "info", 4000);
+             setTimeout(() => window.location.reload(), 1500);
+             break;
+        // La page admin n'écoute pas les autres événements (update, theoretical_update, etc.)
+    }
+}
+
+
 // --- Point d'entrée de la logique ---
 export async function initializeAdminLogic() {
     const adminPageContainer = document.getElementById('admin-page-container');
     if (!adminPageContainer) return;
 
-    try {
-        const data = await fetchAdminData();
-        renderAdminDashboard(adminPageContainer, data);
+    // --- Fonction pour rafraîchir le dashboard ---
+    async function refreshDashboard() {
+        try {
+            const data = await fetchAdminData();
+            renderAdminDashboard(adminPageContainer, data);
+        } catch (error) {
+             console.error("Erreur chargement admin:", error);
+            adminPageContainer.innerHTML = `<p class="error">${error.message}. Tentative de redirection...</p>`;
+            setTimeout(() => { if (!window.location.pathname.endsWith('/login')) window.location.href = '/login'; }, 1500);
+        }
+    }
 
-        // --- GESTIONNAIRE DE SOUMISSION MODIFIÉ ---
-        adminPageContainer.addEventListener('submit', async (e) => {
-            const form = e.target.closest('.js-admin-action-form');
-            if (form) {
-                e.preventDefault();
-                const submitter = e.submitter;
-                const confirmMessage = submitter?.dataset.confirm;
+    // --- GESTIONNAIRE DE SOUMISSION ENTIÈREMENT MODIFIÉ POUR L'AJAX ---
+    adminPageContainer.addEventListener('submit', async (e) => {
+        const form = e.target.closest('.js-admin-action-form');
+        if (form) {
+            e.preventDefault();
+            const submitter = e.submitter;
+            const confirmMessage = submitter?.dataset.confirm;
 
-                if (confirmMessage && !confirm(confirmMessage)) {
-                    return;
-                }
-
-                const formData = new FormData(form);
-                const action = formData.get('action');
-
-                // Si c'est l'action de mise à jour de la caisse, on intercepte avec fetch
-                if (action === 'rename_caisse') {
-                    if(submitter) submitter.disabled = true;
-                    try {
-                        const response = await fetch(form.getAttribute('action'), {
-                            method: 'POST',
-                            body: formData
-                        });
-
-                        // Si la requête réussit (même si elle retourne une erreur métier)
-                        if (response.ok) {
-                            // On envoie le message WebSocket
-                            const caisseId = formData.get('caisse_id');
-                            const fondDeCaisse = formData.get('fond_de_caisse');
-                            
-                            sendWsMessage({
-                                type: 'master_fond_updated',
-                                caisse_id: caisseId,
-                                value: fondDeCaisse.replace(',', '.') // Assure un format correct
-                            });
-                            
-                            // --- CORRECTION ---
-                            // On attend 150ms AVANT de recharger, pour laisser le temps au message de partir
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 150);
-                            // --- FIN CORRECTION ---
-                        } else {
-                            throw new Error(`Erreur HTTP ${response.status}`);
-                        }
-                    } catch (error) {
-                        console.error("Erreur lors de la mise à jour de la caisse:", error);
-                        alert("Une erreur est survenue. Rechargement de la page.");
-                        window.location.reload();
-                    }
-                } else {
-                    // Pour toutes les autres actions (delete, add, etc.), on laisse la soumission classique
-                    form.submit();
-                }
+            if (confirmMessage && !confirm(confirmMessage)) {
+                return;
             }
-        });
 
-    } catch (error) {
-        console.error("Erreur chargement admin:", error);
-        adminPageContainer.innerHTML = `<p class="error">${error.message}. Tentative de redirection...</p>`;
-        setTimeout(() => { if (!window.location.pathname.endsWith('/login')) window.location.href = '/login'; }, 1500);
+            if (submitter) submitter.disabled = true;
+
+            const formData = new FormData(form);
+            const action = formData.get('action');
+
+            try {
+                const response = await fetch(form.getAttribute('action'), {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || `Erreur HTTP ${response.status}`);
+                }
+
+                // Si c'est un succès, on affiche la notification
+                showToast(result.message, 'success');
+
+                // Si c'est l'action qui nous intéresse, on envoie le WebSocket
+                if (action === 'rename_caisse') {
+                    const caisseId = formData.get('caisse_id');
+                    const fondDeCaisse = formData.get('fond_de_caisse');
+                    
+                    sendWsMessage({
+                        type: 'master_fond_updated',
+                        caisse_id: caisseId,
+                        value: fondDeCaisse.replace(',', '.')
+                    });
+                }
+                
+                // On rafraîchit tout le dashboard pour voir les changements
+                // (ex: une caisse ajoutée/supprimée)
+                await refreshDashboard();
+
+            } catch (error) {
+                console.error(`Erreur lors de l'action '${action}':`, error);
+                showToast(error.message, 'error');
+                // Ré-activer le bouton même en cas d'erreur
+                if (submitter) submitter.disabled = false;
+            }
+        }
+    });
+
+    // --- Chargement initial ---
+    await refreshDashboard();
+    
+    // --- AJOUT : Initialisation du WebSocket ---
+    try {
+        setActiveMessageHandler(handleAdminSocketMessage);
+        await initializeWebSocket(handleAdminSocketMessage);
+    } catch (wsError) {
+        console.warn("La connexion WebSocket a échoué sur la page admin, l'envoi de mises à jour sera désactivé.", wsError);
+        showToast("Connexion temps-réel échouée.", "error");
     }
 }
