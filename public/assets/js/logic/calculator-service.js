@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-service.js (Version Corrigée pour test écart)
+// Fichier : public/assets/js/logic/calculator-service.js (Version Corrigée pour la "source de vérité")
 
 import { formatCurrency, parseLocaleFloat } from '../utils/formatters.js';
 
@@ -10,7 +10,10 @@ export async function fetchInitialData() {
     const dataPromise = fetch('index.php?route=calculateur/get_initial_data').then(res => res.json());
     const reservePromise = fetch('index.php?route=reserve/get_data').then(res => res.json());
 
+    // --- CORRECTION SUR CETTE LIGNE ---
+    // (reservePromise au lieu de reserveResult dans le tableau)
     const [configResult, dataResult, reserveResult] = await Promise.all([configPromise, dataPromise, reservePromise]);
+    // --- FIN CORRECTION ---
 
     let calculatorData = { caisse: {} };
     if (dataResult.success && dataResult.data) {
@@ -32,10 +35,14 @@ export async function fetchInitialData() {
     }
 
     // S'assurer que chaque caisse configurée a un objet de données, même vide
+    // ET FORCER LE FOND DE CAISSE "SOURCE DE VÉRITÉ"
     Object.keys(configResult.nomsCaisses).forEach(caisseId => {
+        const masterFondDeCaisse = configResult.masterFondsDeCaisse ? configResult.masterFondsDeCaisse[caisseId] : '0.00';
+
         if (!calculatorData.caisse[caisseId]) {
+            // Si la caisse n'existe pas dans les données auto (ex: nouvelle caisse)
             calculatorData.caisse[caisseId] = {
-                fond_de_caisse: '0', // Initialiser ici aussi
+                fond_de_caisse: masterFondDeCaisse, // Utiliser la source de vérité
                 ventes_especes: '0', retrocession: '0',
                 ventes_cb: '0', retrocession_cb: '0',
                 ventes_cheques: '0', retrocession_cheques: '0',
@@ -43,24 +50,30 @@ export async function fetchInitialData() {
                 tpe: {},
                 denominations: {}
             };
-        } else if (calculatorData.caisse[caisseId].fond_de_caisse === undefined) {
-             calculatorData.caisse[caisseId].fond_de_caisse = '0'; // Assurer l'existence si la caisse existe déjà
+        } else {
+             // Si la caisse existe (chargée depuis J+1 ou Auto), ÉCRASER le fond de caisse
+             calculatorData.caisse[caisseId].fond_de_caisse = masterFondDeCaisse;
         }
     });
+
 
     const clotureState = {
         lockedCaisses: [],
         closedCaisses: (configResult.closedCaisses || []).map(String)
     };
-    const targetFondsDeCaisse = configResult.targetFondsDeCaisse || {};
+    
+    // --- MODIFIÉ ---
+    // Récupérer le 'masterFondsDeCaisse' au lieu de 'targetFondsDeCaisse'
+    const masterFondsDeCaisse = configResult.masterFondsDeCaisse || {};
     delete configResult.closedCaisses;
-    delete configResult.targetFondsDeCaisse;
+    delete configResult.masterFondsDeCaisse;
+    // --- FIN MODIFICATION ---
 
     return {
         config: configResult,
         calculatorData,
         clotureState,
-        targetFondsDeCaisse,
+        masterFondsDeCaisse, // MODIFIÉ
         reserveStatus: reserveResult.success ? reserveResult.reserve_status : { denominations: {}, total: 0 }
     };
 }
@@ -110,8 +123,15 @@ export function calculateEcartsForCaisse(caisseId, appState) {
     const { calculatorData, config } = appState;
     // Utiliser une copie pour éviter de modifier l'état global directement ici
     const caisseData = { ...(calculatorData.caisse[caisseId] || {}) };
-    // Assurer la présence de fond_de_caisse pour le calcul, même si non présent dans l'UI
-    caisseData.fond_de_caisse = caisseData.fond_de_caisse || '0';
+    
+    // --- MODIFIÉ ---
+    // S'assurer que fond_de_caisse existe, en utilisant la "source de vérité" de l'état si besoin
+    if (caisseData.fond_de_caisse === undefined && appState.masterFondsDeCaisse) {
+         caisseData.fond_de_caisse = appState.masterFondsDeCaisse[caisseId] || '0';
+    } else if (caisseData.fond_de_caisse === undefined) {
+        caisseData.fond_de_caisse = '0';
+    }
+    // --- FIN MODIFICATION ---
 
     // --- Calcul Espèces en centimes ---
     let totalCompteEspecesCents = 0;
@@ -164,7 +184,7 @@ export function calculateEcartsForCaisse(caisseId, appState) {
 
 /**
  * Calcule la suggestion de retrait d'espèces pour une caisse.
- * Basé sur les ventes théoriques + rétrocessions.
+ * Basé sur les ventes théoriques + rétrocessions. (Logique inchangée)
  */
 export function calculateWithdrawalSuggestion(caisseData, config) {
     if (!caisseData || !config || !config.denominations) return { suggestions: [], totalToWithdraw: 0 };
@@ -214,7 +234,11 @@ export function calculateWithdrawalSuggestion(caisseData, config) {
  * Calcule tous les totaux pour TOUTES les caisses et met à jour l'affichage.
  */
 export function calculateAll(config, appState) {
-    const { calculatorData, targetFondsDeCaisse } = appState; // targetFondsDeCaisse est toujours là, mais non utilisé ici
+    // --- MODIFIÉ ---
+    // const { calculatorData, targetFondsDeCaisse } = appState; // (Ancienne ligne)
+    const { calculatorData, masterFondsDeCaisse } = appState; // (Nouvelle ligne)
+    // --- FIN MODIFICATION ---
+    
     if (!config || !config.nomsCaisses || !config.denominations) {
         console.error("Configuration incomplète pour calculateAll");
         return;
@@ -224,10 +248,13 @@ export function calculateAll(config, appState) {
         // Utiliser une copie pour éviter de modifier l'état directement avant le calcul d'écart
         const caisseDataCopy = { ...(appState.calculatorData.caisse[id] || {}) };
         caisseDataCopy.denominations = { ...(caisseDataCopy.denominations || {}) }; // Copie profonde pour denominations
-        caisseDataCopy.fond_de_caisse = caisseDataCopy.fond_de_caisse || '0'; // Assurer présence pour calcul écart
-
+        
+        // --- MODIFIÉ ---
+        // S'assurer que le FDC de la copie est le bon (celui du formulaire caché)
         const formElements = document.getElementById('caisse-form')?.elements;
         if (!formElements) return;
+        caisseDataCopy.fond_de_caisse = formElements[`caisse[${id}][fond_de_caisse]`]?.value || (masterFondsDeCaisse ? masterFondsDeCaisse[id] : '0') || '0';
+        // --- FIN MODIFICATION ---
 
         // Mise à jour de la copie avec les valeurs du formulaire (sans fond_de_caisse UI)
         caisseDataCopy.ventes_especes = formElements[`caisse[${id}][ventes_especes]`]?.value || '0';

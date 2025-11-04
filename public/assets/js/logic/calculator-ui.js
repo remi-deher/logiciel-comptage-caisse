@@ -554,6 +554,9 @@ export function renderCalculatorUI(pageElement, config) {
             </div>
             <div class="cheque-section" id="cheque-section-${id}"></div>`;
 
+        // --- MODIFIÉ ---
+        // Remplacement du champ 'fond_de_caisse' visible par un champ caché.
+        // Il sera rempli par populateInitialData et mis à jour par WebSocket.
         contentHtml += `
             <div id="caisse${id}" class="caisse-tab-content ${isActive}">
                 <div class="payment-method-tabs">
@@ -568,6 +571,7 @@ export function renderCalculatorUI(pageElement, config) {
                 </div>
             <input type="hidden" data-caisse-id="${id}" id="fond_de_caisse_${id}" name="caisse[${id}][fond_de_caisse]">
             </div>`;
+        // --- FIN MODIFICATION ---
     });
 
     tabSelector.innerHTML = tabsHtml;
@@ -609,8 +613,10 @@ export function populateInitialData(calculatorData, config) {
 
         const caisseData = calculatorData.caisse[caisseId];
         if (caisseData) {
+            // --- MODIFIÉ ---
             // L'input fond de caisse est maintenant caché, mais on le remplit quand même
             setFieldValue(`caisse[${caisseId}][fond_de_caisse]`, caisseData.fond_de_caisse);
+            // --- FIN MODIFICATION ---
             setFieldValue(`caisse[${caisseId}][ventes_especes]`, caisseData.ventes_especes);
             setFieldValue(`caisse[${caisseId}][retrocession]`, caisseData.retrocession);
             setFieldValue(`caisse[${caisseId}][ventes_cb]`, caisseData.ventes_cb);
@@ -745,8 +751,10 @@ export function applyTheoreticalUpdate(caisseId, data) {
     const activeElement = document.activeElement;
 
     for (const fieldName in data) {
+        // --- MODIFIÉ ---
         // Ignorer le champ fond de caisse s'il est maintenant caché
-        if (fieldName === 'fond_de_caisse') continue;
+        // if (fieldName === 'fond_de_caisse') continue; // Ligne supprimée
+        // --- FIN MODIFICATION ---
 
         const inputId = `${fieldName}_${caisseId}`;
         if (activeElement && activeElement.id === inputId) {
@@ -935,8 +943,9 @@ export function applyFullFormState(data, state) {
     // Appliquer les quantités de dénominations
     if (data.state) {
         for (const id in data.state) {
-            // Ignorer le champ fond de caisse s'il est caché
-            if (id.startsWith('fond_de_caisse_')) continue;
+            // --- MODIFIÉ ---
+            // if (id.startsWith('fond_de_caisse_')) continue; // Ligne supprimée
+            // --- FIN MODIFICATION ---
             const field = document.getElementById(id);
             if (field && document.activeElement !== field) field.value = data.state[id];
         }

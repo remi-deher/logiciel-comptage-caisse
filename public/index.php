@@ -30,7 +30,7 @@ $denominations = $denominations ?? ['billets' => [], 'pieces' => []];
 $tpe_par_caisse = $tpe_par_caisse ?? [];
 $min_to_keep = $min_to_keep ?? [];
 $rouleaux_pieces = $rouleaux_pieces ?? [];
-// La variable $target_fonds_de_caisse est supprimée d'ici
+// --- MODIFIÉ : La variable $target_fonds_de_caisse est supprimée d'ici ---
 
 date_default_timezone_set(defined('APP_TIMEZONE') ? APP_TIMEZONE : 'Europe/Paris');
 
@@ -90,17 +90,18 @@ $request_method = $_SERVER['REQUEST_METHOD'];
 $route_key = "{$request_method}:{$route}";
 
 $routes = [
-    // MODIFIER CETTE ROUTE
+    // --- MODIFIER CETTE ROUTE ---
     'GET:calculateur/config' => function() use ($pdo, $noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $rouleaux_pieces, $current_currency_code, $current_currency_symbol, $clotureStateService) {
-        // Récupérer les fonds cibles depuis la BDD
-        $target_fonds_de_caisse_db = [];
+        // Récupérer les fonds de caisse de référence depuis la BDD
+        $master_fonds_de_caisse_db = [];
         try {
-            $stmt = $pdo->query("SELECT id, fond_cible FROM caisses");
+            // Lecture de la colonne 'fond_de_caisse' (anciennement 'fond_cible')
+            $stmt = $pdo->query("SELECT id, fond_de_caisse FROM caisses");
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                $target_fonds_de_caisse_db[$row['id']] = $row['fond_cible'] ?? '0.00';
+                $master_fonds_de_caisse_db[$row['id']] = $row['fond_de_caisse'] ?? '0.00';
             }
         } catch (Exception $e) {
-            error_log("Erreur récupération fond_cible pour /config: " . $e->getMessage());
+            error_log("Erreur récupération fond_de_caisse pour /config: " . $e->getMessage());
         }
 
         echo json_encode([
@@ -110,12 +111,13 @@ $routes = [
             'tpeParCaisse' => $tpe_par_caisse,
             'minToKeep' => $min_to_keep,
             'rouleaux_pieces' => $rouleaux_pieces,
-            'targetFondsDeCaisse' => $target_fonds_de_caisse_db, // Donnée BDD
+            'masterFondsDeCaisse' => $master_fonds_de_caisse_db, // Renommé (anciennement targetFondsDeCaisse)
             'currencyCode' => $current_currency_code,
             'currencySymbol' => $current_currency_symbol,
             'closedCaisses' => $clotureStateService->getClosedCaisses(),
         ]);
     },
+    // --- FIN MODIFICATION ---
     'GET:calculateur/get_initial_data' => [$calculateurController, 'getInitialData'],
     'GET:calculateur/get_closed_caisse_data' => [$calculateurController, 'getClosedCaisseData'],
     'POST:calculateur/save' => [$calculateurController, 'save'],

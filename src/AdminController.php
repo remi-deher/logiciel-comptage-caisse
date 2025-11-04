@@ -47,13 +47,14 @@ class AdminController {
     }
 
     public function getDashboardData() {
-        // SUPPRIMER $target_fonds_de_caisse de la ligne global
         global $noms_caisses, $denominations, $min_to_keep;
         AuthController::checkAuth();
         if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
 
-        // Récupérer les caisses AVEC leur fond cible
-        $stmt_caisses = $this->pdo->query("SELECT id, nom_caisse, fond_cible FROM caisses ORDER BY id ASC");
+        // --- MODIFIÉ ---
+        // Récupérer les caisses AVEC leur fond de caisse de référence (anciennement fond_cible)
+        $stmt_caisses = $this->pdo->query("SELECT id, nom_caisse, fond_de_caisse FROM caisses ORDER BY id ASC");
+        // --- FIN MODIFICATION ---
         $caisses_db = $stmt_caisses->fetchAll(PDO::FETCH_ASSOC);
 
         // Transformer pour correspondre à l'ancien format attendu par le JS (si nécessaire)
@@ -76,7 +77,6 @@ class AdminController {
             'denominations' => $denominations,
             'min_to_keep' => $min_to_keep ?? [],
             'currencySymbol' => defined('APP_CURRENCY_SYMBOL') ? APP_CURRENCY_SYMBOL : '€'
-            // Pas besoin d'envoyer target_fonds_de_caisse ici car inclus dans caisses_details
         ]);
         exit;
     }
@@ -90,33 +90,32 @@ class AdminController {
                 case 'add_caisse':
                     $this->caisseManagementService->addCaisse($_POST['caisse_name'] ?? '');
                     break;
-                // MODIFIER CETTE ACTION
-                case 'rename_caisse':
+                // --- MODIFIER CETTE ACTION ---
+                case 'rename_caisse': // Cette action met à jour le nom ET le fond de caisse
                     $caisse_id = intval($_POST['caisse_id'] ?? 0);
                     $new_name = $_POST['caisse_name'] ?? '';
-                    // Récupérer aussi la valeur du fond cible depuis le formulaire
-                    $fond_cible_value = $_POST['fond_cible'] ?? null;
+                    // Récupérer la valeur du fond de caisse (anciennement fond_cible)
+                    $fond_de_caisse_value = $_POST['fond_de_caisse'] ?? null;
 
-                    // Valider et formater le fond cible
-                    $fond_cible_to_update = null;
-                    if ($fond_cible_value !== null) {
-                        $floatVal = floatval(str_replace(',', '.', $fond_cible_value));
+                    // Valider et formater le fond de caisse
+                    $fond_de_caisse_to_update = null;
+                    if ($fond_de_caisse_value !== null) {
+                        $floatVal = floatval(str_replace(',', '.', $fond_de_caisse_value));
                         if (is_numeric($floatVal) && $floatVal >= 0) {
-                            $fond_cible_to_update = number_format($floatVal, 2, '.', '');
+                            $fond_de_caisse_to_update = number_format($floatVal, 2, '.', '');
                         } else {
-                             $_SESSION['admin_error'] = "Le montant du fond cible pour la caisse ID {$caisse_id} est invalide.";
-                             // On ne bloque pas forcément le renommage pour une erreur de fond cible
+                             $_SESSION['admin_error'] = "Le montant du fond de caisse pour la caisse ID {$caisse_id} est invalide.";
+                             // On ne bloque pas forcément le renommage pour une erreur de fond
                         }
                     }
 
-                    // Appeler une méthode de service mise à jour (ou faire la logique ici)
                     if ($caisse_id > 0 && !empty($new_name)) {
                         try {
                             $sql = "UPDATE caisses SET nom_caisse = ?";
                             $params = [$new_name];
-                            if ($fond_cible_to_update !== null) {
-                                $sql .= ", fond_cible = ?";
-                                $params[] = $fond_cible_to_update;
+                            if ($fond_de_caisse_to_update !== null) {
+                                $sql .= ", fond_de_caisse = ?"; // Modification de la colonne
+                                $params[] = $fond_de_caisse_to_update;
                             }
                             $sql .= " WHERE id = ?";
                             $params[] = $caisse_id;
@@ -138,6 +137,7 @@ class AdminController {
                          $_SESSION['admin_error'] = "Données invalides pour la mise à jour de la caisse.";
                     }
                     break;
+                // --- FIN MODIFICATION ---
                 case 'delete_caisse':
                      $this->caisseManagementService->deleteCaisse(intval($_POST['caisse_id'] ?? 0));
                      break;
@@ -153,12 +153,7 @@ class AdminController {
                         $_SESSION['admin_message'] = "Configuration du fond de caisse minimal enregistrée.";
                     }
                     break;
-                // SUPPRIMER CE CASE
-                /*
-                case 'update_target_fonds':
-                    // ...
-                    break;
-                */
+                // Le case 'update_target_fonds' a été supprimé (logique maintenant dans 'rename_caisse')
                 case 'add_terminal':
                     $this->terminalManagementService->addTerminal($_POST['terminal_name'] ?? '', intval($_POST['caisse_id'] ?? 0));
                     break;

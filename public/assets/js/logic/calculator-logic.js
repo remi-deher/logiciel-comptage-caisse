@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/calculator-logic.js (Corrected - Vérifiez l'export à la fin)
+// Fichier : public/assets/js/logic/calculator-logic.js (Corrigé - Logique du cadenas supprimée)
 
 import * as service from './calculator-service.js';
 import * as ui from './calculator-ui.js';
@@ -17,7 +17,8 @@ let state = {
     lockedCaisses: [],
     closedCaisses: [],
     isDirty: false,
-    reserveStatus: { denominations: {}, total: 0 }
+    reserveStatus: { denominations: {}, total: 0 },
+    masterFondsDeCaisse: {} // Ajout pour stocker la source de vérité
 };
 
 // --- UTILITIES ---
@@ -37,7 +38,7 @@ const debouncedSendTheoreticals = debounce((target) => {
         'ventes_especes', 'retrocession',
         'ventes_cb', 'retrocession_cb',
         'ventes_cheques', 'retrocession_cheques',
-        'fond_de_caisse'
+        'fond_de_caisse' // Le fond de caisse est maintenant inclus dans la synchro
     ];
     const data = {};
     fields.forEach(fieldName => {
@@ -56,6 +57,7 @@ async function refreshCalculatorData() {
         state.config = initialData.config;
         state.calculatorData = initialData.calculatorData;
         state.reserveStatus = initialData.reserveStatus;
+        state.masterFondsDeCaisse = initialData.masterFondsDeCaisse; // Stocker la source de vérité
         state.lockedCaisses = [];
         state.closedCaisses = initialData.clotureState.closedCaisses || [];
 
@@ -73,7 +75,8 @@ async function refreshCalculatorData() {
         }
 
         // Utiliser la fonction importée de ui.js pour peupler
-        ui.populateInitialData(state.calculatorData, state.config); // Appel de la fonction importée
+        // Ceci inclut le remplissage du champ caché fond_de_caisse
+        ui.populateInitialData(state.calculatorData, state.config); 
 
         attachEventListeners();
         service.calculateAll(state.config, state);
@@ -301,7 +304,11 @@ function handlePageInput(e) {
         if (target.matches('.quantity-input')) {
              sendWsMessage({ type: 'update', id: target.id, value: target.value });
         } else if (target.dataset.caisseId && (target.id.includes('ventes_') || target.id.includes('retrocession_') || target.id.includes('fond_de_caisse_'))) {
+             // --- MODIFIÉ ---
+             // On envoie la mise à jour du fond de caisse (caché) via le même
+             // debounce que les autres champs théoriques.
              debouncedSendTheoreticals(target);
+             // --- FIN MODIFICATION ---
         }
     }
 }
@@ -309,37 +316,9 @@ function handlePageInput(e) {
 function handlePageClick(e) {
     const target = e.target;
 
-// --- Gestion du bouton de verrouillage du Fond de Caisse ---
-    const lockBtn = target.closest('.lock-toggle-btn');
-    if (lockBtn) {
-        const targetInputId = lockBtn.dataset.targetInput;
-        const inputField = document.getElementById(targetInputId);
-        const icon = lockBtn.querySelector('i');
-
-        if (inputField && icon) {
-            const isReadOnly = inputField.hasAttribute('readonly');
-            if (isReadOnly) {
-                inputField.removeAttribute('readonly');
-                icon.classList.remove('fa-lock');
-                icon.classList.add('fa-lock-open');
-                inputField.focus(); // Met le focus sur le champ pour l'édition
-                inputField.select(); // Sélectionne le contenu
-            } else {
-                inputField.setAttribute('readonly', '');
-                icon.classList.remove('fa-lock-open');
-                icon.classList.add('fa-lock');
-                // Optionnel: Envoyer la mise à jour via WebSocket dès le verrouillage
-                debouncedSendTheoreticals(inputField); // Force l'envoi si la valeur a changé
-            }
-            // Marquez l'état comme modifié pour déclencher l'autosave/save
-            state.isDirty = true;
-            const statusEl = document.getElementById('autosave-status');
-            if(statusEl) statusEl.textContent = 'Modifications non enregistrées.';
-            // Recalculer au cas où la valeur ait changé
-            service.calculateAll(state.config, state);
-        }
-        return; // Important: Arrêter le traitement ici
-    }
+    // --- MODIFIÉ ---
+    // --- Bloc de code pour le cadenas de fond de caisse SUPPRIMÉ ---
+    // --- FIN MODIFICATION ---
 
     // --- Clics pour la modale Réserve ---
     if (target.closest('.open-reserve-modal-btn')) {
@@ -500,6 +479,15 @@ function handleWebSocketMessage(data) {
 
         case 'theoretical_update':
             if (data.caisse_id && data.data) {
+                // --- MODIFIÉ ---
+                // Met à jour l'état local du fond de caisse si reçu
+                if (data.data.fond_de_caisse !== undefined) {
+                    if (state.calculatorData.caisse[data.caisse_id]) {
+                        state.calculatorData.caisse[data.caisse_id].fond_de_caisse = data.data.fond_de_caisse;
+                    }
+                }
+                // --- FIN MODIFICATION ---
+                
                 ui.applyTheoreticalUpdate(data.caisse_id, data.data);
                 service.calculateAll(state.config, state);
             }

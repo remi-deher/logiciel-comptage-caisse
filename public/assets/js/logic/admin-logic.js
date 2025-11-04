@@ -1,5 +1,8 @@
 // public/assets/js/logic/admin-logic.js
 
+// --- IMPORT AJOUTÉ ---
+import { sendWsMessage } from './websocket-service.js';
+
 // --- API ---
 async function fetchAdminData() {
     const response = await fetch('index.php?route=admin/dashboard_data');
@@ -22,21 +25,22 @@ function renderAdminDashboard(container, data) {
     const caisseOptionsHtml = Object.entries(data.caisses).map(([id, nom]) => `<option value="${id}">${nom}</option>`).join('');
     const currencySymbol = data.currencySymbol || '€';
 
-    // MODIFIER CETTE PARTIE pour utiliser data.caisses_details
-    const caissesHtml = data.caisses_details.map(caisse => { // Utilise le nouveau tableau caisses_details
+    // --- MODIFIER CETTE PARTIE ---
+    const caissesHtml = data.caisses_details.map(caisse => {
         const id = caisse.id;
         const nom = caisse.nom_caisse;
-        const fondCible = parseFloat(caisse.fond_cible || 0).toFixed(2); // Récupère le fond cible
+        // Utilise fond_de_caisse (au lieu de fond_cible)
+        const fondDeCaisse = parseFloat(caisse.fond_de_caisse || 0).toFixed(2); 
 
         return `
         <tr>
-            <td data-label="Nom & Fond Cible">
+            <td data-label="Nom & Fond de Caisse">
                 <form class="inline-form js-admin-action-form" method="POST" action="index.php?route=admin/action" style="display: grid; grid-template-columns: minmax(150px, 2fr) minmax(100px, 1fr) auto; gap: 10px; align-items: center;">
                     <input type="hidden" name="action" value="rename_caisse">
                     <input type="hidden" name="caisse_id" value="${id}">
                     <input type="text" name="caisse_name" value="${nom}" class="inline-input" aria-label="Nom de la caisse" placeholder="Nom Caisse">
                     <div class="input-with-symbol" style="display: flex; align-items: center; gap: 5px;">
-                       <input type="number" step="0.01" min="0" name="fond_cible" value="${fondCible}" class="inline-input" aria-label="Fond de caisse cible" placeholder="0.00" style="text-align: right;">
+                       <input type="number" step="0.01" min="0" name="fond_de_caisse" value="${fondDeCaisse}" class="inline-input" aria-label="Fond de caisse de référence" placeholder="0.00" style="text-align: right;">
                        <span>${currencySymbol}</span>
                     </div>
                     <button type="submit" class="action-btn-small save-btn" title="Enregistrer les modifications"><i class="fa-solid fa-save"></i></button>
@@ -51,6 +55,7 @@ function renderAdminDashboard(container, data) {
             </td>
         </tr>
     `;}).join('');
+    // --- FIN MODIFICATION ---
 
 
     // ... adminsHtml, terminauxHtml, minToKeepHtml (inchangés) ...
@@ -110,7 +115,7 @@ function renderAdminDashboard(container, data) {
             <div class="admin-card admin-card-full-width">
                 <h3><i class="fa-solid fa-cash-register"></i> Gestion des Caisses</h3>
                 <div class="admin-card-content">
-                    <table class="admin-table responsive-table"><thead><tr><th>Nom & Fond Cible (J+1)</th><th>Actions</th></tr></thead><tbody>${caissesHtml}</tbody></table>
+                    <table class="admin-table responsive-table"><thead><tr><th>Nom & Fond de Caisse de Référence</th><th>Actions</th></tr></thead><tbody>${caissesHtml}</tbody></table>
                 </div>
                 <div class="admin-card-footer">
                     <form class="inline-form js-admin-action-form" method="POST" action="index.php?route=admin/action">
@@ -178,7 +183,8 @@ export async function initializeAdminLogic() {
         const data = await fetchAdminData();
         renderAdminDashboard(adminPageContainer, data);
 
-        adminPageContainer.addEventListener('submit', (e) => {
+        // --- GESTIONNAIRE DE SOUMISSION MODIFIÉ ---
+        adminPageContainer.addEventListener('submit', async (e) => {
             const form = e.target.closest('.js-admin-action-form');
             if (form) {
                 e.preventDefault();
@@ -188,7 +194,49 @@ export async function initializeAdminLogic() {
                 if (confirmMessage && !confirm(confirmMessage)) {
                     return;
                 }
-                form.submit();
+
+                const formData = new FormData(form);
+                const action = formData.get('action');
+
+                // Si c'est l'action de mise à jour de la caisse, on intercepte avec fetch
+                if (action === 'rename_caisse') {
+                    if(submitter) submitter.disabled = true;
+                    try {
+                        const response = await fetch(form.getAttribute('action'), {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        // Si la requête réussit (même si elle retourne une erreur métier)
+                        if (response.ok) {
+                            // On envoie le message WebSocket
+                            const caisseId = formData.get('caisse_id');
+                            const fondDeCaisse = formData.get('fond_de_caisse');
+                            
+                            sendWsMessage({
+                                type: 'master_fond_updated',
+                                caisse_id: caisseId,
+                                value: fondDeCaisse.replace(',', '.') // Assure un format correct
+                            });
+                            
+                            // --- CORRECTION ---
+                            // On attend 150ms AVANT de recharger, pour laisser le temps au message de partir
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 150);
+                            // --- FIN CORRECTION ---
+                        } else {
+                            throw new Error(`Erreur HTTP ${response.status}`);
+                        }
+                    } catch (error) {
+                        console.error("Erreur lors de la mise à jour de la caisse:", error);
+                        alert("Une erreur est survenue. Rechargement de la page.");
+                        window.location.reload();
+                    }
+                } else {
+                    // Pour toutes les autres actions (delete, add, etc.), on laisse la soumission classique
+                    form.submit();
+                }
             }
         });
 

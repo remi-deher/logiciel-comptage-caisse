@@ -2,7 +2,7 @@
 // Fichier : config/websocket_server.php (Version finale complète et corrigée)
 
 // Port d'écoute du serveur WebSocket
-$port = '8080'; // Assurez-vous que ce port est correct et ouvert sur votre pare-feu
+$port = '8081'; // Assurez-vous que ce port est correct et ouvert sur votre pare-feu
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 require_once __DIR__ . '/../src/services/ClotureStateService.php';
@@ -133,6 +133,32 @@ class CaisseServer implements MessageComponentInterface {
                     $this->broadcast($msg, $from);
                 }
                 break;
+
+            // --- NOUVEAU CASE AJOUTÉ ---
+            case 'master_fond_updated':
+                if (isset($data['caisse_id']) && isset($data['value'])) {
+                    $caisseId = $data['caisse_id'];
+                    // Assure que le conteneur pour cette caisse existe
+                    if (!isset($this->theoreticalsState[$caisseId])) {
+                        $this->theoreticalsState[$caisseId] = [];
+                    }
+                    // Met à jour spécifiquement le fond de caisse dans l'état du serveur
+                    $this->theoreticalsState[$caisseId]['fond_de_caisse'] = $data['value'];
+                    
+                    // Renomme le type de message en 'theoretical_update'
+                    // pour que le client (calculator-ui.js) le traite
+                    // comme une mise à jour de champ théorique normale.
+                    $broadcastData = [
+                        'type' => 'theoretical_update',
+                        'caisse_id' => $caisseId,
+                        'data' => ['fond_de_caisse' => $data['value']]
+                    ];
+                    
+                    // Diffuse ce message formaté à tous les AUTRES clients
+                    $this->broadcast(json_encode($broadcastData), $from);
+                }
+                break;
+            // --- FIN DE L'AJOUT ---
 
             case 'cheque_update':
                 $this->chequesState[$data['caisseId']] = $data['cheques'];

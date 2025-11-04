@@ -17,7 +17,7 @@ class ConfigService {
      * @return array ['success' => bool, 'message' => string|null]
      */
     public function updateConfigFile($updates) {
-        // SUPPRIMER $target_fonds_de_caisse de la ligne global
+        // La variable $target_fonds_de_caisse (maintenant $masterFondsDeCaisse) n'est plus dans config.php
         global $noms_caisses, $denominations, $tpe_par_caisse, $min_to_keep, $rouleaux_pieces;
 
         // On charge les valeurs actuelles pour ne pas les écraser
@@ -49,12 +49,6 @@ class ConfigService {
         if (isset($updates['denominations'])) {
             $denominations = $updates['denominations'];
         }
-        // SUPPRIMER CE BLOC
-        /*
-        if (isset($updates['target_fonds_de_caisse'])) {
-            // ...
-        }
-        */
         if (isset($updates['rouleaux_pieces'])) {
              $rouleaux_pieces = $updates['rouleaux_pieces'];
         }
@@ -77,8 +71,7 @@ class ConfigService {
         $new_content .= '$denominations = ' . var_export($denominations, true) . ";\n";
         $new_content .= '$rouleaux_pieces = ' . var_export($rouleaux_pieces, true) . ";\n";
         $new_content .= '$min_to_keep = ' . var_export($min_to_keep, true) . ";\n";
-        // SUPPRIMER LA LIGNE SUIVANTE
-        // $new_content .= '$target_fonds_de_caisse = ' . var_export($target_fonds_de_caisse, true) . ";\n";
+        // La ligne pour $target_fonds_de_caisse a été supprimée
 
 
         if (is_writable($this->configPath)) {
