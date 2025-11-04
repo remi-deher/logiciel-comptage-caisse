@@ -1,4 +1,4 @@
-// Fichier : public/assets/js/logic/cloture-logic.js (Version Finale Complète)
+// Fichier : public/assets/js/logic/cloture-logic.js (Version Corrigée)
 
 import { sendWsMessage } from './websocket-service.js';
 import * as service from './calculator-service.js';
@@ -154,10 +154,40 @@ export async function startClotureCaisse(caisseId, state) {
        return;
     }
 
+    // --- DEBUT DE LA CORRECTION ---
+    // On doit lire les données actuelles du formulaire (la source de vérité)
+    // pour les passer au calcul de suggestion, au lieu d'utiliser 'state.calculatorData'
+    // qui peut être obsolète (stale state) pour les dénominations.
+    const currentCaisseData = { ...(state.calculatorData.caisse[caisseId] || {}) }; // Copie de base
+    currentCaisseData.denominations = {}; // On va la remplir depuis le formulaire
+    
+    const formElements = document.getElementById('caisse-form')?.elements;
+    if (!formElements) {
+        showToast("Erreur interne: Formulaire introuvable.", "error");
+        return;
+    }
+
+    // Lire les dénominations actuelles du formulaire
+    const allDenoms = { ...(state.config.denominations.billets || {}), ...(state.config.denominations.pieces || {}) };
+    Object.keys(allDenoms).forEach(name => {
+        const input = formElements[`caisse[${caisseId}][denominations][${name}]`];
+        if (input) {
+            currentCaisseData.denominations[name] = input.value || '0';
+        }
+    });
+    
+    // Lire les champs théoriques actuels du formulaire (requis pour le calcul de suggestion)
+    currentCaisseData.ventes_especes = formElements[`caisse[${caisseId}][ventes_especes]`]?.value || '0';
+    currentCaisseData.retrocession = formElements[`caisse[${caisseId}][retrocession]`]?.value || '0';
+    // --- FIN DE LA CORRECTION ---
+
     let suggestions;
     try {
         console.log(`[startClotureCaisse] Calcul suggestions pour caisse ${caisseId}`);
-        suggestions = service.calculateWithdrawalSuggestion(state.calculatorData.caisse[caisseId], state.config);
+        
+        // --- MODIFIÉ : On passe les données à jour 'currentCaisseData' ---
+        suggestions = service.calculateWithdrawalSuggestion(currentCaisseData, state.config);
+        
         console.log(`[startClotureCaisse] Suggestions calculées:`, suggestions);
     } catch (e) {
        console.error(`[startClotureCaisse] ERREUR lors du calcul des suggestions pour caisse ${caisseId}:`, e);
