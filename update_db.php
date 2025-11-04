@@ -25,6 +25,11 @@ if (!file_exists(ROOT_PATH . '/config/config.php')) {
     exit(1);
 }
 
+// --- DÉBUT DE LA CORRECTION ---
+// On charge la configuration pour définir DB_HOST, DB_NAME, etc.
+require_once ROOT_PATH . '/config/config.php';
+// --- FIN DE LA CORRECTION ---
+
 // On charge les dépendances et la configuration
 require_once ROOT_PATH . '/vendor/autoload.php';
 require_once ROOT_PATH . '/src/Bdd.php';
