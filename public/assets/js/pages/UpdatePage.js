@@ -11,7 +11,11 @@ export function renderUpdatePage(element) {
     <div class="container" id="update-page">
         <div class="update-header">
             <h2><i class="fa-solid fa-cloud-arrow-down"></i> Mise à jour de l'application</h2>
-        </div>
+            
+            <button id="force-update-check-btn" class="btn action-btn" style="margin-top: 15px;">
+                <i class="fa-solid fa-sync"></i> Forcer la vérification
+            </button>
+            </div>
         <div id="update-content">
             <p>Vérification de l'état de la mise à jour...</p>
         </div>
@@ -21,16 +25,34 @@ export function renderUpdatePage(element) {
         </div>
     </div>
   `;
-  fetchAndUpdateStatus();
+  fetchAndUpdateStatus(false); // appel initial sans forçage
 }
 
 /**
  * Récupère l'état de la mise à jour depuis l'API et met à jour l'affichage.
+ * @param {boolean} force - Si true, force la vérification en ignorant le cache.
  */
-async function fetchAndUpdateStatus() {
+async function fetchAndUpdateStatus(force = false) {
     const contentContainer = document.getElementById('update-content');
+    const forceButton = document.getElementById('force-update-check-btn'); // Cible le bouton
+    
+    if (forceButton) {
+        forceButton.disabled = true;
+        forceButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Vérification...';
+    }
+    // Ne montrer "Vérification..." que si ce n'est pas un re-check forcé
+    if (!force) {
+         // --- DÉBUT DE LA CORRECTION ---
+         // Remplacer les apostrophes simples par des guillemets doubles
+         contentContainer.innerHTML = "<p>Vérification de l'état de la mise à jour...</p>";
+         // --- FIN DE LA CORRECTION ---
+    }
+    
     try {
-        const response = await fetch('index.php?route=update/status');
+        // Ajout du paramètre 'force' à l'URL si nécessaire
+        const apiUrl = `index.php?route=update/status${force ? '&force=true' : ''}`;
+        
+        const response = await fetch(apiUrl);
         if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
         const data = await response.json();
         if (data.success) {
@@ -40,6 +62,11 @@ async function fetchAndUpdateStatus() {
         }
     } catch (error) {
         contentContainer.innerHTML = `<div class="error-box"><p>Erreur: ${error.message}</p></div>`;
+    } finally {
+        if (forceButton) {
+            forceButton.disabled = false;
+            forceButton.innerHTML = '<i class="fa-solid fa-sync"></i> Forcer la vérification';
+        }
     }
 }
 
@@ -90,6 +117,13 @@ function attachEventListeners() {
     if (updateBtn) {
         updateBtn.addEventListener('click', handleFullUpdate);
     }
+    
+    // ÉCOUTEUR AJOUTÉ ICI
+    const forceCheckBtn = document.getElementById('force-update-check-btn');
+    if (forceCheckBtn) {
+        forceCheckBtn.addEventListener('click', () => fetchAndUpdateStatus(true));
+    }
+    // FIN DE L'AJOUT
 }
 
 /**

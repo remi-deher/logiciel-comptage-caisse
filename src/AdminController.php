@@ -201,10 +201,16 @@ class AdminController {
     }
 
     public function getUpdateStatus() {
-        // AuthController::checkAuth(); // MODIFIÉ : Ligne commentée
+        // AuthController::checkAuth(); // Reste commenté comme demandé
         if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
 
-        $release_info = $this->versionService->getLatestReleaseInfo();
+        // --- DÉBUT DE LA MODIFICATION ---
+        // Vérifier si le forçage est demandé
+        $forceCheck = isset($_GET['force']) && $_GET['force'] === 'true';
+        
+        $release_info = $this->versionService->getLatestReleaseInfo($forceCheck); // Passer le paramètre
+        // --- FIN DE LA MODIFICATION ---
+        
         $migration_sql = $this->databaseMigrationService->generateMigrationSql();
         $migration_needed = !empty($migration_sql) && !isset($migration_sql['error']);
 
@@ -218,7 +224,7 @@ class AdminController {
     }
 
     public function performFullUpdate() {
-        // AuthController::checkAuth(); // MODIFIÉ : Ligne commentée
+        // AuthController::checkAuth(); // Reste commenté comme demandé
         if (!defined('PHPUNIT_RUNNING')) { header('Content-Type: application/json'); }
 
         $output = [];
